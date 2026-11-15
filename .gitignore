@@ -1,3 +1,12 @@
+.legion-cli/index/
+.legion-cli/cache/
+.legion-cli/index/engine.lock
+.legion-cli/worktrees/
+.legion-cli/sandbox/
+.legion-cli/chat/
+.legion-cli/serve.json
+.legion-cli/runs/
+
 node_modules
 .bun
 .turbo
@@ -46,11 +55,3 @@ node_modules/
 
 # pnpm content-addressable store; never belongs in the repo.
 .pnpm-store/
-.legion-cli/index/
-.legion-cli/cache/
-.legion-cli/index/engine.lock
-.legion-cli/worktrees/
-.legion-cli/sandbox/
-.legion-cli/chat/
-.legion-cli/serve.json
-.legion-cli/runs/

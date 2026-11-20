@@ -1,4 +1,9 @@
-import type { EnvironmentId, ScopedThreadRef, ThreadPullRequestLink } from "@t3tools/contracts";
+import {
+  AuthOrchestrationOperateScope,
+  type EnvironmentId,
+  type ScopedThreadRef,
+  type ThreadPullRequestLink,
+} from "@t3tools/contracts";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -19,8 +24,9 @@ import { msg } from "gt-react";
 import { m } from "~/i18n/messages";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { environmentServerConfigsAtom } from "~/state/server";
+import { useEnvironmentScope } from "~/state/session";
 import { threadEnvironment } from "~/state/threads";
-import { useAtomCommand } from "~/state/use-atom-command";
+import { useOrchestrationCommand } from "~/state/use-orchestration-command";
 
 // A primitive mode prevents unchanged status pushes from re-rendering every link.
 const linkModeAtom = Atom.family((environmentId: EnvironmentId | null) =>
@@ -35,8 +41,14 @@ const linkModeAtom = Atom.family((environmentId: EnvironmentId | null) =>
 
 export function usePullRequestLinking(environmentId: EnvironmentId | null | undefined) {
   const mode = useAtomValue(linkModeAtom(environmentId ?? null));
-  const link = useAtomCommand(threadEnvironment.linkPullRequest, { reportFailure: false });
-  const unlink = useAtomCommand(threadEnvironment.unlinkPullRequest, { reportFailure: false });
+  const canOperateThread = useEnvironmentScope(
+    environmentId ?? null,
+    AuthOrchestrationOperateScope,
+  );
+  const link = useOrchestrationCommand(threadEnvironment.linkPullRequest, { reportFailure: false });
+  const unlink = useOrchestrationCommand(threadEnvironment.unlinkPullRequest, {
+    reportFailure: false,
+  });
   const canLink = (url: string) =>
     mode !== "unsupported" && sourceControlClients.parseChangeRequestUrl(url) !== null;
   const isLinked = (
@@ -77,5 +89,5 @@ export function usePullRequestLinking(environmentId: EnvironmentId | null | unde
       throw squashAtomCommandFailure(result);
     }
   };
-  return { mode, canLink, isLinked, changeLink };
+  return { mode, canOperateThread, canLink, isLinked, changeLink };
 }

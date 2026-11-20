@@ -276,14 +276,14 @@ const make = Effect.gen(function* () {
         const { alreadyLinked } = yield* threadIssues
           .link({
             threadId: thread.id,
-            ref: refOf(target),
+            ref: { ...refOf(target), key: detail.key },
             url,
             displayKey: detail.displayKey,
             title: detail.title,
             source: "agent",
           })
           .pipe(Effect.catchCause(linkFailure));
-        return { ...identityOf(target), url, alreadyLinked };
+        return { ...identityOf(target), key: detail.key, url, alreadyLinked };
       }),
     ),
     unlink_issue: writesThread((input) =>

@@ -16,6 +16,7 @@ it.effect("finds every thread linked to exactly one issue, newest activity first
     const issue = { tracker: "linear", host: "linear.app", scope: "eng", key: "ENG-7" };
     const fixtures = [
       { id: "older", day: 1, issues: [issue] },
+      { id: "lowercase", day: 1, issues: [{ ...issue, key: "eng-7" }] },
       { id: "newer", day: 2, issues: [{ ...issue, key: "ENG-8" }, issue] },
       { id: "settled", day: 3, issues: [issue], payload: { settledOverride: "settled" } },
       { id: "archived", day: 4, issues: [issue], archived: true },
@@ -44,12 +45,13 @@ it.effect("finds every thread linked to exactly one issue, newest activity first
       tracker: IssueTrackerKind.make("linear"),
       host: "Linear.app",
       scope: "ENG",
-      key: "ENG-7",
+      key: "eng-7",
     });
     expect(result.threads.map((thread) => [thread.id, thread.settled, thread.archivedAt])).toEqual([
       ["archived", false, at(4)],
       ["settled", true, null],
       ["newer", false, null],
+      ["lowercase", false, null],
       ["older", false, null],
     ]);
   }).pipe(Effect.provide(SqlitePersistence.layerMemory)),

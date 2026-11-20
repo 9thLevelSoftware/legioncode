@@ -1412,14 +1412,45 @@ function ComposerPromptEditorTiptapInner(
         handlePaste: (view, event) => {
           const clipboardData = event.clipboardData;
           if (!clipboardData) return false;
+          const pastedText = readPastedPlainText(clipboardData);
           if (
             clipboardData.files.length > 0 &&
+            !pastedText &&
             (literalText || !readPastedComposerContext(clipboardData)?.records.length)
           )
             return false;
-          const pastedText = readPastedPlainText(clipboardData);
           if (!pastedText) return false;
           event.preventDefault();
+          if (literalText) {
+            const editorInstance = (view.dom as TiptapEditorHTMLElement).editor;
+            if (editorInstance) {
+              insertMarkdownParagraphs(
+                pastedText,
+                skillLabelFor,
+                { styling: false, blocks: true, literalText: true },
+                (content) => {
+                  editorInstance
+                    .chain()
+                    .command(({ tr }) => {
+                      markAsClipboardEdit(tr, "paste");
+                      return true;
+                    })
+                    .insertContent(content)
+                    .run();
+                },
+              );
+              scrollTiptapCaretIntoView(editorInstance);
+            } else {
+              const { from, to } = view.state.selection;
+              view.dispatch(
+                markAsClipboardEdit(
+                  view.state.tr.insertText(pastedText, from, to),
+                  "paste",
+                ).scrollIntoView(),
+              );
+            }
+            return true;
+          }
           // Paste verbatim inside fences; markdown parsing would split blocks and create unsupported chips.
           if (isInCodeBlock(view)) {
             const { from, to } = view.state.selection;

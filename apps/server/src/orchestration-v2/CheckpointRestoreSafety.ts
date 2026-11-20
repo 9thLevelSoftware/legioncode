@@ -188,13 +188,8 @@ export const isCheckpointRestoreIsolated = Effect.fn("orchestrationV2.isCheckpoi
           for (const candidate of paths) {
             if (checkedPaths.has(candidate)) continue;
             checkedPaths.add(candidate);
-            const otherCwd = yield* fileSystem.realPath(candidate).pipe(
-              Effect.catchIf(
-                (error) => error.reason._tag === "NotFound",
-                (_error) => Effect.succeed(null),
-              ),
-            );
-            if (otherCwd !== null && (contains(cwd, otherCwd) || contains(otherCwd, cwd))) {
+            const otherCwd = yield* resolve(candidate);
+            if (contains(cwd, otherCwd) || contains(otherCwd, cwd)) {
               shared = true;
               break;
             }

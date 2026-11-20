@@ -3028,6 +3028,19 @@ describe("CodexAdapterV2 post-settle continuation", () => {
           }),
           {
             type: "emit_inbound",
+            label: "question-delta",
+            frame: {
+              method: "item/agentMessage/delta",
+              params: {
+                threadId: nativeThreadId,
+                turnId: nativeTurnId,
+                itemId: "async-question-item",
+                delta: "Which branch?",
+              },
+            },
+          },
+          {
+            type: "emit_inbound",
             label: "question",
             frame: {
               method: "item/completed",
@@ -3041,6 +3054,19 @@ describe("CodexAdapterV2 post-settle continuation", () => {
                   delivery: "async",
                   questions: [{ title: "Which branch?", options: ["main", "dev"] }],
                 },
+              },
+            },
+          },
+          {
+            type: "emit_inbound",
+            label: "question-late-delta",
+            frame: {
+              method: "item/agentMessage/delta",
+              params: {
+                threadId: nativeThreadId,
+                turnId: nativeTurnId,
+                itemId: "async-question-item",
+                delta: "Trailing text.",
               },
             },
           },

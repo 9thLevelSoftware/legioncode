@@ -69,14 +69,67 @@ const isRunning = (status: string) =>
 
 type KeptThreads = ReadonlyMap<EnvironmentId, ReadonlySet<ThreadId>>;
 
-function isDetailDone<E>(result: AsyncResult.AsyncResult<EnvironmentThreadState, E>): boolean {
+interface KeptThreadObservation {
+  readonly baselineLiveStopped: boolean;
+  readonly baselineSequence: number;
+  readonly baselineData: EnvironmentThreadState["data"];
+  sawFreshLiveSignal: boolean;
+}
+
+const observationKey = (environmentId: EnvironmentId, threadId: ThreadId) =>
+  `${environmentId}\u0000${threadId}`;
+
+function hasRunningRun(state: EnvironmentThreadState): boolean {
+  return Option.exists(state.data, (thread) => thread.runs.some((run) => isRunning(run.status)));
+}
+
+function createInitialObservation<E>(
+  result: AsyncResult.AsyncResult<EnvironmentThreadState, E>,
+): KeptThreadObservation {
+  if (!AsyncResult.isSuccess(result)) {
+    return {
+      baselineLiveStopped: false,
+      baselineSequence: 0,
+      baselineData: Option.none(),
+      sawFreshLiveSignal: false,
+    };
+  }
+  const { status, data, sequence } = result.value;
+  const running = hasRunningRun(result.value);
+  return {
+    baselineLiveStopped: status === "live" && !running,
+    baselineSequence: sequence,
+    baselineData: data,
+    sawFreshLiveSignal: status === "synchronizing" || running,
+  };
+}
+
+function recordLiveObservation<E>(
+  obs: KeptThreadObservation,
+  result: AsyncResult.AsyncResult<EnvironmentThreadState, E>,
+): void {
+  if (obs.sawFreshLiveSignal || !AsyncResult.isSuccess(result)) return;
+  const { status, data, sequence } = result.value;
+  if (
+    status === "synchronizing" ||
+    hasRunningRun(result.value) ||
+    (!obs.baselineLiveStopped && status === "live") ||
+    (status === "live" &&
+      (sequence > obs.baselineSequence ||
+        Option.getOrNull(data) !== Option.getOrNull(obs.baselineData)))
+  ) {
+    obs.sawFreshLiveSignal = true;
+  }
+}
+
+function isDetailDone<E>(
+  obs: KeptThreadObservation,
+  result: AsyncResult.AsyncResult<EnvironmentThreadState, E>,
+): boolean {
   if (!AsyncResult.isSuccess(result)) return true;
-  const { status, data, error } = result.value;
+  const { status, error } = result.value;
   if (status === "deleted" || Option.isSome(error)) return true;
-  return (
-    status === "live" &&
-    !Option.exists(data, (thread) => thread.runs.some((run) => isRunning(run.status)))
-  );
+  return status === "live" && !hasRunningRun(result.value) && obs.sawFreshLiveSignal;
 }
 
 /** Keeps stopped threads mounted until their independent detail stream is live and also reports stopped. */
@@ -102,23 +155,51 @@ export function createRunningThreadKeepAliveAtom<E>(input: {
     }).pipe(Atom.withLabel(`web-running-thread-ids:${environmentId}`));
   });
 
+  const observations = new Map<string, KeptThreadObservation>();
+
   return Atom.make((get): KeptThreads => {
     const previous = Option.getOrUndefined(get.self<KeptThreads>());
     const kept = new Map<EnvironmentId, ReadonlySet<ThreadId>>();
+    const activeKeys = new Set<string>();
     for (const environmentId of get(input.environmentIdsAtom)) {
-      const threadIds = new Set(get(runningThreadIdsAtom(environmentId)));
-      for (const threadId of previous?.get(environmentId) ?? []) {
-        if (threadIds.has(threadId)) continue;
+      const runningIds = new Set(get(runningThreadIdsAtom(environmentId)));
+      const threadIds = new Set<ThreadId>();
+      const watch = (threadId: ThreadId, currentlyRunning: boolean) => {
+        const key = observationKey(environmentId, threadId);
         const stateAtom = input.stateAtom(environmentId, threadId);
-        // A get dependency would hold stopped streams open until another change rebuilds this atom.
-        if (isDetailDone(get.once(stateAtom))) continue;
+        if (currentlyRunning) {
+          get.mount(stateAtom);
+        }
+        const current = get.once(stateAtom);
+        let obs = observations.get(key);
+        if (obs === undefined) {
+          obs = createInitialObservation(current);
+          observations.set(key, obs);
+        } else {
+          recordLiveObservation(obs, current);
+        }
+        if (!currentlyRunning && isDetailDone(obs, current)) return;
         threadIds.add(threadId);
+        activeKeys.add(key);
+        if (!currentlyRunning) {
+          get.mount(stateAtom);
+        }
+        const activeObs = obs;
         get.subscribe(stateAtom, (state) => {
-          if (isDetailDone(state)) get.refreshSelf();
+          recordLiveObservation(activeObs, state);
+          if (!currentlyRunning && isDetailDone(activeObs, state)) get.refreshSelf();
         });
+      };
+      for (const threadId of runningIds) watch(threadId, true);
+      for (const threadId of previous?.get(environmentId) ?? []) {
+        if (runningIds.has(threadId)) continue;
+        // A get dependency would hold stopped streams open until another change rebuilds this atom.
+        watch(threadId, false);
       }
-      for (const threadId of threadIds) get.mount(input.stateAtom(environmentId, threadId));
       kept.set(environmentId, threadIds);
+    }
+    for (const key of observations.keys()) {
+      if (!activeKeys.has(key)) observations.delete(key);
     }
     return kept;
   }).pipe(Atom.withLabel("web-running-thread-keep-alive"));

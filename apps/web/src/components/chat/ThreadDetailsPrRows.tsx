@@ -1,10 +1,11 @@
 import { pipe } from "effect/Function";
 import { ThreadDetailsMoreButton } from "./ThreadDetailsControl";
-import type {
-  EnvironmentId,
-  ScopedThreadRef,
-  ThreadPullRequestLink,
-  VcsStatusResult,
+import {
+  AuthOrchestrationOperateScope,
+  type EnvironmentId,
+  type ScopedThreadRef,
+  type ThreadPullRequestLink,
+  type VcsStatusResult,
 } from "@t3tools/contracts";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
 import {
@@ -24,8 +25,9 @@ import {
 
 import type { ComposerThreadTarget } from "~/composerDraftStore";
 import { useProjects, useQuietThreadShell } from "~/state/entities";
+import { useEnvironmentScope } from "~/state/session";
 import { threadEnvironment } from "~/state/threads";
-import { useAtomCommand } from "~/state/use-atom-command";
+import { useOrchestrationCommand } from "~/state/use-orchestration-command";
 
 import { useOpenPrLink } from "../../lib/openPullRequestLink";
 import {
@@ -93,9 +95,15 @@ function ThreadDetailsPrRows({
   onOpenLink: (event: ReactMouseEvent<HTMLElement>, url: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const watch = useAtomCommand(threadEnvironment.watchPullRequest, { reportFailure: true });
+  const canOperateThread = useEnvironmentScope(
+    threadRef.environmentId,
+    AuthOrchestrationOperateScope,
+  );
+  const watch = useOrchestrationCommand(threadEnvironment.watchPullRequest, {
+    reportFailure: true,
+  });
   const stopWatching = (link: ThreadPullRequestLink | null) =>
-    link?.watch === undefined
+    !canOperateThread || link?.watch === undefined
       ? undefined
       : () =>
           void watch({

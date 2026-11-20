@@ -586,29 +586,55 @@ export const layerExecutor: Layer.Layer<
                     }),
                 ),
               );
-          case "checkpoint.capture":
-            return runFinalization
-              .finalize({
-                threadId: effect.threadId,
-                runId: effect.request.runId,
-                scopeId: effect.request.scopeId,
-              })
-              .pipe(
-                // Completion bookkeeping must survive a missed live run update, including capture retries.
-                Effect.andThen(
-                  threads.recoverDelegatedTask(effect.threadId, {
-                    completedRunId: effect.request.runId,
+          case "checkpoint.capture": {
+            const target = {
+              threadId: effect.threadId,
+              runId: effect.request.runId,
+              scopeId: effect.request.scopeId,
+            };
+            return runFinalization.finalize(target).pipe(
+              Effect.tapCause((cause) =>
+                willRetry || Cause.hasInterruptsOnly(cause)
+                  ? Effect.void
+                  : runFinalization.settleWithoutCheckpoint(target).pipe(
+                      Effect.catchCause((settleCause) =>
+                        Effect.logWarning(
+                          "Failed to settle run after permanent checkpoint capture failure",
+                          { effectId: effect.id, runId: target.runId, cause: settleCause },
+                        ),
+                      ),
+                      Effect.andThen(
+                        threads
+                          .recoverDelegatedTask(effect.threadId, {
+                            completedRunId: target.runId,
+                          })
+                          .pipe(
+                            Effect.catchCause((recoverCause) =>
+                              Effect.logWarning(
+                                "Failed to recover delegated task after permanent checkpoint capture failure",
+                                { effectId: effect.id, runId: target.runId, cause: recoverCause },
+                              ),
+                            ),
+                          ),
+                      ),
+                    ),
+              ),
+              // Completion bookkeeping must survive a missed live run update, including capture retries.
+              Effect.andThen(
+                threads.recoverDelegatedTask(effect.threadId, {
+                  completedRunId: target.runId,
+                }),
+              ),
+              Effect.mapError(
+                (cause) =>
+                  new OrchestrationEffectExecutionError({
+                    effectId: effect.id,
+                    effectType: effect.request.type,
+                    cause,
                   }),
-                ),
-                Effect.mapError(
-                  (cause) =>
-                    new OrchestrationEffectExecutionError({
-                      effectId: effect.id,
-                      effectType: effect.request.type,
-                      cause,
-                    }),
-                ),
-              );
+              ),
+            );
+          }
           case "scheduled-tasks.cleanup":
             return resourceCleanup.cleanupScheduledTasks(effect.threadId).pipe(
               Effect.mapError(

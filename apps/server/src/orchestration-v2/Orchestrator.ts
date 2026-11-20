@@ -5596,13 +5596,23 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     if (command.type === "thread.archive") {
       const projection = yield* loadProjectionForCommand(
         command,
-        ["runs", "attempts", "nodes", "subagents", "messages"],
-        { turnItemTypes: [], messageRoles: ["user"] },
+        ["runs", "attempts", "nodes", "providerTurns", "runtimeRequests", "subagents", "messages"],
+        {
+          turnItemTypes: [],
+          messageRoles: ["user"],
+        },
       );
       const emitEvent = emit(events, command);
       const activeRunIds = new Set(
         projection.runs
-          .filter((run) => run.status === "queued" || run.status === "preparing")
+          .filter(
+            (run) =>
+              run.status === "queued" ||
+              run.status === "preparing" ||
+              run.status === "starting" ||
+              run.status === "running" ||
+              run.status === "waiting",
+          )
           .map((run) => run.id),
       );
       const preparingRuns = projection.runs.filter((run) => run.status === "preparing");
@@ -5613,6 +5623,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               turnItemTypes: ["command_execution"],
               turnItemRunIds: preparingRuns.map((run) => run.id),
             })).turnItems;
+      const cancelledAttemptIds = new Set<string>();
+      const cancelledNodeIds = new Set<NodeId>();
       for (const run of projection.runs.filter((candidate) => activeRunIds.has(candidate.id))) {
         yield* emitEvent({
           type: "run.updated",
@@ -5653,6 +5665,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           activeRunIds.has(candidate.runId) &&
           (candidate.status === "pending" || candidate.status === "running"),
       )) {
+        cancelledAttemptIds.add(attempt.id);
         const run = projection.runs.find((candidate) => candidate.id === attempt.runId)!;
         yield* emitEvent({
           type: "run-attempt.updated",
@@ -5664,12 +5677,34 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           payload: { ...attempt, status: "cancelled", completedAt: now },
         });
       }
+      for (const turn of projection.providerTurns.filter(
+        (candidate) =>
+          candidate.status === "running" &&
+          candidate.runAttemptId !== null &&
+          cancelledAttemptIds.has(candidate.runAttemptId),
+      )) {
+        const attempt = projection.attempts.find((candidate) => candidate.id === turn.runAttemptId);
+        const run =
+          attempt === undefined
+            ? undefined
+            : projection.runs.find((candidate) => candidate.id === attempt.runId);
+        yield* emitEvent({
+          type: "provider-turn.updated",
+          threadId: command.threadId,
+          ...(run === undefined ? {} : { runId: run.id }),
+          nodeId: turn.nodeId,
+          providerInstanceId: run?.providerInstanceId ?? updatedThread.providerInstanceId,
+          occurredAt: now,
+          payload: { ...turn, status: "interrupted", completedAt: now },
+        });
+      }
       for (const node of projection.nodes.filter(
         (candidate) =>
           candidate.runId !== null &&
           activeRunIds.has(candidate.runId) &&
           ["pending", "running", "waiting"].includes(candidate.status),
       )) {
+        cancelledNodeIds.add(node.id);
         const run = projection.runs.find((candidate) => candidate.id === node.runId)!;
         yield* emitEvent({
           type: "node.updated",
@@ -5680,6 +5715,66 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
           occurredAt: now,
           payload: { ...node, status: "cancelled", completedAt: now },
         });
+      }
+      const pendingRequests = projection.runtimeRequests.filter(
+        (candidate) => candidate.status === "pending",
+      );
+      const pendingRequestItems =
+        pendingRequests.length === 0
+          ? []
+          : (yield* loadProjectionForCommand(command, ["turnItems"], {
+              turnItemTypes: ["approval_request", "user_input_request"],
+              turnItemStatuses: ["pending", "running", "waiting"],
+            })).turnItems;
+      for (const request of pendingRequests) {
+        const requestNode = projection.nodes.find((node) => node.id === request.nodeId);
+        yield* emitEvent({
+          type: "runtime-request.updated",
+          threadId: command.threadId,
+          ...(requestNode?.runId == null ? {} : { runId: requestNode.runId }),
+          nodeId: request.nodeId,
+          providerInstanceId: updatedThread.providerInstanceId,
+          occurredAt: now,
+          payload: {
+            ...request,
+            status: "cancelled",
+            responseCapability: { type: "not_resumable", reason: "Thread archived." },
+            resolvedAt: now,
+          },
+        });
+        if (
+          requestNode !== undefined &&
+          !cancelledNodeIds.has(requestNode.id) &&
+          ["pending", "running", "waiting"].includes(requestNode.status)
+        ) {
+          cancelledNodeIds.add(requestNode.id);
+          yield* emitEvent({
+            type: "node.updated",
+            threadId: command.threadId,
+            ...(requestNode.runId === null ? {} : { runId: requestNode.runId }),
+            nodeId: requestNode.id,
+            providerInstanceId: updatedThread.providerInstanceId,
+            occurredAt: now,
+            payload: { ...requestNode, status: "cancelled", completedAt: now },
+          });
+        }
+        const requestItem = pendingRequestItems.find(
+          (item) =>
+            (item.type === "approval_request" || item.type === "user_input_request") &&
+            item.requestId === request.id &&
+            ["pending", "running", "waiting"].includes(item.status),
+        );
+        if (requestItem !== undefined) {
+          yield* emitEvent({
+            type: "turn-item.updated",
+            threadId: command.threadId,
+            ...(requestItem.runId === null ? {} : { runId: requestItem.runId }),
+            ...(requestItem.nodeId === null ? {} : { nodeId: requestItem.nodeId }),
+            providerInstanceId: updatedThread.providerInstanceId,
+            occurredAt: now,
+            payload: { ...requestItem, status: "cancelled", completedAt: now, updatedAt: now },
+          });
+        }
       }
       yield* disposeAllDelegatedCompletionCohorts({
         command,
@@ -15362,6 +15457,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       readonly events: ReadonlyArray<OrchestrationV2DomainEvent>;
       readonly effects: ReadonlyArray<PendingOrchestrationEffectV2>;
       readonly cancelUnsettledEffects?: {
+        readonly threadIds?: ReadonlyArray<ThreadId>;
         readonly effectTypes: ReadonlyArray<OrchestrationEffectRequestV2["type"]>;
         readonly reason: string;
       };
@@ -15379,6 +15475,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
     const effects = yield* Ref.make<Array<PendingOrchestrationEffectV2>>([]);
     let cancelUnsettledEffects:
       | {
+          readonly threadIds?: ReadonlyArray<ThreadId>;
           readonly effectTypes: ReadonlyArray<OrchestrationEffectRequestV2["type"]>;
           readonly reason: string;
         }
@@ -15495,6 +15592,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       case "thread.unarchive": {
         const parentArchivedAt = (yield* findThread(command.threadId))?.archivedAt ?? null;
         yield* dispatchThreadMutation(command, events, effects);
+        const archivedThreadIds: Array<ThreadId> =
+          command.type === "thread.archive" ? [command.threadId] : [];
         // Unarchive restores the side chats this parent's archive took, not ones archived before it.
         for (const threadId of sideChatIds) {
           const sideChatArchivedAt = (yield* findThread(threadId))?.archivedAt ?? null;
@@ -15512,6 +15611,7 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
               .getThreadRecords(threadId, ["subagents"])
               .pipe(mapDispatchError(command));
             if (hasRunningDelegatedTasks(subagents)) continue;
+            archivedThreadIds.push(threadId);
           }
           yield* dispatchThreadMutation(
             {
@@ -15522,6 +15622,13 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
             events,
             effects,
           );
+        }
+        if (command.type === "thread.archive") {
+          cancelUnsettledEffects = {
+            threadIds: archivedThreadIds,
+            effectTypes: EffectOutbox.PROCESS_BOUND_EFFECT_TYPES,
+            reason: "Thread archived.",
+          };
         }
         break;
       }

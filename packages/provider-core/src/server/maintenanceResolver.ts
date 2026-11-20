@@ -251,36 +251,49 @@ function isYarnGlobalCommandPath(commandPath: string): boolean {
   return /\/yarn\/(?:data\/)?global\/node_modules\//.test(normalizeCommandPath(commandPath));
 }
 
+function miseSubdir(
+  root: string | undefined,
+  ...segments: ReadonlyArray<string>
+): string | undefined {
+  return root ? [normalizeCommandPath(root).replace(/\/+$/, ""), ...segments].join("/") : undefined;
+}
+
+function isUnderDir(normalizedPath: string, root: string | undefined): boolean {
+  return root !== undefined && normalizedPath.startsWith(`${root}/`);
+}
+
+function isMiseShimCommandPath(commandPath: string, env: NodeJS.ProcessEnv): boolean {
+  const normalized = normalizeCommandPath(commandPath);
+  return (
+    normalized.includes("/mise/shims/") ||
+    isUnderDir(normalized, miseSubdir(env.MISE_DATA_DIR, "shims")) ||
+    isUnderDir(normalized, miseSubdir(env.MISE_SYSTEM_DATA_DIR, "shims"))
+  );
+}
+
 /**
  * Paths mise owns. npm globals under mise's own Node belong to npm, which proves their prefix.
  * A command wrapper is a symlink to the `mise` binary, which dispatches on argv[0].
  */
 function isMiseCommandPath(commandPath: string, env: NodeJS.ProcessEnv): boolean {
   const normalized = normalizeCommandPath(commandPath);
-  const dir = (root: string | undefined, ...segments: ReadonlyArray<string>) =>
-    root ? [normalizeCommandPath(root).replace(/\/+$/, ""), ...segments].join("/") : undefined;
   // `MISE_DATA_DIR` and friends move mise's layout off its usual `/mise/` paths.
   const installRoots = [
-    dir(env.MISE_DATA_DIR, "installs"),
-    dir(env.MISE_DATA_DIR, "i"),
-    dir(env.MISE_SYSTEM_DATA_DIR, "installs"),
-    dir(env.MISE_INSTALLS_DIR),
-    dir(env.MISE_INSTALL_STORE_DIR),
-    dir(env.MISE_SYSTEM_INSTALLS_DIR),
+    miseSubdir(env.MISE_DATA_DIR, "installs"),
+    miseSubdir(env.MISE_DATA_DIR, "i"),
+    miseSubdir(env.MISE_SYSTEM_DATA_DIR, "installs"),
+    miseSubdir(env.MISE_INSTALLS_DIR),
+    miseSubdir(env.MISE_INSTALL_STORE_DIR),
+    miseSubdir(env.MISE_SYSTEM_INSTALLS_DIR),
   ];
-  const otherRoots = [
-    dir(env.MISE_DATA_DIR, "shims"),
-    dir(env.MISE_DATA_DIR, "command-wrappers"),
-    dir(env.MISE_SYSTEM_DATA_DIR, "shims"),
-  ];
-  const under = (root: string | undefined) =>
-    root !== undefined && normalized.startsWith(`${root}/`);
   return (
+    isMiseShimCommandPath(commandPath, env) ||
     (normalized.includes("/mise/installs/") && !normalized.includes("/mise/installs/node/")) ||
-    normalized.includes("/mise/shims/") ||
     normalized.includes("/mise/command-wrappers/") ||
-    installRoots.some((root) => under(root) && !under(dir(root, "node"))) ||
-    otherRoots.some(under)
+    installRoots.some(
+      (root) => isUnderDir(normalized, root) && !isUnderDir(normalized, miseSubdir(root, "node")),
+    ) ||
+    isUnderDir(normalized, miseSubdir(env.MISE_DATA_DIR, "command-wrappers"))
   );
 }
 
@@ -644,7 +657,9 @@ export const resolveMiseProviderMaintenance = Effect.fn("resolveMiseProviderMain
     context: ProviderMaintenanceResolutionContext,
   ) {
     const commandPaths = [context.resolvedCommandPath, context.realCommandPath];
-    const isShim = isMiseExecutablePath(context.realCommandPath);
+    const isShim =
+      isMiseExecutablePath(context.realCommandPath) ||
+      commandPaths.some((commandPath) => isMiseShimCommandPath(commandPath, context.env));
     const looksMise =
       isShim ||
       commandPaths.some((commandPath) => isMiseCommandPath(commandPath, context.env)) ||
@@ -666,7 +681,7 @@ export const resolveMiseProviderMaintenance = Effect.fn("resolveMiseProviderMain
       fileSystem.realPath(target).pipe(Effect.orElseSucceed(() => target));
     const misePath =
       (yield* resolveCommandPath("mise", { env: context.env })) ??
-      (isShim ? context.realCommandPath : null);
+      (isMiseExecutablePath(context.realCommandPath) ? context.realCommandPath : null);
     if (!misePath) return notOwned(context.realCommandPath);
     // Asked even off mise's usual paths, since `MISE_DATA_DIR` can put installs anywhere.
     const which = nonEmptyString(yield* runProbe(misePath, ["which", miseTool], context.env));

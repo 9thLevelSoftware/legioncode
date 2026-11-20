@@ -279,8 +279,9 @@ export const launchThread = Effect.fn("ThreadMessageIntake.launchThread")(functi
   input: ThreadLaunch.ThreadLaunchInput,
 ) {
   const launches = yield* ThreadLaunch.ThreadLaunchService;
-  yield* AttachmentClaims.validateAttachmentLimits(input.initialMessage?.attachments ?? []);
-  if (!input.initialMessage?.attachments.some(AttachmentClaims.attachmentIsPendingUpload)) {
+  const initialMessage = input.initialMessage;
+  yield* AttachmentClaims.validateAttachmentLimits(initialMessage?.attachments ?? []);
+  if (initialMessage === undefined || initialMessage.attachments.length === 0) {
     return yield* launches.launch(input);
   }
   if (input.threadId === undefined) {
@@ -290,19 +291,19 @@ export const launchThread = Effect.fn("ThreadMessageIntake.launchThread")(functi
   }
   const claimed = yield* AttachmentClaims.claimPendingAttachments({
     threadId: input.threadId,
-    attachments: input.initialMessage.attachments,
+    attachments: initialMessage.attachments,
   });
   return yield* launches
     .launch({
       ...input,
       initialMessage: {
-        ...input.initialMessage,
+        ...initialMessage,
         attachments: claimed.attachments,
-        ...(input.initialMessage.context
+        ...(initialMessage.context
           ? {
               context: remapComposerContextAttachments(
-                input.initialMessage.context,
-                input.initialMessage.attachments,
+                initialMessage.context,
+                initialMessage.attachments,
                 claimed.attachments,
               ),
             }

@@ -456,13 +456,15 @@ export const makeCursorAgentSdkRunner = Effect.fn("makeCursorAgentSdkRunner")(fu
       yield* Effect.tryPromise({
         try: async () => {
           const cwd = typeof options.local?.cwd === "string" ? options.local.cwd : undefined;
-          const platform = await sdk
-            .load()
-            .createAgentPlatform(cwd === undefined ? {} : { workspaceRef: cwd });
+          const platform = await sdk.load().createAgentPlatform({
+            ...(cwd === undefined ? {} : { workspaceRef: cwd }),
+            ...(options.local?.store === undefined ? {} : { localStore: options.local.store }),
+          });
           const release = await platform.prewarmLocalWorkspace({
             ...(options.apiKey === undefined ? {} : { apiKey: options.apiKey }),
             local: {
               ...(cwd === undefined ? {} : { cwd }),
+              ...(options.local?.store === undefined ? {} : { store: options.local.store }),
               settingSources: [],
               sandboxOptions: { enabled: true },
             },

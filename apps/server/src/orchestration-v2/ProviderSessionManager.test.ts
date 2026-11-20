@@ -5776,3 +5776,143 @@ it.effect("ProviderSessionManagerV2 gives a delegated child its project's device
     assert.isTrue(child?.capabilities?.has("device"));
   }),
 );
+
+it.effect(
+  "ProviderSessionManagerV2 settles detached thread pending runtime requests on a shared multi-thread runtime without closing the session",
+  () =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      const settings = yield* ServerSettings.ServerSettingsService.pipe(
+        Effect.provide(ServerSettings.layerTest()),
+      );
+      const effect = Effect.gen(function* () {
+        const eventSink = yield* EventSink.EventSinkV2;
+        const idAllocator = yield* IdAllocator.IdAllocatorV2;
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
+        const now = yield* DateTime.now;
+        const projectId = yield* idAllocator.allocate.project({
+          fixtureName: "provider-session-manager-shared-detach",
+        });
+        const firstThreadId = yield* idAllocator.allocate.thread({
+          fixtureName: "provider-session-manager-shared-detach-a",
+          projectId,
+        });
+        const secondThreadId = yield* idAllocator.allocate.thread({
+          fixtureName: "provider-session-manager-shared-detach-b",
+          projectId,
+        });
+        const providerSessionId = idAllocator.derive.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+        });
+
+        yield* eventSink.write({
+          events: [
+            yield* makeThreadCreatedEvent({ idAllocator, threadId: firstThreadId, now }),
+            yield* makeThreadCreatedEvent({ idAllocator, threadId: secondThreadId, now }),
+          ],
+        });
+        const firstProviderThread = makeProviderThread({
+          idAllocator,
+          threadId: firstThreadId,
+          providerSessionId,
+          now,
+        });
+        const secondProviderThread = makeProviderThread({
+          idAllocator,
+          threadId: secondThreadId,
+          providerSessionId,
+          now,
+        });
+        const firstPending = yield* makePendingRuntimeRequestEvents({
+          idAllocator,
+          threadId: firstThreadId,
+          providerSessionId,
+          providerThread: firstProviderThread,
+          now,
+        });
+        const secondPending = yield* makePendingRuntimeRequestEvents({
+          idAllocator,
+          threadId: secondThreadId,
+          providerSessionId,
+          providerThread: secondProviderThread,
+          now,
+        });
+        yield* eventSink.write({
+          events: [
+            {
+              id: yield* idAllocator.allocate.event({ threadId: firstThreadId }),
+              type: "provider-thread.updated",
+              threadId: firstThreadId,
+              driver: CODEX_DRIVER,
+              occurredAt: now,
+              payload: firstProviderThread,
+            },
+            ...firstPending.events,
+            {
+              id: yield* idAllocator.allocate.event({ threadId: secondThreadId }),
+              type: "provider-thread.updated",
+              threadId: secondThreadId,
+              driver: CODEX_DRIVER,
+              occurredAt: now,
+              payload: secondProviderThread,
+            },
+            ...secondPending.events,
+          ],
+        });
+
+        yield* manager.open({
+          threadId: firstThreadId,
+          providerSessionId,
+          modelSelection,
+          runtimePolicy,
+        });
+        yield* manager.open({
+          threadId: secondThreadId,
+          providerSessionId,
+          modelSelection,
+          runtimePolicy,
+        });
+
+        yield* manager.detach({
+          providerSessionId,
+          threadId: firstThreadId,
+          detail: "Thread archived.",
+        });
+
+        assert.equal((yield* Ref.get(state)).closeCount, 0);
+        const firstProjection = yield* projectionStore.getThreadProjection(firstThreadId);
+        const secondProjection = yield* projectionStore.getThreadProjection(secondThreadId);
+        assert.equal(
+          firstProjection.runtimeRequests.find((req) => req.id === firstPending.requestId)?.status,
+          "cancelled",
+        );
+        assert.equal(
+          firstProjection.nodes.find((node) => node.id === firstPending.nodeId)?.status,
+          "cancelled",
+        );
+        assert.equal(
+          firstProjection.turnItems.find(
+            (item) => item.type === "approval_request" && item.requestId === firstPending.requestId,
+          )?.status,
+          "cancelled",
+        );
+        assert.equal(
+          secondProjection.runtimeRequests.find((req) => req.id === secondPending.requestId)
+            ?.status,
+          "pending",
+        );
+      });
+
+      yield* effect.pipe(
+        Effect.provide(
+          layerTest({
+            state,
+            idleTimeoutMs: 1000,
+            normalizeThreadLoadModelSelection: normalizeCodexThreadLoadModelSelection,
+            serverSettingsLayer: Layer.succeed(ServerSettings.ServerSettingsService, settings),
+          }),
+        ),
+      );
+    }),
+);

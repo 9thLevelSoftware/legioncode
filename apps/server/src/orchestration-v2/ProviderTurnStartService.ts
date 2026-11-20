@@ -529,6 +529,69 @@ export const layer: Layer.Layer<
       captureStartingRun(run);
       const rootNode = projection.nodes.find((candidate) => candidate.id === run.rootNodeId);
       const attempt = projection.attempts.find((candidate) => candidate.id === run.activeAttemptId);
+      if (projection.thread.archivedAt != null) {
+        const now = yield* DateTime.now;
+        const allocateEventId = () => idAllocator.allocate.event({ threadId: run.threadId });
+        const events: Array<OrchestrationV2DomainEvent> = [
+          {
+            id: yield* allocateEventId(),
+            type: "run.updated",
+            threadId: run.threadId,
+            runId,
+            ...(rootNode === undefined ? {} : { nodeId: rootNode.id }),
+            providerInstanceId: run.providerInstanceId,
+            occurredAt: now,
+            payload: { ...run, status: "cancelled", queuePosition: null, completedAt: now },
+          },
+          ...(attempt === undefined
+            ? []
+            : [
+                {
+                  id: yield* allocateEventId(),
+                  type: "run-attempt.updated" as const,
+                  threadId: run.threadId,
+                  runId,
+                  nodeId: attempt.rootNodeId,
+                  providerInstanceId: run.providerInstanceId,
+                  occurredAt: now,
+                  payload: { ...attempt, status: "cancelled" as const, completedAt: now },
+                },
+              ]),
+          ...(rootNode === undefined
+            ? []
+            : [
+                {
+                  id: yield* allocateEventId(),
+                  type: "node.updated" as const,
+                  threadId: run.threadId,
+                  runId,
+                  nodeId: rootNode.id,
+                  providerInstanceId: run.providerInstanceId,
+                  occurredAt: now,
+                  payload: { ...rootNode, status: "cancelled" as const, completedAt: now },
+                },
+              ]),
+        ];
+        const written =
+          run.activeAttemptId === null
+            ? { committed: false }
+            : yield* eventSink.writeIfRunCurrent({
+                threadId: run.threadId,
+                runId,
+                activeAttemptId: run.activeAttemptId,
+                expectedStatus: "starting",
+                events,
+              });
+        if (written.committed) {
+          yield* turnAnalytics.runSettled({
+            runId,
+            status: "cancelled",
+            completedAt: now,
+            childrenRunning: false,
+          });
+        }
+        return;
+      }
       const providerThread = projection.providerThreads.find(
         (candidate) => candidate.id === run.providerThreadId,
       );

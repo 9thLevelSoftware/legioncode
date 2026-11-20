@@ -102,7 +102,11 @@ import * as SqlClient from "effect/sql/SqlClient";
 import type * as Statement from "effect/sql/Statement";
 
 import { MCP_APP_OUTPUT_KEY } from "@t3tools/shared/mcpApp";
-import { threadHtmlRenderAttachmentIds } from "../attachmentStore.ts";
+import {
+  parseThreadSegmentFromAttachmentId,
+  threadHtmlRenderAttachmentIds,
+  toSafeThreadAttachmentSegment,
+} from "../attachmentStore.ts";
 import { DELEGATED_TASK_MESSAGE_CONDITION } from "./delegatedTaskMessage.ts";
 import {
   DEFERRED_COMMAND_MESSAGE_CONDITION,
@@ -281,6 +285,7 @@ export interface ProjectionCheckpointCaptureContext {
   readonly rootNode: OrchestrationV2ExecutionNode | undefined;
   readonly scope: OrchestrationV2CheckpointScope | undefined;
   readonly providerThread: OrchestrationV2ProviderThread | undefined;
+  readonly attemptCompletedAt: DateTime.Utc | null;
   /**
    * Ordinals a runless baseline must not overwrite: ready snapshots, and missing checkpoints pinning
    * a run. Without file snapshots that run link is what rewind uses. Stale rows are rebaselined.
@@ -6321,21 +6326,28 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
               runRows[0] === undefined
                 ? undefined
                 : yield* decodeRunPayload(runRows[0].payload_json);
-            const [nodeRows, scopeRows, providerRows, preservedRows] = yield* Effect.all([
-              sql<PayloadRow>`SELECT payload_json FROM orchestration_v2_projection_nodes
+            const [nodeRows, scopeRows, providerRows, preservedRows, attemptRows] =
+              yield* Effect.all([
+                sql<PayloadRow>`SELECT payload_json FROM orchestration_v2_projection_nodes
             WHERE thread_id = ${threadId} AND node_id = ${run?.rootNodeId ?? null}`,
-              sql<PayloadRow>`SELECT payload_json FROM orchestration_v2_projection_checkpoint_scopes
+                sql<PayloadRow>`SELECT payload_json FROM orchestration_v2_projection_checkpoint_scopes
             WHERE thread_id = ${threadId} AND scope_id = ${target.scopeId}`,
-              sql<PayloadRow>`SELECT payload_json FROM orchestration_v2_projection_provider_threads
+                sql<PayloadRow>`SELECT payload_json FROM orchestration_v2_projection_provider_threads
             WHERE provider_thread_id = ${run?.providerThreadId ?? null}
               AND (thread_id = ${threadId}
                 OR owner_node_id IN (${nodesOwningProviderThreads(threadId)})
                 OR provider_thread_id IN (SELECT provider_thread_id FROM orchestration_v2_projection_subagents WHERE thread_id = ${threadId}))`,
-              sql<{ readonly ordinal: number }>`SELECT ordinal_within_scope AS ordinal
+                sql<{ readonly ordinal: number }>`SELECT ordinal_within_scope AS ordinal
             FROM orchestration_v2_projection_checkpoints
             WHERE thread_id = ${threadId} AND scope_id = ${target.scopeId}
               AND (status = 'ready' OR (status = 'missing' AND run_id IS NOT NULL))`,
-            ]);
+                sql<PayloadRow>`SELECT payload_json FROM orchestration_v2_projection_run_attempts
+            WHERE thread_id = ${threadId} AND attempt_id = ${run?.activeAttemptId ?? null}`,
+              ]);
+            const attempt =
+              attemptRows[0] === undefined
+                ? undefined
+                : yield* decodeRunAttemptPayload(attemptRows[0].payload_json);
             return {
               run,
               rootNode:
@@ -6350,6 +6362,7 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
                 providerRows[0] === undefined
                   ? undefined
                   : yield* decodeProviderThreadPayload(providerRows[0].payload_json),
+              attemptCompletedAt: attempt?.completedAt ?? null,
               preservedCheckpointOrdinals: preservedRows.map(({ ordinal }) => ordinal),
               sideChat: threadRows[0].side_chat === 1,
             };
@@ -6791,9 +6804,14 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
         AND ${runOrdinalBetween("item.run_id", from, through)}
     `,
       ]);
+      const threadSegment = toSafeThreadAttachmentSegment(threadId);
+      const isOwnedByThread = (id: string) => {
+        const ownerSegment = parseThreadSegmentFromAttachmentId(id);
+        return ownerSegment === null || (threadSegment !== null && ownerSegment === threadSegment);
+      };
       return [
-        ...messages.map((row) => row.id),
-        ...answerFiles.map((row) => row.id),
+        ...messages.map((row) => row.id).filter(isOwnedByThread),
+        ...answerFiles.map((row) => row.id).filter(isOwnedByThread),
         ...threadHtmlRenderAttachmentIds(
           threadId,
           renders.map((row) => {

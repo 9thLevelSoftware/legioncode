@@ -5,13 +5,24 @@ import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
 
+const NO_REDIRECT_INIT: RequestInit = { redirect: "error" };
+
 export const makeRelayEnvironmentClient = (connection: {
   readonly url: string;
   readonly environmentCredential: string;
 }) =>
   HttpApiClient.make(RelayApi, {
     baseUrl: connection.url,
-    transformClient: HttpClient.mapRequest(
-      HttpClientRequest.setHeader("authorization", `Bearer ${connection.environmentCredential}`),
-    ),
+    transformClient: (client) =>
+      client.pipe(
+        HttpClient.mapRequest(
+          HttpClientRequest.setHeader(
+            "authorization",
+            `Bearer ${connection.environmentCredential}`,
+          ),
+        ),
+        HttpClient.transformResponse(
+          Effect.provideService(FetchHttpClient.RequestInit, NO_REDIRECT_INIT),
+        ),
+      ),
   }).pipe(Effect.provide(FetchHttpClient.layer));

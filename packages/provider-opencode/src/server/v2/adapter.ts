@@ -997,25 +997,23 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
       return state.active === undefined ? undefined : { state, turn: state.active };
     };
 
+    interface ShellEntry {
+      state: ThreadState;
+      turn?: ActiveTurn;
+      toolId?: string;
+      tool?: { name: string; input: Record<string, unknown> };
+      command: string;
+      running: boolean;
+      awaited?: boolean;
+      stopping?: boolean;
+      output: string;
+      cursor: number;
+      startedAt?: DateTime.Utc;
+      recoveredRunId?: RunId | null;
+      published?: boolean;
+    }
     const shellInfo = new Map<string, Shell.Info>();
-    const shells = new Map<
-      string,
-      {
-        state: ThreadState;
-        turn?: ActiveTurn;
-        toolId?: string;
-        tool?: { name: string; input: Record<string, unknown> };
-        command: string;
-        running: boolean;
-        awaited?: boolean;
-        stopping?: boolean;
-        output: string;
-        cursor: number;
-        startedAt?: DateTime.Utc;
-        recoveredRunId?: RunId | null;
-        published?: boolean;
-      }
-    >();
+    const shells = new Map<string, ShellEntry>();
 
     // A held wake routes its shell launches only when T3 starts its run, so marks wait on the wake.
     const heldLaunch = (state: ThreadState, taskId: string) =>
@@ -1834,12 +1832,37 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
       }
     });
 
+    const shellItemTarget = (id: string, shell: ShellEntry) =>
+      shell.turn === undefined || shell.toolId === undefined || shell.tool === undefined
+        ? {
+            threadId: shell.state.providerThread.appThreadId ?? input.threadId,
+            itemId: idAllocator.derive.turnItemFromProviderItem({ driver, nativeItemId: id }),
+          }
+        : {
+            threadId: shell.turn.input.threadId,
+            itemId: idAllocator.derive.turnItemFromProviderItem({
+              driver,
+              nativeItemId: `${shell.turn.scope}${shell.toolId}`,
+            }),
+          };
+
+    const emitShellDelta = (id: string, shell: ShellEntry, chunk: string) =>
+      chunk.length === 0
+        ? Effect.void
+        : emit({
+            type: "command_output.delta",
+            driver,
+            ...shellItemTarget(id, shell),
+            chunk,
+          });
+
     const fetchShellOutput = Effect.fn("OpenCode2Adapter.fetchShellOutput")(function* (
       id: string,
       snapshot: { directory: string; cursor: number; output: string },
       settled = false,
     ) {
       let { cursor, output } = snapshot;
+      let delta = "";
       // Bound each read and retained UI text; the native byte cursor must never use JS string lengths.
       for (let page = 0; page < (settled ? 5 : 4); page++) {
         const { data } = yield* client.shell.output({
@@ -1849,15 +1872,17 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
           limit: 65536,
         });
         output = (output + data.output).slice(-262144);
+        delta += data.output;
         const previous = cursor;
         cursor = data.cursor;
         if (data.cursor >= data.size || data.cursor <= previous) break;
         if (settled && data.size - data.cursor > 262144) {
           cursor = data.size - 262144;
           output = "";
+          delta = "";
         }
       }
-      return { cursor, output };
+      return { cursor, output, delta };
     }, Effect.timeout(INVENTORY_TIMEOUT));
 
     const readShellOutput = Effect.fn("OpenCode2Adapter.readShellOutput")(function* (
@@ -1866,7 +1891,7 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
     ) {
       const shell = shells.get(id);
       if (shell === undefined) return;
-      const output = yield* fetchShellOutput(
+      const next = yield* fetchShellOutput(
         id,
         {
           directory: shell.state.directory,
@@ -1875,7 +1900,9 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
         },
         settled,
       );
-      Object.assign(shell, output);
+      shell.cursor = next.cursor;
+      shell.output = next.output;
+      yield* emitShellDelta(id, shell, next.delta);
     });
 
     const emitShell = Effect.fnUntraced(function* (
@@ -1885,15 +1912,17 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
     ) {
       const shell = shells.get(id);
       if (shell === undefined) return;
+      const output = status === "running" ? undefined : shell.output;
       if (shell.turn === undefined || shell.toolId === undefined || shell.tool === undefined) {
         const updatedAt = yield* DateTime.now;
+        const target = shellItemTarget(id, shell);
         yield* emit({
           type: "turn_item.updated",
           driver,
           sessionScoped: true,
           turnItem: {
-            id: idAllocator.derive.turnItemFromProviderItem({ driver, nativeItemId: id }),
-            threadId: shell.state.providerThread.appThreadId ?? input.threadId,
+            id: target.itemId,
+            threadId: target.threadId,
             runId: shell.recoveredRunId ?? null,
             nodeId: null,
             providerThreadId: shell.state.providerThread.id,
@@ -1908,7 +1937,7 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
             updatedAt,
             type: "command_execution",
             input: shell.command,
-            output: shell.output,
+            ...(output === undefined ? {} : { output }),
             ...(exit === undefined ? {} : { exitCode: exit }),
           },
         });
@@ -1917,7 +1946,7 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
       }
       shell.turn.tools.set(shell.toolId, shell.tool);
       yield* emitTool(shell.state, shell.turn, shell.toolId, status, {
-        output: shell.output,
+        output,
         nativeTaskId: id,
         metadata: { shellID: id, exit },
       });
@@ -3998,8 +4027,10 @@ export const make = Effect.fn("OpenCode2Adapter.make")(function* (instanceId: Pr
                   )
                     return;
                   if (next.cursor <= shell.cursor) return;
-                  Object.assign(shell, next);
-                  yield* emitShell(snapshot.id, "running");
+                  shell.cursor = next.cursor;
+                  shell.output = next.output;
+                  yield* emitShellDelta(snapshot.id, shell, next.delta);
+                  if (shell.published !== true) yield* emitShell(snapshot.id, "running");
                 }),
               ),
             ),

@@ -130,6 +130,16 @@ const SANDBOXED_RESPONSE_HEADERS = {
   "content-security-policy": "sandbox; default-src 'none'",
 } as const;
 
+function isUnsafeHookSegment(segment: string, allowSlash = false): boolean {
+  return (
+    segment.length === 0 ||
+    segment === "." ||
+    segment === ".." ||
+    segment.includes("\\") ||
+    (!allowSlash && segment.includes("/"))
+  );
+}
+
 function parseHookPath(url: string) {
   const queryIndex = url.indexOf("?");
   const path = queryIndex === -1 ? url : url.slice(0, queryIndex);
@@ -141,10 +151,15 @@ function parseHookPath(url: string) {
     return null;
   }
   try {
+    const hookId = decodeURIComponent(rawHookId);
+    const token = decodeURIComponent(rawToken);
+    if (isUnsafeHookSegment(hookId) || isUnsafeHookSegment(token, true)) {
+      return null;
+    }
     return {
       endpointKey,
-      hookId: decodeURIComponent(rawHookId),
-      token: decodeURIComponent(rawToken),
+      hookId,
+      token,
       // Forward the encoded segments byte-for-byte; the environment decodes them.
       rawHookId,
       rawToken,

@@ -236,21 +236,27 @@ export const layer: Layer.Layer<
           checkpointId: input.checkpointId,
         });
 
+      if (restoreFiles && !(yield* isolated)) return yield* sharedWorkspace();
+
       const { worktreePath, branch } = context.thread;
       // Recreated only where the server would have made it, as turn start does.
-      if (worktreePath != null && branch != null) {
-        // A failed removal can leave the folder without its checkout; only a file restore replaces it.
-        const leftover =
-          restoreFiles &&
-          (yield* fileSystem.exists(worktreePath)) &&
-          !(yield* fileSystem.exists(path.join(worktreePath, ".git")));
-        if (
-          (leftover || !(yield* fileSystem.exists(worktreePath))) &&
-          (yield* isManagedWorktreePath(worktreePath))
-        ) {
-          const project = yield* projects.get(context.thread.projectId);
-          if (Option.isSome(project)) {
-            const recreate = gitWorkflow.pruneWorktrees({ cwd: project.value.workspaceRoot }).pipe(
+      const leftover =
+        worktreePath != null &&
+        branch != null &&
+        restoreFiles &&
+        (yield* fileSystem.exists(worktreePath)) &&
+        !(yield* fileSystem.exists(path.join(worktreePath, ".git")));
+      const needsRecreation =
+        worktreePath != null &&
+        branch != null &&
+        (leftover || !(yield* fileSystem.exists(worktreePath))) &&
+        (yield* isManagedWorktreePath(worktreePath));
+      const project = needsRecreation
+        ? yield* projects.get(context.thread.projectId)
+        : Option.none();
+      const recreateWorktree =
+        Option.isSome(project) && worktreePath != null && branch != null
+          ? gitWorkflow.pruneWorktrees({ cwd: project.value.workspaceRoot }).pipe(
               Effect.andThen(
                 gitWorkflow.createWorktree({
                   cwd: project.value.workspaceRoot,
@@ -258,165 +264,167 @@ export const layer: Layer.Layer<
                   path: worktreePath,
                 }),
               ),
-            );
-            if (leftover) {
-              if (!(yield* isolated)) return yield* sharedWorkspace();
-              // Set aside, not removed: a checkout that fails puts the folder and its files back.
-              yield* Effect.acquireUseRelease(
-                Effect.gen(function* () {
-                  const aside = yield* fileSystem.makeTempDirectory({
-                    directory: path.dirname(worktreePath),
-                    prefix: ".t3-replaced-",
-                  });
-                  yield* fileSystem.rename(worktreePath, path.join(aside, "folder"));
-                  return aside;
-                }),
-                () => recreate,
-                (aside, exit) =>
-                  (Exit.isSuccess(exit)
-                    ? Effect.void
-                    : fileSystem
-                        .remove(worktreePath, { recursive: true, force: true })
-                        .pipe(
-                          Effect.andThen(
-                            fileSystem.rename(path.join(aside, "folder"), worktreePath),
-                          ),
-                        )
-                  ).pipe(
-                    Effect.andThen(fileSystem.remove(aside, { recursive: true, force: true })),
-                    Effect.catchCause((cause) =>
-                      Effect.logWarning("Edit from here left a worktree folder set aside", {
-                        worktreePath,
-                        setAside: path.join(aside, "folder"),
-                        cause,
-                      }),
-                    ),
-                  ),
-              );
-            } else {
-              yield* recreate;
-            }
-          }
+            )
+          : Effect.void;
+
+      const providerSessionId = providerThread.providerSessionId;
+      const executeRollback = Effect.gen(function* () {
+        yield* recreateWorktree;
+
+        const modelSelection = context.thread.modelSelection;
+        const resolvedRuntimePolicy = yield* runtimePolicy.resolve({
+          thread: context.thread,
+          modelSelection,
+        });
+        const existingSession = context.providerSession;
+        const session = yield* sessions.open({
+          threadId: input.threadId,
+          providerSessionId,
+          modelSelection,
+          runtimePolicy: resolvedRuntimePolicy,
+          ...(existingSession === undefined ? {} : { resumeFromSession: existingSession }),
+          ...(providerThread.nativeThreadRef?.nativeId == null
+            ? {}
+            : { initialNativeThreadId: providerThread.nativeThreadRef.nativeId }),
+          ...(providerThread.nativeMetadata?.itemIdentityVersion === undefined
+            ? {}
+            : {
+                initialProviderItemIdentityVersion:
+                  providerThread.nativeMetadata.itemIdentityVersion,
+              }),
+        });
+
+        // Rolled-back turns remain in audit history but no longer exist in the provider conversation.
+        const rolledBackAttemptIds = new Set(context.rolledBackAttemptIds);
+        const providerThreadTurns = context.providerTurns.filter(
+          (turn) =>
+            turn.providerThreadId === providerThread.id &&
+            (turn.runAttemptId === null || !rolledBackAttemptIds.has(turn.runAttemptId)),
+        );
+
+        const snapshot =
+          runsToRollback.length === 0
+            ? { providerThread }
+            : yield* session.rollbackThread({
+                providerThread,
+                target: rollbackTarget,
+                providerThreadTurns,
+              });
+        if (input.restoreFiles !== false) yield* checkpoints.restore({ scope, checkpoint });
+        if (staleCheckpoints.length > 0) {
+          yield* checkpoints.deleteStaleRefs({ scope, checkpoints: staleCheckpoints });
         }
-      }
 
-      if (restoreFiles && !(yield* isolated)) return yield* sharedWorkspace();
-
-      const modelSelection = context.thread.modelSelection;
-      const resolvedRuntimePolicy = yield* runtimePolicy.resolve({
-        thread: context.thread,
-        modelSelection,
-      });
-      const existingSession = context.providerSession;
-      const session = yield* sessions.open({
-        threadId: input.threadId,
-        providerSessionId: providerThread.providerSessionId,
-        modelSelection,
-        runtimePolicy: resolvedRuntimePolicy,
-        ...(existingSession === undefined ? {} : { resumeFromSession: existingSession }),
-        ...(providerThread.nativeThreadRef?.nativeId == null
-          ? {}
-          : { initialNativeThreadId: providerThread.nativeThreadRef.nativeId }),
-        ...(providerThread.nativeMetadata?.itemIdentityVersion === undefined
-          ? {}
-          : {
-              initialProviderItemIdentityVersion: providerThread.nativeMetadata.itemIdentityVersion,
-            }),
-      });
-
-      // Rolled-back turns remain in audit history but no longer exist in the provider conversation.
-      const rolledBackAttemptIds = new Set(context.rolledBackAttemptIds);
-      const providerThreadTurns = context.providerTurns.filter(
-        (turn) =>
-          turn.providerThreadId === providerThread.id &&
-          (turn.runAttemptId === null || !rolledBackAttemptIds.has(turn.runAttemptId)),
-      );
-
-      const snapshot =
-        runsToRollback.length === 0
-          ? { providerThread }
-          : yield* session.rollbackThread({
-              providerThread,
-              target: rollbackTarget,
-              providerThreadTurns,
-            });
-      if (input.restoreFiles !== false) yield* checkpoints.restore({ scope, checkpoint });
-      if (staleCheckpoints.length > 0) {
-        yield* checkpoints.deleteStaleRefs({ scope, checkpoints: staleCheckpoints });
-      }
-
-      // Lock against full-row thread writes that could restore the old native session after rollback.
-      yield* threadCommands.withLock(
-        input.threadId,
-        Effect.gen(function* () {
-          const now = yield* DateTime.now;
-          const makeEvent = <Event extends OrchestrationV2DomainEvent>(event: Omit<Event, "id">) =>
-            Effect.map(
-              ids.allocate.event({ threadId: event.threadId }),
-              (id) =>
-                ({
-                  ...event,
-                  id,
-                }) as Event,
-            );
-          const events: Array<OrchestrationV2DomainEvent> = [];
-          events.push(
-            yield* makeEvent({
-              type: "provider-thread.updated",
-              threadId: input.threadId,
-              driver: providerThread.driver,
-              providerInstanceId: providerThread.providerInstanceId,
-              occurredAt: now,
-              payload: {
-                ...snapshot.providerThread,
-                lastRunOrdinal: targetOrdinal === 0 ? null : targetOrdinal,
-                updatedAt: now,
-              },
-            }),
-          );
-          for (const staleCheckpoint of staleCheckpoints) {
+        // Lock against full-row thread writes that could restore the old native session after rollback.
+        yield* threadCommands.withLock(
+          input.threadId,
+          Effect.gen(function* () {
+            const now = yield* DateTime.now;
+            const makeEvent = <Event extends OrchestrationV2DomainEvent>(
+              event: Omit<Event, "id">,
+            ) =>
+              Effect.map(
+                ids.allocate.event({ threadId: event.threadId }),
+                (id) =>
+                  ({
+                    ...event,
+                    id,
+                  }) as Event,
+              );
+            const events: Array<OrchestrationV2DomainEvent> = [];
             events.push(
               yield* makeEvent({
-                type: "checkpoint.captured",
+                type: "provider-thread.updated",
                 threadId: input.threadId,
-                ...(staleCheckpoint.runId === null ? {} : { runId: staleCheckpoint.runId }),
-                nodeId: staleCheckpoint.nodeId,
+                driver: providerThread.driver,
                 providerInstanceId: providerThread.providerInstanceId,
                 occurredAt: now,
-                payload: { ...staleCheckpoint, status: "stale" },
+                payload: {
+                  ...snapshot.providerThread,
+                  lastRunOrdinal: targetOrdinal === 0 ? null : targetOrdinal,
+                  updatedAt: now,
+                },
               }),
             );
-          }
-          for (const run of runsToRollback) {
-            const rootNode = context.rootNodes.find((candidate) => candidate.id === run.rootNodeId);
-            events.push(
-              yield* makeEvent({
-                type: "run.updated",
-                threadId: input.threadId,
-                runId: run.id,
-                ...(rootNode === undefined ? {} : { nodeId: rootNode.id }),
-                providerInstanceId: run.providerInstanceId,
-                occurredAt: now,
-                payload: { ...run, status: "rolled_back", completedAt: now },
-              }),
-            );
-            if (rootNode !== undefined) {
+            for (const staleCheckpoint of staleCheckpoints) {
               events.push(
                 yield* makeEvent({
-                  type: "node.updated",
+                  type: "checkpoint.captured",
                   threadId: input.threadId,
-                  runId: run.id,
-                  nodeId: rootNode.id,
-                  providerInstanceId: run.providerInstanceId,
+                  ...(staleCheckpoint.runId === null ? {} : { runId: staleCheckpoint.runId }),
+                  nodeId: staleCheckpoint.nodeId,
+                  providerInstanceId: providerThread.providerInstanceId,
                   occurredAt: now,
-                  payload: { ...rootNode, status: "rolled_back", completedAt: now },
+                  payload: { ...staleCheckpoint, status: "stale" },
                 }),
               );
             }
-          }
-          yield* eventSink.write({ events });
-        }),
-      );
+            for (const run of runsToRollback) {
+              const rootNode = context.rootNodes.find(
+                (candidate) => candidate.id === run.rootNodeId,
+              );
+              events.push(
+                yield* makeEvent({
+                  type: "run.updated",
+                  threadId: input.threadId,
+                  runId: run.id,
+                  ...(rootNode === undefined ? {} : { nodeId: rootNode.id }),
+                  providerInstanceId: run.providerInstanceId,
+                  occurredAt: now,
+                  payload: { ...run, status: "rolled_back", completedAt: now },
+                }),
+              );
+              if (rootNode !== undefined) {
+                events.push(
+                  yield* makeEvent({
+                    type: "node.updated",
+                    threadId: input.threadId,
+                    runId: run.id,
+                    nodeId: rootNode.id,
+                    providerInstanceId: run.providerInstanceId,
+                    occurredAt: now,
+                    payload: { ...rootNode, status: "rolled_back", completedAt: now },
+                  }),
+                );
+              }
+            }
+            yield* eventSink.write({ events });
+          }),
+        );
+      });
+
+      if (leftover && Option.isSome(project) && worktreePath != null) {
+        // Set aside, not removed: keep pre-rollback files recoverable until provider rollback and restore succeed.
+        yield* Effect.acquireUseRelease(
+          Effect.gen(function* () {
+            const aside = yield* fileSystem.makeTempDirectory({
+              directory: path.dirname(worktreePath),
+              prefix: ".t3-replaced-",
+            });
+            yield* fileSystem.rename(worktreePath, path.join(aside, "folder"));
+            return aside;
+          }),
+          () => executeRollback,
+          (aside, exit) =>
+            (Exit.isSuccess(exit)
+              ? Effect.void
+              : fileSystem
+                  .remove(worktreePath, { recursive: true, force: true })
+                  .pipe(Effect.andThen(fileSystem.rename(path.join(aside, "folder"), worktreePath)))
+            ).pipe(
+              Effect.andThen(fileSystem.remove(aside, { recursive: true, force: true })),
+              Effect.catchCause((cause) =>
+                Effect.logWarning("Rollback left a worktree folder set aside", {
+                  worktreePath,
+                  setAside: path.join(aside, "folder"),
+                  cause,
+                }),
+              ),
+            ),
+        );
+      } else {
+        yield* executeRollback;
+      }
     });
 
     return CheckpointRollbackServiceV2.of({

@@ -205,11 +205,22 @@ describe("resolveAccessEnvironmentId", () => {
       expected: laptop,
     },
     {
-      label: "drops a choice that is no longer listed",
+      label:
+        "returns null when an explicit choice is not listed, even with a primary or connected environment",
+      primaryEnvironmentId: primary,
+      environments: [
+        { environmentId: primary, connected: true },
+        { environmentId: service, connected: true },
+      ],
+      selected: laptop,
+      expected: null,
+    },
+    {
+      label: "returns null when an explicit choice is not listed without a primary",
       primaryEnvironmentId: null,
       environments: [{ environmentId: service, connected: true }],
       selected: laptop,
-      expected: service,
+      expected: null,
     },
     {
       label: "has nothing to show without environments",

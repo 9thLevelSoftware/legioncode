@@ -1,8 +1,9 @@
 import { assert, describe, it } from "@effect/vitest";
 import { afterEach, vi } from "vite-plus/test";
+import * as NodeVM from "node:vm";
 
 import { PASSKEY_CREATE_CHANNEL, PASSKEY_GET_CHANNEL } from "./GuestProtocol.ts";
-import { installPasskeyBridge } from "./PasskeyBridge.ts";
+import { buildMainWorldPasskeyBridgeScript, installPasskeyBridge } from "./PasskeyBridge.ts";
 
 const base64Url = (bytes: ReadonlyArray<number>) => Buffer.from(bytes).toString("base64url");
 const bytesOf = (buffer: ArrayBuffer | null) => (buffer ? [...new Uint8Array(buffer)] : null);
@@ -157,5 +158,44 @@ describe("installPasskeyBridge", () => {
     const error = await pending;
     assert.instanceOf(error, DOMException);
     assert.strictEqual((error as DOMException).name, "AbortError");
+  });
+
+  it("evaluates the main-world passkey bridge script cleanly with zero closure globals and deletes its bridge key", async () => {
+    class FakeCredentialsContainer {
+      create() {
+        return Promise.resolve("native-create");
+      }
+      get() {
+        return Promise.resolve("native-get");
+      }
+    }
+    function FakePublicKeyCredential() {}
+    function FakeAttestationResponse() {}
+    function FakeAssertionResponse() {}
+    const create = vi.fn(async () => ({ success: false, error: "NotAllowedError" }));
+    const get = vi.fn(async () => ({ success: true, data: assertionData }));
+    const bridgeKey = "__t3TestPasskeyBridge";
+    const sandbox: Record<string, unknown> = {
+      CredentialsContainer: FakeCredentialsContainer,
+      PublicKeyCredential: FakePublicKeyCredential,
+      AuthenticatorAttestationResponse: FakeAttestationResponse,
+      AuthenticatorAssertionResponse: FakeAssertionResponse,
+      DOMException,
+      TypeError,
+      atob,
+      btoa,
+      [bridgeKey]: { create, get },
+    };
+    sandbox.globalThis = sandbox;
+
+    NodeVM.runInNewContext(buildMainWorldPasskeyBridgeScript(bridgeKey), sandbox);
+
+    assert.isFalse(Object.hasOwn(sandbox, bridgeKey));
+    const credentials = new FakeCredentialsContainer() as unknown as CredentialsContainer;
+    const credential = (await credentials.get({
+      publicKey: { challenge: new Uint8Array([1, 2, 3]) },
+    })) as PublicKeyCredential;
+    assert.strictEqual(get.mock.calls.length, 1);
+    assert.strictEqual(credential.id, assertionData.credentialId);
   });
 });

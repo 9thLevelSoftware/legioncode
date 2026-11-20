@@ -1112,45 +1112,48 @@ it.layer(
       configs: { ".local/share/vite-plus": "managed", ".config/vite-plus": "system_first" },
       vitePlus: true,
     },
-  ] as const)("updates through vp only for the install the shim runs: $name", (fixture) =>
-    Effect.gen(function* () {
-      const tempDir = yield* makeTempDir("vite-plus-system-first");
-      const vpHome = NodePath.join(tempDir, fixture.vpHome);
-      for (const [dir, shimMode] of Object.entries(fixture.configs)) {
-        NodeFS.mkdirSync(NodePath.join(tempDir, dir), { recursive: true });
-        NodeFS.writeFileSync(
-          NodePath.join(tempDir, dir, "config.json"),
-          JSON.stringify({ shimMode }),
-        );
-      }
-      const shim = NodePath.join(vpHome, "bin", "package-tool");
-      writeExecutable(shim);
-      const otherInstall = linkIntoPackage(NodePath.join(tempDir, "npm"), "package-tool", [
-        "lib",
-        "node_modules",
-        "@example",
-        "package-tool",
-      ]);
+  ] as const)(
+    "updates through vp only for the install the shim runs: $name",
+    (fixture) =>
+      Effect.gen(function* () {
+        const tempDir = yield* makeTempDir("vite-plus-system-first");
+        const vpHome = NodePath.join(tempDir, fixture.vpHome);
+        for (const [dir, shimMode] of Object.entries(fixture.configs)) {
+          NodeFS.mkdirSync(NodePath.join(tempDir, dir), { recursive: true });
+          NodeFS.writeFileSync(
+            NodePath.join(tempDir, dir, "config.json"),
+            JSON.stringify({ shimMode }),
+          );
+        }
+        const shim = NodePath.join(vpHome, "bin", "package-tool");
+        writeExecutable(shim);
+        const otherInstall = linkIntoPackage(NodePath.join(tempDir, "npm"), "package-tool", [
+          "lib",
+          "node_modules",
+          "@example",
+          "package-tool",
+        ]);
 
-      const capabilities = yield* packageToolUpdate
-        .resolve({
-          binaryPath: "package-tool",
-          resolvedCommandPath: shim,
-          realCommandPath: NodePath.join(vpHome, "current", "bin", "vp"),
-          env: {
-            ...(fixture.setVpHome ? { VP_HOME: vpHome } : {}),
-            PATH: [NodePath.dirname(shim), NodePath.dirname(otherInstall)].join(":"),
-          },
-          platform: "linux",
-        })
-        .pipe(
-          Effect.provideService(HostProcess.Platform, "linux"),
-          Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, noSpawn),
-          Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
-        );
+        const capabilities = yield* packageToolUpdate
+          .resolve({
+            binaryPath: "package-tool",
+            resolvedCommandPath: shim,
+            realCommandPath: NodePath.join(vpHome, "current", "bin", "vp"),
+            env: {
+              ...(fixture.setVpHome ? { VP_HOME: vpHome } : {}),
+              PATH: [NodePath.dirname(shim), NodePath.dirname(otherInstall)].join(":"),
+            },
+            platform: "linux",
+          })
+          .pipe(
+            Effect.provideService(HostProcess.Platform, "linux"),
+            Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, noSpawn),
+            Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
+          );
 
-      expect(capabilities.update?.lockKey === "vite-plus-global").toBe(fixture.vitePlus);
-    }),
+        expect(capabilities.update?.lockKey === "vite-plus-global").toBe(fixture.vitePlus);
+      }),
+    { skip: !symlinksSupported || windowsHost },
   );
 
   it.effect("keeps a project folder named vite-plus manual-only", () =>
@@ -2131,6 +2134,94 @@ it.layer(
         expect(spawned.some((args) => args[1] === "latest")).toBe(false);
       }),
     { skip: !symlinksSupported || windowsHost },
+  );
+
+  it.effect.each([
+    { name: "a .cmd shim in /mise/shims/", dir: ["mise", "shims"], shim: "package-tool.cmd" },
+    { name: "a <tool>.exe shim in /mise/shims/", dir: ["mise", "shims"], shim: "package-tool.exe" },
+    {
+      name: "a .cmd shim in $MISE_DATA_DIR/shims/",
+      dir: ["custom-data", "shims"],
+      shim: "package-tool.cmd",
+      envKey: "MISE_DATA_DIR",
+    },
+    {
+      name: "a <tool>.exe shim in $MISE_SYSTEM_DATA_DIR/shims/",
+      dir: ["system-data", "shims"],
+      shim: "package-tool.exe",
+      envKey: "MISE_SYSTEM_DATA_DIR",
+    },
+  ] as const)("upgrades the mapped mise tool through Windows $name", (fixture) =>
+    Effect.gen(function* () {
+      const tempDir = yield* makeTempDir("t3-mise-windows-shim");
+      const miseBinDir = NodePath.join(tempDir, "mise-bin");
+      const miseExe = NodePath.join(miseBinDir, "mise.exe");
+      writeExecutable(miseExe);
+      const dataRoot =
+        "envKey" in fixture
+          ? NodePath.join(tempDir, fixture.dir[0])
+          : NodePath.join(tempDir, "mise");
+      const installPath = NodePath.join(dataRoot, "installs", "package-tool", "1.0.0");
+      const installedBinary = NodePath.join(installPath, "bin", "package-tool.exe");
+      writeExecutable(installedBinary);
+      const shimPath = NodePath.join(tempDir, ...fixture.dir, fixture.shim);
+      NodeFS.mkdirSync(NodePath.dirname(shimPath), { recursive: true });
+      NodeFS.writeFileSync(
+        shimPath,
+        fixture.shim.endsWith(".cmd") ? "@echo off\r\nmise x package-tool -- %*\r\n" : "shim",
+      );
+      const env: NodeJS.ProcessEnv = {
+        PATH: miseBinDir,
+        PATHEXT: ".COM;.EXE;.BAT;.CMD",
+        ...("envKey" in fixture ? { [fixture.envKey]: dataRoot } : {}),
+      };
+      const spawned: Array<ReadonlyArray<string>> = [];
+      const installed = {
+        "package-tool": [{ install_path: installPath, requested_version: "latest", active: true }],
+      };
+
+      const capabilities = yield* resolveProviderMaintenanceCapabilitiesEffect(miseToolUpdate, {
+        binaryPath: shimPath,
+        env,
+      }).pipe(
+        Effect.provideService(HostProcess.Platform, "win32"),
+        Effect.provideService(
+          ChildProcessSpawner.ChildProcessSpawner,
+          miseSpawner({ which: installedBinary, installed }, spawned),
+        ),
+      );
+
+      expect(capabilities.update).toMatchObject({
+        command: "mise upgrade package-tool",
+        args: ["upgrade", "package-tool"],
+      });
+      expect(normalizeCommandPath(capabilities.update?.executable ?? "")).toBe(
+        normalizeCommandPath(miseExe),
+      );
+      expect(
+        spawned.map(([command, ...args]) => [normalizeCommandPath(command ?? ""), ...args]),
+      ).toContainEqual([normalizeCommandPath(miseExe), "which", "package-tool"]);
+
+      for (const [name, content] of [
+        ["package-tool.cmd", "@echo off\r\nmise x package-tool -- %*\r\n"],
+        ["package-tool", '#!/bin/sh\nexec mise x package-tool -- "$@"\n'],
+      ] as const) {
+        const externalScript = NodePath.join(tempDir, "bin", name);
+        NodeFS.mkdirSync(NodePath.dirname(externalScript), { recursive: true });
+        NodeFS.writeFileSync(externalScript, content);
+        const external = yield* resolveProviderMaintenanceCapabilitiesEffect(miseToolUpdate, {
+          binaryPath: externalScript,
+          env,
+        }).pipe(
+          Effect.provideService(HostProcess.Platform, "win32"),
+          Effect.provideService(
+            ChildProcessSpawner.ChildProcessSpawner,
+            miseSpawner({ which: installedBinary, installed }, []),
+          ),
+        );
+        expect(external.update).toBeNull();
+      }
+    }),
   );
 
   it.effect.each([

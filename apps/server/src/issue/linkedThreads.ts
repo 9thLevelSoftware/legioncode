@@ -37,7 +37,7 @@ export const listLinkedIssueThreads = Effect.fn("listLinkedIssueThreads")(
         t.updated_at AS "updatedAt"
       FROM orchestration_v2_projection_threads AS t
       JOIN json_each(t.payload_json, '$.issues') AS link
-      WHERE json_extract(link.value, '$.key') = ${key.key.trim()}
+      WHERE lower(json_extract(link.value, '$.key')) = lower(${key.key.trim()})
         AND t.deleted_at IS NULL
         AND json_extract(t.payload_json, '$.lineage.sideChat') IS NOT 1
       ORDER BY "updatedAt" DESC, id ASC

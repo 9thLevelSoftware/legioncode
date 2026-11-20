@@ -307,7 +307,11 @@ export const make = Effect.fn("EnvironmentSupervisor.make")(function* (
 > {
   const target = entry.target;
   const usesRelay = connectionRoutes(entry).some(
-    (route) => route.target._tag === "RelayConnectionTarget",
+    (route) =>
+      route.target._tag === "RelayConnectionTarget" ||
+      (Option.isSome(route.profile) &&
+        route.profile.value._tag === "BearerConnectionProfile" &&
+        route.profile.value.authorization === "t3-connect"),
   );
   const setupTimeout = msg("{host} did not respond during connection setup.", {
     host: target.label,
@@ -669,7 +673,9 @@ export const make = Effect.fn("EnvironmentSupervisor.make")(function* (
   });
 
   const isRelayLease = (lease: ConnectionDriver.EnvironmentConnectionLease) =>
-    lease.prepared.target._tag === "RelayConnectionTarget";
+    lease.prepared.target._tag === "RelayConnectionTarget" ||
+    (lease.prepared.httpAuthorization?._tag === "Dpop" &&
+      lease.prepared.httpAuthorization.directConnection === undefined);
 
   const connectedLeaseEnd = Effect.fnUntraced(function* (
     next: SupervisorSignal,

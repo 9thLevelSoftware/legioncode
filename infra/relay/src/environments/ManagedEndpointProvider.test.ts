@@ -1438,6 +1438,56 @@ describe("ManagedEndpointProvider", () => {
     }).pipe(Effect.provide(layer));
   });
 
+  it.effect("marks an already-deleted tunnel released when markReleased is true", () => {
+    const tunnelCalls: TunnelCall[] = [];
+    const allocationCalls: AllocationCall[] = [];
+    const persistent = makePersistentTunnelClient(tunnelCalls);
+    const tunnelClient = ManagedEndpointProvider.ManagedEndpointTunnelClient.of({
+      ...persistent,
+      get: (tunnelId) =>
+        Effect.sync(() => {
+          tunnelCalls.push({ operation: "get", input: tunnelId });
+        }).pipe(
+          Effect.andThen(
+            Effect.fail(
+              new ManagedEndpointProvider.ManagedEndpointTunnelClientError({
+                operation: "get",
+                tunnelId,
+                cause: { _tag: "NotFound" },
+              }),
+            ),
+          ),
+        ),
+    });
+    const allocations = makeAllocations(allocationCalls);
+    const layer = layerProvider(tunnelClient, makeDnsClient(), allocations);
+
+    return Effect.gen(function* () {
+      const provider = yield* ManagedEndpointProvider.ManagedEndpointProvider;
+      const key = { userId: "user_ABC", environmentId: "env_ABC" } as const;
+      yield* provider.provision({
+        ...key,
+        origin: { localHttpHost: "127.0.0.1", localHttpPort: 3773 },
+      });
+
+      expect(
+        yield* provider.release({
+          ...key,
+          expectedTunnelId: "tunnel-id",
+          expectedStatus: "down",
+          expectedInactiveBefore: "2026-06-01T00:05:00.000Z",
+          markReleased: true,
+        }),
+      ).toBe(true);
+      expect((yield* allocations.get(key))?.tunnelReleasedAt).toBe("2026-06-02T00:00:00.000Z");
+      expect(tunnelCalls.map((call) => call.operation)).not.toContain("delete");
+      expect(allocationCalls.at(-2)).toMatchObject({
+        operation: "claimRelease",
+        input: { tunnelId: "tunnel-id", markReleased: true },
+      });
+    }).pipe(Effect.provide(layer));
+  });
+
   it.effect.each([
     { name: "the tunnel is gone", tunnelRemoved: true, released: true },
     { name: "the tunnel still exists", tunnelRemoved: false, released: false },

@@ -1,4 +1,7 @@
 import {
+  type AuthSessionState,
+  AuthProvidersManageScope,
+  AuthSettingsWriteScope,
   EnvironmentId,
   ProviderDriverKind,
   ServerSelfUpdateError,
@@ -74,6 +77,25 @@ import {
 } from "./server.ts";
 import { runAtomCommand } from "./runtime.ts";
 import { applyServerConfigProjection } from "./serverConfigProjection.ts";
+
+vi.mock("./session.ts", () => ({
+  createEnvironmentSessionAtoms: () => ({ sessionStateAtom: grantedSessions }),
+}));
+const grantedSessions = Atom.family((_id: EnvironmentId) =>
+  Atom.make<AsyncResult.AsyncResult<AuthSessionState>>(
+    AsyncResult.success({
+      authenticated: true,
+      auth: {
+        policy: "remote-reachable" as const,
+        bootstrapMethods: [],
+        sessionMethods: [],
+        sessionCookieName: "test",
+      },
+      scopes: [AuthProvidersManageScope, AuthSettingsWriteScope],
+      permissions: [AuthProvidersManageScope, AuthSettingsWriteScope],
+    }),
+  ),
+);
 
 const CONFIG = {
   availableEditors: [],
@@ -1728,7 +1750,7 @@ describe("provider setup commands", () => {
         retryNow: Effect.void,
       } satisfies EnvironmentSupervisor.EnvironmentSupervisor["Service"]);
       const runtime = Atom.runtime(
-        Layer.merge(
+        Layer.mergeAll(
           Layer.succeed(EnvironmentRegistry.EnvironmentRegistry, {
             run: (_environmentId, effect) =>
               Effect.provideService(
@@ -1737,6 +1759,7 @@ describe("provider setup commands", () => {
                 supervisor,
               ),
           } as EnvironmentRegistry.EnvironmentRegistry["Service"]),
+          Layer.succeed(RpcPermissionGuard, { authorize: () => Effect.void }),
           Layer.succeed(
             Persistence.EnvironmentCacheStore,
             {} as Persistence.EnvironmentCacheStore["Service"],
@@ -1799,7 +1822,7 @@ describe("provider setup commands", () => {
         retryNow: Effect.void,
       } satisfies EnvironmentSupervisor.EnvironmentSupervisor["Service"]);
       const runtime = Atom.runtime(
-        Layer.merge(
+        Layer.mergeAll(
           Layer.succeed(EnvironmentRegistry.EnvironmentRegistry, {
             run: (_environmentId, effect) =>
               Effect.provideService(
@@ -1808,6 +1831,7 @@ describe("provider setup commands", () => {
                 supervisor,
               ),
           } as EnvironmentRegistry.EnvironmentRegistry["Service"]),
+          Layer.succeed(RpcPermissionGuard, { authorize: () => Effect.void }),
           Layer.succeed(
             Persistence.EnvironmentCacheStore,
             {} as Persistence.EnvironmentCacheStore["Service"],

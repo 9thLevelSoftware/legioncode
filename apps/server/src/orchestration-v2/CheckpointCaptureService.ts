@@ -38,6 +38,11 @@ export interface CheckpointCaptureServiceV2Shape {
     readonly runId: RunId;
     readonly scopeId: CheckpointScopeId;
   }) => Effect.Effect<void, CheckpointCaptureExecutionError>;
+  readonly settleWithoutCheckpoint: (input: {
+    readonly threadId: ThreadId;
+    readonly runId: RunId;
+    readonly scopeId: CheckpointScopeId;
+  }) => Effect.Effect<void, CheckpointCaptureExecutionError>;
 }
 
 export class CheckpointCaptureServiceV2 extends Context.Service<
@@ -65,8 +70,15 @@ export const layer: Layer.Layer<
       readonly runId: RunId;
       readonly scopeId: CheckpointScopeId;
     }) {
-      const { run, rootNode, scope, providerThread, preservedCheckpointOrdinals, sideChat } =
-        yield* projections.getCheckpointCaptureContext(input.threadId, input);
+      const {
+        run,
+        rootNode,
+        scope,
+        providerThread,
+        attemptCompletedAt,
+        preservedCheckpointOrdinals,
+        sideChat,
+      } = yield* projections.getCheckpointCaptureContext(input.threadId, input);
       // Stopped runs remain terminal; their checkpoint is the next message's rollback point.
       const stopped = run?.status === "interrupted" || run?.status === "cancelled";
 
@@ -100,6 +112,7 @@ export const layer: Layer.Layer<
       }
 
       const capturedAt = yield* DateTime.now;
+      const runCompletedAt = run.completedAt ?? attemptCompletedAt ?? capturedAt;
       const baselineOrdinalWithinScope = Math.max(0, run.ordinal - 1);
       const isPreserved = (ordinalWithinScope: number) =>
         preservedCheckpointOrdinals.includes(ordinalWithinScope);
@@ -207,7 +220,7 @@ export const layer: Layer.Layer<
               : {
                   ...runWithoutDelegatedCompletion,
                   status: "completed",
-                  completedAt: capturedAt,
+                  completedAt: runCompletedAt,
                   checkpointId: checkpoint.id,
                 },
           },
@@ -225,7 +238,7 @@ export const layer: Layer.Layer<
                   payload: {
                     ...rootNode,
                     status: "completed" as const,
-                    completedAt: capturedAt,
+                    completedAt: runCompletedAt,
                     checkpointScopeId: scope.id,
                   },
                 },
@@ -234,16 +247,101 @@ export const layer: Layer.Layer<
       });
     });
 
+    const settleWithoutCheckpoint = Effect.fn(
+      "orchestrationV2.checkpointCapture.settleWithoutCheckpoint",
+    )(function* (input: {
+      readonly threadId: ThreadId;
+      readonly runId: RunId;
+      readonly scopeId: CheckpointScopeId;
+    }) {
+      const { run, rootNode, scope, attemptCompletedAt } =
+        yield* projections.getCheckpointCaptureContext(input.threadId, input);
+      const settleRun = run !== undefined && run.status === "waiting";
+      const settleNode = rootNode !== undefined && rootNode.status === "waiting";
+      if (!settleRun && !settleNode) {
+        return;
+      }
+      const settledAt = yield* DateTime.now;
+      const completedAt = run?.completedAt ?? attemptCompletedAt ?? settledAt;
+      const targetRunId = run?.id ?? input.runId;
+      const commandId = CommandId.make(`command:effect:checkpoint.capture.settle:${targetRunId}`);
+      const eventNodeId = rootNode?.id ?? run?.rootNodeId ?? null;
+      const runUpdatedEvent = !settleRun
+        ? []
+        : [
+            (() => {
+              const { delegatedCompletion: _delegatedCompletion, ...runWithoutDelegated } = run;
+              return {
+                id: ids.allocate.event({ threadId: input.threadId, commandId }),
+                type: "run.updated" as const,
+                threadId: input.threadId,
+                runId: run.id,
+                ...(eventNodeId === null ? {} : { nodeId: eventNodeId }),
+                providerInstanceId: run.providerInstanceId,
+                occurredAt: settledAt,
+                payload: {
+                  ...runWithoutDelegated,
+                  status: "completed" as const,
+                  completedAt,
+                  checkpointId: null,
+                },
+              };
+            })(),
+          ];
+      const settledEvents: Array<Parameters<typeof eventSink.commitCommand>[0]["events"][number]> =
+        [];
+      for (const entry of runUpdatedEvent) {
+        settledEvents.push({ ...entry, id: yield* entry.id });
+      }
+      if (settleNode) {
+        settledEvents.push({
+          id: yield* ids.allocate.event({ threadId: input.threadId, commandId }),
+          type: "node.updated" as const,
+          threadId: input.threadId,
+          runId: targetRunId,
+          nodeId: rootNode.id,
+          ...(run?.providerInstanceId === undefined
+            ? {}
+            : { providerInstanceId: run.providerInstanceId }),
+          occurredAt: settledAt,
+          payload: {
+            ...rootNode,
+            status: "completed" as const,
+            completedAt,
+            ...(scope === undefined ? {} : { checkpointScopeId: scope.id }),
+          },
+        });
+      }
+      yield* eventSink.commitCommand({
+        commandId,
+        threadId: input.threadId,
+        commandType: "checkpoint.capture",
+        acceptedAt: settledAt,
+        effects: [],
+        events: settledEvents,
+      });
+    });
+
+    const mapCaptureError = (input: {
+      readonly threadId: ThreadId;
+      readonly runId: RunId;
+      readonly scopeId: CheckpointScopeId;
+    }) =>
+      Effect.mapError((cause: unknown) =>
+        isCheckpointCaptureExecutionError(cause)
+          ? cause
+          : new CheckpointCaptureExecutionError({ ...input, cause }),
+      );
+
     return CheckpointCaptureServiceV2.of({
       execute: Effect.fn("CheckpointCaptureServiceV2.execute")(function (input) {
-        return execute(input).pipe(
-          Effect.mapError((cause) =>
-            isCheckpointCaptureExecutionError(cause)
-              ? cause
-              : new CheckpointCaptureExecutionError({ ...input, cause }),
-          ),
-        );
+        return execute(input).pipe(mapCaptureError(input));
       }),
+      settleWithoutCheckpoint: Effect.fn("CheckpointCaptureServiceV2.settleWithoutCheckpoint")(
+        function (input) {
+          return settleWithoutCheckpoint(input).pipe(mapCaptureError(input));
+        },
+      ),
     });
   }),
 );

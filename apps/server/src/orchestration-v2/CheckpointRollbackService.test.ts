@@ -176,11 +176,23 @@ it.effect.each([
   { order: "cleanup-first", restoreFiles: false, unmanaged: true },
   { order: "cleanup-first", restoreFiles: true, leavesFolder: true },
   { order: "cleanup-first", restoreFiles: false, leavesFolder: true },
+  { order: "cleanup-first", restoreFiles: true, shared: true },
   { order: "cleanup-first", restoreFiles: true, leavesFolder: true, shared: true },
   { order: "cleanup-first", restoreFiles: true, leavesFolder: true, createFails: true },
+  { order: "cleanup-first", restoreFiles: true, leavesFolder: true, rollbackFails: true },
+  { order: "cleanup-first", restoreFiles: true, leavesFolder: true, restoreFails: true },
 ])("locks rollback with %s", (row) =>
   Effect.gen(function* () {
-    const { order, restoreFiles, unmanaged, leavesFolder, shared, createFails } = row;
+    const {
+      order,
+      restoreFiles,
+      unmanaged,
+      leavesFolder,
+      shared,
+      createFails,
+      rollbackFails,
+      restoreFails,
+    } = row;
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const workspaceRoot = yield* fileSystem.realPath(
@@ -217,7 +229,8 @@ it.effect.each([
       providerSession: undefined,
       checkpoint: { id: checkpointId, scopeId, status: "ready", appRunOrdinal: 0 },
       scope: { id: scopeId, cwd: worktreePath },
-      runsToRollback: [],
+      runsToRollback: rollbackFails ? [{ id: "rollback-run" }] : [],
+      rollbackTarget: { kind: "ordinal", targetOrdinal: 0 },
       targetAttempt: undefined,
       rolledBackAttemptIds: [],
       staleCheckpoints: [],
@@ -265,6 +278,7 @@ it.effect.each([
                   yield* fileSystem.exists(path.join(worktreePath, ".git")).pipe(Effect.orDie),
                 );
                 calls.push("files");
+                if (restoreFails) return yield* Effect.die("restore failed");
               }),
           }),
           Layer.mock(EventSink.EventSinkV2)({
@@ -311,7 +325,12 @@ it.effect.each([
                 calls.push("session");
                 yield* Deferred.succeed(openEntered, undefined);
                 if (order === "rollback-first") yield* Deferred.await(release);
-                return {} as never;
+                return {
+                  rollbackThread: () =>
+                    rollbackFails
+                      ? Effect.die("provider rollback failed")
+                      : Effect.succeed({ providerThread }),
+                } as never;
               }),
           }),
           Layer.mock(RuntimePolicy.RuntimePolicyV2)({
@@ -361,13 +380,17 @@ it.effect.each([
         assert.deepEqual(calls, ["cleanup"]);
         if (shared) {
           assert.equal(error.reason, "shared-workspace");
-          assert.isTrue(yield* fileSystem.exists(path.join(worktreePath, "unsaved.txt")));
+          assert.equal(
+            yield* fileSystem.exists(path.join(worktreePath, "unsaved.txt")),
+            Boolean(leavesFolder),
+          );
         }
         return;
       }
-      if (createFails) {
-        yield* Fiber.join(rollback).pipe(Effect.exit);
-        assert.deepEqual(calls, ["cleanup", "prune", "create"]);
+      if (createFails || rollbackFails || restoreFails) {
+        const failedExit = yield* Fiber.join(rollback).pipe(Effect.exit);
+        assert.isTrue(failedExit._tag === "Failure");
+        if (createFails) assert.deepEqual(calls, ["cleanup", "prune", "create"]);
         assert.equal(
           yield* fileSystem.readFileString(path.join(worktreePath, "unsaved.txt")),
           "keep",

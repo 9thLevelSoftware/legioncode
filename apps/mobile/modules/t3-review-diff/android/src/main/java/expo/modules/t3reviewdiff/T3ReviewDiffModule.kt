@@ -12,6 +12,7 @@ private val REVIEW_DIFF_EVENTS = arrayOf(
   "onPressLine",
   "onToggleComment",
   "onPressNotice",
+  "onPullToRefresh",
 )
 
 class T3ReviewDiffModule : Module() {
@@ -56,6 +57,12 @@ class T3ReviewDiffModule : Module() {
       }
       Prop("scrollEnabled") { view: T3ReviewDiffView, enabled: Boolean ->
         view.setScrollEnabled(enabled)
+      }
+      Prop("refreshEnabled") { view: T3ReviewDiffView, enabled: Boolean ->
+        view.setRefreshEnabled(enabled)
+      }
+      Prop("refreshing") { view: T3ReviewDiffView, refreshing: Boolean ->
+        view.setRefreshing(refreshing)
       }
       Prop("initialRowIndex") { view: T3ReviewDiffView, initialRowIndex: Double ->
         view.setInitialRowIndex(initialRowIndex)

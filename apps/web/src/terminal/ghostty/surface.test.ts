@@ -802,6 +802,17 @@ describe("GhosttyTerminalSurface visibility", () => {
       expect(harness.renderedSnapshot.rowData[0]?.text).toContain("ready");
     },
   );
+
+  it("cancels a pending resize notification on dispose without invoking onResize", async () => {
+    const harness = createHarness();
+    const onResize = vi.fn();
+    const surface = await harness.create({ onResize });
+    expect(onResize).not.toHaveBeenCalled();
+
+    surface.dispose();
+    vi.advanceTimersByTime(200);
+    expect(onResize).not.toHaveBeenCalled();
+  });
 });
 
 const cell = (text: string): GhosttyCell => ({

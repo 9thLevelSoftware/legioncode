@@ -353,6 +353,55 @@ describe("issue toolkit handlers", () => {
     }),
   );
 
+  it.effect("stores the tracker's canonical issue key and unlinks case-insensitively", () =>
+    Effect.gen(function* () {
+      const linear = IssueTrackerKind.make("linear");
+      const canonicalDetail: IssueDetail = {
+        ...detail,
+        tracker: linear,
+        host: "linear.app",
+        scope: "ENG",
+        key: "ENG-7",
+        displayKey: "ENG-7",
+        url: "https://linear.app/acme/issue/ENG-7/seven",
+      };
+      const issueLayer = Layer.mock(IssueService.IssueService)({
+        detail: () => Effect.succeed(canonicalDetail),
+        projectScope: (projectId) =>
+          Effect.succeed({
+            projectId,
+            tracker: linear,
+            host: "linear.app",
+            scope: "ENG",
+          }),
+      });
+      const harness = yield* makeHarness([], issueLayer);
+      const linked = yield* harness.call("link_issue", { key: "eng-7" });
+      expect(linked.key).toBe("ENG-7");
+      expect((yield* Ref.get(harness.links))[0]?.ref.key).toBe("ENG-7");
+
+      const canonicalHarness = yield* makeHarness(
+        [
+          {
+            tracker: linear,
+            host: "linear.app",
+            scope: "ENG",
+            key: "ENG-7",
+            projectId: PROJECT_ID,
+            url: canonicalDetail.url,
+            source: "agent",
+            linkedAt: "2026-08-10T00:00:00.000Z",
+            displayKey: "ENG-7",
+            title: "Seven",
+          },
+        ],
+        issueLayer,
+      );
+      const unlinked = yield* canonicalHarness.call("unlink_issue", { key: "eng-7" });
+      expect(unlinked.wasLinked).toBe(true);
+    }),
+  );
+
   it.effect("lists linked issues from the thread shell as they were named when linked", () =>
     Effect.gen(function* () {
       const harness = yield* makeHarness([

@@ -846,7 +846,11 @@ const make = Effect.gen(function* () {
     HttpClientRequest.post(input.url).pipe(
       HttpClientRequest.bearerToken(input.token),
       HttpClientRequest.bodyJson(input.payload),
-      Effect.flatMap(httpClient.execute),
+      Effect.flatMap((request) =>
+        httpClient
+          .execute(request)
+          .pipe(Effect.provideService(FetchHttpClient.RequestInit, { redirect: "error" })),
+      ),
       Effect.flatMap(filterRelayResponse),
       Effect.flatMap(HttpClientResponse.schemaBodyJson(input.schema)),
       Effect.timeout(input.timeout ?? "10 seconds"),

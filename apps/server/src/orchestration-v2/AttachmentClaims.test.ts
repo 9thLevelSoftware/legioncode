@@ -14,6 +14,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 
 import {
+  createAttachmentId,
   createPendingAttachmentId,
   parseThreadSegmentFromAttachmentId,
 } from "../attachmentStore.ts";
@@ -282,6 +283,47 @@ describe("AttachmentClaims", () => {
       expect(NodeFS.existsSync(claimedPath + ".txt")).toBe(false);
       const config = yield* ServerConfig.ServerConfig;
       expect(NodeFS.readdirSync(config.attachmentsDir)).toHaveLength(1);
+    }).pipe(Effect.provide(layerTest)),
+  );
+
+  it.effect("rejects non-pending attachments owned by a different thread", () =>
+    Effect.gen(function* () {
+      const config = yield* ServerConfig.ServerConfig;
+      const pending = yield* stagePendingUpload({
+        name: "pending.png",
+        bytes: new Uint8Array([1, 2]),
+        mimeType: "image/png",
+      });
+      const foreignId = ChatAttachmentId.make(createAttachmentId("thread-owner-a")!);
+      NodeFS.writeFileSync(
+        NodePath.join(config.attachmentsDir, `${foreignId}.png`),
+        new Uint8Array([9, 8]),
+      );
+      const foreignAttachment: ChatAttachment = {
+        type: "image",
+        id: foreignId,
+        name: "secret.png",
+        mimeType: "image/png",
+        sizeBytes: 2,
+      };
+
+      const direct = yield* Effect.exit(
+        claimPendingAttachments({
+          threadId: "thread-requester-b",
+          attachments: [foreignAttachment],
+        }),
+      );
+      expect(direct._tag).toBe("Failure");
+
+      const mixed = yield* Effect.exit(
+        claimPendingAttachments({
+          threadId: "thread-requester-b",
+          attachments: [pending, foreignAttachment],
+        }),
+      );
+      expect(mixed._tag).toBe("Failure");
+      const files = NodeFS.readdirSync(config.attachmentsDir);
+      expect(files.some((entry) => entry.startsWith("thread-requester-b-"))).toBe(false);
     }).pipe(Effect.provide(layerTest)),
   );
 });

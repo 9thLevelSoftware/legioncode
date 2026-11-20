@@ -1,5 +1,9 @@
 import { resolveQueuedEditExit } from "@t3tools/client-runtime/queued-run-edit";
-import type { ChatAttachment } from "@t3tools/contracts";
+import type {
+  ChatAttachment,
+  EnvironmentId,
+  OrchestrationMessageContext,
+} from "@t3tools/contracts";
 import {
   composerDraftHasUserContent,
   useComposerDraftStore,
@@ -10,6 +14,16 @@ import {
 import { msg } from "gt-react";
 import { m } from "../../i18n/messages";
 import { releaseDraftAttachments } from "../../lib/attachmentUploadQueue";
+import {
+  asKnownContextRecord,
+  previewAnnotationContextId,
+  reviewCommentContextId,
+  terminalContextReference,
+} from "../../lib/composerContextRecords";
+import {
+  collectInlineContextIds,
+  producerIdFromComposerContextId,
+} from "../../lib/composerContextReferences";
 
 /** Staged attachments upload as soon as they are added, so a dropped edit must release them. */
 export function discardQueuedEditDraft(target: ComposerThreadTarget): void {
@@ -29,6 +43,9 @@ export function recoverQueuedMessageEdit(input: {
   readonly threadTarget: ComposerThreadTarget;
   readonly originalText: string;
   readonly removedExistingAttachment?: boolean;
+  readonly environmentId?: EnvironmentId;
+  readonly existingAttachments?: ReadonlyArray<ChatAttachment>;
+  readonly context?: OrchestrationMessageContext | undefined;
 }): "kept" | "discarded" | "clean" {
   const store = useComposerDraftStore.getState();
   const draft = store.getComposerDraft(input.editTarget);
@@ -42,9 +59,72 @@ export function recoverQueuedMessageEdit(input: {
       composerDraftHasUserContent(draft) &&
       !composerDraftHasUserContent(store.getComposerDraft(input.threadTarget)),
   });
-  if (recovery === "kept") {
+  if (recovery === "kept" && draft !== null) {
+    const referencedIds = new Set(collectInlineContextIds(draft.prompt));
+    const keptTerminals = draft.terminalContexts.filter((context) =>
+      referencedIds.has(terminalContextReference(context).contextId),
+    );
+    if (keptTerminals.length !== draft.terminalContexts.length) {
+      store.setTerminalContexts(input.editTarget, keptTerminals);
+    }
+    const keptReviewComments = draft.reviewComments.filter((comment) =>
+      referencedIds.has(reviewCommentContextId(comment.id)),
+    );
+    if (keptReviewComments.length !== draft.reviewComments.length) {
+      store.setReviewComments(input.editTarget, keptReviewComments);
+    }
+    const keptPreviewAnnotations = draft.previewAnnotations.filter((annotation) =>
+      referencedIds.has(previewAnnotationContextId(annotation.id)),
+    );
+    if (keptPreviewAnnotations.length !== draft.previewAnnotations.length) {
+      store.setPreviewAnnotations(input.editTarget, keptPreviewAnnotations);
+    }
+    const keptThreadContexts = draft.threadContexts.filter((record) =>
+      referencedIds.has(record.contextId),
+    );
+    if (keptThreadContexts.length !== draft.threadContexts.length) {
+      store.setThreadContexts(input.editTarget, keptThreadContexts);
+    }
+    const keptEnvironmentContexts = draft.environmentContexts.filter((record) =>
+      referencedIds.has(record.contextId),
+    );
+    if (keptEnvironmentContexts.length !== draft.environmentContexts.length) {
+      store.setEnvironmentContexts(input.editTarget, keptEnvironmentContexts);
+    }
     store.moveComposerContent(input.editTarget, input.threadTarget);
     store.clearComposerContent(input.editTarget);
+    if (
+      input.environmentId !== undefined &&
+      input.context !== undefined &&
+      input.existingAttachments !== undefined
+    ) {
+      const remainingAttachmentIds = new Set(
+        input.existingAttachments.map((attachment) => attachment.id),
+      );
+      const recoveredFiles: ComposerFileAttachment[] = [];
+      for (const record of input.context.records) {
+        const known = asKnownContextRecord(record);
+        if (
+          known?.kind === "file" &&
+          referencedIds.has(known.contextId) &&
+          remainingAttachmentIds.has(known.attachmentId)
+        ) {
+          recoveredFiles.push({
+            type: "file",
+            id: producerIdFromComposerContextId("file", known.contextId),
+            name: known.name,
+            mimeType: known.mimeType,
+            sizeBytes: known.sizeBytes,
+            file: null,
+            uploadedAttachmentId: known.attachmentId,
+            uploadEnvironmentId: input.environmentId,
+          });
+        }
+      }
+      if (recoveredFiles.length > 0) {
+        store.addFiles(input.threadTarget, recoveredFiles);
+      }
+    }
   } else {
     discardQueuedEditDraft(input.editTarget);
   }

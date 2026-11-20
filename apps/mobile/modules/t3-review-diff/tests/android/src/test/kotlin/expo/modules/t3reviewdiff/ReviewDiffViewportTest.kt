@@ -4,6 +4,8 @@ import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Looper
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.view.View
 import expo.modules.kotlin.AppContext
 import java.util.concurrent.AbstractExecutorService
@@ -189,6 +191,126 @@ class ReviewDiffViewportTest {
       appContext.events.clear()
     }
   }
+
+  @Test
+  fun pullToRefreshRespectsRefreshEnabledRefreshingAndVerticalOffset() {
+    val activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+    val appContext = AppContext()
+    val view = T3ReviewDiffView(activity, appContext)
+    val decoder = ManualDecoder()
+    view.javaClass.getDeclaredField("payloadDecodeExecutor").apply { isAccessible = true }
+      .set(view, decoder)
+    activity.setContentView(view)
+    val widthSpec = View.MeasureSpec.makeMeasureSpec(320, View.MeasureSpec.EXACTLY)
+    val heightSpec = View.MeasureSpec.makeMeasureSpec(480, View.MeasureSpec.EXACTLY)
+    view.measure(widthSpec, heightSpec)
+    view.layout(0, 0, 320, 480)
+    val canvas = view.getChildAt(0)
+    val bitmap = Bitmap.createBitmap(320, 480, Bitmap.Config.ARGB_8888)
+    try {
+      assertEquals(1, view.childCount)
+      view.setRowsJson(rows("second-file"))
+      decoder.completeNext()
+      appContext.events.clear()
+
+      pullDown(view, 40f, 180f)
+      assertEquals(0, pullRefreshCount(appContext))
+
+      view.setRefreshEnabled(true)
+      pullDown(view, 40f, 64f)
+      assertEquals(0, pullRefreshCount(appContext))
+
+      pullDown(view, 40f, 180f, endAction = MotionEvent.ACTION_CANCEL)
+      assertEquals(0, pullRefreshCount(appContext))
+
+      pullDown(view, 40f, 180f, 64f)
+      assertEquals(0, pullRefreshCount(appContext))
+
+      pullDown(view, 40f, 90f, 180f)
+      assertEquals(1, pullRefreshCount(appContext))
+      assertEquals(emptyMap<String, Any>(), appContext.events.last { it.first == "onPullToRefresh" }.second)
+      assertEquals(0, verticalOffset(canvas))
+
+      pullDown(view, 40f, 180f)
+      assertEquals(2, pullRefreshCount(appContext))
+
+      view.setRefreshing(true)
+      assertTrue(isRefreshIndicatorVisible(view))
+      view.draw(Canvas(bitmap))
+      pullDown(view, 40f, 180f)
+      assertEquals(2, pullRefreshCount(appContext))
+
+      view.setRefreshing(false)
+      assertTrue(!isRefreshIndicatorVisible(view))
+      pullDown(view, 40f, 180f)
+      assertEquals(3, pullRefreshCount(appContext))
+
+      // Dragging up first into the content and then back past 0 in the same gesture must not refresh.
+      pullDown(view, 200f, 140f, 340f)
+      assertEquals(3, pullRefreshCount(appContext))
+      assertEquals(0, verticalOffset(canvas))
+
+      setVerticalOffset(canvas, 80)
+      assertTrue(verticalOffset(canvas) > 0)
+      pullDown(view, 40f, 120f, 260f)
+      assertEquals(3, pullRefreshCount(appContext))
+
+      setVerticalOffset(canvas, 0)
+      view.setRefreshing(true)
+      view.setRefreshEnabled(false)
+      assertTrue(!isRefreshIndicatorVisible(view))
+      pullDown(view, 40f, 180f)
+      assertEquals(3, pullRefreshCount(appContext))
+
+      view.setRefreshEnabled(true)
+      assertTrue(isRefreshIndicatorVisible(view))
+    } finally {
+      view.cleanup()
+      bitmap.recycle()
+      activity.finish()
+      appContext.events.clear()
+    }
+  }
+
+  private fun pullDown(
+    view: View,
+    startY: Float,
+    vararg moveYs: Float,
+    endAction: Int = MotionEvent.ACTION_UP
+  ) {
+    val downTime = SystemClock.uptimeMillis()
+    var eventTime = downTime
+    val down = MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_DOWN, 160f, startY, 0)
+    view.dispatchTouchEvent(down)
+    down.recycle()
+    for (y in moveYs) {
+      eventTime += 16L
+      val move = MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_MOVE, 160f, y, 0)
+      view.dispatchTouchEvent(move)
+      move.recycle()
+    }
+    eventTime += 16L
+    val endY = moveYs.lastOrNull() ?: startY
+    val end = MotionEvent.obtain(downTime, eventTime, endAction, 160f, endY, 0)
+    view.dispatchTouchEvent(end)
+    end.recycle()
+  }
+
+  private fun verticalOffset(canvas: View): Int = canvas.javaClass
+    .getDeclaredMethod("verticalOffset").apply { isAccessible = true }
+    .invoke(canvas) as Int
+
+  private fun setVerticalOffset(canvas: View, offset: Int) {
+    canvas.javaClass.getDeclaredMethod("setVerticalOffset", Int::class.javaPrimitiveType)
+      .apply { isAccessible = true }.invoke(canvas, offset)
+  }
+
+  private fun pullRefreshCount(appContext: AppContext): Int =
+    appContext.events.count { it.first == "onPullToRefresh" }
+
+  private fun isRefreshIndicatorVisible(view: T3ReviewDiffView): Boolean = view.javaClass
+    .getDeclaredMethod("isRefreshIndicatorVisible").apply { isAccessible = true }
+    .invoke(view) as Boolean
 
   private fun rowTop(canvas: View, index: Int): Int = canvas.javaClass
     .getDeclaredMethod("rowTop", Int::class.javaPrimitiveType).apply { isAccessible = true }

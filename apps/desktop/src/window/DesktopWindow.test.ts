@@ -1477,6 +1477,9 @@ describe("DesktopWindow", () => {
             partition: "persist:t3code-preview-test",
           });
 
+          assert.equal(webPreferences.contextIsolation, true);
+          assert.equal(webPreferences.sandbox, true);
+          assert.equal(webPreferences.nodeIntegration, false);
           assert.deepEqual(webPreferences.additionalArguments, expected);
         }).pipe(Effect.provide(layer));
       }),

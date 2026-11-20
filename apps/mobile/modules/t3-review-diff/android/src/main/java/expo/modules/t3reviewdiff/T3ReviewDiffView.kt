@@ -32,6 +32,7 @@ class T3ReviewDiffView(context: Context, appContext: AppContext) : ExpoView(cont
   private val onPressLine by EventDispatcher()
   private val onToggleComment by EventDispatcher()
   private val onPressNotice by EventDispatcher()
+  private val onPullToRefresh by EventDispatcher()
   private var rows: List<DiffRow> = emptyList()
   private var visibleRows: List<DiffRow> = emptyList()
   private var visibleRowIndices = IntArray(0)
@@ -57,6 +58,17 @@ class T3ReviewDiffView(context: Context, appContext: AppContext) : ExpoView(cont
   private val horizontalScroller = OverScroller(context)
   private var dragAxis: DragAxis? = null
   private var scrollEnabled = true
+  private var refreshEnabled = false
+  private var refreshing = false
+  private var canStartPull = false
+  private var isPulling = false
+  private var pullDistancePx = 0f
+  private val refreshOverlay = PullRefreshOverlay(resources.displayMetrics.density)
+  private val refreshAnimationRunnable = Runnable {
+    if (refreshEnabled && refreshing && isAttachedToWindow) {
+      invalidate()
+    }
+  }
   private var horizontalDragTarget: HorizontalPanTarget? = null
   private var lastTouchX = 0f
   private var lastTouchY = 0f
@@ -116,6 +128,8 @@ class T3ReviewDiffView(context: Context, appContext: AppContext) : ExpoView(cont
     pendingScrollFileId = initialFileId
     canvasView.setVerticalOffset(0)
     canvasView.resetHorizontalOffsets()
+    cancelPull()
+    invalidate()
     applyPendingInitialScroll()
   }
 
@@ -143,10 +157,12 @@ class T3ReviewDiffView(context: Context, appContext: AppContext) : ExpoView(cont
 
   fun setAppearanceScheme(value: String) {
     canvasView.theme = DiffTheme.fallback(value)
+    if (isRefreshIndicatorVisible()) invalidate()
   }
 
   fun setThemeJson(value: String) {
     canvasView.theme = DiffTheme.fromJson(value, canvasView.theme)
+    if (isRefreshIndicatorVisible()) invalidate()
   }
 
   fun setStyleJson(value: String) {
@@ -246,7 +262,18 @@ class T3ReviewDiffView(context: Context, appContext: AppContext) : ExpoView(cont
   }
 
   fun cleanup() {
+    removeCallbacks(refreshAnimationRunnable)
     payloadDecodeExecutor.shutdownNow()
+  }
+
+  override fun onDetachedFromWindow() {
+    removeCallbacks(refreshAnimationRunnable)
+    super.onDetachedFromWindow()
+  }
+
+  override fun dispatchDraw(canvas: Canvas) {
+    super.dispatchDraw(canvas)
+    drawPullRefreshIndicator(canvas)
   }
 
   fun scrollToFile(fileId: String, animated: Boolean) {
@@ -260,20 +287,46 @@ class T3ReviewDiffView(context: Context, appContext: AppContext) : ExpoView(cont
     if (!enabled) {
       verticalScroller.forceFinished(true)
       canvasView.setVerticalOffset(0)
+      cancelPull()
+      invalidate()
     }
+  }
+
+  fun setRefreshEnabled(enabled: Boolean) {
+    if (refreshEnabled == enabled) return
+    refreshEnabled = enabled
+    if (!enabled) {
+      removeCallbacks(refreshAnimationRunnable)
+      cancelPull()
+    }
+    invalidate()
+  }
+
+  fun setRefreshing(value: Boolean) {
+    if (refreshing == value) return
+    refreshing = value
+    if (value) {
+      cancelPull()
+    } else {
+      removeCallbacks(refreshAnimationRunnable)
+    }
+    invalidate()
   }
 
   fun scrollToTop(animated: Boolean) {
     scrollToY(0, animated)
   }
 
-  @Suppress("NestedBlockDepth", "ReturnCount")
+  @Suppress("ReturnCount")
   override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
     when (event.actionMasked) {
       MotionEvent.ACTION_DOWN -> {
         verticalScroller.forceFinished(true)
         horizontalScroller.forceFinished(true)
         dragAxis = null
+        isPulling = false
+        pullDistancePx = 0f
+        canStartPull = canBeginPull()
         horizontalDragTarget = canvasView.horizontalPanTarget(event.y)
         lastTouchX = event.x
         lastTouchY = event.y
@@ -282,17 +335,7 @@ class T3ReviewDiffView(context: Context, appContext: AppContext) : ExpoView(cont
       }
       MotionEvent.ACTION_MOVE -> {
         if (dragAxis == null) {
-          val deltaX = event.x - lastTouchX
-          val deltaY = event.y - lastTouchY
-          if (max(abs(deltaX), abs(deltaY)) > touchSlop) {
-            dragAxis = if (abs(deltaY) >= abs(deltaX)) {
-              if (scrollEnabled) DragAxis.VERTICAL else null
-            } else {
-              horizontalDragTarget
-                ?.takeIf { canvasView.maxHorizontalOffset(it) > 0 }
-                ?.let { DragAxis.HORIZONTAL }
-            }
-          }
+          resolveInterceptDragAxis(event)
         }
         if (dragAxis == DragAxis.HORIZONTAL) parent?.requestDisallowInterceptTouchEvent(true)
         return dragAxis != null
@@ -309,13 +352,10 @@ class T3ReviewDiffView(context: Context, appContext: AppContext) : ExpoView(cont
     }
     velocityTracker?.addMovement(event)
     val handled = super.dispatchTouchEvent(event)
-    if (
-      (
-        event.actionMasked == MotionEvent.ACTION_UP ||
-          event.actionMasked == MotionEvent.ACTION_CANCEL
-        ) &&
-      dragAxis == null
-    ) {
+    val isGestureEnd = event.actionMasked == MotionEvent.ACTION_UP ||
+      event.actionMasked == MotionEvent.ACTION_CANCEL
+    if (isGestureEnd && dragAxis == null) {
+      canStartPull = false
       velocityTracker?.recycle()
       velocityTracker = null
       horizontalDragTarget = null
@@ -324,7 +364,6 @@ class T3ReviewDiffView(context: Context, appContext: AppContext) : ExpoView(cont
     return handled
   }
 
-  @Suppress("NestedBlockDepth")
   override fun onTouchEvent(event: MotionEvent): Boolean {
     val axis = dragAxis ?: return false
     when (event.actionMasked) {
@@ -332,7 +371,9 @@ class T3ReviewDiffView(context: Context, appContext: AppContext) : ExpoView(cont
         val deltaX = (lastTouchX - event.x).toInt()
         val deltaY = (lastTouchY - event.y).toInt()
         if (axis == DragAxis.VERTICAL) {
-          canvasView.scrollByVertical(deltaY)
+          if (!updatePullDrag(event.y - lastTouchY)) {
+            canvasView.scrollByVertical(deltaY)
+          }
         } else {
           horizontalDragTarget?.let { canvasView.scrollByHorizontal(deltaX, it) }
         }
@@ -340,39 +381,10 @@ class T3ReviewDiffView(context: Context, appContext: AppContext) : ExpoView(cont
         lastTouchY = event.y
       }
       MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-        if (event.actionMasked == MotionEvent.ACTION_UP) {
-          velocityTracker?.computeCurrentVelocity(1000)
-          if (axis == DragAxis.VERTICAL) {
-            val velocity = -(velocityTracker?.yVelocity ?: 0f).toInt()
-            if (abs(velocity) >= minimumFlingVelocity) {
-              verticalScroller.fling(
-                0,
-                canvasView.verticalOffset(),
-                0,
-                velocity,
-                0,
-                0,
-                0,
-                canvasView.maxVerticalOffset(),
-              )
-              postInvalidateOnAnimation()
-            }
-          } else if (horizontalDragTarget?.kind == HorizontalPanKind.CODE) {
-            val velocity = -(velocityTracker?.xVelocity ?: 0f).toInt()
-            if (abs(velocity) >= minimumFlingVelocity) {
-              horizontalScroller.fling(
-                canvasView.horizontalOffset(),
-                0,
-                velocity,
-                0,
-                0,
-                canvasView.maxHorizontalOffset(),
-                0,
-                0,
-              )
-              postInvalidateOnAnimation()
-            }
-          }
+        val wasPulling = isPulling
+        finishPull(emitRefresh = event.actionMasked == MotionEvent.ACTION_UP)
+        if (event.actionMasked == MotionEvent.ACTION_UP && !wasPulling) {
+          flingAfterRelease(axis)
         }
         dragAxis = null
         horizontalDragTarget = null
@@ -499,6 +511,92 @@ class T3ReviewDiffView(context: Context, appContext: AppContext) : ExpoView(cont
   }
 
   private fun dp(value: Float): Float = value * resources.displayMetrics.density
+
+  private fun canBeginPull(): Boolean {
+    if (!scrollEnabled || !refreshEnabled || refreshing) return false
+    return canvasView.verticalOffset() == 0
+  }
+
+  private fun isRefreshIndicatorVisible(): Boolean =
+    refreshEnabled && (refreshing || (isPulling && pullDistancePx > 0f))
+
+  private fun resolveInterceptDragAxis(event: MotionEvent) {
+    val deltaX = event.x - lastTouchX
+    val deltaY = event.y - lastTouchY
+    if (max(abs(deltaX), abs(deltaY)) <= touchSlop) return
+    dragAxis = if (abs(deltaY) >= abs(deltaX)) {
+      if (scrollEnabled) DragAxis.VERTICAL else null
+    } else {
+      horizontalDragTarget
+        ?.takeIf { canvasView.maxHorizontalOffset(it) > 0 }
+        ?.let { DragAxis.HORIZONTAL }
+    }
+    if (dragAxis != DragAxis.VERTICAL) return
+    if (canStartPull && deltaY > 0f && canvasView.verticalOffset() == 0) {
+      isPulling = true
+      pullDistancePx = deltaY
+      lastTouchX = event.x
+      lastTouchY = event.y
+      invalidate()
+    } else {
+      canStartPull = false
+    }
+  }
+
+  private fun updatePullDrag(fingerDeltaY: Float): Boolean {
+    if (!isPulling) return false
+    val nextPull = pullDistancePx + fingerDeltaY
+    if (nextPull > 0f) {
+      pullDistancePx = nextPull
+    } else {
+      cancelPull()
+      canvasView.scrollByVertical((-nextPull).toInt())
+    }
+    invalidate()
+    return true
+  }
+
+  private fun finishPull(emitRefresh: Boolean) {
+    val pastThreshold = emitRefresh && isPulling && pullDistancePx >= dp(PULL_TRIGGER_DISTANCE_DP)
+    val shouldEmit = pastThreshold && refreshEnabled && !refreshing
+    val hadPull = isPulling || pullDistancePx > 0f
+    cancelPull()
+    if (hadPull) invalidate()
+    if (shouldEmit) {
+      onPullToRefresh(emptyMap<String, Any>())
+    }
+  }
+
+  private fun cancelPull() {
+    isPulling = false
+    canStartPull = false
+    pullDistancePx = 0f
+  }
+
+  private fun flingAfterRelease(axis: DragAxis) {
+    velocityTracker?.computeCurrentVelocity(1000)
+    if (axis == DragAxis.VERTICAL) {
+      val velocity = -(velocityTracker?.yVelocity ?: 0f).toInt()
+      if (abs(velocity) < minimumFlingVelocity) return
+      verticalScroller.fling(0, canvasView.verticalOffset(), 0, velocity, 0, 0, 0, canvasView.maxVerticalOffset())
+      postInvalidateOnAnimation()
+    } else if (horizontalDragTarget?.kind == HorizontalPanKind.CODE) {
+      val velocity = -(velocityTracker?.xVelocity ?: 0f).toInt()
+      if (abs(velocity) < minimumFlingVelocity) return
+      horizontalScroller.fling(canvasView.horizontalOffset(), 0, velocity, 0, 0, canvasView.maxHorizontalOffset(), 0, 0)
+      postInvalidateOnAnimation()
+    }
+  }
+
+  private fun drawPullRefreshIndicator(canvas: Canvas) {
+    if (!isRefreshIndicatorVisible() || width <= 0 || height <= 0) return
+    val activePull = if (isPulling) pullDistancePx else 0f
+    val animate = refreshOverlay.draw(canvas, width, canvasView.theme, refreshing, activePull)
+    if (animate && isAttachedToWindow && visibility == View.VISIBLE) {
+      removeCallbacks(refreshAnimationRunnable)
+      postOnAnimation(refreshAnimationRunnable)
+    }
+  }
 
   private enum class DragAxis {
     VERTICAL,
@@ -1599,4 +1697,65 @@ private fun rowIndexAtOffset(y: Int, rowOffsets: IntArray, rowCount: Int): Int {
     }
   }
   return low.coerceIn(0, rowCount - 1)
+}
+
+private const val PULL_TRIGGER_DISTANCE_DP = 72f
+private const val REFRESH_INDICATOR_SIZE_DP = 36f
+private const val REFRESH_MAX_TRAVEL_DP = 64f
+private const val REFRESH_RESTING_TOP_DP = 16f
+
+private class PullRefreshOverlay(private val density: Float) {
+  private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+  private val arcRect = RectF()
+  private var spinnerAngle = 0f
+
+  fun draw(
+    canvas: Canvas,
+    width: Int,
+    theme: DiffTheme,
+    refreshing: Boolean,
+    pullDistancePx: Float
+  ): Boolean {
+    val radius = REFRESH_INDICATOR_SIZE_DP * density / 2f
+    val centerX = width / 2f
+    val centerY = if (pullDistancePx > 0f) {
+      min(REFRESH_MAX_TRAVEL_DP * density, pullDistancePx * 0.5f) - radius
+    } else {
+      REFRESH_RESTING_TOP_DP * density + radius
+    }
+    paint.style = Paint.Style.FILL
+    paint.color = theme.headerBackground
+    canvas.drawCircle(centerX, centerY, radius, paint)
+
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = density
+    paint.color = theme.border
+    canvas.drawCircle(centerX, centerY, radius, paint)
+
+    val arcInset = 9f * density
+    arcRect.set(
+      centerX - radius + arcInset,
+      centerY - radius + arcInset,
+      centerX + radius - arcInset,
+      centerY + radius - arcInset,
+    )
+    paint.strokeWidth = 2.2f * density
+    paint.strokeCap = Paint.Cap.ROUND
+    if (refreshing) {
+      paint.color = theme.hunkText
+      canvas.drawArc(arcRect, spinnerAngle, 240f, false, paint)
+      spinnerAngle = (spinnerAngle + 6f) % 360f
+      return true
+    }
+    val progress = (pullDistancePx / (PULL_TRIGGER_DISTANCE_DP * density)).coerceIn(0f, 1f)
+    paint.color = if (progress >= 1f) theme.hunkText else theme.mutedText
+    canvas.drawArc(
+      arcRect,
+      -90f + progress * 180f,
+      max(30f, progress * 270f),
+      false,
+      paint,
+    )
+    return false
+  }
 }

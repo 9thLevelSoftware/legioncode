@@ -18,6 +18,7 @@ import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import * as Terminal from "effect/Terminal";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientError from "effect/http/HttpClientError";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
@@ -312,6 +313,8 @@ const readTokenResponse = Effect.fn("cloud.cli_token.read_token_response")(funct
   };
 });
 
+const NO_REDIRECT_INIT: RequestInit = { redirect: "error" };
+
 const exchangeToken = Effect.fn("cloud.cli_token.exchange")(function* (
   metadata: Pick<CloudCliOAuthConfig, "tokenEndpoint">,
   params: Record<string, string>,
@@ -321,6 +324,7 @@ const exchangeToken = Effect.fn("cloud.cli_token.exchange")(function* (
   return yield* HttpClientRequest.post(metadata.tokenEndpoint).pipe(
     HttpClientRequest.bodyUrlParams(params),
     httpClient.execute,
+    Effect.provideService(FetchHttpClient.RequestInit, NO_REDIRECT_INIT),
     Effect.flatMap((response) => readTokenResponse(response, params)),
     Effect.timeout(OAUTH_REQUEST_TIMEOUT),
     Effect.catchTags({
@@ -404,6 +408,7 @@ const pollDeviceToken = Effect.fn("cloud.cli_token.poll_device_token")(function*
     const response = yield* HttpClientRequest.post(metadata.tokenEndpoint).pipe(
       HttpClientRequest.bodyUrlParams(params),
       httpClient.execute,
+      Effect.provideService(FetchHttpClient.RequestInit, NO_REDIRECT_INIT),
       Effect.timeoutOption(OAUTH_REQUEST_TIMEOUT),
       Effect.catchIf(isTransportError, () => Effect.succeedNone),
     );
@@ -445,6 +450,7 @@ export const deviceAuthorizationLogin = Effect.fn("cloud.cli_token.device_author
         scope: metadata.scopes.join(" "),
       }),
       httpClient.execute,
+      Effect.provideService(FetchHttpClient.RequestInit, NO_REDIRECT_INIT),
       Effect.flatMap(HttpClientResponse.schemaBodyJson(DeviceAuthorizationResponse)),
       Effect.timeout(OAUTH_REQUEST_TIMEOUT),
     );

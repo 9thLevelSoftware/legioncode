@@ -12,6 +12,7 @@ import { deriveThreadQueueWorkflowState } from "@t3tools/client-runtime/state/th
 import {
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
   type ChatAttachment,
+  type ComposerContextId,
   type ComposerContextRecord,
   type EnvironmentContextRecord,
   type ResponseContextRecord,
@@ -28,6 +29,7 @@ import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import {
   restoreAttachmentOnlyBootstrapPrompt,
   stripAttachmentOnlyBootstrapPrompt,
+  toKindScopedComposerContextId,
 } from "@t3tools/shared/composerContextReferences";
 import { Atom } from "effect/reactivity";
 import type { RefObject } from "react";
@@ -47,7 +49,17 @@ import {
   releaseDraftAttachments,
   startAttachmentUpload,
 } from "../../lib/attachmentUploadQueue";
-import { buildMessageContext, isResponseContextRecord } from "../../lib/composerContextRecords";
+import {
+  asKnownContextRecord,
+  buildMessageContext,
+  isResponseContextRecord,
+  previewAnnotationContextId,
+  previewAnnotationFromRecord,
+  reviewCommentContextId,
+  reviewCommentFromRecord,
+  terminalContextDraftFromRecord,
+  terminalContextReference,
+} from "../../lib/composerContextRecords";
 import {
   collectInlineContextIds,
   removeInlineContextReference,
@@ -105,7 +117,12 @@ interface QueuedRunEditContent {
 }
 
 const isDraftOwnedRecord = (record: ComposerContextRecord) =>
-  record.kind === "thread" || record.kind === "environment";
+  record.kind === "thread" ||
+  record.kind === "environment" ||
+  record.kind === "terminal" ||
+  record.kind === "review-comment" ||
+  record.kind === "preview-annotation" ||
+  record.kind === "response";
 
 async function submitQueuedRunEdit(input: {
   readonly environmentId: EnvironmentId;
@@ -149,28 +166,84 @@ async function submitQueuedRunEdit(input: {
     });
     if (input.draftChanged())
       return m(msg("Draft changed while preparing this message. Review it and save again."));
-    // The edit draft owns thread and machine mentions, so a chip removed while editing is dropped.
-    const keptRecords = (editing.context?.records ?? []).filter(
-      (record) =>
-        !isDraftOwnedRecord(record) &&
-        (!("attachmentId" in record) ||
-          editing.existingAttachments.some((attachment) => attachment.id === record.attachmentId)),
+    const referencedIds = new Set(collectInlineContextIds(editText));
+    const originalReferencedIds = new Set(collectInlineContextIds(editing.originalText));
+    const remainingAttachmentIds = new Set(
+      editing.existingAttachments.map((attachment) => attachment.id),
     );
-    const newRecords =
+    const existingRecords = editing.context?.records ?? [];
+    const existingScreenshotByAnnotationId = new Map<ComposerContextId, ComposerContextId>();
+    for (const record of existingRecords) {
+      const known = asKnownContextRecord(record);
+      if (known?.kind !== "preview-annotation" || !known.screenshotContextId) continue;
+      const screenshotRecord = existingRecords.find(
+        (candidate) => candidate.contextId === known.screenshotContextId,
+      );
+      if (
+        screenshotRecord &&
+        "attachmentId" in screenshotRecord &&
+        remainingAttachmentIds.has(screenshotRecord.attachmentId)
+      ) {
+        existingScreenshotByAnnotationId.set(known.contextId, known.screenshotContextId);
+      }
+    }
+    const builtNewRecords =
       buildMessageContext({
         terminalContexts: content.terminalContexts.filter(
-          (context) => context.text.trim().length > 0,
+          (context) =>
+            context.text.trim().length > 0 &&
+            referencedIds.has(terminalContextReference(context).contextId),
         ),
-        reviewComments: content.reviewComments,
-        previewAnnotations: content.previewAnnotations,
-        threadContexts: content.threadContexts,
-        environmentContexts: content.environmentContexts,
+        reviewComments: content.reviewComments.filter((comment) =>
+          referencedIds.has(reviewCommentContextId(comment.id)),
+        ),
+        previewAnnotations: content.previewAnnotations.filter((annotation) =>
+          referencedIds.has(previewAnnotationContextId(annotation.id)),
+        ),
+        threadContexts: content.threadContexts.filter((record) =>
+          referencedIds.has(record.contextId),
+        ),
+        environmentContexts: content.environmentContexts.filter((record) =>
+          referencedIds.has(record.contextId),
+        ),
         replyTo: content.replyTo ?? null,
         attachments: newAttachments.map((attachment, index) => ({
           attachment,
           attachmentId: uploads[editing.existingAttachments.length + index]?.id ?? attachment.id,
         })),
       })?.records ?? [];
+    const newRecords = builtNewRecords.map((record) => {
+      if (
+        record.kind === "preview-annotation" &&
+        !("payload" in record) &&
+        !record.screenshotContextId
+      ) {
+        const screenshotContextId = existingScreenshotByAnnotationId.get(record.contextId);
+        if (screenshotContextId) {
+          return {
+            ...record,
+            screenshotContextId,
+          };
+        }
+      }
+      return record;
+    });
+    const keptScreenshotContextIds = new Set(
+      newRecords.flatMap((record) =>
+        record.kind === "preview-annotation" && !("payload" in record) && record.screenshotContextId
+          ? [record.screenshotContextId]
+          : [],
+      ),
+    );
+    const keptRecords = existingRecords.filter((record) => {
+      if (isDraftOwnedRecord(record)) return false;
+      if ("attachmentId" in record) {
+        if (!remainingAttachmentIds.has(record.attachmentId)) return false;
+        if (keptScreenshotContextIds.has(record.contextId)) return true;
+        return !originalReferencedIds.has(record.contextId) || referencedIds.has(record.contextId);
+      }
+      return referencedIds.has(record.contextId);
+    });
     const result = await input.editQueuedRun({
       environmentId,
       input: {
@@ -266,6 +339,10 @@ export function useQueuedRunEdit(input: {
     )?.context;
     const referenced = new Set(collectInlineContextIds(sentText));
     const records = (context?.records ?? []).filter((record) => referenced.has(record.contextId));
+    const knownRecords = records.flatMap((record) => {
+      const known = asKnownContextRecord(record);
+      return known ? [known] : [];
+    });
     // A reply shows above the composer while its message is edited, not as a chip in the text.
     // Only the reply the text still points at: a removed or replaced one stays behind as a record.
     const reply = records.find(isResponseContextRecord);
@@ -273,15 +350,36 @@ export function useQueuedRunEdit(input: {
     const store = useComposerDraftStore.getState();
     store.clearComposerContent(target);
     store.setPrompt(target, text);
+    store.setTerminalContexts(
+      target,
+      knownRecords.flatMap((record) =>
+        record.kind === "terminal" ? [terminalContextDraftFromRecord(record, activeThreadId)] : [],
+      ),
+    );
+    store.setReviewComments(
+      target,
+      knownRecords.flatMap((record) =>
+        record.kind === "review-comment" ? [reviewCommentFromRecord(record)] : [],
+      ),
+    );
+    store.setPreviewAnnotations(
+      target,
+      knownRecords.flatMap((record) =>
+        record.kind === "preview-annotation" ? [previewAnnotationFromRecord(record)] : [],
+      ),
+    );
     store.setThreadContexts(
       target,
-      records.filter((record): record is ThreadContextRecord => record.kind === "thread"),
+      knownRecords.filter((record): record is ThreadContextRecord => record.kind === "thread"),
     );
     store.setEnvironmentContexts(
       target,
-      records.filter((record): record is EnvironmentContextRecord => record.kind === "environment"),
+      knownRecords.filter(
+        (record): record is EnvironmentContextRecord => record.kind === "environment",
+      ),
     );
     if (reply) store.setReplyTo(target, reply);
+    const originalText = store.getComposerDraft(target)?.prompt ?? text;
     const threadRef = { environmentId, threadId: activeThreadId };
     queuedRunEdits.begin(
       editKey,
@@ -289,7 +387,7 @@ export function useQueuedRunEdit(input: {
         threadId: activeThreadId,
         runId: request.runId,
         messageId: request.messageId,
-        originalText: text,
+        originalText,
         existingAttachments: request.attachments,
         context,
       },
@@ -313,6 +411,9 @@ export function useQueuedRunEdit(input: {
             threadTarget: threadDraftTarget,
             originalText: edit.originalText,
             removedExistingAttachment: edit.removedExistingAttachment === true,
+            environmentId,
+            existingAttachments: edit.existingAttachments,
+            context: edit.context,
           });
           if (recovery === "clean") return;
           const title = appAtomRegistry.get(
@@ -344,10 +445,39 @@ export function useQueuedRunEdit(input: {
     focusComposerSoon();
   });
   const removeEditingAttachment = useStableCallback((attachmentId: string) => {
-    queuedRunEdits.update(editKey, (current) => ({
-      ...current,
+    const current = queuedRunEdits.get(editKey);
+    if (current !== null) {
+      const removedAttachment = current.existingAttachments.find(
+        (attachment) => attachment.id === attachmentId,
+      );
+      const contextIds = new Set<string>();
+      for (const record of current.context?.records ?? []) {
+        if ("attachmentId" in record && record.attachmentId === attachmentId) {
+          contextIds.add(record.contextId);
+        }
+      }
+      if (removedAttachment?.type === "image" || removedAttachment?.type === "file") {
+        contextIds.add(toKindScopedComposerContextId(removedAttachment.type, attachmentId));
+      }
+      if (contextIds.size > 0) {
+        const target = queuedRunEditDraftId(routeThreadRef, current.runId);
+        const store = useComposerDraftStore.getState();
+        const draft = store.getComposerDraft(target);
+        if (draft !== null) {
+          let prompt = draft.prompt;
+          for (const contextId of contextIds) {
+            prompt = removeInlineContextReference(prompt, contextId).prompt;
+          }
+          if (prompt !== draft.prompt) {
+            store.setPrompt(target, prompt);
+          }
+        }
+      }
+    }
+    queuedRunEdits.update(editKey, (currentEdit) => ({
+      ...currentEdit,
       removedExistingAttachment: true,
-      existingAttachments: current.existingAttachments.filter(
+      existingAttachments: currentEdit.existingAttachments.filter(
         (attachment) => attachment.id !== attachmentId,
       ),
     }));

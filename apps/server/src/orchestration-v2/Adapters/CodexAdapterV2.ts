@@ -2227,6 +2227,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
         const deferredRootTerminals = yield* Ref.make(new Map<string, DeferredCodexRootTerminal>());
         const offeredContinuationItemsByTurn = yield* Ref.make(new Map<string, Set<string>>());
         const finalAnswerItemIdsByTurn = yield* Ref.make(new Map<string, Set<string>>());
+        const asyncQuestionItemIdsByTurn = yield* Ref.make(new Map<string, Set<string>>());
         const completedFinalAnswerTextsByTurn = yield* Ref.make(new Map<string, Set<string>>());
         const imageTurns = new Map<
           string,
@@ -3905,6 +3906,11 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           emit:
             /* Provider events include streaming deltas; avoid a span for each update. */
             Effect.fnUntraced(function* (update) {
+              if (
+                (yield* Ref.get(asyncQuestionItemIdsByTurn)).get(update.turnId)?.has(update.itemId)
+              ) {
+                return;
+              }
               const context = yield* awaitActiveTurn(update.turnId);
               if (context === undefined) {
                 return;
@@ -4851,6 +4857,11 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
 
         yield* client.handleServerNotification("item/agentMessage/delta", (payload) =>
           Effect.gen(function* () {
+            if (
+              (yield* Ref.get(asyncQuestionItemIdsByTurn)).get(payload.turnId)?.has(payload.itemId)
+            ) {
+              return;
+            }
             const context = (yield* Ref.get(activeTurns)).get(payload.turnId);
             if (context !== undefined) {
               yield* completeProviderRetry(context, yield* DateTime.now);
@@ -5783,6 +5794,17 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             }
 
             if (payload.item.delivery === "async" && payload.item.questions?.length) {
+              yield* Ref.update(asyncQuestionItemIdsByTurn, (current) => {
+                const updated = new Map(current);
+                const itemIds = new Set(updated.get(payload.turnId) ?? []);
+                itemIds.add(payload.item.id);
+                updated.set(payload.turnId, itemIds);
+                return updated;
+              });
+              yield* agentMessageDeltas.discard({
+                turnId: payload.turnId,
+                itemId: payload.item.id,
+              });
               const artifacts = yield* buildUserInputRequestArtifacts({
                 context,
                 nativeItemId: payload.item.id,
@@ -6833,6 +6855,12 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 });
               }
               yield* agentMessageDeltas.flushTurn(input.nativeTurnId);
+              yield* Ref.update(asyncQuestionItemIdsByTurn, (current) => {
+                if (!current.has(input.nativeTurnId)) return current;
+                const updated = new Map(current);
+                updated.delete(input.nativeTurnId);
+                return updated;
+              });
               yield* reasoningDeltas.flushTurn(input.nativeTurnId);
               yield* planDeltas.flushTurn(input.nativeTurnId);
               for (const [key, part] of reasoningParts) {

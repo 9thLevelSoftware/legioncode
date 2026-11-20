@@ -1,18 +1,27 @@
+import { SshConnectionProfile, SshConnectionTarget } from "@t3tools/client-runtime/connection";
+import { ConnectionCatalogDocument } from "@t3tools/client-runtime/platform";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodeWS from "@effect/platform-node/NodeWS";
 import { EnvironmentId } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
-import { expect, it } from "@effect/vitest";
+import { expect, it, vi } from "@effect/vitest";
 import * as NodeNet from "node:net";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
+import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
+import * as Schema from "effect/Schema";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 
+import * as DesktopConnectionCatalogStore from "../app/DesktopConnectionCatalogStore.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
+import * as DesktopSshEnvironment from "../ssh/DesktopSshEnvironment.ts";
+import { setConnectionCatalog } from "../ipc/methods/connectionCatalog.ts";
+import { disconnectSshEnvironment } from "../ipc/methods/sshEnvironment.ts";
 import * as LoopbackTunnel from "./LoopbackTunnel.ts";
 
 const addressPort = (server: NodeNet.Server | NodeWS.WebSocketServer) =>
@@ -143,40 +152,69 @@ const routeThroughTunnel = (
     return Number(/socks5:\/\/127\.0\.0\.1:(\d+)/.exec(proxyRules)![1]);
   });
 
+const formatProcTcpRow = (entry: {
+  readonly clientPort: number;
+  readonly listenerPort: number;
+  readonly uid: number;
+}) => {
+  const hexPort = (port: number) => port.toString(16).padStart(4, "0").toUpperCase();
+  return [
+    "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode",
+    `   0: 0100007F:${hexPort(entry.clientPort)} 0100007F:${hexPort(entry.listenerPort)} 01 00000000:00000000 00:00000000 00000000 ${entry.uid} 0 0 1 0000000000000000 0 0 0 0 -1`,
+  ].join("\n");
+};
+
 /**
- * The real TCP tables with 127.0.0.1 in one column rewritten to 127.0.0.2. The rows keep their
- * ports and owner, so only an address mismatch can refuse them.
+ * The real TCP tables with 127.0.0.1 in one column rewritten to 127.0.0.2 (or a synthetic Linux
+ * table when `/proc/net/tcp` does not exist on non-Linux test hosts). The rows keep their ports and
+ * owner, so only an address mismatch can refuse them.
  */
-const tcpTablesWithMovedAddress = (column: 1 | 2) =>
+const tcpTablesLayer = (
+  movedColumn: 1 | 2 | undefined,
+  fallbackRow: () => {
+    readonly clientPort: number;
+    readonly listenerPort: number;
+    readonly uid: number;
+  },
+) =>
   Layer.effect(
     FileSystem.FileSystem,
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;
       const moveAddress = (line: string) => {
+        if (movedColumn === undefined) return line;
         const columns = line.trim().split(/\s+/);
-        const address = columns[column];
+        const address = columns[movedColumn];
         if (address === undefined || !/0100007F:/i.test(address)) return line;
-        columns[column] = address.replace(/0100007F:/i, "0200007F:");
+        columns[movedColumn] = address.replace(/0100007F:/i, "0200007F:");
         return columns.join(" ");
       };
       return FileSystem.FileSystem.of({
         ...fileSystem,
         readFileString: (path, encoding) =>
-          fileSystem
-            .readFileString(path, encoding)
-            .pipe(Effect.map((table) => table.split("\n").map(moveAddress).join("\n"))),
+          fileSystem.readFileString(path, encoding).pipe(
+            Effect.orElseSucceed(() =>
+              path === "/proc/net/tcp" ? formatProcTcpRow(fallbackRow()) : "",
+            ),
+            Effect.map((table) => table.split("\n").map(moveAddress).join("\n")),
+          ),
       });
     }),
   ).pipe(Layer.provide(NodeFileSystem.layer));
 
 /** Greets the SOCKS listener and sends a CONNECT for `host:port`; resolves with the reply. */
-const socksConnect = (proxyPort: number, host: string, port: number) =>
+const socksConnect = (proxyPort: number, host: string, port: number, localPort?: number) =>
   Effect.acquireRelease(
     Effect.promise(
       () =>
         new Promise<{ socket: NodeNet.Socket; reply: Buffer }>((resolve, reject) => {
-          const socket = NodeNet.connect(proxyPort, "127.0.0.1", () =>
-            socket.write(Uint8Array.of(5, 1, 0)),
+          const socket = NodeNet.connect(
+            {
+              host: "127.0.0.1",
+              port: proxyPort,
+              ...(localPort === undefined ? {} : { localAddress: "127.0.0.1", localPort }),
+            },
+            () => socket.write(Uint8Array.of(5, 1, 0)),
           );
           let received = Buffer.alloc(0);
           let greeted = false;
@@ -239,6 +277,7 @@ it.effect.each([
   { case: "a non-loopback destination", host: "192.168.1.20", tunnel: "endpoint" },
   { case: "no tunnel URL", host: "127.0.0.1", tunnel: "none" },
   { case: "an unreachable tunnel endpoint", host: "localhost", tunnel: "unreachable" },
+  { case: "a missing Linux user id", host: "localhost", tunnel: "missing-uid" },
   { case: "another OS user's client", host: "localhost", tunnel: "other-user" },
   { case: "a TCP row whose client address differs", host: "localhost", tunnel: "moved-client" },
   { case: "a TCP row whose listener address differs", host: "localhost", tunnel: "moved-listener" },
@@ -248,22 +287,45 @@ it.effect.each([
     const endpoint = yield* listenEndpoint;
     const endpointPort =
       tunnel === "unreachable" ? yield* unusedPort : addressPort(endpoint.server);
-    const proxyPort = yield* routeThroughTunnel(
+    const linuxUid = process.getuid?.() ?? 1000;
+    const pinnedClientPort =
+      tunnel === "other-user" || tunnel === "moved-client" || tunnel === "moved-listener"
+        ? yield* unusedPort
+        : undefined;
+    let proxyPort = 0;
+    const row = () => ({
+      clientPort: pinnedClientPort!,
+      listenerPort: proxyPort,
+      uid: linuxUid,
+    });
+    proxyPort = yield* routeThroughTunnel(
       tunnel === "none" ? null : `ws://127.0.0.1:${endpointPort}/api/preview/tunnel`,
-      // This process owns the client, so a different user id here makes it another user's.
-      tunnel === "other-user"
+      tunnel === "missing-uid"
         ? Layer.mergeAll(
             Layer.succeed(HostProcess.Platform, "linux"),
-            Layer.succeed(HostProcess.UserId, (process.getuid?.() ?? 0) + 1),
+            Layer.succeed(HostProcess.UserId, undefined),
           )
-        : tunnel === "moved-client" || tunnel === "moved-listener"
+        : // This process owns the client, so a different user id here makes it another user's.
+          tunnel === "other-user"
           ? Layer.mergeAll(
               Layer.succeed(HostProcess.Platform, "linux"),
-              tcpTablesWithMovedAddress(tunnel === "moved-client" ? 1 : 2),
+              Layer.succeed(HostProcess.UserId, linuxUid + 1),
+              tcpTablesLayer(undefined, row),
             )
-          : undefined,
+          : tunnel === "moved-client" || tunnel === "moved-listener"
+            ? Layer.mergeAll(
+                Layer.succeed(HostProcess.Platform, "linux"),
+                Layer.succeed(HostProcess.UserId, linuxUid),
+                tcpTablesLayer(tunnel === "moved-client" ? 1 : 2, row),
+              )
+            : undefined,
     );
-    const { reply } = yield* socksConnect(proxyPort, host, addressPort(decoy.server));
+    const { reply } = yield* socksConnect(
+      proxyPort,
+      host,
+      addressPort(decoy.server),
+      pinnedClientPort,
+    );
     expect(reply[1]).not.toBe(0);
     expect(endpoint.requests).toEqual([]);
     expect(decoy.connections()).toBe(0);
@@ -514,4 +576,264 @@ it.effect("closes connections beyond a forward's limit without tunnelling them",
     expect(closed).toBe(true);
     expect(endpoint.requests.length).toBe(tunnelled);
   }),
+);
+
+it.effect(
+  "stops local port forwards on SSH disconnect and when dropped from the connection catalog",
+  () =>
+    Effect.gen(function* () {
+      const endpoint = yield* listenEndpoint;
+      const tunnel = yield* makeTunnel(
+        `ws://127.0.0.1:${addressPort(endpoint.server)}/api/preview/tunnel`,
+      );
+      const announced: Array<ReadonlyArray<string>> = [];
+      yield* tunnel.subscribeForwards((forwards) =>
+        Effect.sync(() =>
+          announced.push(
+            forwards.map((forward) => `${forward.environmentId}:${forward.remotePort}`),
+          ),
+        ),
+      );
+
+      const env1 = EnvironmentId.make("ssh-env-1");
+      const env2 = EnvironmentId.make("ssh-env-2");
+      const sshTarget1 = {
+        alias: "box-1",
+        hostname: "box-1.example.test",
+        username: "dev",
+        port: 22,
+      } as const;
+      const sshTarget2 = {
+        alias: "box-2",
+        hostname: "box-2.example.test",
+        username: "dev",
+        port: 2222,
+      } as const;
+      const encodeCatalog = Schema.encodeEffect(Schema.fromJsonString(ConnectionCatalogDocument));
+      const initialCatalog = yield* encodeCatalog({
+        schemaVersion: 1,
+        targets: [
+          new SshConnectionTarget({
+            environmentId: env1,
+            label: "Box 1",
+            connectionId: `ssh:${env1}`,
+          }),
+          new SshConnectionTarget({
+            environmentId: env2,
+            label: "Box 2",
+            connectionId: `ssh:${env2}`,
+          }),
+        ],
+        profiles: [
+          new SshConnectionProfile({
+            connectionId: `ssh:${env1}`,
+            environmentId: env1,
+            label: "Box 1",
+            target: sshTarget1,
+          }),
+          new SshConnectionProfile({
+            connectionId: `ssh:${env2}`,
+            environmentId: env2,
+            label: "Box 2",
+            target: sshTarget2,
+          }),
+        ],
+        credentials: [],
+        remoteDpopTokens: [],
+        disabledEnvironmentIds: [],
+      });
+      const catalogRef = yield* Ref.make<Option.Option<string>>(Option.some(initialCatalog));
+      const catalogLayer = Layer.succeed(
+        DesktopConnectionCatalogStore.DesktopConnectionCatalogStore,
+        {
+          get: Ref.get(catalogRef),
+          set: (catalog) => Ref.set(catalogRef, Option.some(catalog)).pipe(Effect.as(true)),
+        },
+      );
+      const sshLayer = Layer.succeed(DesktopSshEnvironment.DesktopSshEnvironment, {
+        discoverHosts: () => Effect.succeed([]),
+        resolveHost: () => Effect.die("unexpected resolveHost"),
+        ensureEnvironment: () => Effect.die("unexpected ensureEnvironment"),
+        disconnectEnvironment: () => Effect.void,
+        closeAllTunnels: Effect.void,
+      });
+      const ipcLayers = Layer.mergeAll(
+        Layer.succeed(LoopbackTunnel.LoopbackTunnel, tunnel),
+        catalogLayer,
+        sshLayer,
+      );
+
+      const port1 = yield* unusedPort;
+      const port2 = yield* unusedPort;
+      const port3 = yield* unusedPort;
+      const fwd1 = yield* tunnel.forward({ environmentId: env1, remotePort: port1 });
+      const fwd2 = yield* tunnel.forward({ environmentId: env1, remotePort: port2 });
+      const fwd3 = yield* tunnel.forward({ environmentId: env2, remotePort: port3 });
+
+      yield* disconnectSshEnvironment.handler(sshTarget1).pipe(Effect.provide(ipcLayers));
+
+      expect(yield* refusesConnections(fwd1.localPort)).toBe(true);
+      expect(yield* refusesConnections(fwd2.localPort)).toBe(true);
+      expect(yield* refusesConnections(fwd3.localPort)).toBe(false);
+      expect(yield* tunnel.forwards).toEqual([fwd3]);
+
+      const catalogWithoutEnv2 = yield* encodeCatalog({
+        schemaVersion: 1,
+        targets: [
+          new SshConnectionTarget({
+            environmentId: env1,
+            label: "Box 1",
+            connectionId: `ssh:${env1}`,
+          }),
+        ],
+        profiles: [
+          new SshConnectionProfile({
+            connectionId: `ssh:${env1}`,
+            environmentId: env1,
+            label: "Box 1",
+            target: sshTarget1,
+          }),
+        ],
+        credentials: [],
+        remoteDpopTokens: [],
+        disabledEnvironmentIds: [],
+      });
+      expect(
+        yield* setConnectionCatalog.handler(catalogWithoutEnv2).pipe(Effect.provide(ipcLayers)),
+      ).toBe(true);
+
+      expect(yield* refusesConnections(fwd3.localPort)).toBe(true);
+      expect(yield* tunnel.forwards).toEqual([]);
+      expect(announced.at(-2)).toEqual([`${env2}:${port3}`]);
+      expect(announced.at(-1)).toEqual([]);
+
+      // Also stops forwards when a previously active environment becomes disabled in the catalog.
+      const fwd3Reopened = yield* tunnel.forward({ environmentId: env2, remotePort: port3 });
+      const catalogDisablingEnv2 = yield* encodeCatalog({
+        schemaVersion: 1,
+        targets: [
+          new SshConnectionTarget({
+            environmentId: env1,
+            label: "Box 1",
+            connectionId: `ssh:${env1}`,
+          }),
+          new SshConnectionTarget({
+            environmentId: env2,
+            label: "Box 2",
+            connectionId: `ssh:${env2}`,
+          }),
+        ],
+        profiles: [
+          new SshConnectionProfile({
+            connectionId: `ssh:${env1}`,
+            environmentId: env1,
+            label: "Box 1",
+            target: sshTarget1,
+          }),
+          new SshConnectionProfile({
+            connectionId: `ssh:${env2}`,
+            environmentId: env2,
+            label: "Box 2",
+            target: sshTarget2,
+          }),
+        ],
+        credentials: [],
+        remoteDpopTokens: [],
+        disabledEnvironmentIds: [env2],
+      });
+      yield* Ref.set(catalogRef, Option.some(initialCatalog));
+      expect(
+        yield* setConnectionCatalog.handler(catalogDisablingEnv2).pipe(Effect.provide(ipcLayers)),
+      ).toBe(true);
+      expect(yield* refusesConnections(fwd3Reopened.localPort)).toBe(true);
+      expect(yield* tunnel.forwards).toEqual([]);
+    }),
+);
+
+it.effect("closes a forwarded connection when writing over the tunnel WebSocket fails", () =>
+  Effect.gen(function* () {
+    const endpoint = yield* listenEndpoint;
+    const tunnel = yield* makeTunnel(
+      `ws://127.0.0.1:${addressPort(endpoint.server)}/api/preview/tunnel`,
+    );
+    const forward = yield* tunnel.forward({
+      environmentId: EnvironmentId.make("remote"),
+      remotePort: yield* unusedPort,
+    });
+    using _spy = {
+      [Symbol.dispose]: () => vi.restoreAllMocks(),
+    };
+    const originalSend = NodeWS.WebSocket.prototype.send;
+    vi.spyOn(NodeWS.WebSocket.prototype, "send").mockImplementation(function (
+      this: NodeWS.WebSocket,
+      data: Parameters<NodeWS.WebSocket["send"]>[0],
+      optionsOrCallback?: unknown,
+      maybeCallback?: unknown,
+    ) {
+      const callback =
+        typeof optionsOrCallback === "function"
+          ? (optionsOrCallback as (err?: Error) => void)
+          : typeof maybeCallback === "function"
+            ? (maybeCallback as (err?: Error) => void)
+            : undefined;
+      if (this.url.includes(`port=${forward.remotePort}`)) {
+        queueMicrotask(() => callback?.(new Error("socket broken")));
+        return;
+      }
+      return (originalSend as (...args: unknown[]) => void).apply(
+        this,
+        maybeCallback === undefined
+          ? [data, optionsOrCallback]
+          : [data, optionsOrCallback, maybeCallback],
+      );
+    });
+
+    const closed = yield* Effect.promise(
+      () =>
+        new Promise<boolean>((resolve) => {
+          const socket = NodeNet.connect(forward.localPort, "127.0.0.1", () => {
+            socket.write(Uint8Array.of(1, 2, 3));
+          });
+          socket.on("close", () => resolve(true));
+          socket.on("data", () => resolve(false));
+        }),
+    );
+    expect(closed).toBe(true);
+  }),
+);
+
+it.effect(
+  "sendWebSocketChunks fails with SocketWriteError on non-OPEN, sync throw, or chunk error",
+  () =>
+    Effect.gen(function* () {
+      const closedSend = vi.fn();
+      const nonOpen = yield* LoopbackTunnel.sendWebSocketChunks(
+        { readyState: 3, send: closedSend as unknown as NodeWS.WebSocket["send"] },
+        [Uint8Array.of(1)],
+      ).pipe(Effect.flip);
+      expect(nonOpen.reason._tag).toBe("SocketWriteError");
+      expect(closedSend).not.toHaveBeenCalled();
+
+      const syncError = yield* LoopbackTunnel.sendWebSocketChunks(
+        {
+          readyState: 1,
+          send: (() => {
+            throw new Error("sync write failure");
+          }) as unknown as NodeWS.WebSocket["send"],
+        },
+        [Uint8Array.of(1)],
+      ).pipe(Effect.flip);
+      expect(syncError.reason._tag).toBe("SocketWriteError");
+
+      const callbackError = yield* LoopbackTunnel.sendWebSocketChunks(
+        {
+          readyState: 1,
+          send: ((chunk: Uint8Array, cb?: (err?: Error) => void) => {
+            queueMicrotask(() => cb?.(chunk[0] === 1 ? new Error("chunk 1 failed") : undefined));
+          }) as unknown as NodeWS.WebSocket["send"],
+        },
+        [Uint8Array.of(1), Uint8Array.of(2)],
+      ).pipe(Effect.flip);
+      expect(callbackError.reason._tag).toBe("SocketWriteError");
+    }),
 );

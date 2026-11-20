@@ -458,6 +458,65 @@ function withCaptureTimeout<A>(promise: Promise<A>, millis: number): Promise<A |
 
 const HTML_PREVIEW_MAX_CHARS = 500;
 
+export interface MainWorldElementInspectorResult {
+  readonly componentName: string | null;
+  readonly stack: ReadonlyArray<PickedElementStackFrame>;
+}
+
+export type MainWorldElementInspector = (
+  element: Element,
+) => Promise<MainWorldElementInspectorResult | null>;
+
+let mainWorldElementInspector: MainWorldElementInspector | null = null;
+
+export function registerMainWorldElementInspector(
+  inspector: MainWorldElementInspector | null,
+): void {
+  mainWorldElementInspector = inspector;
+}
+
+export function buildMainWorldReactInspectScript(attributeName: string, token: string): string {
+  return `(() => {
+  try {
+    const target = document.querySelector('[' + ${JSON.stringify(attributeName)} + '=' + JSON.stringify(${JSON.stringify(token)}) + ']');
+    if (!target) return null;
+    const fiberKey = Object.keys(target).find(
+      (key) => key.startsWith("__reactFiber$") || key.startsWith("__reactInternalInstance$"),
+    );
+    if (!fiberKey) return null;
+    const readName = (type) => {
+      if (typeof type === "function") return type.displayName || type.name || null;
+      if (typeof type === "object" && type !== null) {
+        return type.displayName || readName(type.render) || readName(type.type) || null;
+      }
+      return null;
+    };
+    const stack = [];
+    let componentName = null;
+    let fiber = target[fiberKey];
+    let steps = 0;
+    while (fiber && steps < 40 && stack.length < 12) {
+      steps += 1;
+      const name = readName(fiber.type);
+      const source = fiber._debugSource;
+      if (name || source) {
+        if (componentName === null && name) componentName = name;
+        stack.push({
+          functionName: name,
+          fileName: typeof source?.fileName === "string" ? source.fileName : null,
+          lineNumber: typeof source?.lineNumber === "number" ? source.lineNumber : null,
+          columnNumber: typeof source?.columnNumber === "number" ? source.columnNumber : null,
+        });
+      }
+      fiber = fiber.return;
+    }
+    return componentName === null && stack.length === 0 ? null : { componentName, stack };
+  } catch {
+    return null;
+  }
+})();`;
+}
+
 /** Preserve the tag, HTML, and crop rect when React context lookup fails or stalls. */
 async function captureElement(element: Element): Promise<PickedElementPayload> {
   const base = {
@@ -471,16 +530,28 @@ async function captureElement(element: Element): Promise<PickedElementPayload> {
       Promise.resolve(getElementContext(element)),
       ELEMENT_CONTEXT_TIMEOUT_MS,
     );
-    if (context) {
-      const stack = (context.stack ?? []).map(toStackFrame);
+    const hasReactInfo =
+      context !== null && (context.componentName !== null || (context.stack?.length ?? 0) > 0);
+    const mainWorld =
+      !hasReactInfo && mainWorldElementInspector !== null
+        ? await withCaptureTimeout(
+            Promise.resolve(mainWorldElementInspector(element)),
+            ELEMENT_CONTEXT_TIMEOUT_MS,
+          )
+        : null;
+    if (context || mainWorld) {
+      const stack =
+        mainWorld && mainWorld.stack.length > 0
+          ? [...mainWorld.stack]
+          : (context?.stack ?? []).map(toStackFrame);
       return {
         ...base,
-        selector: context.selector,
-        htmlPreview: context.htmlPreview ?? "",
-        componentName: context.componentName,
+        selector: context?.selector ?? null,
+        htmlPreview: context?.htmlPreview ?? element.outerHTML.slice(0, HTML_PREVIEW_MAX_CHARS),
+        componentName: mainWorld?.componentName ?? context?.componentName ?? null,
         source: stack[0] ?? null,
         stack,
-        styles: context.styles ?? "",
+        styles: context?.styles ?? "",
       };
     }
   } catch {}
@@ -1819,7 +1890,7 @@ function startAnnotation(
     if (event.type === "keyup") onVoiceKeyUp(event);
     if (event.type !== "keydown") return;
     onKeyDown(event);
-    if (event.cancelBubble) return;
+    if (event.cancelBubble || !event.isTrusted) return;
     const submission =
       shadowRoot.activeElement === comment ? resolveAnnotationSubmission(event, sendEnabled) : null;
     if (!submission) return;

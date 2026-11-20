@@ -19,6 +19,11 @@ import { useTerminalUiStateStore } from "../terminalUiStateStore";
 import { extractTerminalLinks } from "../terminal-links";
 import { expect, it, vi } from "vite-plus/test";
 import { act, fakeTimers, render } from "../../test/render";
+import {
+  PersistentThreadTerminalDrawer,
+  PersistentThreadTerminalPanel,
+  type PersistentTerminalLaunchContext,
+} from "./PersistentThreadTerminals";
 import ThreadTerminalDrawer from "./ThreadTerminalDrawer";
 
 const fixture = vi.hoisted(() => ({
@@ -36,6 +41,20 @@ const fixture = vi.hoisted(() => ({
     _generation?: number,
   ) => {},
   sessionEvent: (_thread: ScopedThreadRef, _type: "snapshot" | "restarted", _pid = 123) => {},
+  drawerSessionsByThread: new Map<
+    string,
+    ReadonlyArray<{
+      readonly terminalId: string;
+      readonly cwd: string;
+      readonly worktreePath: string | null;
+    }>
+  >(),
+  attachedTerminals: [] as Array<{
+    readonly threadId: string;
+    readonly terminalId: string;
+    readonly cwd: string;
+    readonly worktreePath?: string | null;
+  }>,
   surfaceOptions: [] as GhosttyTerminalSurfaceOptions[],
   reportedSize: null as { cols: number; rows: number } | null,
   resizeCommand: {},
@@ -146,11 +165,68 @@ vi.mock("../state/terminalSessions", async () => {
       }),
     });
   };
+  const knownSessionsForThread = (environmentId: EnvironmentId, threadId: ThreadId) => {
+    const entries = fixture.drawerSessionsByThread.get(`${environmentId}:${threadId}`) ?? [];
+    return entries.map((entry) => ({
+      target: { environmentId, threadId, terminalId: entry.terminalId },
+      state: {
+        ...EMPTY_TERMINAL_SESSION_STATE,
+        status: "running" as const,
+        version: 1,
+        summary: {
+          ...summary(threadId, 123),
+          terminalId: entry.terminalId,
+          cwd: entry.cwd,
+          worktreePath: entry.worktreePath,
+        },
+      },
+    }));
+  };
   return {
-    attachedTerminalSessionAtom: (environmentId: EnvironmentId, terminal: { threadId: ThreadId }) =>
-      session(environmentId, terminal.threadId),
+    attachedTerminalSessionAtom: (
+      environmentId: EnvironmentId,
+      terminal: {
+        threadId: ThreadId;
+        terminalId: string;
+        cwd: string;
+        worktreePath?: string | null;
+      },
+    ) => {
+      fixture.attachedTerminals.push({
+        threadId: terminal.threadId,
+        terminalId: terminal.terminalId,
+        cwd: terminal.cwd,
+        ...(terminal.worktreePath !== undefined ? { worktreePath: terminal.worktreePath } : {}),
+      });
+      return session(environmentId, terminal.threadId);
+    },
+    useTerminalDrawerSessions: (environmentId: EnvironmentId, threadId: ThreadId) => ({
+      sessions: knownSessionsForThread(environmentId, threadId),
+      snapshotId: "snapshot-1",
+    }),
+    useKnownTerminalSessions: (input: {
+      readonly environmentId: EnvironmentId | null;
+      readonly threadId: ThreadId | null;
+    }) =>
+      input.environmentId && input.threadId
+        ? knownSessionsForThread(input.environmentId, input.threadId)
+        : null,
   };
 });
+vi.mock("../state/entities", () => ({
+  useProject: (
+    projectRef: { readonly environmentId: EnvironmentId; readonly projectId: string } | null,
+  ) => (projectRef ? { id: projectRef.projectId, workspaceRoot: "/repo" } : null),
+  useQuietThreadShell: (threadRef: ScopedThreadRef | null) =>
+    threadRef
+      ? {
+          id: threadRef.threadId,
+          environmentId: threadRef.environmentId,
+          projectId: "project-1",
+          worktreePath: null,
+        }
+      : null,
+}));
 vi.mock("../state/session", () => ({
   useEnvironmentScope: () => true,
   readEnvironmentScope: () => true,
@@ -173,7 +249,7 @@ vi.mock("../state/server", async () => {
   return { serverEnvironment: { configValueAtom: () => config } };
 });
 vi.mock("../state/terminal", () => ({
-  terminalEnvironment: { write: {}, resize: fixture.resizeCommand },
+  terminalEnvironment: { write: {}, resize: fixture.resizeCommand, open: {}, close: {} },
 }));
 vi.mock("../state/preview", () => ({ previewEnvironment: { open: {} } }));
 vi.mock("../state/projects", async () => {
@@ -262,6 +338,8 @@ function setup(originalStatus: "starting" | "exited" = "exited") {
   fixture.messages = [];
   fixture.surfaceOptions = [];
   fixture.reportedSize = null;
+  fixture.drawerSessionsByThread.clear();
+  fixture.attachedTerminals = [];
   fixture.runResize = () => Promise.resolve(AsyncResult.success(undefined));
   fixture.runWrite = () => Promise.resolve({ _tag: "Success" });
   fixture.metadata.clear();
@@ -553,4 +631,153 @@ it("resends a failed resize once in each writable session", async () => {
     input: { threadId: threadRef.threadId, terminalId: "term-1", cols: 57, rows: 41 },
   };
   expect(resizes).toEqual([resize, resize, resize]);
+});
+
+it("keeps existing open drawer and panel terminal sessions bound to summary cwd across launchContext flips", async () => {
+  const { other: threadRef } = setup();
+  const threadKey = `${threadRef.environmentId}:${threadRef.threadId}`;
+  fixture.drawerSessionsByThread.set(threadKey, [
+    { terminalId: "term-1", cwd: "/repo", worktreePath: null },
+  ]);
+  useTerminalUiStateStore.getState().setTerminalOpen(threadRef, true);
+  useTerminalUiStateStore.getState().splitTerminal(threadRef, "term-2");
+
+  const launchContext: PersistentTerminalLaunchContext = {
+    cwd: "/repo/worktree",
+    worktreePath: "/repo/worktree",
+  };
+  const renderDrawer = (
+    active: boolean,
+    nextLaunchContext: PersistentTerminalLaunchContext | null,
+  ) => (
+    <PersistentThreadTerminalDrawer
+      threadRef={threadRef}
+      threadId={threadRef.threadId}
+      active={active}
+      composerHeight={0}
+      launchContext={nextLaunchContext}
+      splitShortcutLabel={undefined}
+      splitVerticalShortcutLabel={undefined}
+      newShortcutLabel={undefined}
+      closeShortcutLabel={undefined}
+      keybindings={[]}
+      onAddTerminalContext={() => {}}
+    />
+  );
+
+  await using drawerScreen = await render(renderDrawer(true, launchContext));
+  await act(async () => {
+    while (fixture.pendingSurfaces.length > 0) fixture.pendingSurfaces.shift()?.();
+  });
+
+  expect(fixture.attachedTerminals).toContainEqual(
+    expect.objectContaining({ terminalId: "term-1", cwd: "/repo", worktreePath: null }),
+  );
+  expect(fixture.attachedTerminals).toContainEqual(
+    expect.objectContaining({
+      terminalId: "term-2",
+      cwd: "/repo/worktree",
+      worktreePath: "/repo/worktree",
+    }),
+  );
+  const drawerSurfacesBeforeSwitch = fixture.surfaceOptions.length;
+
+  await drawerScreen.rerender(renderDrawer(false, null));
+  await drawerScreen.rerender(renderDrawer(true, launchContext));
+  expect(fixture.surfaceOptions).toHaveLength(drawerSurfacesBeforeSwitch);
+
+  fixture.attachedTerminals = [];
+  const renderPanel = (nextLaunchContext: PersistentTerminalLaunchContext | null) => (
+    <PersistentThreadTerminalPanel
+      visible
+      threadRef={threadRef}
+      surface={{
+        id: "terminal:panel-term",
+        kind: "terminal",
+        resourceId: "panel-term",
+        terminalIds: ["term-1"],
+        activeTerminalId: "term-1",
+      }}
+      launchContext={nextLaunchContext}
+      keybindings={[]}
+      onAddTerminalContext={() => {}}
+      onSplitTerminal={() => {}}
+      onSplitTerminalVertical={() => {}}
+      onNewTerminal={() => {}}
+      onActiveTerminalChange={() => {}}
+      onCloseTerminal={() => {}}
+    />
+  );
+
+  await using panelScreen = await render(renderPanel(launchContext));
+  await act(async () => {
+    while (fixture.pendingSurfaces.length > 0) fixture.pendingSurfaces.shift()?.();
+  });
+  expect(fixture.attachedTerminals).toContainEqual(
+    expect.objectContaining({ terminalId: "term-1", cwd: "/repo", worktreePath: null }),
+  );
+  const panelSurfacesBeforeSwitch = fixture.surfaceOptions.length;
+  await panelScreen.rerender(renderPanel(null));
+  expect(fixture.surfaceOptions).toHaveLength(panelSurfacesBeforeSwitch);
+});
+
+it("scopes cached panel terminal launch locations to the active thread", async () => {
+  const { original, other } = setup();
+  const renderPanel = (
+    targetThreadRef: ScopedThreadRef,
+    terminalId: string,
+    launchContext: PersistentTerminalLaunchContext | null,
+  ) => (
+    <PersistentThreadTerminalPanel
+      visible
+      threadRef={targetThreadRef}
+      surface={{
+        id: "terminal:panel-term",
+        kind: "terminal",
+        resourceId: "panel-term",
+        terminalIds: [terminalId],
+        activeTerminalId: terminalId,
+      }}
+      launchContext={launchContext}
+      keybindings={[]}
+      onAddTerminalContext={() => {}}
+      onSplitTerminal={() => {}}
+      onSplitTerminalVertical={() => {}}
+      onNewTerminal={() => {}}
+      onActiveTerminalChange={() => {}}
+      onCloseTerminal={() => {}}
+    />
+  );
+
+  await using panelScreen = await render(
+    renderPanel(original, "default", {
+      cwd: "/repo/worktree-a",
+      worktreePath: "/repo/worktree-a",
+    }),
+  );
+  await act(async () => {
+    while (fixture.pendingSurfaces.length > 0) fixture.pendingSurfaces.shift()?.();
+  });
+  expect(fixture.attachedTerminals).toContainEqual(
+    expect.objectContaining({
+      threadId: original.threadId,
+      terminalId: "default",
+      cwd: "/repo/worktree-a",
+      worktreePath: "/repo/worktree-a",
+    }),
+  );
+
+  fixture.attachedTerminals = [];
+  await panelScreen.rerender(renderPanel(other, "default", null));
+  await act(async () => {
+    while (fixture.pendingSurfaces.length > 0) fixture.pendingSurfaces.shift()?.();
+  });
+  expect(fixture.attachedTerminals).toContainEqual(
+    expect.objectContaining({
+      threadId: other.threadId,
+      terminalId: "default",
+      cwd: "/repo",
+      worktreePath: null,
+    }),
+  );
 });

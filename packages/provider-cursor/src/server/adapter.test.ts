@@ -48,7 +48,7 @@ import {
 } from "./adapter.ts";
 import * as CursorAgentSdk from "./CursorAgentSdk.ts";
 import * as CursorSdk from "./CursorSdk.ts";
-import { loadCursorSdk } from "./sdk.ts";
+import { loadCursorSdk, loadCursorSqlite } from "./sdk.ts";
 import { cursorWorkspaceMcpServers } from "./workspaceMcpServers.ts";
 
 // The SDK reads CURSOR_BACKEND_URL once when it loads, before any test body runs.
@@ -2105,11 +2105,19 @@ describe("CursorAdapterV2", () => {
                     callId: "shell-call",
                     toolCall: shell,
                   });
-                  for (const chunk of chunks) {
+                  for (const [index, chunk] of chunks.entries()) {
                     yield* input.onDelta!({
                       type: "shell-output-delta",
                       event: { case: "stdout", value: { data: chunk }, toolCallId: "shell-call" },
                     });
+                    if (index === 0) {
+                      yield* input.onDelta!({
+                        type: "partial-tool-call",
+                        modelCallId: "model-call",
+                        callId: "shell-call",
+                        toolCall: shell,
+                      });
+                    }
                   }
                   yield* input.onDelta!({
                     type: "tool-call-completed",
@@ -2202,6 +2210,20 @@ describe("CursorAdapterV2", () => {
         Stream.takeUntil((event) => event.type === "turn.terminal"),
         Stream.runCollect,
       );
+      const deltas = events.flatMap((event) =>
+        event.type === "command_output.delta" ? [event.chunk] : [],
+      );
+      assert.equal(deltas.length, chunks.length);
+      assert.equal(deltas[0], chunks[0]);
+      const runningCommandItems = events.flatMap((event) =>
+        event.type === "turn_item.updated" &&
+        event.turnItem.type === "command_execution" &&
+        event.turnItem.status === "running"
+          ? [event.turnItem]
+          : [],
+      );
+      assert.isTrue(runningCommandItems.length > 0);
+      assert.isTrue(runningCommandItems.every((item) => item.output === undefined));
       const output = events
         .flatMap((event) =>
           event.type === "turn_item.updated" &&
@@ -2358,25 +2380,36 @@ describe("CursorAdapterV2", () => {
         USERPROFILE: home,
         CURSOR_CONFIG_DIR: path.join(home, ".cursor"),
       });
+      const store = yield* Effect.acquireRelease(
+        Effect.promise(() =>
+          loadCursorSqlite().SqliteLocalAgentStore.open({
+            workspaceRef: home,
+            stateRoot: path.join(home, "sdk-agent-store"),
+          }),
+        ),
+        (store) => Effect.promise(() => store.dispose()),
+      );
+      const baseOptions = makeCursorAgentOptions({
+        apiKey: "synthetic-cursor-api-key",
+        modelSelection: {
+          instanceId: ProviderInstanceId.make("cursor"),
+          model: "composer-2",
+        },
+        runtimePolicy: {
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          cwd: home,
+        },
+        threadId: ThreadId.make("cursor-attribution-thread"),
+        mcpSession: undefined,
+        platform: "linux",
+      });
       const agent = yield* Effect.acquireRelease(
         Effect.promise(() =>
-          Agent.create(
-            makeCursorAgentOptions({
-              apiKey: "synthetic-cursor-api-key",
-              modelSelection: {
-                instanceId: ProviderInstanceId.make("cursor"),
-                model: "composer-2",
-              },
-              runtimePolicy: {
-                runtimeMode: "full-access",
-                interactionMode: "default",
-                cwd: home,
-              },
-              threadId: ThreadId.make("cursor-attribution-thread"),
-              mcpSession: undefined,
-              platform: "linux",
-            }),
-          ),
+          Agent.create({
+            ...baseOptions,
+            local: { ...baseOptions.local, store },
+          }),
         ),
         (agent) => Effect.sync(() => agent.close()),
       );
@@ -2400,30 +2433,44 @@ describe("CursorAdapterV2", () => {
         USERPROFILE: home,
         CURSOR_CONFIG_DIR: path.join(home, ".cursor"),
       });
+      const store = yield* Effect.acquireRelease(
+        Effect.promise(() =>
+          loadCursorSqlite().SqliteLocalAgentStore.open({
+            workspaceRef: home,
+            stateRoot: path.join(home, "sdk-agent-store"),
+          }),
+        ),
+        (store) => Effect.promise(() => store.dispose()),
+      );
       const runner = yield* CursorAgentSdk.makeCursorAgentSdkRunner(() => undefined).pipe(
         Effect.provide(CursorSdk.layer),
       );
-      const open = (model: string) =>
-        Effect.acquireRelease(
+      const open = (model: string) => {
+        const baseOptions = makeCursorAgentOptions({
+          apiKey: "synthetic-cursor-api-key",
+          modelSelection: { instanceId: ProviderInstanceId.make("cursor"), model },
+          runtimePolicy: {
+            runtimeMode: "full-access",
+            interactionMode: "default",
+            cwd: home,
+          },
+          threadId: ThreadId.make(`cursor-new-model-${model}`),
+          mcpSession: undefined,
+          platform: "linux",
+        });
+        return Effect.acquireRelease(
           runner.open({
             operation: "create",
-            options: makeCursorAgentOptions({
-              apiKey: "synthetic-cursor-api-key",
-              modelSelection: { instanceId: ProviderInstanceId.make("cursor"), model },
-              runtimePolicy: {
-                runtimeMode: "full-access",
-                interactionMode: "default",
-                cwd: home,
-              },
-              threadId: ThreadId.make(`cursor-new-model-${model}`),
-              mcpSession: undefined,
-              platform: "linux",
-            }),
+            options: {
+              ...baseOptions,
+              local: { ...baseOptions.local, store },
+            },
             threadId: ThreadId.make(`cursor-new-model-${model}`),
             providerSessionId: ProviderSessionId.make(`cursor-new-model-${model}`),
           }),
           (session) => Effect.ignore(session.close),
         );
+      };
 
       yield* open("composer-2");
       backend.models.push("composer-2.5");

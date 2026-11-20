@@ -101,6 +101,7 @@ import {
 } from "@t3tools/source-control-core/server/PullRequestProvider";
 import * as PullRequestReadCache from "./PullRequestReadCache.ts";
 import * as PullRequestProviderRegistry from "./PullRequestProviderRegistry.ts";
+import { pullRequestSyncKey } from "./pullRequestSyncKey.ts";
 import * as ViewedFiles from "./pullRequestViewedFiles.ts";
 import { toChangeBreakdown } from "./pullRequestChangeBreakdown.ts";
 
@@ -318,7 +319,10 @@ export class PullRequestService extends Context.Service<
     ) => Effect.Effect<void, PullRequestError>;
     readonly invalidate: (
       input: PullRequestInvalidateInput,
-      options?: { readonly notifyReaders?: boolean },
+      options?: {
+        readonly notifyReaders?: boolean;
+        readonly syncLinkedThreads?: boolean;
+      },
     ) => Effect.Effect<void>;
   }
 >()("t3/pullRequest/PullRequestService") {}
@@ -3763,6 +3767,34 @@ export const make = Effect.gen(function* () {
       { discard: true },
     );
 
+  const resolveSyncKey = (reference: PullRequestRef, project?: SupportedProject) => {
+    if (project !== undefined) {
+      return Effect.succeed(
+        pullRequestSyncKey(
+          {
+            ...reference,
+            projectId: project.project.id,
+            host: project.host,
+            repository: project.repository,
+          },
+          project.project.repositoryIdentity,
+        ),
+      );
+    }
+    return reference.host !== undefined && reference.repository.includes("/")
+      ? Effect.succeed(pullRequestSyncKey(reference))
+      : projects.getShell(reference.projectId).pipe(
+          Effect.map((shell) =>
+            pullRequestSyncKey(reference, Option.getOrUndefined(shell)?.repositoryIdentity),
+          ),
+          Effect.orElseSucceed(() => null),
+        );
+  };
+  const publishStateChange = (reference: PullRequestRef, project?: SupportedProject) =>
+    resolveSyncKey(reference, project).pipe(
+      Effect.flatMap((key) => (key === null ? Effect.void : PubSub.publish(stateChanges, key))),
+    );
+
   const invalidate: PullRequestService["Service"]["invalidate"] = Effect.fn(
     "PullRequestService.invalidate",
   )(function* (input, options) {
@@ -3775,14 +3807,22 @@ export const make = Effect.gen(function* () {
             Effect.ignore,
           );
     }
+    let resolvedProject: SupportedProject | undefined;
     if (reference !== undefined) {
-      yield* canonicalRef(reference).pipe(
-        Effect.flatMap((ref) =>
-          forgetProviderReads({ repository: ref.repository, number: ref.number }).pipe(
+      yield* requireProject(reference).pipe(
+        Effect.flatMap((project) => {
+          resolvedProject = project;
+          const ref = {
+            ...reference,
+            projectId: project.project.id,
+            host: project.host,
+            repository: project.repository,
+          };
+          return forgetProviderReads({ repository: ref.repository, number: ref.number }).pipe(
             Effect.andThen(readCache.invalidate(refScope(ref))),
             Effect.andThen(Effect.sync(() => bumpRefEpoch(ref))),
-          ),
-        ),
+          );
+        }),
         Effect.ignore,
       );
     } else {
@@ -3794,6 +3834,9 @@ export const make = Effect.gen(function* () {
     }
     if (options?.notifyReaders) {
       yield* SubscriptionRef.set(pullRequestRefreshes, ++epochCounter);
+    }
+    if (options?.syncLinkedThreads && reference !== undefined) {
+      yield* publishStateChange(reference, resolvedProject);
     }
   });
 
@@ -3952,7 +3995,13 @@ export const make = Effect.gen(function* () {
   const runActionAndInvalidate: PullRequestService["Service"]["runAction"] = Effect.fn(
     "PullRequestService.runActionAndInvalidate",
   )(function* (input) {
-    const ref = yield* canonicalRef(input);
+    const project = yield* requireProject(input);
+    const ref = {
+      ...input,
+      projectId: project.project.id,
+      host: project.host,
+      repository: project.repository,
+    };
     yield* readCache.invalidate(refScope(ref));
     const { repository, summary } = yield* runAction(input).pipe(
       Effect.ensuring(readCache.invalidate(refScope(ref))),
@@ -3960,6 +4009,7 @@ export const make = Effect.gen(function* () {
     bumpRefEpoch({ ...ref, repository });
     listingsEpoch = ++epochCounter;
     yield* SubscriptionRef.set(pullRequestRefreshes, listingsEpoch);
+    yield* publishStateChange(ref, project);
     if (input.action === "merge") {
       // A successful merge action can merely enqueue the PR or enable auto-merge.
       const merged = summary?.state === "merged" ? summary : null;

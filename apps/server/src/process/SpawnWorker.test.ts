@@ -28,6 +28,11 @@ const text = <E>(stream: Stream.Stream<Uint8Array, E>) =>
 const node = (script: string, args: ReadonlyArray<string> = [], options = {}) =>
   ChildProcess.make(process.execPath, ["-e", script, ...args], options);
 
+const makeAbortHandle = () => {
+  const controller = new AbortController();
+  return { signal: controller.signal, abort: () => controller.abort() };
+};
+
 describe("SpawnWorker", () => {
   it.live("runs children on a launcher thread where the server thread would wait on them", () =>
     Effect.gen(function* () {
@@ -199,6 +204,74 @@ describe("SpawnWorker", () => {
       });
       const exited = new Promise((resolve) => direct.once("exit", () => resolve(direct.killed)));
       expect(yield* Effect.promise(() => exited)).toBe(true);
+
+      const treeScript = [
+        "const { spawn } = require('node:child_process');",
+        "const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 60000)'], { detached: true, stdio: 'ignore' });",
+        "process.stdout.write(String(child.pid) + '\\n');",
+        "setInterval(() => {}, 60000);",
+      ].join("");
+      const spawnTreeChild = (signal?: AbortSignal) =>
+        SpawnWorker.spawnPiped(process.execPath, ["-e", treeScript], signal ? { signal } : {});
+      const awaitPidAndExit = (
+        proc: ReturnType<typeof SpawnWorker.spawnPiped>,
+        triggerKill: (proc: ReturnType<typeof SpawnWorker.spawnPiped>) => void,
+      ) =>
+        Effect.promise(
+          () =>
+            new Promise<number>((resolve, reject) => {
+              let buffer = "";
+              let grandchildPid: number | undefined;
+              const onExit = () => {
+                if (grandchildPid === undefined) {
+                  reject(new Error("parent exited before reporting grandchild pid"));
+                  return;
+                }
+                resolve(grandchildPid);
+              };
+              proc.once("exit", onExit);
+              proc.once("error", reject);
+              proc.stdout.setEncoding("utf8");
+              proc.stdout.on("data", (chunk: string) => {
+                buffer += chunk;
+                const newline = buffer.indexOf("\n");
+                if (newline === -1 || grandchildPid !== undefined) return;
+                grandchildPid = Number(buffer.slice(0, newline).trim());
+                if (!isPidAlive(grandchildPid)) {
+                  reject(new Error(`grandchild ${grandchildPid} exited before kill`));
+                  return;
+                }
+                triggerKill(proc);
+              });
+            }),
+        );
+      const isPidAlive = (pid: number) => {
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+
+      const assertTreeKilled = (pid: number) => {
+        const alive = isPidAlive(pid);
+        if (alive) {
+          try {
+            process.kill(pid, "SIGKILL");
+          } catch {}
+        }
+        expect(alive).toBe(false);
+      };
+
+      const killedGrandchildPid = yield* awaitPidAndExit(spawnTreeChild(), (proc) => proc.kill());
+      assertTreeKilled(killedGrandchildPid);
+
+      const abortHandle = makeAbortHandle();
+      const abortedGrandchildPid = yield* awaitPidAndExit(spawnTreeChild(abortHandle.signal), () =>
+        abortHandle.abort(),
+      );
+      assertTreeKilled(abortedGrandchildPid);
     }).pipe(Effect.scoped, Effect.provide(layer)),
   );
 });

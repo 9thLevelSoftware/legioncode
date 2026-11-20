@@ -490,7 +490,7 @@ function OpenCommandPaletteDialog(props: {
   const startProjectClone = useAtomCommand(sourceControlEnvironment.startProjectClone, {
     reportFailure: false,
   });
-  const stopThreadSession = useAtomCommand(threadEnvironment.stopSession, {
+  const stopThreadSession = useOrchestrationCommand(threadEnvironment.stopSession, {
     reportFailure: false,
   });
   const refreshProviders = useAtomCommand(serverEnvironment.refreshProviders, {
@@ -515,6 +515,10 @@ function OpenCommandPaletteDialog(props: {
   const openPanelPullRequestUrl = useOpenPanelPullRequestUrl(referenceThreadRef);
   const activeThreadServerConfig = useServerConfigs().get(
     activeThread?.environmentId ?? ("" as EnvironmentId),
+  );
+  const canOperateActiveThread = useEnvironmentScope(
+    activeThread?.environmentId ?? null,
+    AuthOrchestrationOperateScope,
   );
   const canShareActiveThreadWithGuest = useAtomValue(
     canShareWithGuestAtom(activeThread?.environmentId ?? ("" as EnvironmentId)),
@@ -1509,16 +1513,19 @@ function OpenCommandPaletteDialog(props: {
     threadPullRequestLinkMode(activeThreadServerConfig?.environment.capabilities) !== "unsupported"
   ) {
     const threadRef = scopeThreadRef(activeThread.environmentId, activeThread.id);
-    actionItems.push({
-      kind: "action",
-      value: "action:link-pull-request",
-      searchTerms: ["link", "pull request", "pr", "attach", "stack"],
-      title: gt("Link pull request to thread"),
-      icon: <PullRequestGlyph.link className={ITEM_ICON_CLASS} />,
-      run: async () => {
-        openLinkPullRequestDialog(threadRef);
-      },
-    });
+    if (canOperateActiveThread) {
+      actionItems.push({
+        kind: "action",
+        value: "action:link-pull-request",
+        searchTerms: ["link", "pull request", "pr", "attach", "stack"],
+        title: gt("Link pull request to thread"),
+        icon: <PullRequestGlyph.link className={ITEM_ICON_CLASS} />,
+        run: async () => {
+          if (!readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope)) return;
+          openLinkPullRequestDialog(threadRef);
+        },
+      });
+    }
     actionItems.push({
       kind: "action",
       value: "action:open-thread-pull-requests",
@@ -1548,7 +1555,7 @@ function OpenCommandPaletteDialog(props: {
     });
   }
 
-  if (activeThread !== null) {
+  if (activeThread !== null && canOperateActiveThread) {
     const thread = activeThread;
     actionItems.push({
       kind: "action",
@@ -1558,6 +1565,7 @@ function OpenCommandPaletteDialog(props: {
       icon: <RotateCcwIcon className={ITEM_ICON_CLASS} />,
       run: async () => {
         const { environmentId } = thread;
+        if (!readEnvironmentScope(environmentId, AuthOrchestrationOperateScope)) return;
         if (thread.runtime !== null) {
           const stopped = await stopThreadSession({
             environmentId,

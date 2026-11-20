@@ -181,6 +181,7 @@ class WorkerChild
   killed = false;
   spawned = false;
   exited = false;
+  pendingKillSignal: NodeJS.Signals | number | undefined;
   readonly #writes = new Map<number, Array<(error?: Error | null) => void>>();
   readonly #finals = new Map<number, (error?: Error | null) => void>();
   readonly #paused = new Set<number>();
@@ -268,6 +269,16 @@ class WorkerChild
   kill(signal: NodeJS.Signals | number = "SIGTERM"): boolean {
     if (this.exited) return false;
     this.killed = true;
+    if (this.worker.pool.platform === "win32") {
+      if (this.pid === undefined) {
+        this.pendingKillSignal = signal;
+        return true;
+      }
+      this.worker.pool.killTree(this.pid, () => {
+        if (!this.exited) this.worker.post({ type: "kill", id: this.id, signal });
+      });
+      return true;
+    }
     this.worker.post({ type: "kill", id: this.id, signal });
     return true;
   }
@@ -381,6 +392,17 @@ class SpawnWorker {
         child.spawned = true;
         child.pid = message.pid;
         child.emit("spawn");
+        if (child.pendingKillSignal !== undefined) {
+          const pendingSignal = child.pendingKillSignal;
+          child.pendingKillSignal = undefined;
+          if (this.pool.platform === "win32" && message.pid !== undefined) {
+            this.pool.killTree(message.pid, () => {
+              if (!child.exited) this.post({ type: "kill", id: child.id, signal: pendingSignal });
+            });
+          } else {
+            this.post({ type: "kill", id: child.id, signal: pendingSignal });
+          }
+        }
         break;
       case "error":
         if (!child.spawned) {

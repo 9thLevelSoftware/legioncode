@@ -138,6 +138,48 @@ const isTunnelEndpoint = (tunnelUrl: string, port: number) => {
 /** Opens a connection to the destination; `ws` pauses its socket, so a slow page slows the tunnel. */
 /** Set by the environment's /api/preview/tunnel when it reached the port and nothing listens. */
 const PORT_REFUSED_HEADER = "x-t3-tunnel-port-refused";
+const WEBSOCKET_OPEN = 1;
+
+const socketWriteError = (cause: unknown) =>
+  new Socket.SocketError({ reason: new Socket.SocketWriteError({ cause }) });
+
+/** @public */
+export const sendWebSocketChunks = (
+  tunnel: Pick<NodeWS.WebSocket, "readyState" | "send">,
+  chunks: NonEmptyReadonlyArray<Uint8Array>,
+): Effect.Effect<void, Socket.SocketError> =>
+  Effect.callback<void, Socket.SocketError>((resume) => {
+    let remaining = chunks.length;
+    let settled = false;
+    const fail = (cause: unknown) => {
+      if (settled) return;
+      settled = true;
+      resume(Effect.fail(socketWriteError(cause)));
+    };
+    for (const chunk of chunks) {
+      if (settled) return;
+      if (tunnel.readyState !== WEBSOCKET_OPEN) {
+        fail(new Error(`Tunnel WebSocket is not open (readyState=${tunnel.readyState}).`));
+        return;
+      }
+      try {
+        tunnel.send(chunk, (error) => {
+          if (error) {
+            fail(error);
+            return;
+          }
+          remaining -= 1;
+          if (remaining === 0 && !settled) {
+            settled = true;
+            resume(Effect.void);
+          }
+        });
+      } catch (error) {
+        fail(error);
+        return;
+      }
+    }
+  });
 
 const dialDestination = Effect.fn("LoopbackTunnel.dialDestination")(function* (
   tunnelUrl: string,
@@ -173,12 +215,7 @@ const dialDestination = Effect.fn("LoopbackTunnel.dialDestination")(function* (
   });
   // Effect's WebSocket writer never waits for the send buffer; `ws` calls back once it is written.
   const sendAll = (chunks: NonEmptyReadonlyArray<Uint8Array>) =>
-    Effect.callback<void>((resume) => {
-      const last = chunks.length - 1;
-      chunks.forEach((chunk, index) =>
-        tunnel.send(chunk, index === last ? () => resume(Effect.void) : undefined),
-      );
-    });
+    sendWebSocketChunks(tunnel, chunks);
   return {
     pull: yield* Socket.readerBytes(socket),
     writer: { write: (chunk: Uint8Array) => sendAll([chunk]), writeAll: sendAll },
@@ -297,6 +334,7 @@ export class LoopbackTunnel extends Context.Service<
       readonly environmentId: EnvironmentId;
       readonly remotePort: number;
     }) => Effect.Effect<void>;
+    readonly stopForwardsForEnvironment: (environmentId: EnvironmentId) => Effect.Effect<void>;
     readonly forwards: Effect.Effect<ReadonlyArray<DesktopPortForward>>;
     /** Whether the environment's loopback is this machine's, so forwarding would only loop. */
     readonly sharesLoopback: (
@@ -354,6 +392,7 @@ const make = Effect.gen(function* () {
   // client belongs to this OS user. Other users could otherwise ride this user's tunnel.
   const isOwnConnection = Effect.fn("LoopbackTunnel.isOwnConnection")(function* () {
     if (platform !== "linux") return true;
+    if (userId === undefined) return false;
     const connection = yield* Effect.serviceOption(NodeSocket.NetSocket);
     if (Option.isNone(connection)) return false;
     const { remoteAddress, remotePort, localAddress, localPort } = connection.value;
@@ -546,6 +585,25 @@ const make = Effect.gen(function* () {
     yield* announceForwards;
   }, forwarding.withPermits(1));
 
+  const stopForwardsForEnvironment: LoopbackTunnel["Service"]["stopForwardsForEnvironment"] =
+    Effect.fn("LoopbackTunnel.stopForwardsForEnvironment")(function* (environmentId) {
+      const matches: Array<{ readonly key: string; readonly scope: Scope.Closeable }> = [];
+      for (const [key, entry] of forwarded) {
+        if (entry.forward.environmentId === environmentId) {
+          matches.push({ key, scope: entry.scope });
+        }
+      }
+      if (matches.length === 0) return;
+      for (const match of matches) {
+        forwarded.delete(match.key);
+      }
+      yield* Effect.forEach(matches, (match) => Scope.close(match.scope, Exit.void), {
+        concurrency: "unbounded",
+        discard: true,
+      });
+      yield* announceForwards;
+    }, forwarding.withPermits(1));
+
   const subscribeForwards: LoopbackTunnel["Service"]["subscribeForwards"] = (listener) =>
     Effect.acquireRelease(
       Effect.sync(() => forwardListeners.add(listener)),
@@ -614,6 +672,7 @@ const make = Effect.gen(function* () {
     resolveAccess,
     forward,
     stopForward,
+    stopForwardsForEnvironment,
     forwards: Effect.sync(currentForwards),
     sharesLoopback,
     subscribeForwards,

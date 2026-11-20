@@ -1,5 +1,11 @@
 import { threadKey } from "@t3tools/client-runtime/state/entities";
-import { EnvironmentId, ProjectId, ThreadId } from "@t3tools/contracts";
+import {
+  AuthOrchestrationOperateScope,
+  EnvironmentId,
+  ProjectId,
+  RunId,
+  ThreadId,
+} from "@t3tools/contracts";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 
@@ -17,6 +23,9 @@ const entities = vi.hoisted(() => ({
   threads: [] as ReadonlyArray<Thread>,
   activeThread: undefined as Thread | undefined,
   delegatedUnderParent: new Set<string>() as ReadonlySet<string>,
+  serverConfigs: new Map() as ReadonlyMap<EnvironmentId, unknown>,
+  deniedScope: undefined as string | undefined,
+  commands: [] as unknown[],
   handleNewThread: vi.fn(async () => undefined),
 }));
 vi.mock("../state/server", async (original) => {
@@ -49,6 +58,18 @@ vi.mock("../state/entities", async (original) => ({
   useProjects: () => entities.projects,
   useVisibleThreadShells: () => entities.threads,
   useDelegatedUnderParent: () => entities.delegatedUnderParent,
+  useServerConfigs: () => entities.serverConfigs as never,
+}));
+vi.mock("../state/session", async (original) => ({
+  ...(await original<typeof import("../state/session")>()),
+  useEnvironmentScope: (_environmentId: unknown, scope: string) => scope !== entities.deniedScope,
+  readEnvironmentScope: (_environmentId: unknown, scope: string) => scope !== entities.deniedScope,
+}));
+vi.mock("../state/use-atom-command", () => ({
+  useAtomCommand: (command: unknown) => async (value: unknown) => {
+    entities.commands.push({ command, value });
+    return { _tag: "Success", value: undefined };
+  },
 }));
 
 function setup(state: Partial<typeof entities> = {}) {
@@ -60,6 +81,9 @@ function setup(state: Partial<typeof entities> = {}) {
   entities.threads = state.threads ?? [];
   entities.activeThread = state.activeThread;
   entities.delegatedUnderParent = state.delegatedUnderParent ?? new Set();
+  entities.serverConfigs = state.serverConfigs ?? new Map();
+  entities.deniedScope = state.deniedScope;
+  entities.commands = [];
   entities.handleNewThread.mockClear();
 }
 
@@ -307,5 +331,51 @@ describe("CommandPalette open intents", () => {
         projectId: ProjectId.make("lima"),
       }),
     );
+  });
+
+  it("hides and blocks thread-operating actions without AuthOrchestrationOperateScope", async () => {
+    const environmentId = EnvironmentId.make("local");
+    const activeThread = makeThreadFixture({
+      environmentId,
+      id: ThreadId.make("active"),
+      projectId: ProjectId.make("acme"),
+      latestRun: {
+        runId: RunId.make("run-1"),
+        status: "completed",
+        requestedAt: null,
+        startedAt: null,
+        completedAt: "2026-03-01T00:00:00.000Z",
+        assistantMessageId: null,
+      },
+    });
+    const serverConfigs = new Map([[environmentId, { environment: { capabilities: {} } }]]);
+    setup({ activeThread, serverConfigs });
+    await using screen = await render(<CommandPalette>{null}</CommandPalette>);
+
+    openCommandPalette({ query: ">" });
+    await expect.element(page.getByRole("option", { name: "Restart agent session" })).toBeVisible();
+    await expect
+      .element(page.getByRole("option", { name: "Link pull request to thread" }))
+      .toBeVisible();
+
+    // Narrow to the top row so virtualization keeps it inside the popup viewport,
+    // then revoke permission before clicking to verify the runtime guard blocks dispatch.
+    await userEvent.fill(page.getByRole("combobox"), ">Restart");
+    await expect.element(page.getByRole("option", { name: "Restart agent session" })).toBeVisible();
+    entities.deniedScope = AuthOrchestrationOperateScope;
+    await page.getByRole("option", { name: "Restart agent session" }).click();
+    expect(entities.commands).toEqual([]);
+
+    await expect.element(page.getByRole("combobox")).not.toBeInTheDocument();
+    await screen.rerender(<CommandPalette>{null}</CommandPalette>);
+    openCommandPalette({ query: ">" });
+    await userEvent.fill(page.getByRole("combobox"), ">Restart");
+    await expect
+      .element(page.getByRole("option", { name: "Restart agent session" }))
+      .not.toBeInTheDocument();
+    await userEvent.fill(page.getByRole("combobox"), ">Link pull request");
+    await expect
+      .element(page.getByRole("option", { name: "Link pull request to thread" }))
+      .not.toBeInTheDocument();
   });
 });

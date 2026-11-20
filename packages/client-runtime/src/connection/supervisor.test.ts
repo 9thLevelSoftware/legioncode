@@ -1609,6 +1609,72 @@ describe("EnvironmentSupervisor", () => {
     }),
   );
 
+  it.effect(
+    "releases a direct t3-connect DPoP session on credentials-changed while keeping paired DPoP connected",
+    () =>
+      Effect.gen(function* () {
+        const cloudDpopEntry: ConnectionCatalogEntry = {
+          target: LAN_ROUTE.target,
+          profile: Option.some(
+            new BearerConnectionProfile({
+              ...Option.getOrThrow(LAN_ROUTE.profile),
+              learned: true,
+              authorization: "t3-connect",
+            }),
+          ),
+          enabled: true,
+        };
+        const cloudHarness = yield* makeHarness({
+          prepare: () =>
+            Effect.succeed({
+              ...preparedFor(LAN_TARGET),
+              httpAuthorization: {
+                _tag: "Dpop",
+                accessToken: "cloud-dpop-token",
+                expiresAtEpochMs: 9_999_999,
+              },
+            }),
+        });
+        const cloudSupervisor = yield* EnvironmentSupervisor.make(cloudDpopEntry, {
+          initiallyDesired: true,
+        }).pipe(Effect.provide(cloudHarness.dependencies));
+
+        yield* awaitState(cloudSupervisor.state, (state) => state.phase === "connected");
+        yield* cloudHarness.wake("credentials-changed");
+        yield* awaitState(
+          cloudSupervisor.state,
+          (state) => state.phase === "connected" && state.generation === 2,
+        );
+        expect(yield* Ref.get(cloudHarness.sessionCount)).toBe(2);
+        expect(yield* Ref.get(cloudHarness.releaseCount)).toBe(1);
+
+        const pairedHarness = yield* makeHarness({
+          prepare: () =>
+            Effect.succeed({
+              ...preparedFor(LAN_TARGET),
+              httpAuthorization: {
+                _tag: "Dpop",
+                accessToken: "paired-dpop-token",
+                expiresAtEpochMs: 9_999_999,
+                directConnection: {
+                  connectionId: LAN_TARGET.connectionId,
+                  httpBaseUrl: "http://192.168.1.10:3773/",
+                },
+              },
+            }),
+        });
+        const pairedSupervisor = yield* EnvironmentSupervisor.make(LAN_ENTRY, {
+          initiallyDesired: true,
+        }).pipe(Effect.provide(pairedHarness.dependencies));
+
+        yield* awaitState(pairedSupervisor.state, (state) => state.phase === "connected");
+        yield* pairedHarness.wake("credentials-changed");
+        yield* Effect.yieldNow;
+        expect(yield* Ref.get(pairedHarness.sessionCount)).toBe(1);
+        expect(yield* Ref.get(pairedHarness.releaseCount)).toBe(0);
+      }),
+  );
+
   it.effect("refreshes HTTP authorization without replacing the active relay session", () =>
     Effect.gen(function* () {
       const endpoint = {

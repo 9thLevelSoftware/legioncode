@@ -6,8 +6,10 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Result from "effect/Result";
+import * as SubscriptionRef from "effect/SubscriptionRef";
 import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientRequest from "effect/http/HttpClientRequest";
 import * as HttpClientResponse from "effect/http/HttpClientResponse";
@@ -268,6 +270,95 @@ describe("DesktopLocalEnvironmentAuth", () => {
 
       assert.isTrue(Result.isSuccess(result));
       assert.strictEqual(yield* Ref.get(requestCount), 4);
+    }).pipe(Effect.provide(TestClock.layer())),
+  );
+
+  it.effect("re-exchanges the bearer token after primary config changes, restarts, or stops", () =>
+    Effect.gen(function* () {
+      let tokenNumber = 0;
+      let currentReady = true;
+      let currentPid = 100;
+      let currentConfig = config;
+      const primaryEpoch = yield* SubscriptionRef.make(0);
+
+      const httpClientLayer = Layer.succeed(
+        HttpClient.HttpClient,
+        HttpClient.make((request) =>
+          Effect.sync(() => {
+            tokenNumber += 1;
+            return HttpClientResponse.fromWeb(
+              request,
+              new Response(
+                JSON.stringify({
+                  access_token: `desktop-bearer-token-${tokenNumber}`,
+                  issued_token_type: "urn:ietf:params:oauth:token-type:access_token",
+                  token_type: "Bearer",
+                  expires_in: 3600,
+                  scope: "orchestration:read",
+                }),
+                { status: 200, headers: { "content-type": "application/json" } },
+              ),
+            );
+          }),
+        ),
+      );
+      const poolLayer = Layer.succeed(DesktopBackendPool.DesktopBackendPool, {
+        primaryEpoch,
+        list: Effect.succeed([
+          {
+            id: PRIMARY_LOCAL_ENVIRONMENT_ID,
+            label: Effect.succeed("Windows"),
+            currentConfig: Effect.sync(() => ({ _tag: "Some" as const, value: currentConfig })),
+            snapshot: Effect.sync(() => ({
+              desiredRunning: currentReady,
+              ready: currentReady,
+              activePid: currentReady ? Option.some(currentPid) : Option.none(),
+              restartAttempt: 0,
+              restartScheduled: false,
+            })),
+            waitForReady: () => Effect.sync(() => currentReady),
+          },
+        ]),
+      } as unknown as DesktopBackendPool.DesktopBackendPool["Service"]);
+
+      const auth = yield* DesktopLocalEnvironmentAuth.DesktopLocalEnvironmentAuth.pipe(
+        Effect.provide(
+          DesktopLocalEnvironmentAuth.layer.pipe(
+            Layer.provide(Layer.mergeAll(poolLayer, httpClientLayer, NodeCrypto.layerMac)),
+          ),
+        ),
+      );
+
+      assert.strictEqual(yield* auth.getBearerToken, "desktop-bearer-token-1");
+      assert.strictEqual(yield* auth.getBearerToken, "desktop-bearer-token-1");
+
+      // Same config on a new backend epoch (e.g. backend restart on the same port).
+      yield* SubscriptionRef.update(primaryEpoch, (epoch) => epoch + 1);
+      assert.strictEqual(yield* auth.getBearerToken, "desktop-bearer-token-2");
+
+      // Active PID change without epoch change also invalidates the cached token.
+      currentPid = 101;
+      assert.strictEqual(yield* auth.getBearerToken, "desktop-bearer-token-3");
+
+      // Reconfiguration / WSL fallback changing endpoint and bootstrap credential.
+      currentConfig = {
+        ...config,
+        bootstrap: { ...config.bootstrap, desktopBootstrapToken: "fallback-bootstrap-token" },
+        httpBaseUrl: new URL("http://127.0.0.1:4773"),
+      };
+      assert.strictEqual(yield* auth.getBearerToken, "desktop-bearer-token-4");
+
+      // Primary backend stops: getBearerToken fails and clears cache instead of returning stale token.
+      currentReady = false;
+      const stoppedError = yield* auth.getBearerToken.pipe(Effect.flip);
+      assert.strictEqual(stoppedError._tag, "DesktopLocalEnvironmentAuthBackendNotConfiguredError");
+
+      currentReady = true;
+      assert.strictEqual(yield* auth.getBearerToken, "desktop-bearer-token-5");
+
+      // Explicit refresh bypasses a valid cache entry and caches the new token.
+      assert.strictEqual(yield* auth.refreshBearerToken, "desktop-bearer-token-6");
+      assert.strictEqual(yield* auth.getBearerToken, "desktop-bearer-token-6");
     }).pipe(Effect.provide(TestClock.layer())),
   );
 });

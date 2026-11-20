@@ -5,6 +5,7 @@ import {
   type RemoteEnvironmentAuthError,
 } from "@t3tools/client-runtime/authorization";
 import { fetchRemoteEnvironmentDescriptor } from "@t3tools/client-runtime/environment";
+import { SshConnectionProfile, sshTargetKey } from "@t3tools/client-runtime/connection";
 import {
   EnvironmentAuthInvalidError,
   DesktopDiscoveredSshHostSchema,
@@ -23,14 +24,19 @@ import {
   EnvironmentScopeRequiredError,
   AuthAccessTokenResult,
   AuthSessionState,
+  type EnvironmentId,
 } from "@t3tools/contracts";
 import { SshHttpBridgeError } from "@t3tools/ssh/errors";
 import { resolveLoopbackSshHttpBaseUrl } from "@t3tools/ssh/tunnel";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
+import * as DesktopConnectionCatalogStore from "../../app/DesktopConnectionCatalogStore.ts";
+import * as LoopbackTunnel from "../../preview/LoopbackTunnel.ts";
 import * as IpcChannels from "../channels.ts";
 import * as DesktopIpc from "../DesktopIpc.ts";
+import { decodeConnectionCatalogDocument } from "./connectionCatalog.ts";
 import * as DesktopSshEnvironment from "../../ssh/DesktopSshEnvironment.ts";
 import * as DesktopSshPasswordPrompts from "../../ssh/DesktopSshPasswordPrompts.ts";
 
@@ -148,13 +154,45 @@ export const ensureSshEnvironment = DesktopIpc.makeIpcMethod({
   }),
 });
 
+const isSshConnectionProfile = Schema.is(SshConnectionProfile);
+
 export const disconnectSshEnvironment = DesktopIpc.makeIpcMethod({
   channel: IpcChannels.DISCONNECT_SSH_ENVIRONMENT_CHANNEL,
   payload: DesktopSshEnvironmentTargetSchema,
   result: Schema.Void,
   handler: Effect.fn("desktop.ipc.sshEnvironment.disconnectEnvironment")(function* (target) {
     const sshEnvironment = yield* DesktopSshEnvironment.DesktopSshEnvironment;
-    yield* sshEnvironment.disconnectEnvironment(target);
+    const store = yield* DesktopConnectionCatalogStore.DesktopConnectionCatalogStore;
+    const tunnel = yield* LoopbackTunnel.LoopbackTunnel;
+    const rawCatalog = yield* store.get.pipe(Effect.orElseSucceed(() => Option.none<string>()));
+    const environmentIds = yield* Option.match(rawCatalog, {
+      onNone: () => Effect.succeed<ReadonlyArray<EnvironmentId>>([]),
+      onSome: (raw) =>
+        decodeConnectionCatalogDocument(raw).pipe(
+          Effect.map((doc) => {
+            const targetKey = sshTargetKey(target);
+            const ids = new Set<EnvironmentId>();
+            for (const profile of doc.profiles) {
+              if (isSshConnectionProfile(profile) && sshTargetKey(profile.target) === targetKey) {
+                ids.add(profile.environmentId);
+              }
+            }
+            return Array.from(ids);
+          }),
+          Effect.orElseSucceed((): ReadonlyArray<EnvironmentId> => []),
+        ),
+    });
+    yield* sshEnvironment
+      .disconnectEnvironment(target)
+      .pipe(
+        Effect.ensuring(
+          Effect.forEach(
+            environmentIds,
+            (environmentId) => tunnel.stopForwardsForEnvironment(environmentId),
+            { discard: true },
+          ).pipe(Effect.ignore),
+        ),
+      );
   }),
 });
 

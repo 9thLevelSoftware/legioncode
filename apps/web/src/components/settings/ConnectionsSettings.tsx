@@ -181,19 +181,28 @@ export function ConnectionsSettings({ view }: { readonly view: "environments" | 
 
 function AccessSettings() {
   const gt = useGT();
-  // A link that names an environment, such as the MCP wizard's, opens the page on it. The
-  // settings layout remounts this page when the link changes.
   const linkedEnvironmentId = useSearch({
     strict: false,
     select: (search) =>
       typeof search.machine === "string" ? EnvironmentId.make(search.machine) : null,
   });
-  const [selectedEnvironmentId, setSelectedEnvironmentId] = useState(linkedEnvironmentId);
+  const [selection, setSelection] = useState<{
+    readonly forLinked: EnvironmentId | null;
+    readonly value: EnvironmentId | null;
+  }>(() => ({
+    forLinked: linkedEnvironmentId,
+    value: linkedEnvironmentId,
+  }));
+  const selectedEnvironmentId =
+    selection.forLinked === linkedEnvironmentId ? selection.value : linkedEnvironmentId;
+  const setSelectedEnvironmentId = (next: EnvironmentId) =>
+    setSelection({ forLinked: linkedEnvironmentId, value: next });
   const { candidates, environment: accessEnvironment } =
     useAccessEnvironment(selectedEnvironmentId);
   const accessEnvironmentId = accessEnvironment?.environmentId ?? null;
+  const isRequestedUnavailable = selectedEnvironmentId !== null && accessEnvironmentId === null;
   const picker =
-    candidates.length > 1 && accessEnvironmentId !== null ? (
+    candidates.length > 1 || (isRequestedUnavailable && candidates.length > 0) ? (
       <div className="flex min-w-0 items-center gap-1.5 px-3 text-sm text-muted-foreground sm:px-4">
         <span className="shrink-0">
           <T>Showing access for</T>
@@ -206,11 +215,13 @@ function AccessSettings() {
         >
           <SelectTrigger size="sm" className="w-auto max-w-72" aria-label={gt("Environment")}>
             <SelectValue>
-              {(value: EnvironmentId) => {
+              {(value: EnvironmentId | null) => {
                 const environment = candidates.find(
                   (candidate) => candidate.environmentId === value,
                 );
-                return environment ? settingsScopeEnvironmentLabel(environment, candidates) : null;
+                return environment
+                  ? settingsScopeEnvironmentLabel(environment, candidates)
+                  : gt("Choose a machine");
               }}
             </SelectValue>
           </SelectTrigger>
@@ -248,6 +259,7 @@ function AccessSettings() {
       key={accessEnvironmentId ?? "none"}
       view="access"
       accessEnvironmentId={accessEnvironmentId}
+      accessEnvironmentUnavailable={isRequestedUnavailable}
       accessEnvironmentPicker={picker}
     />
   );
@@ -256,10 +268,12 @@ function AccessSettings() {
 function ConnectionsSettingsContent({
   view,
   accessEnvironmentId,
+  accessEnvironmentUnavailable = false,
   accessEnvironmentPicker = null,
 }: {
   readonly view: "environments" | "access";
   readonly accessEnvironmentId: EnvironmentId | null;
+  readonly accessEnvironmentUnavailable?: boolean;
   readonly accessEnvironmentPicker?: ReactNode;
 }) {
   const searchableSetting = useSearchableSetting();
@@ -1761,8 +1775,16 @@ function ConnectionsSettingsContent({
       ) : (
         <SettingsSection {...searchableSetting("connections-environment")}>
           <SettingsRow
-            title={gt("No environment selected")}
-            description={gt("Connect an environment to view its settings and access.")}
+            title={
+              accessEnvironmentUnavailable
+                ? gt("Environment unavailable")
+                : gt("No environment selected")
+            }
+            description={
+              accessEnvironmentUnavailable
+                ? gt("This environment is no longer available.")
+                : gt("Connect an environment to view its settings and access.")
+            }
           />
         </SettingsSection>
       )}

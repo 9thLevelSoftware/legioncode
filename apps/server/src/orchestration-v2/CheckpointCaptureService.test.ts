@@ -13,6 +13,7 @@ import {
   ProviderDriverKind,
   ProviderInstanceId,
   ProviderThreadId,
+  RunAttemptId,
   RunId,
   ThreadId,
 } from "@t3tools/contracts";
@@ -21,6 +22,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Ref from "effect/Ref";
 import * as SqlClient from "effect/sql/SqlClient";
+import * as TestClock from "effect/testing/TestClock";
 
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as CheckpointStore from "../checkpointing/CheckpointStore.ts";
@@ -1119,5 +1121,292 @@ it.layer(layerProjectionStoreTest)("CheckpointCaptureServiceV2", (it) => {
       const checkpoint = checkpoints.find((candidate) => candidate.id === runs[0]?.checkpointId);
       assert.equal(checkpoint?.status, "missing");
     }),
+  );
+
+  it.effect(
+    "stamps run and root node completion with attempt.completedAt rather than capturedAt",
+    () =>
+      Effect.gen(function* () {
+        const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
+        const t0 = yield* DateTime.now;
+        const attemptCompletedAt = DateTime.add(t0, { seconds: 5 });
+        const timedThreadId = ThreadId.make("thread:checkpoint-capture-attempt-time");
+        const timedRunId = RunId.make("run:checkpoint-capture-attempt-time");
+        const timedAttemptId = RunAttemptId.make("attempt:checkpoint-capture-attempt-time");
+        const timedScopeId = CheckpointScopeId.make("scope:checkpoint-capture-attempt-time");
+        const timedRootNodeId = NodeId.make("node:checkpoint-capture-attempt-time-root");
+        const timedProviderThreadId = ProviderThreadId.make(
+          "provider-thread:checkpoint-capture-attempt-time",
+        );
+
+        yield* Effect.forEach(
+          [
+            {
+              id: EventId.make("event:checkpoint-capture-attempt-time:thread"),
+              type: "thread.created" as const,
+              threadId: timedThreadId,
+              occurredAt: t0,
+              payload: {
+                createdBy: "user" as const,
+                creationSource: "web" as const,
+                id: timedThreadId,
+                projectId,
+                title: "Checkpoint capture attempt completion timestamp",
+                providerInstanceId,
+                modelSelection,
+                runtimeMode: "full-access" as const,
+                interactionMode: "default" as const,
+                branch: null,
+                worktreePath: null,
+                activeProviderThreadId: null,
+                lineage: {
+                  parentThreadId: null,
+                  relationshipToParent: null,
+                  rootThreadId: timedThreadId,
+                },
+                forkedFrom: null,
+                createdAt: t0,
+                updatedAt: t0,
+                archivedAt: null,
+                settledOverride: null,
+                settledAt: null,
+                lastVisitedAt: null,
+                deletedAt: null,
+              },
+            },
+            {
+              id: EventId.make("event:checkpoint-capture-attempt-time:provider-thread"),
+              type: "provider-thread.updated" as const,
+              threadId: timedThreadId,
+              nodeId: timedRootNodeId,
+              driver,
+              providerInstanceId,
+              occurredAt: t0,
+              payload: {
+                id: timedProviderThreadId,
+                driver,
+                providerInstanceId,
+                providerSessionId: null,
+                appThreadId: timedThreadId,
+                ownerNodeId: timedRootNodeId,
+                nativeThreadRef: null,
+                nativeConversationHeadRef: null,
+                status: "idle" as const,
+                firstRunOrdinal: 1,
+                lastRunOrdinal: 1,
+                handoffIds: [],
+                forkedFrom: null,
+                createdAt: t0,
+                updatedAt: t0,
+              },
+            },
+            {
+              id: EventId.make("event:checkpoint-capture-attempt-time:attempt"),
+              type: "run-attempt.updated" as const,
+              threadId: timedThreadId,
+              runId: timedRunId,
+              nodeId: timedRootNodeId,
+              providerInstanceId,
+              occurredAt: attemptCompletedAt,
+              payload: {
+                id: timedAttemptId,
+                runId: timedRunId,
+                attemptOrdinal: 1,
+                rootNodeId: timedRootNodeId,
+                providerInstanceId,
+                providerThreadId: timedProviderThreadId,
+                providerTurnId: null,
+                reason: "initial" as const,
+                status: "completed" as const,
+                startedAt: t0,
+                completedAt: attemptCompletedAt,
+              },
+            },
+            {
+              id: EventId.make("event:checkpoint-capture-attempt-time:run"),
+              type: "run.updated" as const,
+              threadId: timedThreadId,
+              runId: timedRunId,
+              nodeId: timedRootNodeId,
+              providerInstanceId,
+              occurredAt: attemptCompletedAt,
+              payload: {
+                id: timedRunId,
+                threadId: timedThreadId,
+                ordinal: 1,
+                providerInstanceId,
+                modelSelection,
+                providerThreadId: timedProviderThreadId,
+                userMessageId: MessageId.make("message:checkpoint-capture-attempt-time"),
+                rootNodeId: timedRootNodeId,
+                activeAttemptId: timedAttemptId,
+                status: "waiting" as const,
+                requestedAt: t0,
+                startedAt: t0,
+                completedAt: null,
+                checkpointId: null,
+                contextHandoffId: null,
+              },
+            },
+            {
+              id: EventId.make("event:checkpoint-capture-attempt-time:node"),
+              type: "node.updated" as const,
+              threadId: timedThreadId,
+              runId: timedRunId,
+              nodeId: timedRootNodeId,
+              providerInstanceId,
+              occurredAt: attemptCompletedAt,
+              payload: {
+                id: timedRootNodeId,
+                threadId: timedThreadId,
+                runId: timedRunId,
+                parentNodeId: null,
+                rootNodeId: timedRootNodeId,
+                kind: "root_turn" as const,
+                status: "waiting" as const,
+                countsForRun: true,
+                providerThreadId: timedProviderThreadId,
+                providerTurnId: null,
+                nativeItemRef: null,
+                runtimeRequestId: null,
+                checkpointScopeId: timedScopeId,
+                startedAt: t0,
+                completedAt: null,
+              },
+            },
+            {
+              id: EventId.make("event:checkpoint-capture-attempt-time:scope"),
+              type: "checkpoint-scope.created" as const,
+              threadId: timedThreadId,
+              runId: timedRunId,
+              nodeId: timedRootNodeId,
+              occurredAt: t0,
+              payload: {
+                id: timedScopeId,
+                threadId: timedThreadId,
+                runId: timedRunId,
+                nodeId: timedRootNodeId,
+                parentScopeId: null,
+                providerThreadId: timedProviderThreadId,
+                kind: "root_run" as const,
+                ordinalWithinParent: 0,
+                advancesAppRunCount: true,
+                cwd: "/repo",
+                createdAt: t0,
+              },
+            },
+            {
+              id: EventId.make("event:checkpoint-capture-attempt-time:baseline"),
+              type: "checkpoint.captured" as const,
+              threadId: timedThreadId,
+              nodeId: timedRootNodeId,
+              driver,
+              providerInstanceId,
+              occurredAt: t0,
+              payload: {
+                id: CheckpointId.make("checkpoint:attempt-time-baseline-0"),
+                threadId: timedThreadId,
+                scopeId: timedScopeId,
+                runId: null,
+                nodeId: timedRootNodeId,
+                parentCheckpointId: null,
+                ordinalWithinScope: 0,
+                appRunOrdinal: null,
+                ref: CheckpointRef.make("checkpoint-ref:attempt-time-baseline-0"),
+                status: "ready" as const,
+                files: [],
+                capturedAt: t0,
+              },
+            },
+          ] satisfies ReadonlyArray<OrchestrationV2DomainEvent>,
+          (event) => projectionStore.apply(event),
+        );
+
+        yield* TestClock.adjust("30 seconds");
+        const capturedAt = yield* DateTime.now;
+        const captured = {
+          id: CheckpointId.make("checkpoint:attempt-time-captured-1"),
+          threadId: timedThreadId,
+          scopeId: timedScopeId,
+          runId: timedRunId,
+          nodeId: timedRootNodeId,
+          parentCheckpointId: CheckpointId.make("checkpoint:attempt-time-baseline-0"),
+          ordinalWithinScope: 1,
+          appRunOrdinal: 1,
+          ref: CheckpointRef.make("checkpoint-ref:attempt-time-captured-1"),
+          status: "ready" as const,
+          files: [],
+          capturedAt,
+        };
+        const committed = yield* Ref.make<ReadonlyArray<OrchestrationV2DomainEvent>>([]);
+        const layerCapture = CheckpointCaptureService.layer.pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              IdAllocator.layer,
+              Layer.mock(CheckpointService.CheckpointServiceV2)({
+                materializeBaselineCheckpoint: () => Effect.die("baseline already ready"),
+                capture: () => Effect.succeed(captured),
+              }),
+              Layer.mock(EventSink.EventSinkV2)({
+                commitCommand: (input) =>
+                  Ref.set(committed, input.events).pipe(
+                    Effect.andThen(Effect.forEach(input.events, (e) => projectionStore.apply(e))),
+                    Effect.as({ committed: true } as never),
+                    Effect.orDie,
+                  ),
+              }),
+            ),
+          ),
+        );
+
+        yield* CheckpointCaptureService.CheckpointCaptureServiceV2.use((service) =>
+          service.execute({
+            threadId: timedThreadId,
+            runId: timedRunId,
+            scopeId: timedScopeId,
+          }),
+        ).pipe(Effect.provide(layerCapture));
+
+        const events = yield* Ref.get(committed);
+        const checkpointCaptured = events.find((event) => event.type === "checkpoint.captured");
+        const checkpointItem = events.find((event) => event.type === "turn-item.updated");
+        const runUpdated = events.find((event) => event.type === "run.updated");
+        const nodeUpdated = events.find((event) => event.type === "node.updated");
+
+        assert.equal(checkpointCaptured?.type, "checkpoint.captured");
+        if (checkpointCaptured?.type === "checkpoint.captured") {
+          assert.equal(
+            DateTime.formatIso(checkpointCaptured.payload.capturedAt),
+            DateTime.formatIso(capturedAt),
+          );
+        }
+        assert.equal(checkpointItem?.type, "turn-item.updated");
+        if (checkpointItem?.type === "turn-item.updated") {
+          assert.equal(
+            checkpointItem.payload.completedAt
+              ? DateTime.formatIso(checkpointItem.payload.completedAt)
+              : null,
+            DateTime.formatIso(capturedAt),
+          );
+        }
+        assert.equal(runUpdated?.type, "run.updated");
+        if (runUpdated?.type === "run.updated") {
+          assert.equal(
+            runUpdated.payload.completedAt
+              ? DateTime.formatIso(runUpdated.payload.completedAt)
+              : null,
+            DateTime.formatIso(attemptCompletedAt),
+          );
+        }
+        assert.equal(nodeUpdated?.type, "node.updated");
+        if (nodeUpdated?.type === "node.updated") {
+          assert.equal(
+            nodeUpdated.payload.completedAt
+              ? DateTime.formatIso(nodeUpdated.payload.completedAt)
+              : null,
+            DateTime.formatIso(attemptCompletedAt),
+          );
+        }
+      }),
   );
 });

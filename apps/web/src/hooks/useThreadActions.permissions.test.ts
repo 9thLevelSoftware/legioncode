@@ -24,7 +24,10 @@ function deferred<T>() {
 }
 
 const state = vi.hoisted(() => ({
-  serverConfig: { shellThreadFamilies: false },
+  serverConfig: {
+    shellThreadFamilies: false,
+    environment: { capabilities: {} },
+  },
   familyLookupFails: false,
   scopes: new Map<string, Set<string>>(),
   threads: [] as {
@@ -52,6 +55,7 @@ const state = vi.hoisted(() => ({
   toasts: [] as string[],
   afterRequest: undefined as ((action: string) => void) | undefined,
   sessionLookupFails: false,
+  readAtom: undefined as ((atom: unknown) => unknown) | undefined,
 }));
 
 vi.mock("react", () => ({
@@ -66,8 +70,17 @@ vi.mock("@tanstack/react-router", () => ({
     navigate: async () => {},
   }),
 }));
+vi.mock("@effect/atom-react", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@effect/atom-react")>();
+  return {
+    ...actual,
+    useAtomValue: (atom: unknown) => state.readAtom?.(atom),
+  };
+});
 vi.mock("../state/session", () => ({
   environmentSession: { sessionStateAtom: "session" },
+  useEnvironmentScope: (environmentId: string | null, scope: string) =>
+    environmentId !== null && state.scopes.get(environmentId)?.has(scope) === true,
   readEnvironmentScope: (environmentId: string, scope: string) =>
     state.scopes.get(environmentId)?.has(scope) === true,
 }));
@@ -124,6 +137,8 @@ vi.mock("../state/threads", () => ({
       "snooze",
       "unsnooze",
       "stopSession",
+      "linkPullRequest",
+      "unlinkPullRequest",
     ].map((action) => [action, action]),
   ),
 }));
@@ -200,7 +215,11 @@ vi.mock("./useSettings", () => ({
     }),
 }));
 
+import { appAtomRegistry } from "../rpc/atomRegistry";
 import { useThreadActions } from "./useThreadActions";
+import { usePullRequestLinking } from "./usePullRequestLinking";
+
+state.readAtom = (atom) => appAtomRegistry.get(atom as never);
 
 function seedThreadPanelState(ref: ScopedThreadRef) {
   useRightPanelStore.getState().show(ref);
@@ -496,4 +515,27 @@ describe("thread action permissions", () => {
       consoleError.mockRestore();
     }
   });
+
+  it.each([true, false])(
+    "requires AuthOrchestrationOperateScope when linking=%s a pull request",
+    async (linked) => {
+      const url = "https://github.com/owner/repo/pull/1";
+      await expect(
+        usePullRequestLinking(secondary).changeLink(target, url, linked),
+      ).rejects.toThrow("This connection cannot change threads or projects.");
+      expect(state.requests).toEqual([]);
+
+      state.scopes.get(primary)!.clear();
+      state.scopes.get(secondary)!.add(AuthOrchestrationOperateScope);
+      await expect(
+        usePullRequestLinking(secondary).changeLink(target, url, linked),
+      ).resolves.toBeUndefined();
+      expect(state.requests).toEqual([
+        expect.objectContaining({
+          action: linked ? "linkPullRequest" : "unlinkPullRequest",
+          environmentId: secondary,
+        }),
+      ]);
+    },
+  );
 });

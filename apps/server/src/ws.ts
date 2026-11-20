@@ -100,7 +100,6 @@ import {
   EnvironmentAuthorizationError,
   ThreadId,
   type TerminalMetadataStreamEvent,
-  type PullRequestRef,
   WS_METHODS,
   WsRpcGroup,
 } from "@t3tools/contracts";
@@ -217,8 +216,6 @@ import * as WorkspacePaths from "./workspace/WorkspacePaths.ts";
 import * as VcsStatusBroadcaster from "./vcs/VcsStatusBroadcaster.ts";
 import * as VcsProvisioningService from "./vcs/VcsProvisioningService.ts";
 import * as GitWorkflowService from "./git/GitWorkflowService.ts";
-import { refreshPushedPullRequests } from "./git/refreshPushedPullRequests.ts";
-import { linkCreatedPullRequest } from "./git/linkCreatedPullRequest.ts";
 import * as ReviewService from "./review/ReviewService.ts";
 import * as ProjectEnrichmentService from "./project/ProjectEnrichmentService.ts";
 import * as ProjectService from "./project/ProjectService.ts";
@@ -257,7 +254,6 @@ import * as PullRequestReviewGuideService from "./pullRequest/PullRequestReviewG
 import { listLinkedPullRequestThreads } from "./pullRequest/linkedThreads.ts";
 import { pullRequestSyncKey } from "./pullRequest/pullRequestSyncKey.ts";
 import * as SqlClient from "effect/sql/SqlClient";
-import * as PullRequestSyncReactor from "./orchestration-v2/PullRequestSyncReactor.ts";
 import * as SourceControlDiscovery from "./sourceControl/SourceControlDiscovery.ts";
 import * as OtlpEndpointCheck from "./observability/OtlpEndpointCheck.ts";
 import * as TextGenerators from "./textGeneration/TextGenerators.ts";
@@ -1489,7 +1485,6 @@ export const layerWsRpc = (
       const threadIssues = yield* ThreadIssueService.ThreadIssueService;
       const issueTrackers = yield* IssueTrackerConnections.IssueTrackerConnections;
       const reviewGuides = yield* PullRequestReviewGuideService.PullRequestReviewGuideService;
-      const pullRequestSync = yield* PullRequestSyncReactor.PullRequestSyncReactor;
       const deviceService = yield* DeviceService.DeviceService;
       const deviceHostContext =
         yield* Effect.context<Effect.Services<ReturnType<typeof remoteSshDeviceHosts>>>();
@@ -1499,20 +1494,6 @@ export const layerWsRpc = (
       const terminalViewerPrefix = yield* random.uuidV4();
       const terminalViewerId = (metadata: { readonly client: { readonly id: number } }) =>
         `${terminalViewerPrefix}:${metadata.client.id}`;
-      const serverCommandId = (tag: string) =>
-        random.uuidV4().pipe(
-          Effect.orDie,
-          Effect.map((id) => CommandId.make(`server:${tag}:${id}`)),
-        );
-      const resolvePullRequestSyncKey = (reference: PullRequestRef) =>
-        reference.host !== undefined && reference.repository.includes("/")
-          ? Effect.succeed(pullRequestSyncKey(reference))
-          : projectService.getShell(reference.projectId).pipe(
-              Effect.map((project) =>
-                pullRequestSyncKey(reference, Option.getOrUndefined(project)?.repositoryIdentity),
-              ),
-              Effect.orElseSucceed(() => null),
-            );
       const usage = yield* UsageService.UsageService;
       const usageLimitSources = yield* UsageLimitSources.UsageLimitSources;
       const worktreeSetupTracker = yield* WorktreeSetupTracker.WorktreeSetupTracker;
@@ -2796,7 +2777,15 @@ export const layerWsRpc = (
         [WS_METHODS.pullRequestsStack]: (input) =>
           withPullRequestViewer(input, pullRequests.stack(input)),
         [WS_METHODS.pullRequestsLinkedThreads]: (input) =>
-          resolvePullRequestSyncKey(input).pipe(
+          (input.host !== undefined && input.repository.includes("/")
+            ? Effect.succeed(pullRequestSyncKey(input))
+            : projectService.getShell(input.projectId).pipe(
+                Effect.map((project) =>
+                  pullRequestSyncKey(input, Option.getOrUndefined(project)?.repositoryIdentity),
+                ),
+                Effect.orElseSucceed(() => null),
+              )
+          ).pipe(
             Effect.flatMap((key) =>
               key === null
                 ? Effect.succeed({ threads: [] })
@@ -2828,15 +2817,7 @@ export const layerWsRpc = (
         [WS_METHODS.pullRequestsSetFilesViewed]: (input) =>
           withPullRequestViewer(input, pullRequests.setFilesViewed(input)),
         [WS_METHODS.pullRequestsRunAction]: (input) =>
-          withPullRequestViewer(input, pullRequests.runAction(input)).pipe(
-            Effect.tap(() =>
-              resolvePullRequestSyncKey(input).pipe(
-                Effect.flatMap((key) =>
-                  key === null ? Effect.void : pullRequestSync.requestSync(key),
-                ),
-              ),
-            ),
-          ),
+          withPullRequestViewer(input, pullRequests.runAction(input)),
         [WS_METHODS.pullRequestsUpdate]: (input) =>
           withPullRequestViewer(input, pullRequests.update(input)),
         [WS_METHODS.pullRequestsComment]: (input) =>
@@ -2853,19 +2834,7 @@ export const layerWsRpc = (
           withPullRequestViewer(input, pullRequests.setReaction(input)),
         [WS_METHODS.pullRequestsReportState]: (input) => pullRequests.reportState(input),
         [WS_METHODS.pullRequestsInvalidate]: (input) =>
-          pullRequests
-            .invalidate(input, { notifyReaders: true })
-            .pipe(
-              Effect.andThen(
-                input.reference === undefined || input.filesViewedOnly === true
-                  ? Effect.void
-                  : resolvePullRequestSyncKey(input.reference).pipe(
-                      Effect.flatMap((key) =>
-                        key === null ? Effect.void : pullRequestSync.requestSync(key),
-                      ),
-                    ),
-              ),
-            ),
+          pullRequests.invalidate(input, { notifyReaders: true, syncLinkedThreads: true }),
         [WS_METHODS.pullRequestsSubscribeRefreshes]: () => pullRequests.subscribeRefreshes,
         [WS_METHODS.pullRequestsSubscribeLinkedThreadRefreshes]: () =>
           pullRequests.subscribeLinkedThreadRefreshes,
@@ -3177,33 +3146,17 @@ export const layerWsRpc = (
                 },
               })
               .pipe(
+                Effect.provideService(Orchestrator.OrchestratorV2, orchestrationEngine),
+                Effect.provideService(ProjectService.ProjectService, projectService),
+                Effect.provideService(ProjectStore.ProjectStoreV2, projectStore),
+                Effect.provideService(PullRequestService.PullRequestService, pullRequests),
+                Effect.provideService(SecureRandom.SecureRandom, random),
                 Effect.matchCauseEffect({
                   // Earlier steps (branch, commit) may have landed before the failing one.
                   onFailure: (cause) =>
                     refreshGitStatus(input.cwd).pipe(Effect.andThen(Queue.failCause(queue, cause))),
-                  onSuccess: (result) =>
-                    (input.threadId === undefined
-                      ? Effect.void
-                      : linkCreatedPullRequest({
-                          threadId: input.threadId,
-                          result,
-                          commandId: serverCommandId("pr-created-link"),
-                        }).pipe(
-                          Effect.provideService(Orchestrator.OrchestratorV2, orchestrationEngine),
-                          Effect.provideService(ProjectService.ProjectService, projectService),
-                        )
-                    ).pipe(
-                      Effect.andThen(
-                        refreshPushedPullRequests(input, result).pipe(
-                          Effect.provideService(Orchestrator.OrchestratorV2, orchestrationEngine),
-                          Effect.provideService(ProjectStore.ProjectStoreV2, projectStore),
-                          Effect.provideService(
-                            PullRequestService.PullRequestService,
-                            pullRequests,
-                          ),
-                        ),
-                      ),
-                      Effect.andThen(refreshGitStatus(input.cwd)),
+                  onSuccess: () =>
+                    refreshGitStatus(input.cwd).pipe(
                       Effect.andThen(Queue.end(queue).pipe(Effect.asVoid)),
                     ),
                 }),

@@ -23,6 +23,9 @@ import { beforeEach, vi } from "vite-plus/test";
 beforeEach(() => {
   portalShortcutInstances.length = 0;
   nextPortalState.value = undefined;
+  shortcutAutoReady.value = true;
+  shortcutProcesses.length = 0;
+  spawnedPollers.length = 0;
   vi.stubEnv("NIRI_SOCKET", "");
   vi.stubEnv("XDG_CURRENT_DESKTOP", "test-desktop");
   transitionCapturePageMock.mockReset().mockResolvedValue(undefined);
@@ -61,6 +64,7 @@ const {
   nextPortalState,
   regionCaptureMock,
   screenToDipRectMock,
+  shortcutAutoReady,
   shortcutForkArgs,
   shortcutForkOptions,
   shortcutProcesses,
@@ -71,6 +75,7 @@ const {
   transitionShowMock,
   transitionSnapshotMock,
 } = vi.hoisted(() => ({
+  shortcutAutoReady: { value: true },
   activeWindowMock: vi.fn(),
   animationSettingsMock: vi.fn(() => ({
     prefersReducedMotion: true,
@@ -253,7 +258,7 @@ vi.mock("node:child_process", () => ({
       },
       kill: record.kill,
     };
-    queueMicrotask(() => record.emitStderr("ready\n"));
+    if (shortcutAutoReady.value) queueMicrotask(() => record.emitStderr("ready\n"));
     return child;
   },
   fork: (_path: string, args: ReadonlyArray<string>, options: { env?: NodeJS.ProcessEnv }) => {
@@ -282,7 +287,7 @@ vi.mock("node:child_process", () => ({
     shortcutForkArgs.push(args);
     shortcutForkOptions.push(options);
     shortcutProcesses.push(process);
-    queueMicrotask(() => process.emit("message", "ready"));
+    if (shortcutAutoReady.value) queueMicrotask(() => process.emit("message", "ready"));
     return process;
   },
 }));
@@ -2196,6 +2201,71 @@ it.effect.each([false, true])(
               }),
             ),
           readDirectory: () => Effect.succeed([]),
+        }),
+      ),
+    );
+  },
+);
+
+it.effect.each(["win32", "darwin"] as const)(
+  "times out stalled modifier-pair shortcut helpers without wedging configurationMutex (%s)",
+  (platform) => {
+    accessibilityTrustedMock.mockReturnValue(true);
+    mediaAccessStatusMock.mockReturnValue("granted");
+    const settings: ClientSettings = { ...DEFAULT_CLIENT_SETTINGS, snapShotEnabled: true };
+    const layer = layerTest(platform);
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const service = yield* DesktopSnapShot.make;
+
+        shortcutAutoReady.value = false;
+        const checkFiber = yield* service
+          .checkShortcut(settings.snapShotShortcut)
+          .pipe(Effect.timeoutOption("6 seconds"), Effect.forkScoped);
+        yield* Effect.yieldNow;
+        yield* TestClock.adjust("5 seconds");
+        yield* Effect.yieldNow;
+        yield* TestClock.adjust("1 second");
+        const checkResult = yield* Fiber.join(checkFiber);
+        assert.isTrue(Option.isSome(checkResult), "checkShortcut hung instead of timing out");
+        if (Option.isSome(checkResult)) {
+          assert.isFalse(checkResult.value.available);
+        }
+        const checkKillCount =
+          platform === "win32"
+            ? shortcutProcesses.at(-1)?.kill.mock.calls.length
+            : spawnedPollers.at(-1)?.kill.mock.calls.length;
+        assert.equal(checkKillCount, 1);
+
+        const configureFiber = yield* service
+          .configure(settings)
+          .pipe(Effect.timeoutOption("6 seconds"), Effect.forkScoped);
+        yield* Effect.yieldNow;
+        yield* TestClock.adjust("5 seconds");
+        yield* Effect.yieldNow;
+        yield* TestClock.adjust("1 second");
+        const configureResult = yield* Fiber.join(configureFiber);
+        assert.isTrue(Option.isSome(configureResult), "configure hung holding configurationMutex");
+        assert.isFalse((yield* service.state).shortcutRegistered);
+        const configureKillCount =
+          platform === "win32"
+            ? shortcutProcesses.at(-1)?.kill.mock.calls.length
+            : spawnedPollers.at(-1)?.kill.mock.calls.length;
+        assert.equal(configureKillCount, 1);
+
+        shortcutAutoReady.value = true;
+        yield* service.configure({
+          ...settings,
+          snapShotIncludeAccessibility: !settings.snapShotIncludeAccessibility,
+        });
+        assert.isTrue((yield* service.state).shortcutRegistered);
+      }),
+    ).pipe(
+      Effect.provide(layer),
+      Effect.ensuring(
+        Effect.sync(() => {
+          shortcutAutoReady.value = true;
         }),
       ),
     );

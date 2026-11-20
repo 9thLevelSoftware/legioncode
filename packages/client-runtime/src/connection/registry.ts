@@ -274,6 +274,10 @@ export const make = Effect.gen(function* () {
   const serviceScopes = yield* SubscriptionRef.make<
     ReadonlyMap<EnvironmentId, EnvironmentServiceScope>
   >(new Map());
+  const scopeEpochs = new Map<EnvironmentId, number>();
+  const bumpScopeEpoch = (environmentId: EnvironmentId) => {
+    scopeEpochs.set(environmentId, (scopeEpochs.get(environmentId) ?? 0) + 1);
+  };
   const platformEnvironmentIds = yield* Ref.make<ReadonlySet<EnvironmentId>>(new Set());
   const persistedEnvironmentIds = yield* Ref.make<ReadonlySet<EnvironmentId>>(
     new Set(persistedRoutesByEnvironment.keys()),
@@ -355,6 +359,7 @@ export const make = Effect.gen(function* () {
     }
     const next = new Map(current);
     next.delete(environmentId);
+    bumpScopeEpoch(environmentId);
     yield* SubscriptionRef.set(serviceScopes, next);
     yield* Scope.close(lease.scope, Exit.void);
   });
@@ -445,7 +450,11 @@ export const make = Effect.gen(function* () {
       Stream.fromEffect(SubscriptionRef.get(entries)),
       SubscriptionRef.changes(entries),
     ).pipe(
-      Stream.map((current) => Option.fromUndefinedOr(current.get(environmentId))),
+      Stream.map((current) =>
+        current.has(environmentId)
+          ? Option.some(scopeEpochs.get(environmentId) ?? 0)
+          : Option.none(),
+      ),
       Stream.changesWith(
         (previous, current) => Option.getOrNull(previous) === Option.getOrNull(current),
       ),
@@ -505,6 +514,7 @@ export const make = Effect.gen(function* () {
     }
 
     yield* closeServiceScope(target.environmentId);
+    bumpScopeEpoch(target.environmentId);
     yield* SubscriptionRef.update(entries, (current) => {
       const next = new Map(current);
       next.set(target.environmentId, entry);

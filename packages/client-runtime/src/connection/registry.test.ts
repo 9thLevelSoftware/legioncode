@@ -1348,6 +1348,99 @@ describe("EnvironmentRegistry", () => {
     }),
   );
 
+  it.effect(
+    "keeps followStream active across learnRoutes, setEnabled toggles, and setCompatibility while switching on replacement",
+    () =>
+      Effect.gen(function* () {
+        const harness = yield* makeHarness(
+          [BEARER_TARGET],
+          [BEARER_PROFILE],
+          [[BEARER_TARGET.connectionId, BEARER_CREDENTIAL]],
+          {
+            directEndpoints: [{ kind: "tailnet", httpBaseUrl: "https://tailnet.example.test/" }],
+          },
+        );
+
+        yield* Effect.gen(function* () {
+          const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
+          const initialStarted = yield* Deferred.make<void>();
+          const replacedStarted = yield* Deferred.make<void>();
+          const followedSupervisors = yield* Ref.make(0);
+          const closedStreams = yield* Ref.make(0);
+          yield* registry.start;
+
+          const subscription = yield* Effect.forkChild(
+            registry
+              .followStream(
+                BEARER_TARGET.environmentId,
+                Stream.unwrap(
+                  Effect.gen(function* () {
+                    const supervisor = yield* EnvironmentSupervisor.EnvironmentSupervisor;
+                    const count = yield* Ref.updateAndGet(followedSupervisors, (n) => n + 1);
+                    yield* Deferred.succeed(
+                      count === 1 ? initialStarted : replacedStarted,
+                      undefined,
+                    );
+                    return SubscriptionRef.changes(supervisor.state).pipe(
+                      Stream.ensuring(Ref.update(closedStreams, (n) => n + 1)),
+                    );
+                  }),
+                ),
+              )
+              .pipe(Stream.runDrain),
+          );
+
+          yield* Deferred.await(initialStarted);
+          yield* SubscriptionRef.changes(registry.entries).pipe(
+            Stream.filter(
+              (entries) =>
+                (entries.get(BEARER_TARGET.environmentId)?.alternateRoutes?.length ?? 0) > 0,
+            ),
+            Stream.runHead,
+          );
+          yield* registry.setEnabled(BEARER_TARGET.environmentId, false);
+          yield* awaitConnectionState(
+            registry,
+            BEARER_TARGET.environmentId,
+            (state) => !state.desired,
+          );
+          yield* registry.setEnabled(BEARER_TARGET.environmentId, true);
+          yield* awaitConnectionState(
+            registry,
+            BEARER_TARGET.environmentId,
+            (state) => state.phase === "connected",
+          );
+          yield* registry.setCompatibility(
+            BEARER_TARGET.environmentId,
+            new ConnectionBlockedError({
+              reason: "unsupported",
+              detail: "Upgrade required.",
+            }),
+          );
+          yield* registry.setCompatibility(BEARER_TARGET.environmentId, null);
+          yield* awaitConnectionState(
+            registry,
+            BEARER_TARGET.environmentId,
+            (state) => state.phase === "connected",
+          );
+          expect(yield* Ref.get(closedStreams)).toBe(0);
+          expect(yield* Ref.get(followedSupervisors)).toBe(1);
+
+          yield* registry.register(
+            new RelayConnectionRegistration({
+              target: new RelayConnectionTarget({
+                environmentId: BEARER_TARGET.environmentId,
+                label: "Replacement relay",
+              }),
+            }),
+          );
+          yield* Deferred.await(replacedStarted);
+          yield* Fiber.interrupt(subscription);
+          expect(yield* Ref.get(followedSupervisors)).toBe(2);
+        }).pipe(Effect.provide(harness.layer), Effect.scoped);
+      }),
+  );
+
   it.effect("removes all relay-owned data without touching non-cloud connections", () =>
     Effect.gen(function* () {
       const harness = yield* makeHarness(

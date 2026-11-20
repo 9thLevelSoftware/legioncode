@@ -9,8 +9,8 @@ import * as NodePath from "node:path";
 
 // Desktop only depends on gt-i18n, so the gt CLI hides `generate` there; its script adds it back.
 const GENERATE: Record<string, readonly [string, ...string[]]> = {
-  "apps/web": ["node_modules/.bin/gt", "generate"],
-  "apps/mobile": ["node_modules/.bin/gt", "generate"],
+  "apps/web": [process.execPath, "node_modules/gt/bin/main.js", "generate"],
+  "apps/mobile": [process.execPath, "node_modules/gt/bin/main.js", "generate"],
   "apps/desktop": [process.execPath, "scripts/i18n-generate.mjs"],
 };
 const APPS = Object.keys(GENERATE);
@@ -36,14 +36,19 @@ for (const [app, [command, ...args]] of Object.entries(GENERATE)) {
     const tmpConfig = NodePath.join(tmp, "gt.config.json");
     NodeFS.writeFileSync(
       tmpConfig,
-      JSON.stringify({ ...config, locales: [], files: { gt: { output: `${tmp}/[locale].json` } } }),
+      JSON.stringify({
+        ...config,
+        locales: [],
+        files: { gt: { output: `${tmp.replaceAll("\\", "/")}/[locale].json` } },
+      }),
     );
     const gt = NodeChildProcess.spawnSync(command, [...args, "--config", tmpConfig], {
       cwd: appDir,
       encoding: "utf8",
     });
     if (gt.status !== 0) {
-      problems.push(`${app}: gt generate failed\n${gt.stdout}${gt.stderr}`);
+      const errorDetail = gt.error ? `\n${String(gt.error)}` : "";
+      problems.push(`${app}: gt generate failed\n${gt.stdout}${gt.stderr}${errorDetail}`);
       continue;
     }
     const generated: Catalog = readJson(NodePath.join(tmp, `${config.defaultLocale}.json`));

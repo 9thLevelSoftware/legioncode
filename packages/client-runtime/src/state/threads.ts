@@ -227,6 +227,23 @@ function cachedThreadState(value: EnvironmentThreadState): EnvironmentThreadStat
   };
 }
 
+function initialRetainedThreadState(
+  retainedState: EnvironmentThreadState,
+  initialConnectionPhase: ReturnType<typeof connectionProjectionPhase>,
+  initialSession: Option.Option<unknown>,
+): EnvironmentThreadState {
+  const cached = cachedThreadState(retainedState);
+  if (cached.status !== "live") return cached;
+  if (Option.isSome(initialSession) && initialConnectionPhase !== "disconnected") return cached;
+  return {
+    ...cached,
+    status:
+      initialConnectionPhase === "disconnected"
+        ? statusWithoutLiveData(cached.data)
+        : ("synchronizing" as const),
+  };
+}
+
 function hasMissingPendingQuestionCard(projection: OrchestrationV2ThreadProjection): boolean {
   const pending = new Set(
     projection.runtimeRequests
@@ -288,13 +305,16 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
     (snapshot) => !hasMissingPendingQuestionCard(snapshot.projection),
   );
   const cachedThread = Option.map(cached, (snapshot) => snapshot.projection);
+  const initialConnectionState = yield* SubscriptionRef.get(supervisor.state);
+  const initialSession = yield* SubscriptionRef.get(supervisor.session);
+  const initialConnectionPhase = connectionProjectionPhase(initialConnectionState);
   // Seed the resume cursor from the cached snapshot so a warm cache can catch up
   // via `afterSequence` instead of re-downloading the full thread body.
   const initialSequence =
     retained?.sequence ??
     Option.match(cached, { onNone: () => 0, onSome: (snapshot) => snapshot.snapshotSequence });
   const initialState: EnvironmentThreadState = retained
-    ? cachedThreadState(retained.state)
+    ? initialRetainedThreadState(retained.state, initialConnectionPhase, initialSession)
     : {
         data: cachedThread,
         status: statusWithoutLiveData(cachedThread),
@@ -306,6 +326,10 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
         sequence: initialSequence,
       };
   const state = yield* SubscriptionRef.make(initialState);
+  // Only the first subscription after a warm live resume keeps the retained
+  // status. A replacement session or foreground resubscribe on the same scope
+  // may have missed events, so those show sync progress until confirmed.
+  const resumingLive = yield* Ref.make(initialState.status === "live");
   const canLoadHistory = Option.isSome(httpClient) && Option.isSome(historyController);
   const acceptsBoundedSocketSnapshots = yield* Ref.make(canLoadHistory);
   const lastSequence = yield* SubscriptionRef.make(initialSequence);
@@ -439,6 +463,7 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
         },
   );
   const setDisconnected = Effect.gen(function* () {
+    yield* Ref.set(resumingLive, false);
     yield* Ref.set(awaitingCompletion, false);
     yield* SubscriptionRef.update(state, (current) => ({
       ...current,
@@ -984,10 +1009,6 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
       service.changes.pipe(Stream.filter(ConnectionWakeups.shouldResubscribeAfterWakeup)),
   });
 
-  // Only the first subscription after a warm live resume keeps the retained
-  // status. A replacement session or foreground resubscribe on the same scope
-  // may have missed events, so those show sync progress until confirmed.
-  const resumingLive = yield* Ref.make(initialState.status === "live");
   // A cold open tries the socket snapshot once. Any later cold attempt, after a
   // failure or a dropped session, asks HTTP, which also tells a missing thread
   // apart from a failed load.
@@ -1009,7 +1030,7 @@ export const makeEnvironmentThreadState = Effect.fn("EnvironmentThreadState.make
     );
   });
 
-  yield* markSynchronizing;
+  if (initialConnectionPhase !== "disconnected") yield* markSynchronizing;
   // A 404 can arrive before the thread exists, so a miss asks HTTP again while mounted.
   let httpMisses = 0;
   let defectRetries = 0;

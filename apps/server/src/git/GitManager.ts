@@ -102,6 +102,7 @@ export interface GitActionProgressReporter {
 export interface GitRunStackedActionOptions {
   readonly actionId?: string;
   readonly progressReporter?: GitActionProgressReporter;
+  readonly onPushSucceeded?: () => Effect.Effect<void, never>;
 }
 
 export interface GitLocalStatusOptions {
@@ -2683,7 +2684,11 @@ export const make = Effect.gen(function* () {
       const isDraft =
         result.status === "opened_existing" &&
         (yield* pullRequests.summary({ ...ref, allowStale: false })).isDraft;
-      if (!isDraft) yield* pullRequests.runAction({ ...ref, action: "draft" });
+      if (isDraft) {
+        yield* pullRequests.invalidate({ reference: ref }, { syncLinkedThreads: true });
+      } else {
+        yield* pullRequests.runAction({ ...ref, action: "draft" });
+      }
       return true;
     },
     (effect, input) =>
@@ -3760,6 +3765,11 @@ export const make = Effect.gen(function* () {
               .pipe(
                 Effect.tap(() => Ref.set(currentPhase, Option.some("push"))),
                 Effect.flatMap(() => pushCurrentBranch(input.cwd, currentBranch)),
+                Effect.tap((result) =>
+                  result.status === "pushed"
+                    ? (options?.onPushSucceeded?.() ?? Effect.void)
+                    : Effect.void,
+                ),
               )
           : { status: "skipped_not_requested" as const };
 

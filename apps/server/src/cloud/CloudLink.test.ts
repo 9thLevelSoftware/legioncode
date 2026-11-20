@@ -4,12 +4,13 @@ import { EnvironmentId } from "@t3tools/contracts";
 import { RELAY_MINT_REQUEST_TYP, signRelayJwt } from "@t3tools/shared/relayJwt";
 import { assert, it } from "@effect/vitest";
 import * as DateTime from "effect/DateTime";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import { HttpClient, HttpServer } from "effect/http";
+import { HttpClient, HttpClientResponse, HttpServer } from "effect/http";
 import * as NetAddress from "effect/net/NetAddress";
 import * as NodePlatformCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -25,6 +26,7 @@ import * as CloudLink from "./CloudLink.ts";
 import * as ConnectReachability from "./ConnectReachability.ts";
 import * as ManagedEndpointRuntime from "./ManagedEndpointRuntime.ts";
 import {
+  CLOUD_ENDPOINT_RUNTIME_CONFIG,
   CLOUD_LINKED_USER_ID,
   CLOUD_MINT_PUBLIC_KEY,
   HOLD_WEBHOOKS_WHILE_OFFLINE_SECRET,
@@ -49,6 +51,7 @@ const withService = <A, E>(
     readonly relayFails?: boolean;
     readonly failActivityRead?: boolean;
     readonly failHoldRead?: boolean;
+    readonly httpClient?: HttpClient.HttpClient;
     readonly holdFirstRelayCall?: {
       readonly started: () => void;
       readonly released: Promise<void>;
@@ -57,8 +60,10 @@ const withService = <A, E>(
   body: (input: {
     readonly preferences: { readonly update: CloudLink.CloudLink["Service"]["updatePreferences"] };
     readonly mintCredential: CloudLink.CloudLink["Service"]["mintCredential"];
+    readonly recoverManagedTunnel: CloudLink.CloudLink["Service"]["recoverManagedTunnel"];
     readonly stored: Map<string, Uint8Array>;
     readonly relayCalls: Array<boolean>;
+    readonly fetchRedirects: Array<RequestInit["redirect"] | undefined>;
     readonly connectCredentialRequests: Array<
       Parameters<EnvironmentAuth.EnvironmentAuth["Service"]["issueConnectCredential"]>[0]
     >;
@@ -74,11 +79,13 @@ const withService = <A, E>(
       [CLOUD_LINKED_USER_ID, encode("cloud-user-1")],
     ]);
     const relayCalls: Array<boolean> = [];
+    const fetchRedirects: Array<RequestInit["redirect"] | undefined> = [];
     const connectCredentialRequests: Array<
       Parameters<EnvironmentAuth.EnvironmentAuth["Service"]["issueConnectCredential"]>[0]
     > = [];
     const fetch: typeof globalThis.fetch = Object.assign(
       (_input: Parameters<typeof globalThis.fetch>[0], init?: RequestInit) => {
+        fetchRedirects.push(init?.redirect);
         const payload = JSON.parse(String(init?.body)) as { holdWebhooksWhileOffline: boolean };
         relayCalls.push(payload.holdWebhooksWhileOffline);
         if (relayCalls.length === 1 && options.holdFirstRelayCall) {
@@ -139,7 +146,7 @@ const withService = <A, E>(
       Layer.mock(ServerConfig.ServerConfig)({} as ServerConfig.ServerConfig["Service"]),
       Layer.succeed(
         HttpClient.HttpClient,
-        HttpClient.make(() => Effect.die("unused")),
+        options.httpClient ?? HttpClient.make(() => Effect.die("unused")),
       ),
       NodeServices.layer,
       NodePlatformCrypto.layer,
@@ -149,8 +156,10 @@ const withService = <A, E>(
       return yield* body({
         preferences: { update: link.updatePreferences },
         mintCredential: link.mintCredential,
+        recoverManagedTunnel: link.recoverManagedTunnel,
         stored,
         relayCalls,
+        fetchRedirects,
         connectCredentialRequests,
       });
     }).pipe(
@@ -171,10 +180,11 @@ const withService = <A, E>(
   });
 
 it.effect("tells the relay before saving the hold setting locally", () =>
-  withService({}, ({ preferences, stored, relayCalls }) =>
+  withService({}, ({ preferences, stored, relayCalls, fetchRedirects }) =>
     Effect.gen(function* () {
       yield* preferences.update({ publishAgentActivity: true, holdWebhooksWhileOffline: true });
       assert.deepEqual(relayCalls, [true]);
+      assert.deepEqual(fetchRedirects, ["error"]);
       assert.equal(
         new TextDecoder().decode(stored.get(HOLD_WEBHOOKS_WHILE_OFFLINE_SECRET)),
         "true",
@@ -182,6 +192,35 @@ it.effect("tells the relay before saving the hold setting locally", () =>
     }),
   ),
 );
+
+it.effect("disables HTTP redirects on relayClientRequest calls", () => {
+  const clientRedirects: Array<RequestInit["redirect"] | undefined> = [];
+  const httpClient = HttpClient.make((request, _url, _signal, fiber) =>
+    Effect.sync(() => {
+      clientRedirects.push(
+        Context.getOrUndefined(fiber.context, FetchHttpClient.RequestInit)?.redirect,
+      );
+      return HttpClientResponse.fromWeb(request, new Response("unavailable", { status: 503 }));
+    }),
+  );
+  return withService({ httpClient }, ({ recoverManagedTunnel, stored }) =>
+    Effect.gen(function* () {
+      stored.set(
+        CLOUD_ENDPOINT_RUNTIME_CONFIG,
+        encode(
+          JSON.stringify({
+            providerKind: "cloudflare_tunnel",
+            tunnelId: "tunnel-1",
+            tunnelName: "tunnel-1",
+            connectorToken: "connector-token-1",
+          }),
+        ),
+      );
+      yield* recoverManagedTunnel("http://127.0.0.1:3773").pipe(Effect.exit);
+      assert.deepEqual(clientRedirects, ["error"]);
+    }),
+  );
+});
 
 it.effect("puts the relay back when the local save fails", () =>
   withService({ failHoldWrite: true }, ({ preferences, stored, relayCalls }) =>

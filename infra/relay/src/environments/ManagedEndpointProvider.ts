@@ -1088,6 +1088,7 @@ const make = Effect.gen(function* () {
             }),
         ),
       );
+      let tunnelAlreadyGone = false;
       if (input.expectedInactiveBefore !== undefined && input.expectedStatus !== undefined) {
         const expectedStatus = input.expectedStatus;
         const inactiveBefore = input.expectedInactiveBefore;
@@ -1108,27 +1109,31 @@ const make = Effect.gen(function* () {
           }),
         );
         if (Option.isNone(currentTunnel)) {
-          return true;
-        }
-        const inactiveAt =
-          expectedStatus === "down"
-            ? currentTunnel.value.connsInactiveAt
-            : currentTunnel.value.createdAt;
-        if (
-          currentTunnel.value.id !== tunnelId ||
-          currentTunnel.value.status !== expectedStatus ||
-          typeof inactiveAt !== "string"
-        ) {
-          return false;
-        }
-        const inactiveTime = DateTime.make(inactiveAt);
-        const cutoff = DateTime.make(inactiveBefore);
-        if (
-          Option.isNone(inactiveTime) ||
-          Option.isNone(cutoff) ||
-          inactiveTime.value.epochMilliseconds > cutoff.value.epochMilliseconds
-        ) {
-          return false;
+          if (input.markReleased !== true) {
+            return true;
+          }
+          tunnelAlreadyGone = true;
+        } else {
+          const inactiveAt =
+            expectedStatus === "down"
+              ? currentTunnel.value.connsInactiveAt
+              : currentTunnel.value.createdAt;
+          if (
+            currentTunnel.value.id !== tunnelId ||
+            currentTunnel.value.status !== expectedStatus ||
+            typeof inactiveAt !== "string"
+          ) {
+            return false;
+          }
+          const inactiveTime = DateTime.make(inactiveAt);
+          const cutoff = DateTime.make(inactiveBefore);
+          if (
+            Option.isNone(inactiveTime) ||
+            Option.isNone(cutoff) ||
+            inactiveTime.value.epochMilliseconds > cutoff.value.epochMilliseconds
+          ) {
+            return false;
+          }
         }
       }
       const released = yield* allocations
@@ -1161,6 +1166,9 @@ const make = Effect.gen(function* () {
               );
             if (finalGeneration === null) {
               return false;
+            }
+            if (tunnelAlreadyGone) {
+              return true;
             }
             // A timed-out deletion may have succeeded; confirm Cloudflare state before rolling back the claim.
             return yield* deleteTunnel.pipe(

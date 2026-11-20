@@ -13,6 +13,7 @@ import {
   PENDING_ATTACHMENT_THREAD_SEGMENT,
   planAttachmentClaim,
   resolveAttachmentPath,
+  toSafeThreadAttachmentSegment,
 } from "../attachmentStore.ts";
 import * as ServerConfig from "../config.ts";
 import * as DocumentText from "../provider/DocumentText.ts";
@@ -78,9 +79,10 @@ export const claimPendingAttachments = Effect.fn("AttachmentClaims.claimPendingA
         message: "Duplicate attachment ids are not allowed.",
       });
     }
-    if (!input.attachments.some(attachmentIsPendingUpload)) {
+    if (input.attachments.length === 0) {
       return { attachments: input.attachments, claimedPaths: [] } satisfies ClaimedAttachments;
     }
+    const expectedThreadSegment = toSafeThreadAttachmentSegment(input.threadId);
     const serverConfig = yield* ServerConfig.ServerConfig;
     const fileSystem = yield* FileSystem.FileSystem;
     const claimedPaths: string[] = [];
@@ -90,6 +92,12 @@ export const claimPendingAttachments = Effect.fn("AttachmentClaims.claimPendingA
       (attachment) =>
         Effect.gen(function* () {
           if (!attachmentIsPendingUpload(attachment)) {
+            const ownerSegment = parseThreadSegmentFromAttachmentId(attachment.id);
+            if (expectedThreadSegment === null || ownerSegment !== expectedThreadSegment) {
+              return yield* new AttachmentClaimError({
+                message: `Attachment '${attachment.name}' cannot be sent: it belongs to a different thread.`,
+              });
+            }
             return attachment;
           }
           const claim = planAttachmentClaim({

@@ -20,6 +20,7 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import { createAttachmentId } from "../attachmentStore.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 
 const layerDatabase = Layer.mergeAll(
@@ -407,6 +408,27 @@ it.effect.each(["sqlite"] as const)(
         occurredAt: now,
         payload: { ...message, attachments: [file] },
       });
+      const foreignAttachmentId = createAttachmentId("other-thread")!;
+      yield* store.apply({
+        id: EventId.make("attachment:foreign-message-event"),
+        type: "message.updated",
+        threadId,
+        runId,
+        occurredAt: now,
+        payload: {
+          ...message,
+          id: MessageId.make("attachment:foreign-message"),
+          attachments: [
+            {
+              type: "image",
+              id: foreignAttachmentId as never,
+              name: "foreign.png",
+              mimeType: "image/png",
+              sizeBytes: 8,
+            },
+          ],
+        },
+      });
       yield* store.apply({
         id: EventId.make("attachment:question-event"),
         type: "turn-item.updated",
@@ -423,7 +445,10 @@ it.effect.each(["sqlite"] as const)(
             requestId: "attachment:request",
             answers: { document: ["See document"], image: ["See image"] },
             attachmentsByQuestionId: {
-              document: [{ ...file, id: "answer-document" }],
+              document: [
+                { ...file, id: "answer-document" },
+                { ...file, id: foreignAttachmentId },
+              ],
               image: [
                 {
                   type: "image",

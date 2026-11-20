@@ -3768,6 +3768,112 @@ it.effect("notifies linked threads when detail changes draft status in either di
   }),
 );
 
+it.effect(
+  "publishes normalized state changes on runAction and explicit linked-thread invalidation, keeping plain invalidate silent",
+  () =>
+    Effect.gen(function* () {
+      const github = project({
+        id: "p1",
+        title: "web",
+        workspaceRoot: "/a",
+        repository: "Acme/Web",
+      });
+      const azure = project({
+        id: "az",
+        title: "az",
+        workspaceRoot: "/az",
+        provider: "azure-devops",
+        host: "ssh.dev.azure.com",
+        repository: "v3/Org/Proj/Web",
+        remoteUrl: "git@ssh.dev.azure.com:v3/Org/Proj/Web",
+      });
+      const service = yield* makeService({
+        projects: [github, azure],
+        providers: [
+          fakePullRequestProvider(SourceControlProviderKind.make("github"), {
+            capabilities: {
+              diff: true,
+              comment: true,
+              actions: ["close", "draft", "merge"],
+              mergeMethods: ["merge"],
+              search: true,
+              reactions: true,
+              review: FULL_REVIEW,
+              reviewers: FULL_REVIEWERS,
+            },
+            getViewerPermissions: () =>
+              Effect.succeed({
+                actions: ["close", "draft", "merge"],
+                comment: true,
+                resolve: true,
+                verdicts: ["comment"],
+                requestReviewers: true,
+              }),
+            runAction: () => Effect.void,
+            getChangeRequestSummary: (input) =>
+              Effect.succeed(changeRequest(input.number, "2026-07-02T00:00:00Z")),
+          }),
+          fakePullRequestProvider(SourceControlProviderKind.make("azure-devops"), {
+            ...keyedByCanonicalKey,
+            capabilities: {
+              diff: true,
+              comment: true,
+              actions: ["close", "draft", "merge"],
+              mergeMethods: ["merge"],
+              search: true,
+              reactions: true,
+              review: FULL_REVIEW,
+              reviewers: FULL_REVIEWERS,
+            },
+            getViewerPermissions: () =>
+              Effect.succeed({
+                actions: ["close", "draft", "merge"],
+                comment: true,
+                resolve: true,
+                verdicts: ["comment"],
+                requestReviewers: true,
+              }),
+            runAction: () => Effect.void,
+            getChangeRequestSummary: (input) =>
+              Effect.succeed(changeRequest(input.number, "2026-07-02T00:00:00Z")),
+          }),
+        ],
+      });
+      const changes = yield* service.subscribeStateChanges;
+      const ghRef = { projectId: github.id, repository: "Acme/Web", number: 1 };
+
+      yield* service.invalidate({ reference: ghRef });
+      yield* service.invalidate({ reference: ghRef }, { notifyReaders: true });
+      yield* service.invalidate(
+        { reference: ghRef, filesViewedOnly: true },
+        { syncLinkedThreads: true },
+      );
+      yield* service.invalidate({}, { syncLinkedThreads: true });
+
+      yield* service.runAction({ ...ghRef, action: "close" });
+      yield* service.invalidate(
+        { reference: ghRef },
+        { notifyReaders: true, syncLinkedThreads: true },
+      );
+      yield* service.runAction({
+        projectId: azure.id,
+        repository: "web",
+        number: 7,
+        action: "close",
+      });
+
+      yield* service.reportState({ reference: { ...ghRef, number: 2 }, state: "open" });
+      const events = yield* Stream.runCollect(
+        changes.pipe(Stream.takeUntil((event) => event.number === 2, { excludeLast: true })),
+      );
+      assert.deepStrictEqual(events, [
+        { host: "github.com", repository: "acme/web", number: 1 },
+        { host: "github.com", repository: "acme/web", number: 1 },
+        { host: "dev.azure.com", repository: "org/proj/_git/web", number: 7 },
+      ]);
+    }),
+);
+
 it.effect("deduplicates routed PR reports without dropping draft changes", () =>
   Effect.gen(function* () {
     const reference = { projectId: "p1" as ProjectId, repository: "acme/web", number: 1 };

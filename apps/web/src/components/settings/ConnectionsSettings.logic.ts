@@ -490,7 +490,7 @@ export function endpointShareHint(
   }
 }
 
-/** An explicit choice while it is listed, else the primary, else a connected environment. */
+/** An explicit choice while it is listed, else null; without a choice, the primary or a connected environment. */
 export function resolveAccessEnvironmentId(input: {
   readonly primaryEnvironmentId: EnvironmentId | null;
   readonly environments: ReadonlyArray<{
@@ -501,7 +501,9 @@ export function resolveAccessEnvironmentId(input: {
 }): EnvironmentId | null {
   const isListed = (environmentId: EnvironmentId | null) =>
     input.environments.some((environment) => environment.environmentId === environmentId);
-  if (isListed(input.selected)) return input.selected;
+  if (input.selected !== null) {
+    return isListed(input.selected) ? input.selected : null;
+  }
   if (isListed(input.primaryEnvironmentId)) return input.primaryEnvironmentId;
   return (
     (input.environments.find((environment) => environment.connected) ?? input.environments[0])

@@ -10,6 +10,7 @@ export function startGlobalShiftShortcutProcess(
   modifier: SnapShotModifier,
   onTrigger: () => void,
   onFailure: (error: Error) => void,
+  options?: { readonly signal?: AbortSignal; readonly startupTimeoutMs?: number },
 ): Promise<() => void> {
   const worker = NodeChildProcess.fork(workerPath, [modifier], {
     env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
@@ -20,7 +21,17 @@ export function startGlobalShiftShortcutProcess(
   return new Promise((resolve, reject) => {
     let settled = false;
     let stopped = false;
+    let startupTimer: ReturnType<typeof setTimeout> | undefined;
+    const onAbort = () => fail(new Error("Snapshot shortcut helper startup aborted"));
+    const clearStartup = () => {
+      if (startupTimer !== undefined) {
+        clearTimeout(startupTimer);
+        startupTimer = undefined;
+      }
+      options?.signal?.removeEventListener("abort", onAbort);
+    };
     const stop = () => {
+      clearStartup();
       if (stopped) return;
       stopped = true;
       worker.kill();
@@ -29,6 +40,7 @@ export function startGlobalShiftShortcutProcess(
       worker.once("exit", () => clearTimeout(forceKill));
     };
     const fail = (error: Error) => {
+      clearStartup();
       if (stopped) return;
       if (settled) {
         stop();
@@ -40,9 +52,21 @@ export function startGlobalShiftShortcutProcess(
       reject(error);
     };
 
+    if (options?.signal?.aborted) {
+      fail(new Error("Snapshot shortcut helper startup aborted"));
+      return;
+    }
+    options?.signal?.addEventListener("abort", onAbort, { once: true });
+    startupTimer = setTimeout(
+      () => fail(new Error("Snapshot shortcut helper timed out waiting for ready")),
+      options?.startupTimeoutMs ?? 5_000,
+    );
+    startupTimer.unref?.();
+
     worker.on("message", (message) => {
       if (message === "ready" && !settled) {
         settled = true;
+        clearStartup();
         resolve(stop);
         return;
       }

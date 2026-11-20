@@ -524,7 +524,7 @@ export const ThreadIssueLink = Schema.Struct({
 export type ThreadIssueLink = typeof ThreadIssueLink.Type;
 
 export function threadIssueKeyOf(key: ThreadIssueKey): string {
-  return `${key.tracker}\u0000${key.host.trim().toLowerCase()}\u0000${key.scope.trim().toLowerCase()}\u0000${key.key.trim()}`;
+  return `${key.tracker}\u0000${key.host.trim().toLowerCase()}\u0000${key.scope.trim().toLowerCase()}\u0000${key.key.trim().toLowerCase()}`;
 }
 
 export function threadIssueKeysEqual(left: ThreadIssueKey, right: ThreadIssueKey): boolean {

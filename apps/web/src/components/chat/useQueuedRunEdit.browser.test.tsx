@@ -5,6 +5,8 @@ import {
   MessageId,
   RunId,
   ThreadId,
+  TurnItemId,
+  type PreviewAnnotationPayload,
   type ScopedThreadRef,
 } from "@t3tools/contracts";
 import { useImperativeHandle, type RefObject } from "react";
@@ -12,18 +14,31 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import {
   ATTACHMENT_ONLY_BOOTSTRAP_PROMPT,
   threadContextRecord,
+  toKindScopedComposerContextId,
 } from "@t3tools/shared/composerContextReferences";
 import { toastManager } from "../ui/toast";
 
 import { act, render } from "../../../test/render";
 import { useComposerDraftStore, useComposerThreadDraft } from "../../composerDraftStore";
-import { formatInlineContextReference } from "../../lib/composerContextReferences";
+import {
+  formatInlineContextReference,
+  removeInlineContextReference,
+} from "../../lib/composerContextReferences";
 import { INLINE_TERMINAL_CONTEXT_PLACEHOLDER } from "../../lib/terminalContext";
 import {
   environmentContextRecord,
   environmentContextReference,
+  previewAnnotationContextRecord,
+  previewAnnotationContextReference,
+  responseContextRecord,
+  responseContextReference,
+  reviewCommentContextRecord,
+  reviewCommentContextReference,
+  terminalContextRecord,
+  terminalContextReference,
   threadContextReference,
 } from "../../lib/composerContextRecords";
+import type { ReviewCommentContext } from "../../reviewCommentContext";
 import { deriveComposerSendState } from "../ChatView.logic";
 import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
 import { AppAtomRegistryProvider, appAtomRegistry } from "../../rpc/atomRegistry";
@@ -574,5 +589,423 @@ describe("useQueuedRunEdit", () => {
     expect(
       useComposerDraftStore.getState().getComposerDraft(requireHook(hook).draftTarget)?.prompt,
     ).toBe("newer");
+  });
+
+  it("hydrates all inline context records on beginEdit and prunes removed inline records on save", async () => {
+    const { hook } = setup();
+    mocks.editQueuedRun.mockResolvedValue({ _tag: "Success" });
+    const messageId = MessageId.make("message-1");
+    const terminalDraft = {
+      id: "term-ctx-1",
+      threadId: THREAD_A.threadId,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      terminalId: "default",
+      terminalLabel: "Terminal 1",
+      lineStart: 1,
+      lineEnd: 3,
+      text: "pnpm test failed",
+    };
+    const reviewComment: ReviewCommentContext = {
+      id: "review-ctx-1",
+      sectionId: "diff:src/app.ts",
+      sectionTitle: "src/app.ts",
+      filePath: "src/app.ts",
+      startIndex: 0,
+      endIndex: 1,
+      rangeLabel: "+1 to +2",
+      text: "Handle null case",
+      diff: "+return value;",
+    };
+    const previewAnnotation: PreviewAnnotationPayload = {
+      id: "preview-ctx-1",
+      pageUrl: "http://localhost:3000",
+      pageTitle: "Home",
+      comment: "Align header",
+      elements: [],
+      regions: [],
+      strokes: [],
+      styleChanges: [],
+      screenshot: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+    const thread = threadContextRecord(THREAD_B, "Thread B");
+    const machine = environmentContextRecord(ENV, "Build box");
+    const reply = responseContextRecord({
+      citation: {
+        version: 1,
+        environmentId: ENV,
+        threadId: THREAD_A.threadId,
+        messageId: MessageId.make("assistant-1"),
+        text: "Earlier response",
+        start: 0,
+        end: 16,
+        prefix: "",
+        suffix: "",
+      },
+      itemId: TurnItemId.make("item-1"),
+      subagents: [],
+    });
+    const shotAttachment = {
+      type: "image" as const,
+      id: ChatAttachmentId.make("att-shot-1"),
+      name: "preview-annotation-preview-ctx-1.png",
+      mimeType: "image/png",
+      sizeBytes: 12,
+    };
+    const inlineImageAttachment = {
+      type: "image" as const,
+      id: ChatAttachmentId.make("att-img-1"),
+      name: "shot.png",
+      mimeType: "image/png",
+      sizeBytes: 15,
+    };
+    const inlineFileAttachment = {
+      type: "file" as const,
+      id: ChatAttachmentId.make("att-file-1"),
+      name: "notes.txt",
+      mimeType: "text/plain",
+      sizeBytes: 20,
+    };
+    const previewRecord = previewAnnotationContextRecord(previewAnnotation, {
+      screenshotContextId: previewAnnotation.id,
+    });
+    const shotImageRecord = {
+      version: 1 as const,
+      kind: "image" as const,
+      contextId: toKindScopedComposerContextId("image", previewAnnotation.id),
+      label: shotAttachment.name,
+      attachmentId: shotAttachment.id,
+      name: shotAttachment.name,
+      mimeType: shotAttachment.mimeType,
+      sizeBytes: shotAttachment.sizeBytes,
+    };
+    const inlineImageRecord = {
+      version: 1 as const,
+      kind: "image" as const,
+      contextId: toKindScopedComposerContextId("image", "inline-img"),
+      label: inlineImageAttachment.name,
+      attachmentId: inlineImageAttachment.id,
+      name: inlineImageAttachment.name,
+      mimeType: inlineImageAttachment.mimeType,
+      sizeBytes: inlineImageAttachment.sizeBytes,
+    };
+    const inlineFileRecord = {
+      version: 1 as const,
+      kind: "file" as const,
+      contextId: toKindScopedComposerContextId("file", "inline-file"),
+      label: inlineFileAttachment.name,
+      attachmentId: inlineFileAttachment.id,
+      name: inlineFileAttachment.name,
+      mimeType: inlineFileAttachment.mimeType,
+      sizeBytes: inlineFileAttachment.sizeBytes,
+    };
+    const terminalRecord = terminalContextRecord(terminalDraft);
+    const reviewRecord = reviewCommentContextRecord(reviewComment);
+    const inlineFileToken = formatInlineContextReference({
+      kind: "file",
+      contextId: inlineFileRecord.contextId,
+      label: inlineFileRecord.label,
+    });
+    const inlineImageToken = formatInlineContextReference({
+      kind: "image",
+      contextId: inlineImageRecord.contextId,
+      label: inlineImageRecord.label,
+    });
+    const sentText = [
+      formatInlineContextReference(responseContextReference(reply)),
+      formatInlineContextReference(terminalContextReference(terminalDraft)),
+      formatInlineContextReference(reviewCommentContextReference(reviewComment)),
+      formatInlineContextReference(previewAnnotationContextReference(previewAnnotation)),
+      formatInlineContextReference(threadContextReference(thread)),
+      formatInlineContextReference(environmentContextReference(machine)),
+      inlineImageToken,
+      inlineFileToken,
+    ].join(" ");
+    const messages = [
+      {
+        id: messageId,
+        text: sentText,
+        context: {
+          version: 1,
+          records: [
+            reply,
+            terminalRecord,
+            reviewRecord,
+            previewRecord,
+            shotImageRecord,
+            thread,
+            machine,
+            inlineImageRecord,
+            inlineFileRecord,
+          ],
+        },
+      },
+    ];
+    await using _screen = await render(view(THREAD_A, "queued", hook, messages));
+    await act(() =>
+      requireHook(hook).beginEdit({
+        runId: RUN,
+        messageId,
+        text: sentText,
+        attachments: [shotAttachment, inlineImageAttachment, inlineFileAttachment],
+      }),
+    );
+
+    const target = requireHook(hook).draftTarget;
+    const hydrated = useComposerDraftStore.getState().getComposerDraft(target);
+    expect(hydrated?.terminalContexts).toHaveLength(1);
+    expect(hydrated?.terminalContexts[0]).toMatchObject({
+      terminalId: terminalDraft.terminalId,
+      text: terminalDraft.text,
+    });
+    expect(hydrated?.reviewComments).toHaveLength(1);
+    expect(hydrated?.reviewComments[0]).toMatchObject({
+      filePath: reviewComment.filePath,
+      text: reviewComment.text,
+    });
+    expect(hydrated?.previewAnnotations).toHaveLength(1);
+    expect(hydrated?.previewAnnotations[0]).toMatchObject({
+      id: previewAnnotation.id,
+      comment: previewAnnotation.comment,
+    });
+    expect(hydrated?.threadContexts).toEqual([thread]);
+    expect(hydrated?.environmentContexts).toEqual([machine]);
+    expect(hydrated?.replyTo).toEqual(reply);
+
+    // Delete terminal, review-comment, and inline file tokens from prompt without calling setters,
+    // and clear replyTo; save must not retain their records.
+    let nextPrompt = removeInlineContextReference(
+      hydrated!.prompt,
+      terminalRecord.contextId,
+    ).prompt;
+    nextPrompt = removeInlineContextReference(nextPrompt, reviewRecord.contextId).prompt;
+    nextPrompt = removeInlineContextReference(nextPrompt, inlineFileRecord.contextId).prompt;
+    await act(() => {
+      const store = useComposerDraftStore.getState();
+      store.setPrompt(target, nextPrompt);
+      store.setReplyTo(target, null);
+    });
+    const editedDraft = useComposerDraftStore.getState().getComposerDraft(target)!;
+    await requireHook(hook).saveEdit(
+      {
+        prompt: editedDraft.prompt,
+        images: editedDraft.images,
+        files: editedDraft.files,
+        terminalContexts: editedDraft.terminalContexts,
+        reviewComments: editedDraft.reviewComments,
+        previewAnnotations: editedDraft.previewAnnotations,
+        threadContexts: editedDraft.threadContexts,
+        environmentContexts: editedDraft.environmentContexts,
+        replyTo: editedDraft.replyTo,
+      },
+      () => {},
+    );
+
+    expect(mocks.editQueuedRun).toHaveBeenCalledOnce();
+    const sentRecords = mocks.editQueuedRun.mock.calls[0]?.[0] as {
+      input: {
+        edit: {
+          context: {
+            records: ReadonlyArray<{
+              kind: string;
+              contextId: string;
+              screenshotContextId?: string;
+            }>;
+          };
+        };
+      };
+    };
+    const recordIds = sentRecords.input.edit.context.records.map((record) => record.contextId);
+    expect(recordIds).toEqual(
+      expect.arrayContaining([
+        previewRecord.contextId,
+        shotImageRecord.contextId,
+        thread.contextId,
+        machine.contextId,
+        inlineImageRecord.contextId,
+      ]),
+    );
+    expect(recordIds).not.toContain(terminalRecord.contextId);
+    expect(recordIds).not.toContain(reviewRecord.contextId);
+    expect(recordIds).not.toContain(inlineFileRecord.contextId);
+    expect(recordIds).not.toContain(reply.contextId);
+    expect(
+      sentRecords.input.edit.context.records.find(
+        (record) => record.contextId === previewRecord.contextId,
+      )?.screenshotContextId,
+    ).toBe(shotImageRecord.contextId);
+  });
+
+  it("removes inline file and image tokens from draft.prompt in removeEditingAttachment", async () => {
+    const { hook } = setup();
+    const messageId = MessageId.make("message-1");
+    const fileAttachment = {
+      type: "file" as const,
+      id: ChatAttachmentId.make("att-file-1"),
+      name: "notes.txt",
+      mimeType: "text/plain",
+      sizeBytes: 20,
+    };
+    const imageAttachment = {
+      type: "image" as const,
+      id: ChatAttachmentId.make("att-img-1"),
+      name: "shot.png",
+      mimeType: "image/png",
+      sizeBytes: 15,
+    };
+    const fileRecord = {
+      version: 1 as const,
+      kind: "file" as const,
+      contextId: toKindScopedComposerContextId("file", "inline-file"),
+      label: fileAttachment.name,
+      attachmentId: fileAttachment.id,
+      name: fileAttachment.name,
+      mimeType: fileAttachment.mimeType,
+      sizeBytes: fileAttachment.sizeBytes,
+    };
+    const imageRecord = {
+      version: 1 as const,
+      kind: "image" as const,
+      contextId: toKindScopedComposerContextId("image", "inline-img"),
+      label: imageAttachment.name,
+      attachmentId: imageAttachment.id,
+      name: imageAttachment.name,
+      mimeType: imageAttachment.mimeType,
+      sizeBytes: imageAttachment.sizeBytes,
+    };
+    const text = [
+      "Inspect",
+      formatInlineContextReference({
+        kind: "file",
+        contextId: fileRecord.contextId,
+        label: fileRecord.label,
+      }),
+      "and",
+      formatInlineContextReference({
+        kind: "image",
+        contextId: imageRecord.contextId,
+        label: imageRecord.label,
+      }),
+      "carefully",
+    ].join(" ");
+    const messages = [
+      { id: messageId, text, context: { version: 1, records: [fileRecord, imageRecord] } },
+    ];
+    await using _screen = await render(view(THREAD_A, "queued", hook, messages));
+    await act(() =>
+      requireHook(hook).beginEdit({
+        runId: RUN,
+        messageId,
+        text,
+        attachments: [fileAttachment, imageAttachment],
+      }),
+    );
+
+    await act(() => requireHook(hook).removeEditingAttachment(fileAttachment.id));
+    expect(
+      useComposerDraftStore.getState().getComposerDraft(requireHook(hook).draftTarget)?.prompt,
+    ).not.toContain(fileRecord.contextId);
+    expect(
+      useComposerDraftStore.getState().getComposerDraft(requireHook(hook).draftTarget)?.prompt,
+    ).toContain(imageRecord.contextId);
+
+    await act(() => requireHook(hook).removeEditingAttachment(imageAttachment.id));
+    expect(
+      useComposerDraftStore.getState().getComposerDraft(requireHook(hook).draftTarget)?.prompt,
+    ).toBe("Inspect and carefully");
+  });
+
+  it("keeps hydrated inline context records and prunes deleted ones on kept recovery", async () => {
+    const { hook } = setup();
+    const messageId = MessageId.make("message-1");
+    const terminalDraft = {
+      id: "term-ctx-1",
+      threadId: THREAD_A.threadId,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      terminalId: "default",
+      terminalLabel: "Terminal 1",
+      lineStart: 1,
+      lineEnd: 2,
+      text: "error line",
+    };
+    const reviewComment: ReviewCommentContext = {
+      id: "review-ctx-1",
+      sectionId: "diff:src/app.ts",
+      sectionTitle: "src/app.ts",
+      filePath: "src/app.ts",
+      startIndex: 0,
+      endIndex: 1,
+      rangeLabel: "+1 to +2",
+      text: "Fix typo",
+      diff: "+const a = 1;",
+    };
+    const fileAttachment = {
+      type: "file" as const,
+      id: ChatAttachmentId.make("att-file-1"),
+      name: "notes.txt",
+      mimeType: "text/plain",
+      sizeBytes: 20,
+    };
+    const fileRecord = {
+      version: 1 as const,
+      kind: "file" as const,
+      contextId: toKindScopedComposerContextId("file", "inline-file"),
+      label: fileAttachment.name,
+      attachmentId: fileAttachment.id,
+      name: fileAttachment.name,
+      mimeType: fileAttachment.mimeType,
+      sizeBytes: fileAttachment.sizeBytes,
+    };
+    const terminalRecord = terminalContextRecord(terminalDraft);
+    const reviewRecord = reviewCommentContextRecord(reviewComment);
+    const text = [
+      formatInlineContextReference(terminalContextReference(terminalDraft)),
+      formatInlineContextReference(reviewCommentContextReference(reviewComment)),
+      formatInlineContextReference({
+        kind: "file",
+        contextId: fileRecord.contextId,
+        label: fileRecord.label,
+      }),
+    ].join(" ");
+    const messages = [
+      {
+        id: messageId,
+        text,
+        context: { version: 1, records: [terminalRecord, reviewRecord, fileRecord] },
+      },
+    ];
+    await using _screen = await render(view(THREAD_A, "queued", hook, messages));
+    await act(() =>
+      requireHook(hook).beginEdit({
+        runId: RUN,
+        messageId,
+        text,
+        attachments: [fileAttachment],
+      }),
+    );
+
+    const target = requireHook(hook).draftTarget;
+    const withoutReview = removeInlineContextReference(
+      useComposerDraftStore.getState().getComposerDraft(target)!.prompt,
+      reviewRecord.contextId,
+    ).prompt;
+    await act(() =>
+      useComposerDraftStore.getState().setPrompt(target, `${withoutReview} follow-up`),
+    );
+
+    await act(() => setRuns(THREAD_A, "running"));
+
+    const recovered = useComposerDraftStore.getState().getComposerDraft(THREAD_A);
+    expect(recovered?.prompt).toBe(`${withoutReview} follow-up`);
+    expect(recovered?.terminalContexts).toHaveLength(1);
+    expect(recovered?.reviewComments).toEqual([]);
+    expect(recovered?.files).toEqual([
+      expect.objectContaining({
+        id: "inline-file",
+        name: fileAttachment.name,
+        uploadedAttachmentId: fileAttachment.id,
+        uploadEnvironmentId: ENV,
+      }),
+    ]);
   });
 });

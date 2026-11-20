@@ -2,11 +2,13 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
+import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Base64Url from "effect/encoding/Base64Url";
 import * as Fiber from "effect/Fiber";
+import * as FetchHttpClient from "effect/http/FetchHttpClient";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
@@ -134,6 +136,69 @@ const provideRefreshManager = (
       Layer.provideMerge(ConfigProvider.layer(ConfigProvider.fromEnv({ env: TEST_ENV }))),
     ),
   );
+
+it.effect(
+  "disables HTTP redirects on token exchange, device authorization, and device polling",
+  () =>
+    Effect.gen(function* () {
+      const observedRedirects: Array<{
+        readonly url: string;
+        readonly redirect: RequestInit["redirect"] | undefined;
+      }> = [];
+      const httpClient = HttpClient.make((request, _url, _signal, fiber) =>
+        Effect.sync(() => {
+          observedRedirects.push({
+            url: request.url,
+            redirect: Context.getOrUndefined(fiber.context, FetchHttpClient.RequestInit)?.redirect,
+          });
+          const body = request.url.endsWith("/oauth/device_authorization")
+            ? DEVICE_AUTHORIZATION_BODY
+            : tokenGranted.body;
+          return HttpClientResponse.fromWeb(
+            request,
+            new Response(body, {
+              status: 200,
+              headers: { "content-type": "application/json" },
+            }),
+          );
+        }),
+      );
+
+      const refreshed = yield* Effect.gen(function* () {
+        const manager = yield* CliTokenManager.CloudCliTokenManager;
+        return yield* manager.getExisting;
+      }).pipe(
+        provideRefreshManager(
+          httpClient,
+          Layer.mock(ServerSecretStore.ServerSecretStore)({
+            get: () => Effect.succeedSome(expiredStoredToken),
+            set: () => Effect.void,
+          }),
+        ),
+      );
+      assert.isTrue(Option.isSome(refreshed));
+
+      const deviceFiber = yield* CliTokenManager.deviceAuthorizationLogin(() => Effect.void).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            Layer.succeed(HttpClient.HttpClient, httpClient),
+            NodeServices.layer,
+            NodeCrypto.layer,
+          ),
+        ),
+        provideTestEnv,
+        Effect.forkChild,
+      );
+      yield* TestClock.adjust("5 seconds");
+      yield* Fiber.join(deviceFiber);
+
+      assert.equal(observedRedirects.length, 3);
+      assert.deepEqual(
+        observedRedirects.map((entry) => entry.redirect),
+        ["error", "error", "error"],
+      );
+    }),
+);
 
 it.effect(
   "persists rotated credentials under the lock despite shutdown, while queued callers can cancel",

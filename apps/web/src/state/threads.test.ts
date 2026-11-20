@@ -151,6 +151,51 @@ describe("createRunningThreadKeepAliveAtom", () => {
     expect(h.openStreams()).toEqual([]);
   });
 
+  it("holds a warm-resumed stopped snapshot until live detail catches up", () => {
+    const h = makeHarness();
+    const cached = detail("a", "waiting", { sequence: 10 });
+    h.registry.set(h.stateAtom(LOCAL, "a"), cached);
+    h.registry.set(h.stateAtom(LOCAL, "b"), detail("b", "waiting", { sequence: 20 }));
+    h.registry.set(h.stateAtom(LOCAL, "c"), detail("c", "waiting", { sequence: 30 }));
+    h.registry.set(h.threads(LOCAL), [
+      shell("a", "running"),
+      shell("b", "running"),
+      shell("c", "running"),
+    ]);
+    expect(h.openStreams()).toEqual(["local:a", "local:b", "local:c"]);
+
+    // Duplicate emission of the same cached snapshot must not evict prematurely.
+    h.registry.set(h.stateAtom(LOCAL, "a"), AsyncResult.success({ ...cached.value }));
+    h.registry.set(h.threads(LOCAL), [shell("a", "idle"), shell("b", "idle"), shell("c", "idle")]);
+    expect(h.openStreams()).toEqual(["local:a", "local:b", "local:c"]);
+
+    // Path 1: synchronizing -> live stopped.
+    h.registry.set(
+      h.stateAtom(LOCAL, "a"),
+      detail("a", "waiting", { status: "synchronizing", sequence: 10 }),
+    );
+    expect(h.openStreams()).toEqual(["local:a", "local:b", "local:c"]);
+    h.registry.set(h.stateAtom(LOCAL, "a"), detail("a", "waiting", { sequence: 10 }));
+
+    // Path 2: running run -> stopped run.
+    h.registry.set(h.stateAtom(LOCAL, "b"), detail("b", "running", { sequence: 21 }));
+    expect(h.openStreams()).toEqual(["local:b", "local:c"]);
+    h.registry.set(h.stateAtom(LOCAL, "b"), detail("b", "waiting", { sequence: 22 }));
+
+    // Path 3: live post-mount update with newer sequence.
+    const nextC = detail("c", "waiting", { sequence: 31 });
+    h.registry.set(h.stateAtom(LOCAL, "c"), nextC);
+    expect(h.openStreams()).toEqual([]);
+
+    // Re-running a previously evicted warm thread starts a fresh observation.
+    h.registry.set(h.stateAtom(LOCAL, "c"), nextC);
+    h.registry.set(h.threads(LOCAL), [shell("c", "running")]);
+    h.registry.set(h.threads(LOCAL), [shell("c", "idle")]);
+    expect(h.openStreams()).toEqual(["local:c"]);
+    h.registry.set(h.stateAtom(LOCAL, "c"), detail("c", "waiting", { sequence: 32 }));
+    expect(h.openStreams()).toEqual([]);
+  });
+
   it("follows environments that connect and go away", () => {
     const h = makeHarness();
     h.registry.set(h.environmentIds, [LOCAL]);

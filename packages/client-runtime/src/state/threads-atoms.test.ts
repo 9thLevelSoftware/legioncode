@@ -27,6 +27,7 @@ import {
   PrimaryConnectionTarget,
   type NetworkStatus,
   type PreparedConnection,
+  type SupervisorConnectionState,
 } from "../connection/model.ts";
 import * as EnvironmentSupervisor from "../connection/supervisor.ts";
 import * as Persistence from "../platform/persistence.ts";
@@ -54,6 +55,8 @@ const SNAPSHOT: OrchestrationV2ThreadDetailSnapshot = { snapshotSequence: 7, pro
 const makeHarness = Effect.fn("TestThreadAtoms.makeHarness")(function* (options?: {
   readonly snapshot?: OrchestrationV2ThreadDetailSnapshot;
   readonly socketSnapshot?: false;
+  readonly initialConnectionState?: SupervisorConnectionState;
+  readonly initialSession?: Option.Option<RpcSession>;
 }) {
   const subscriptions = yield* Queue.unbounded<{
     readonly afterSequence: number | undefined;
@@ -109,8 +112,10 @@ const makeHarness = Effect.fn("TestThreadAtoms.makeHarness")(function* (options?
   };
   const supervisor = EnvironmentSupervisor.EnvironmentSupervisor.of({
     target: TARGET,
-    state: yield* SubscriptionRef.make(AVAILABLE_CONNECTION_STATE),
-    session: yield* SubscriptionRef.make(Option.some(session)),
+    state: yield* SubscriptionRef.make(
+      options?.initialConnectionState ?? AVAILABLE_CONNECTION_STATE,
+    ),
+    session: yield* SubscriptionRef.make(options?.initialSession ?? Option.some(session)),
     prepared: yield* SubscriptionRef.make<Option.Option<PreparedConnection>>(
       Option.some({
         environmentId: TARGET.environmentId,
@@ -230,6 +235,8 @@ const makeHarness = Effect.fn("TestThreadAtoms.makeHarness")(function* (options?
     stateAtom,
     details,
     ref,
+    supervisor,
+    session,
     subscriptions,
     olderLoads,
     loadEarlier: () => historyController.loadEarlier(TARGET.environmentId, THREAD_ID),
@@ -291,6 +298,53 @@ describe("createEnvironmentThreadStateAtoms", () => {
       remount();
       yield* Deferred.await(next.closed);
     }),
+  );
+
+  it.effect.each([
+    { phase: "offline" as const, expectedStatus: "cached" as const },
+    { phase: "backoff" as const, expectedStatus: "cached" as const },
+    { phase: "blocked" as const, expectedStatus: "cached" as const },
+    { phase: "connecting" as const, expectedStatus: "synchronizing" as const },
+    { phase: "connected" as const, expectedStatus: "synchronizing" as const },
+  ])(
+    "does not keep warm live status when remounted while $phase without a session",
+    ({ phase, expectedStatus }) =>
+      Effect.gen(function* () {
+        const h = yield* makeHarness({
+          initialConnectionState: {
+            ...AVAILABLE_CONNECTION_STATE,
+            desired: true,
+            phase: "connected",
+          },
+        });
+        const unmount = h.registry.mount(h.stateAtom);
+        const first = yield* Queue.take(h.subscriptions);
+        yield* Queue.offer(first.events, { kind: "synchronized" });
+        yield* observeState(h.registry, h.stateAtom, (state) => state.status === "live");
+        unmount();
+        yield* Deferred.await(first.closed);
+
+        yield* SubscriptionRef.set(h.supervisor.session, Option.none());
+        yield* SubscriptionRef.set(h.supervisor.state, {
+          ...AVAILABLE_CONNECTION_STATE,
+          desired: true,
+          phase,
+          ...(phase === "connecting" ? { stage: "opening" as const } : {}),
+        });
+
+        const remount = h.registry.mount(h.stateAtom);
+        const corrected = h.registry.get(h.stateAtom);
+        expect(corrected.status).toBe(expectedStatus);
+        expect(Option.isSome(corrected.data)).toBe(true);
+        if (phase === "connected") {
+          yield* SubscriptionRef.set(h.supervisor.session, Option.some(h.session));
+          const resumed = yield* Queue.take(h.subscriptions);
+          expect(h.registry.get(h.stateAtom).status).toBe("synchronizing");
+          yield* Queue.offer(resumed.events, { kind: "synchronized" });
+          yield* observeState(h.registry, h.stateAtom, (state) => state.status === "live");
+        }
+        remount();
+      }),
   );
 
   it.effect("cancels older-page work on unmount and permits it again on a warm return", () =>

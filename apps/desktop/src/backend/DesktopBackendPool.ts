@@ -76,6 +76,7 @@ export class DesktopBackendPool extends Context.Service<
     readonly get: (id: BackendInstanceId) => Effect.Effect<Option.Option<DesktopBackendInstance>>;
     readonly list: Effect.Effect<readonly DesktopBackendInstance[]>;
     readonly primary: Effect.Effect<DesktopBackendInstance>;
+    readonly primaryEpoch?: SubscriptionRef.SubscriptionRef<number>;
     readonly register: (
       spec: BackendInstanceSpec,
     ) => Effect.Effect<DesktopBackendInstance, DesktopBackendPoolInstanceAlreadyRegisteredError>;
@@ -127,6 +128,7 @@ export const layer = Layer.effect(
     const electronApp = yield* ElectronApp.ElectronApp;
     const appSettings = yield* DesktopAppSettings.DesktopAppSettings;
     const { primaryBackendStartup } = yield* DesktopState.DesktopState;
+    const primaryEpoch = yield* SubscriptionRef.make(0);
     // Parent instance scopes to the pool so shutdown runs stop finalizers before the OS kills backends.
     const layerScope = yield* Scope.Scope;
     const factoryContext = yield* Effect.context<BackendInstanceFactoryRequirements>();
@@ -242,7 +244,8 @@ export const layer = Layer.effect(
       onStartupFailure: (failure) =>
         SubscriptionRef.set(primaryBackendStartup, { _tag: "Failing", ...failure }),
       onShutdown: () =>
-        FiberHandle.clear(updateMarkerWait).pipe(
+        SubscriptionRef.update(primaryEpoch, (epoch) => epoch + 1).pipe(
+          Effect.andThen(FiberHandle.clear(updateMarkerWait)),
           Effect.andThen(desktopWindow.handleBackendNotReady),
         ),
       onPreflightFailed: handlePrimaryPreflightFailure,
@@ -391,6 +394,7 @@ export const layer = Layer.effect(
         ),
       ),
       primary: Effect.succeed(primary),
+      primaryEpoch,
       register,
       unregister,
     });
@@ -399,6 +403,7 @@ export const layer = Layer.effect(
 
 export const layerTest = (
   instances: readonly DesktopBackendInstance[],
+  options?: { readonly primaryEpoch?: SubscriptionRef.SubscriptionRef<number> },
 ): Layer.Layer<DesktopBackendPool> =>
   Layer.effect(
     DesktopBackendPool,
@@ -410,12 +415,14 @@ export const layerTest = (
         instances.map((instance) => [instance.id, instance] as const),
       );
       const primary = instances[0]!;
+      const primaryEpoch = options?.primaryEpoch ?? (yield* SubscriptionRef.make(0));
       return DesktopBackendPool.of({
         get: Effect.fn("DesktopBackendPool.get")(function (id) {
           return Effect.succeed(Option.fromNullishOr(byId.get(id)));
         }),
         list: Effect.succeed(Array.from(byId.values())),
         primary: Effect.succeed(primary),
+        primaryEpoch,
         register: Effect.fn("DesktopBackendPool.register")(function () {
           return Effect.die("DesktopBackendPool.layerTest does not support register");
         }),

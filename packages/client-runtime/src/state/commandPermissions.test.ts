@@ -10,12 +10,15 @@ import {
   AuthAccessReadScope,
   AuthAccessWriteScope,
   AuthEnvironmentMaintainScope,
+  AuthFilesystemWriteScope,
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
   AuthPreviewOperateScope,
   AuthProvidersManageScope,
   AuthSettingsWriteScope,
   AuthSourceControlWriteScope,
+  ProviderInstanceId,
+  SecretProviderId,
   ThreadId,
   EnvironmentId,
   ORCHESTRATION_V2_WS_METHODS,
@@ -155,6 +158,7 @@ describe("command permissions", () => {
   it.effect.each([
     { method: WS_METHODS.serverRunStorageCleanup, scope: AuthSettingsWriteScope },
     { method: WS_METHODS.serverReclaimDatabaseSpace, scope: AuthEnvironmentMaintainScope },
+    { method: WS_METHODS.projectsWriteFile, scope: AuthFilesystemWriteScope },
   ])("requires the destination $scope grant for $method", ({ method, scope }) =>
     Effect.gen(function* () {
       const registry = yield* setup;
@@ -389,6 +393,83 @@ it.effect.each(["commit", "push", "commit_push", "create_pr", "commit_push_pr"] 
 );
 
 it.effect(
+  "requires settings, provider, or access scopes for serverUpdateSettings based on payload",
+  () =>
+    Effect.gen(function* () {
+      const registry = yield* setup;
+      const command = createCommandPermissions(runtime, WS_METHODS.serverUpdateSettings);
+      const settingsOnly = {
+        ...grant(false),
+        scopes: [AuthSettingsWriteScope],
+        permissions: [AuthSettingsWriteScope],
+      };
+      const providersOnly = {
+        ...grant(false),
+        scopes: [AuthProvidersManageScope],
+        permissions: [AuthProvidersManageScope],
+      };
+      const accessOnly = {
+        ...grant(false),
+        scopes: [AuthAccessWriteScope],
+        permissions: [AuthAccessWriteScope],
+      };
+      const settingsAndProviders = {
+        ...grant(false),
+        scopes: [AuthSettingsWriteScope, AuthProvidersManageScope],
+        permissions: [AuthSettingsWriteScope, AuthProvidersManageScope],
+      };
+      const providerMutation = {
+        operation: "remove" as const,
+        instanceId: ProviderInstanceId.make("codex_work"),
+      };
+      const mixedInput = {
+        patch: { defaultRuntimeMode: "full-access" as const },
+        providerInstanceMutation: providerMutation,
+      };
+      const providerOnlyInput = { patch: {}, providerInstanceMutation: providerMutation };
+      const accessInput = { patch: { requireConnectDeviceApproval: false } };
+      const deleteSecretProviderInput = {
+        patch: { secretProviders: { [SecretProviderId.make("personal")]: null } },
+      };
+
+      registry.set(sessions(env), AsyncResult.success(settingsOnly));
+      expect(registry.get(command.permissionAtom(env))).toBe(true);
+      yield* command.authorize(registry, env);
+      expect(registry.get(command.permissionAtom(env, { patch: {} }))).toBe(true);
+      expect(registry.get(command.permissionAtom(env, providerOnlyInput))).toBe(false);
+      expect(
+        (yield* command.authorize(registry, env, providerOnlyInput).pipe(Effect.flip))
+          .requiredPermission,
+      ).toBe(AuthProvidersManageScope);
+      expect(registry.get(command.permissionAtom(env, mixedInput))).toBe(false);
+      expect(registry.get(command.permissionAtom(env, accessInput))).toBe(false);
+      expect(
+        (yield* command.authorize(registry, env, accessInput).pipe(Effect.flip)).requiredPermission,
+      ).toBe(AuthAccessWriteScope);
+
+      registry.set(sessions(env), AsyncResult.success(providersOnly));
+      expect(registry.get(command.permissionAtom(env))).toBe(false);
+      expect(registry.get(command.permissionAtom(env, providerOnlyInput))).toBe(true);
+      yield* command.authorize(registry, env, providerOnlyInput);
+      expect(registry.get(command.permissionAtom(env, mixedInput))).toBe(false);
+      expect(
+        (yield* command.authorize(registry, env, mixedInput).pipe(Effect.flip)).requiredPermission,
+      ).toBe(AuthSettingsWriteScope);
+      expect(registry.get(command.permissionAtom(env, deleteSecretProviderInput))).toBe(false);
+
+      registry.set(sessions(env), AsyncResult.success(accessOnly));
+      expect(registry.get(command.permissionAtom(env, accessInput))).toBe(true);
+      yield* command.authorize(registry, env, accessInput);
+
+      registry.set(sessions(env), AsyncResult.success(settingsAndProviders));
+      expect(registry.get(command.permissionAtom(env, mixedInput))).toBe(true);
+      yield* command.authorize(registry, env, mixedInput);
+      expect(registry.get(command.permissionAtom(env, deleteSecretProviderInput))).toBe(true);
+      yield* command.authorize(registry, env, deleteSecretProviderInput);
+    }),
+);
+
+it.effect(
   "refreshes linked environments after permitted writes and blocks a read-only session",
   () =>
     Effect.gen(function* () {
@@ -566,6 +647,16 @@ it.effect("rejects protected unary and streamed RPCs outside a guarded command",
             writes++;
             return { id: ScheduledTaskId.make("task") };
           }),
+        [WS_METHODS.projectsWriteFile]: () =>
+          Effect.sync(() => {
+            writes++;
+            return { relativePath: "foo" };
+          }),
+        [WS_METHODS.serverUpdateSettings]: () =>
+          Effect.sync(() => {
+            writes++;
+            return {};
+          }),
         [WS_METHODS.gitRunStackedAction]: () =>
           Stream.fromEffect(
             Effect.sync(() => {
@@ -582,6 +673,16 @@ it.effect("rejects protected unary and streamed RPCs outside a guarded command",
       id: ScheduledTaskId.make("task"),
     }).pipe(Effect.provideService(EnvironmentSupervisor, supervisor), Effect.flip);
     expect(unary._tag).toBe("EnvironmentAuthorizationError");
+    const writeFileDenied = yield* requestGuarded(WS_METHODS.projectsWriteFile, {
+      cwd: "/repo",
+      relativePath: "foo",
+      contents: "bar",
+    }).pipe(Effect.provideService(EnvironmentSupervisor, supervisor), Effect.flip);
+    expect(writeFileDenied._tag).toBe("EnvironmentAuthorizationError");
+    const updateSettingsDenied = yield* requestGuarded(WS_METHODS.serverUpdateSettings, {
+      patch: {},
+    }).pipe(Effect.provideService(EnvironmentSupervisor, supervisor), Effect.flip);
+    expect(updateSettingsDenied._tag).toBe("EnvironmentAuthorizationError");
     const streamed = yield* runStreamGuarded(WS_METHODS.gitRunStackedAction, {
       actionId: "test-action",
       cwd: "/repo",

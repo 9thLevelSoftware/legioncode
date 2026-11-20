@@ -532,6 +532,14 @@ export const PickFolderOptionsSchema = Schema.Struct({
   targetEnvironmentId: Schema.optionalKey(Schema.String),
 });
 
+export interface LocalEnvironmentBearerTokenOptions {
+  readonly forceRefresh?: boolean;
+}
+
+export const LocalEnvironmentBearerTokenOptionsSchema = Schema.Struct({
+  forceRefresh: Schema.optionalKey(Schema.Boolean),
+});
+
 /** Oversized files have empty text so the main process never loads their contents. */
 export interface PickedThemeFile {
   name: string;
@@ -1117,7 +1125,7 @@ export interface DesktopBridge {
   setLocalEnvironmentEnabled: (enabled: boolean) => Promise<void>;
   /** The environment ID recorded in this app's T3 home, such as its own machine's background service. */
   getHostEnvironmentId?: () => Promise<string | null>;
-  getLocalEnvironmentBearerToken: () => Promise<string>;
+  getLocalEnvironmentBearerToken: (options?: LocalEnvironmentBearerTokenOptions) => Promise<string>;
   getClientSettings: () => Promise<ClientSettings | null>;
   setClientSettings: (settings: ClientSettings) => Promise<void>;
   getConnectionCatalog: () => Promise<string | null>;

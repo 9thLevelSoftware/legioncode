@@ -13,6 +13,7 @@ import * as Ref from "effect/Ref";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
+import * as SubscriptionRef from "effect/SubscriptionRef";
 import * as HttpClient from "effect/http/HttpClient";
 
 import * as DesktopBackendPool from "./DesktopBackendPool.ts";
@@ -58,10 +59,33 @@ export const DesktopLocalEnvironmentAuthError = Schema.Union([
 ]);
 export type DesktopLocalEnvironmentAuthError = typeof DesktopLocalEnvironmentAuthError.Type;
 
+interface PrimaryAuthCacheKey {
+  readonly epoch: number;
+  readonly activePid: number | null;
+  readonly httpBaseUrl: string;
+  readonly runningDistro: string | null;
+  readonly desktopBootstrapSecret: string | null;
+  readonly desktopBootstrapToken: string | null;
+}
+
+const samePrimaryAuthCacheKey = (a: PrimaryAuthCacheKey, b: PrimaryAuthCacheKey): boolean =>
+  a.epoch === b.epoch &&
+  a.activePid === b.activePid &&
+  a.httpBaseUrl === b.httpBaseUrl &&
+  a.runningDistro === b.runningDistro &&
+  a.desktopBootstrapSecret === b.desktopBootstrapSecret &&
+  a.desktopBootstrapToken === b.desktopBootstrapToken;
+
+interface CachedBearerToken {
+  readonly key: PrimaryAuthCacheKey;
+  readonly token: string;
+}
+
 export class DesktopLocalEnvironmentAuth extends Context.Service<
   DesktopLocalEnvironmentAuth,
   {
     readonly getBearerToken: Effect.Effect<string, DesktopLocalEnvironmentAuthError>;
+    readonly refreshBearerToken: Effect.Effect<string, DesktopLocalEnvironmentAuthError>;
   }
 >()("@t3tools/desktop/backend/DesktopLocalEnvironmentAuth") {}
 
@@ -70,66 +94,105 @@ export const make = Effect.gen(function* () {
   const pool = yield* DesktopBackendPool.DesktopBackendPool;
   const httpClient = yield* HttpClient.HttpClient;
   const mac = yield* Mac.Mac;
-  const tokenRef = yield* Ref.make(Option.none<string>());
+  const tokenRef = yield* Ref.make(Option.none<CachedBearerToken>());
   const mutex = yield* Semaphore.make(1);
+  const readPrimaryEpoch = pool.primaryEpoch
+    ? SubscriptionRef.get(pool.primaryEpoch)
+    : Effect.succeed(0);
 
-  const getBearerToken = mutex
-    .withPermits(1)(
-      Effect.gen(function* () {
-        const cached = yield* Ref.get(tokenRef);
-        if (Option.isSome(cached)) {
-          return cached.value;
-        }
+  const resolveBearerToken = (forceRefresh: boolean) =>
+    mutex
+      .withPermits(1)(
+        Effect.gen(function* () {
+          if (forceRefresh) {
+            yield* Ref.set(tokenRef, Option.none());
+          }
 
-        const instances = yield* pool.list;
-        const primary = instances.find((instance) => instance.id === PRIMARY_LOCAL_ENVIRONMENT_ID);
-        if (primary === undefined || !(yield* primary.waitForReady(Duration.infinity))) {
-          return yield* new DesktopLocalEnvironmentAuthBackendNotConfiguredError();
-        }
-        const configOption = yield* primary.currentConfig;
-        if (Option.isNone(configOption)) {
-          return yield* new DesktopLocalEnvironmentAuthBackendNotConfiguredError();
-        }
-        const config = configOption.value;
-        // Secret-authenticated backends accept the current window token; the launch token may be stale.
-        const secret = config.bootstrap.desktopBootstrapSecret;
-        const credential =
-          secret === undefined
-            ? config.bootstrap.desktopBootstrapToken
-            : yield* currentDesktopBootstrapToken(secret, yield* Clock.currentTimeMillis).pipe(
-                Effect.provideService(Mac.Mac, mac),
-              );
-        if (!credential) {
-          return yield* new DesktopLocalEnvironmentAuthBackendNotConfiguredError();
-        }
-        const session = yield* bootstrapRemoteBearerSession({
-          httpBaseUrl: config.httpBaseUrl.href,
-          credential,
-          clientMetadata: {
-            label: "T3 Code Desktop",
-            deviceType: "desktop",
-          },
-        }).pipe(
-          Effect.provideService(HttpClient.HttpClient, httpClient),
-          Effect.retry({
-            while: isTransientBearerBootstrapError,
-            schedule: Schedule.spaced(BOOTSTRAP_TRANSIENT_RETRY_INTERVAL),
-          }),
-          Effect.timeout(BOOTSTRAP_TRANSIENT_RETRY_TIMEOUT),
-          Effect.mapError(
-            (cause) =>
-              new DesktopLocalEnvironmentAuthSessionBootstrapError({
-                cause,
-              }),
-          ),
-        );
-        yield* Ref.set(tokenRef, Option.some(session.access_token));
-        return session.access_token;
-      }),
-    )
-    .pipe(Effect.withSpan("desktop.localEnvironmentAuth.getBearerToken"));
+          const instances = yield* pool.list;
+          const primary = instances.find(
+            (instance) => instance.id === PRIMARY_LOCAL_ENVIRONMENT_ID,
+          );
+          if (primary === undefined || !(yield* primary.waitForReady(Duration.infinity))) {
+            yield* Ref.set(tokenRef, Option.none());
+            return yield* new DesktopLocalEnvironmentAuthBackendNotConfiguredError();
+          }
+          const configOption = yield* primary.currentConfig;
+          if (Option.isNone(configOption)) {
+            yield* Ref.set(tokenRef, Option.none());
+            return yield* new DesktopLocalEnvironmentAuthBackendNotConfiguredError();
+          }
+          const config = configOption.value;
+          const epoch = yield* readPrimaryEpoch;
+          const snapshot = primary.snapshot ? yield* primary.snapshot : undefined;
+          const cacheKey: PrimaryAuthCacheKey = {
+            epoch,
+            activePid: snapshot ? Option.getOrNull(snapshot.activePid) : null,
+            httpBaseUrl: config.httpBaseUrl.href,
+            runningDistro: config.runningDistro ?? null,
+            desktopBootstrapSecret: config.bootstrap.desktopBootstrapSecret ?? null,
+            desktopBootstrapToken: config.bootstrap.desktopBootstrapToken ?? null,
+          };
 
-  return DesktopLocalEnvironmentAuth.of({ getBearerToken });
+          const cached = yield* Ref.get(tokenRef);
+          if (
+            !forceRefresh &&
+            Option.isSome(cached) &&
+            samePrimaryAuthCacheKey(cached.value.key, cacheKey)
+          ) {
+            return cached.value.token;
+          }
+          yield* Ref.set(tokenRef, Option.none());
+
+          // Secret-authenticated backends accept the current window token; the launch token may be stale.
+          const secret = config.bootstrap.desktopBootstrapSecret;
+          const credential =
+            secret === undefined
+              ? config.bootstrap.desktopBootstrapToken
+              : yield* currentDesktopBootstrapToken(secret, yield* Clock.currentTimeMillis).pipe(
+                  Effect.provideService(Mac.Mac, mac),
+                );
+          if (!credential) {
+            return yield* new DesktopLocalEnvironmentAuthBackendNotConfiguredError();
+          }
+          const session = yield* bootstrapRemoteBearerSession({
+            httpBaseUrl: config.httpBaseUrl.href,
+            credential,
+            clientMetadata: {
+              label: "T3 Code Desktop",
+              deviceType: "desktop",
+            },
+          }).pipe(
+            Effect.provideService(HttpClient.HttpClient, httpClient),
+            Effect.retry({
+              while: isTransientBearerBootstrapError,
+              schedule: Schedule.spaced(BOOTSTRAP_TRANSIENT_RETRY_INTERVAL),
+            }),
+            Effect.timeout(BOOTSTRAP_TRANSIENT_RETRY_TIMEOUT),
+            Effect.mapError(
+              (cause) =>
+                new DesktopLocalEnvironmentAuthSessionBootstrapError({
+                  cause,
+                }),
+            ),
+          );
+          if ((yield* readPrimaryEpoch) === epoch) {
+            yield* Ref.set(tokenRef, Option.some({ key: cacheKey, token: session.access_token }));
+          }
+          return session.access_token;
+        }),
+      )
+      .pipe(
+        Effect.withSpan(
+          forceRefresh
+            ? "desktop.localEnvironmentAuth.refreshBearerToken"
+            : "desktop.localEnvironmentAuth.getBearerToken",
+        ),
+      );
+
+  return DesktopLocalEnvironmentAuth.of({
+    getBearerToken: resolveBearerToken(false),
+    refreshBearerToken: resolveBearerToken(true),
+  });
 });
 
 export const layer = Layer.effect(DesktopLocalEnvironmentAuth, make);

@@ -1,4 +1,9 @@
-import type { ProjectId, ScopedThreadRef, ThreadPullRequestLink } from "@t3tools/contracts";
+import {
+  AuthOrchestrationOperateScope,
+  type ProjectId,
+  type ScopedThreadRef,
+  type ThreadPullRequestLink,
+} from "@t3tools/contracts";
 import {
   sourceControlClients,
   UNKNOWN_SOURCE_CONTROL_CLIENT,
@@ -38,7 +43,8 @@ import { useProjects, useServerConfigs, useThreadShell } from "~/state/entities"
 import { PullRequestChangeBreakdownStat } from "./PullRequestChangeBreakdownStat";
 import { PullRequestsUnavailableState } from "./PullRequestsUnavailableState";
 import { threadEnvironment } from "~/state/threads";
-import { useAtomCommand } from "~/state/use-atom-command";
+import { readEnvironmentScope, useEnvironmentScope } from "~/state/session";
+import { useOrchestrationCommand } from "~/state/use-orchestration-command";
 import { RelativeTime } from "~/components/RelativeTime";
 import { ThreadDetailsIssueRows } from "../chat/ThreadDetailsIssueRows";
 import { Button } from "../ui/button";
@@ -108,7 +114,7 @@ function LinkRowImpl({
   threadRef: ScopedThreadRef;
   projectId: ProjectId | null;
   speedMode: boolean;
-  onUnlink: (link: ThreadPullRequestLink) => void;
+  onUnlink: ((link: ThreadPullRequestLink) => void) | null;
   onSetWatching: ((link: ThreadPullRequestLink, watching: boolean) => void) | null;
   onIntent: (link: ThreadPullRequestLink | null) => void;
   canStartWatch: boolean;
@@ -378,10 +384,12 @@ function LinkRowImpl({
                 {watching ? gt("Stop watching") : gt("Watch for changes")}
               </MenuItem>
             ) : null}
-            <MenuItem onClick={() => onUnlink(link)}>
-              <PullRequestGlyph.unlink className="size-3.5" />
-              {link.source === "stack" ? gt("Dismiss from thread") : gt("Unlink from thread")}
-            </MenuItem>
+            {onUnlink !== null ? (
+              <MenuItem onClick={() => onUnlink(link)}>
+                <PullRequestGlyph.unlink className="size-3.5" />
+                {link.source === "stack" ? gt("Dismiss from thread") : gt("Unlink from thread")}
+              </MenuItem>
+            ) : null}
           </MenuPopup>
         </Menu>
       </span>
@@ -438,9 +446,20 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
   const modifiers = useShortcutModifierState(true);
   const speedMode =
     modifiers.shiftKey && !modifiers.metaKey && !modifiers.ctrlKey && !modifiers.altKey;
-  const openLinkDialog = () => openLinkPullRequestDialog(threadRef);
-  const unlink = useAtomCommand(threadEnvironment.unlinkPullRequest, { reportFailure: true });
-  const watch = useAtomCommand(threadEnvironment.watchPullRequest, { reportFailure: true });
+  const canOperateThread = useEnvironmentScope(
+    threadRef.environmentId,
+    AuthOrchestrationOperateScope,
+  );
+  const openLinkDialog = () => {
+    if (!readEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope)) return;
+    openLinkPullRequestDialog(threadRef);
+  };
+  const unlink = useOrchestrationCommand(threadEnvironment.unlinkPullRequest, {
+    reportFailure: true,
+  });
+  const watch = useOrchestrationCommand(threadEnvironment.watchPullRequest, {
+    reportFailure: true,
+  });
   const capabilities = useServerConfigs().get(threadRef.environmentId)?.environment.capabilities;
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const opensInApp = useClientSettings((settings) => settings.pullRequestLinksOpenInApp);
@@ -505,6 +524,7 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
     environmentProjects,
     capabilities,
     supportsWatch,
+    canOperateThread,
     thread,
     opensInApp,
     primaryEnvironmentId,
@@ -523,10 +543,12 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
             or a number.
           </T>
         </p>
-        <Button size="sm" variant="outline" onClick={openLinkDialog}>
-          <PlusIcon className="size-3.5" />
-          <T>Link pull request</T>
-        </Button>
+        {canOperateThread ? (
+          <Button size="sm" variant="outline" onClick={openLinkDialog}>
+            <PlusIcon className="size-3.5" />
+            <T>Link pull request</T>
+          </Button>
+        ) : null}
       </div>
     );
   }
@@ -574,8 +596,8 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
                   : null
               }
               speedMode={speedMode}
-              onUnlink={handleUnlink}
-              onSetWatching={supportsWatch ? handleSetWatching : null}
+              onUnlink={canOperateThread ? handleUnlink : null}
+              onSetWatching={canOperateThread && supportsWatch ? handleSetWatching : null}
               onIntent={intendLink}
               canStartWatch={canStartWatch}
             />
@@ -604,10 +626,12 @@ function EnabledThreadPullRequestsPanel({ threadRef }: { threadRef: ScopedThread
               </>
             ) : null}
           </span>
-          <Button size="xs" variant="ghost" onClick={openLinkDialog}>
-            <PlusIcon className="size-3.5" />
-            <T context="verb, button">Link pull request</T>
-          </Button>
+          {canOperateThread ? (
+            <Button size="xs" variant="ghost" onClick={openLinkDialog}>
+              <PlusIcon className="size-3.5" />
+              <T context="verb, button">Link pull request</T>
+            </Button>
+          ) : null}
         </footer>
       </div>
     </PullRequestSpeedModeContext>

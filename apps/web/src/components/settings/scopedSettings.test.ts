@@ -345,6 +345,32 @@ describe("scoped settings writes", () => {
     });
   });
 
+  it("refuses a mixed client and environment-wide patch at project scope even when deviceOnly is true", async () => {
+    const persistServer = vi.fn();
+    const persistClient = vi.fn();
+    for (const scope of [project, checkout]) {
+      const plan = planScopedSettingsPatch(
+        scope,
+        environments,
+        {
+          diffIgnoreWhitespace: false,
+          enableProviderUpdateChecks: false,
+        },
+        { deviceOnly: true },
+      );
+      expect(plan).toMatchObject({
+        clientPatch: {},
+        hasClientWrite: false,
+        serverWrites: [],
+        unavailableReason:
+          "This setting is environment-wide and cannot be overridden by a project.",
+      });
+      await persistScopedSettingsPatch(plan, persistServer, persistClient);
+    }
+    expect(persistClient).not.toHaveBeenCalled();
+    expect(persistServer).not.toHaveBeenCalled();
+  });
+
   it("writes project overrides into each member's entry on its environment", () => {
     const withExisting = environment("Server", {
       settings: {

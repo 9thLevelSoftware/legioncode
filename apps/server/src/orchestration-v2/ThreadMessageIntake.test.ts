@@ -10,6 +10,8 @@ import {
   EventId,
   GuestMessageId,
   MessageId,
+  ProjectId,
+  ProviderInstanceId,
   RunId,
   RuntimeRequestId,
   ThreadId,
@@ -33,6 +35,7 @@ import {
   OrchestratorCommandPreviouslyRejectedError,
   OrchestratorDispatchError,
 } from "./Orchestrator.ts";
+import * as ThreadLaunch from "./ThreadLaunchService.ts";
 import * as ThreadManagementService from "./ThreadManagementService.ts";
 import * as ThreadMessageIntake from "./ThreadMessageIntake.ts";
 
@@ -543,5 +546,94 @@ it.effect("a queued /logout edit without provider management must keep an attach
     ]);
     expect(captured[1]).not.toHaveProperty("attachments");
     expect(captured[2]).not.toHaveProperty("attachments");
+  }).pipe(Effect.provide(layerIntakeTest)),
+);
+
+it.effect("rejects non-pending attachments owned by another thread across intake entrypoints", () =>
+  Effect.gen(function* () {
+    const config = yield* ServerConfig.ServerConfig;
+    const ownerId = ThreadId.make("thread-intake-owner");
+    const targetId = ThreadId.make("thread-intake-target");
+    const foreign = {
+      type: "image" as const,
+      id: ChatAttachmentId.make(createAttachmentId(ownerId)!),
+      name: "secret.png",
+      mimeType: "image/png",
+      sizeBytes: 3,
+    };
+    NodeFS.mkdirSync(config.attachmentsDir, { recursive: true });
+    NodeFS.writeFileSync(
+      NodePath.join(config.attachmentsDir, `${foreign.id}.png`),
+      new Uint8Array([1, 2, 3]),
+    );
+    const captured: OrchestrationV2ServerCommand[] = [];
+    const dispatchLayer = Layer.mock(ThreadManagementService.ThreadManagementService)({
+      dispatch: layerFailingDispatchHandler(captured),
+      hasReceipt: () => Effect.succeed(false),
+    });
+
+    const msgResult = yield* dispatchCommand({
+      type: "message.dispatch",
+      commandId: CommandId.make("intake-foreign-msg"),
+      threadId: targetId,
+      messageId: MessageId.make("msg-foreign"),
+      text: "Check this",
+      attachments: [foreign],
+      dispatchMode: { type: "start_immediately" },
+      createdBy: "user",
+      creationSource: "web",
+    }).pipe(Effect.provide(dispatchLayer), Effect.result);
+    expect(msgResult._tag === "Failure" && msgResult.failure._tag).toBe("AttachmentClaimError");
+
+    const editResult = yield* dispatchCommand({
+      type: "queued-run.edit",
+      commandId: CommandId.make("intake-foreign-edit"),
+      threadId: targetId,
+      runId: RunId.make("run-foreign"),
+      text: "Edit",
+      attachments: [foreign],
+    }).pipe(Effect.provide(dispatchLayer), Effect.result);
+    expect(editResult._tag === "Failure" && editResult.failure._tag).toBe("AttachmentClaimError");
+
+    const respondResult = yield* dispatchCommand({
+      type: "runtime-request.respond",
+      commandId: CommandId.make("intake-foreign-respond"),
+      threadId: targetId,
+      requestId: RuntimeRequestId.make("req-foreign"),
+      attachmentsByQuestionId: { q1: [foreign] },
+    }).pipe(Effect.provide(dispatchLayer), Effect.result);
+    expect(respondResult._tag === "Failure" && respondResult.failure._tag).toBe(
+      "AttachmentClaimError",
+    );
+
+    let launchCalls = 0;
+    const launchLayer = Layer.mock(ThreadLaunch.ThreadLaunchService)({
+      launch: () => {
+        launchCalls += 1;
+        return Effect.succeed({} as never);
+      },
+    });
+    const launchResult = yield* ThreadMessageIntake.launchThread({
+      commandId: CommandId.make("intake-foreign-launch"),
+      threadId: targetId,
+      projectId: ProjectId.make("project-foreign"),
+      title: "Launch",
+      modelSelection: { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5" },
+      runtimeMode: "full-access",
+      interactionMode: "default",
+      workspaceStrategy: { type: "root" },
+      createdBy: "user",
+      creationSource: "web",
+      initialMessage: {
+        messageId: MessageId.make("msg-launch-foreign"),
+        text: "Steal attachment",
+        attachments: [foreign],
+      },
+    }).pipe(Effect.provide(launchLayer), Effect.result);
+    expect(launchResult._tag === "Failure" && launchResult.failure._tag).toBe(
+      "AttachmentClaimError",
+    );
+    expect(launchCalls).toBe(0);
+    expect(captured).toEqual([]);
   }).pipe(Effect.provide(layerIntakeTest)),
 );

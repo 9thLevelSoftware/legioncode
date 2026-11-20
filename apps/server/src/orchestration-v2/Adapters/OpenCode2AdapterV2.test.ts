@@ -1096,6 +1096,8 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
           { replayGate: gate },
         );
         const items: Array<import("@t3tools/contracts").OrchestrationV2TurnItem> = [];
+        const deltas: Array<string> = [];
+        const deltaItemIds = new Set<string>();
         const shellStarted = yield* Deferred.make<void>();
         const terminal = yield* runtime.events.pipe(
           Stream.tap((e) =>
@@ -1104,10 +1106,18 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
                 for (const task of e.providerThread.pendingBackgroundTasks ?? [])
                   assert.isUndefined(task.awaited);
               }
+              if (e.type === "command_output.delta") {
+                deltas.push(e.chunk);
+                deltaItemIds.add(e.itemId);
+                if (deltas.join("") === "retained\n") {
+                  yield* Deferred.succeed(shellStarted, undefined);
+                }
+              }
               if (e.type !== "turn_item.updated") return;
               items.push(e.turnItem);
-              if (e.turnItem.type === "command_execution" && e.turnItem.output === "retained\n")
-                yield* Deferred.succeed(shellStarted, undefined);
+              if (e.turnItem.type === "command_execution" && e.turnItem.status === "running") {
+                assert.isUndefined(e.turnItem.output);
+              }
             }),
           ),
           Stream.filter((e) => e.type === "turn.terminal"),
@@ -1190,13 +1200,118 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
           }),
           { matched: [] },
         );
-        assert.deepInclude(items.filter((i) => i.type === "command_execution").at(-1), {
+        const commandItem = items.filter((i) => i.type === "command_execution").at(-1);
+        assert.deepEqual([...deltaItemIds], commandItem === undefined ? [] : [commandItem.id]);
+        assert.deepInclude(commandItem, {
           type: "command_execution",
           status: stopped ? "interrupted" : stop === "failed" ? "failed" : "completed",
           ...(stop === "failed" ? { exitCode: 7 } : {}),
           output: stop === "burst" ? "x".repeat(262127) + "FINAL DIAGNOSTIC\n" : "retained\n",
         });
         assert.isFalse(items.some((i) => i.type === "subagent"));
+      }),
+  );
+
+  it.effect(
+    "streams 2s shell poll chunks as command_output.delta without repeating running snapshots",
+    () =>
+      Effect.gen(function* () {
+        const shellID = "sh_poll_delta";
+        const tool = {
+          sessionID: SESSION,
+          assistantMessageID: "msg_assistant",
+          id: "call-shell",
+        };
+        const gate = makeProviderReplayGate(["shell-exit"]);
+        const { runtime, thread } = yield* resumed(
+          [
+            out("session.prompt", { sessionID: SESSION, text: "<any>" }),
+            promptAccepted,
+            event("session.execution.started", { sessionID: SESSION }),
+            event("session.tool.input.started", { ...tool, name: "shell" }),
+            event("session.tool.called", {
+              ...tool,
+              name: "shell",
+              input: { command: "echo poll", background: true },
+              executed: false,
+            }),
+            event(
+              "session.tool.success",
+              {
+                ...tool,
+                content: [{ type: "text", text: "Launched" }],
+                metadata: { shellID },
+                executed: false,
+              },
+              undefined,
+              2,
+            ),
+            out("shell.output", { id: shellID, cursor: "0" }),
+            reply("shell.output", {
+              location: { directory: WORK },
+              data: { output: "retained\n", cursor: 9, size: 9, truncated: false },
+            }),
+            event("session.execution.succeeded", { sessionID: SESSION }),
+            out("shell.output", { id: shellID, cursor: "9" }),
+            reply("shell.output", {
+              location: { directory: WORK },
+              data: { output: "polled\n", cursor: 16, size: 16, truncated: false },
+            }),
+            event("shell.exited", { id: shellID, exit: 0, status: "exited" }, "shell-exit"),
+            out("shell.output", { id: shellID, cursor: "16" }),
+            reply("shell.output", {
+              location: { directory: WORK },
+              data: { output: "", cursor: 16, size: 16, truncated: false },
+            }),
+          ],
+          { replayGate: gate },
+        );
+        const items: Array<import("@t3tools/contracts").OrchestrationV2TurnItem> = [];
+        const deltas: Array<{ readonly itemId: string; readonly chunk: string }> = [];
+        const launched = yield* Deferred.make<void>();
+        const polled = yield* Deferred.make<void>();
+        const settled = yield* Deferred.make<void>();
+        yield* runtime.events.pipe(
+          Stream.tap((e) =>
+            Effect.gen(function* () {
+              if (e.type === "command_output.delta") {
+                deltas.push({ itemId: e.itemId, chunk: e.chunk });
+                if (e.chunk === "polled\n") yield* Deferred.succeed(polled, undefined);
+              }
+              if (e.type === "turn.terminal") {
+                yield* Deferred.succeed(launched, undefined);
+              }
+              if (e.type !== "turn_item.updated" || e.turnItem.type !== "command_execution") return;
+              items.push(e.turnItem);
+              if (e.turnItem.status !== "running") yield* Deferred.succeed(settled, undefined);
+            }),
+          ),
+          Stream.runDrain,
+          Effect.forkScoped,
+        );
+
+        yield* runtime.startTurn(withLineage(thread));
+        yield* Deferred.await(launched);
+        const runningCountBeforePoll = items.filter((item) => item.status === "running").length;
+        yield* TestClock.adjust("2 seconds");
+        yield* Deferred.await(polled);
+        assert.equal(
+          items.filter((item) => item.status === "running").length,
+          runningCountBeforePoll,
+        );
+        gate.release("shell-exit");
+        yield* Deferred.await(settled);
+
+        const terminal = items.at(-1);
+        assert.isDefined(terminal);
+        if (terminal?.type === "command_execution") {
+          assert.equal(terminal.status, "completed");
+          assert.equal(terminal.output, "retained\npolled\n");
+          assert.deepEqual(deltas, [
+            { itemId: terminal.id, chunk: "retained\n" },
+            { itemId: terminal.id, chunk: "polled\n" },
+          ]);
+        }
       }),
   );
 
@@ -1308,11 +1423,17 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
         },
       );
       const items: Array<ProviderAdapter.ProviderAdapterV2Event> = [];
+      const deltas: Array<string> = [];
+      const deltaItemIds = new Set<string>();
       const shellEnded = yield* Deferred.make<void>();
       const rosterEnded = yield* Deferred.make<void>();
       yield* runtime.events.pipe(
         Stream.runForEach((event) =>
           Effect.gen(function* () {
+            if (event.type === "command_output.delta") {
+              deltas.push(event.chunk);
+              deltaItemIds.add(event.itemId);
+            }
             if (
               event.type === "provider_thread.updated" &&
               event.sessionScoped === true &&
@@ -1394,8 +1515,15 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
         assert.deepInclude(projected.turnItem, {
           type: "command_execution",
           input: info.command,
-          output: "retained",
+          ...(discovery === "settled" ? { output: "retained" } : {}),
         });
+        if (discovery !== "settled") {
+          assert.isUndefined(
+            projected.turnItem.type === "command_execution" ? projected.turnItem.output : undefined,
+          );
+          assert.equal(deltas.join(""), discovery === "exited" ? "retained finished" : "retained");
+          assert.deepEqual([...deltaItemIds], [projected.turnItem.id]);
+        }
       }
     }),
   );
@@ -5636,9 +5764,9 @@ it.layer(McpProviderSessions.layer)("OpenCode2 adapter", (it) => {
           text: [
             index === 0 ? "What is in this image?" : "And this one?",
             `[Attached image "${attachment.name}" is saved at: ${path}]`,
-            `[Attached image "missing.png" is saved at: ${attachmentsDir}/${missing.id}.png]`,
-            `[Attached image "diagram.svg" is saved at: ${attachmentsDir}/${unsupported.id}.svg]`,
-            `[Attached file "requirements.pdf" is saved at: ${attachmentsDir}/${document.id}.pdf]`,
+            `[Attached image "missing.png" is saved at: ${resolveAttachmentPath({ attachmentsDir, attachment: missing })!}]`,
+            `[Attached image "diagram.svg" is saved at: ${resolveAttachmentPath({ attachmentsDir, attachment: unsupported })!}]`,
+            `[Attached file "requirements.pdf" is saved at: ${resolveAttachmentPath({ attachmentsDir, attachment: document })!}]`,
           ].join("\n\n"),
         });
         if (external) {

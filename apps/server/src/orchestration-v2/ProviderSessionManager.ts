@@ -804,6 +804,7 @@ export const layerWithOptions = (
         readonly reason: ProviderSessionReleaseReason;
         readonly releasedAt: DateTime.Utc;
         readonly detachedThreadId?: ThreadId;
+        readonly threadIds?: Iterable<ThreadId>;
       }) {
         const providerSessionId = input.entry.runtime.providerSessionId;
         const now = yield* DateTime.now;
@@ -814,7 +815,7 @@ export const layerWithOptions = (
             : "Provider session was closed before this runtime request was resolved.";
 
         const events: Array<OrchestrationV2DomainEvent> = [];
-        for (const threadId of releasedThreadIds(input)) {
+        for (const threadId of input.threadIds ?? releasedThreadIds(input)) {
           const projection = yield* projectionStore.getThreadRecords(
             threadId,
             ["runtimeRequests"],
@@ -3337,6 +3338,9 @@ export const layerWithOptions = (
                 );
               }
             }
+            const detachedProviderThreadIds = new Set(
+              detachedProviderThreads.map((providerThread) => providerThread.id),
+            );
             const detachResult = yield* Ref.modify(sessions, (current) => {
               const entry = current.get(key);
               if (entry === undefined || !entry.attachedThreadIds.has(input.threadId)) {
@@ -3350,6 +3354,17 @@ export const layerWithOptions = (
               }
               const attachedThreadIds = new Set(entry.attachedThreadIds);
               attachedThreadIds.delete(input.threadId);
+              const busyTurns =
+                entry.supportsMultipleProviderThreads && detachedProviderThreadIds.size > 0
+                  ? new Set(
+                      [...entry.busyTurns].filter(
+                        (turnKey) =>
+                          ![...detachedProviderThreadIds].some((id) =>
+                            turnKey.startsWith(busyTurnPrefix(id)),
+                          ),
+                      ),
+                    )
+                  : entry.busyTurns;
               const loadedProviderThreadKeyByThread = new Map(
                 entry.loadedProviderThreadKeyByThread,
               );
@@ -3369,6 +3384,7 @@ export const layerWithOptions = (
               const updatedEntry = {
                 ...entry,
                 attachedThreadIds,
+                busyTurns,
                 loadedProviderThreadKeyByThread,
                 linkedEnvironmentsByThread,
                 mcpCredentialIdByThread,
@@ -3406,6 +3422,39 @@ export const layerWithOptions = (
                 detachedThreadId: input.threadId,
               });
               return;
+            }
+            if (detached.value.supportsMultipleProviderThreads) {
+              const releasedAt = yield* DateTime.now;
+              yield* writeReleasedRuntimeRequestEvents({
+                entry: detached.value,
+                reason: "manual_shutdown",
+                releasedAt,
+                threadIds: [input.threadId],
+              }).pipe(
+                detached.value.requestEventPermit.withPermits(1),
+                logReleaseFailure(input.providerSessionId),
+              );
+              if (detached.value.runtime.backgroundTasksEndWithProcess === true) {
+                const releasedThreads = detachedProviderThreads
+                  .filter(
+                    (providerThread) =>
+                      (providerThread.appThreadId ?? input.threadId) === input.threadId,
+                  )
+                  .map((providerThread) => ({
+                    threadId: input.threadId,
+                    providerSessionId: input.providerSessionId,
+                    providerThreadId: providerThread.id,
+                    driver: providerThread.driver,
+                    taskIds: new Set(
+                      (providerThread.pendingBackgroundTasks ?? []).map((task) => task.taskId),
+                    ),
+                  }));
+                if (releasedThreads.length > 0) {
+                  yield* writeReleasedBackgroundWorkEvents(releasedThreads, releasedAt).pipe(
+                    logReleaseFailure(input.providerSessionId),
+                  );
+                }
+              }
             }
             const unloadThread = detached.value.exposedRuntime.unloadThread;
             if (detached.value.supportsMultipleProviderThreads && unloadThread !== undefined) {

@@ -3,6 +3,7 @@ import { GitPreparePullRequestThreadInput, GitRunStackedActionInput } from "./gi
 import {
   AuthAccessWriteScope,
   AuthEnvironmentMaintainScope,
+  AuthFilesystemWriteScope,
   AuthOrchestrationOperateScope,
   AuthOrchestrationReadScope,
   AuthPreviewOperateScope,
@@ -13,7 +14,9 @@ import {
   type AuthEnvironmentScope,
 } from "./auth.ts";
 import { ORCHESTRATION_V2_WS_METHODS } from "./orchestrationV2.ts";
+import { ProviderInstanceMutation } from "./providerInstance.ts";
 import { WS_METHODS } from "./rpc.ts";
+import { requiredScopesForServerSettingsPatch, ServerSettingsPatch } from "./settings.ts";
 
 /** Incremental client enforcement; the server still authorizes every request. */
 export const CLIENT_GUARDED_RPC_SCOPES = {
@@ -22,6 +25,7 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   // Stopping a server signals its processes, as closing a terminal does.
   [WS_METHODS.previewStopLocalServer]: AuthTerminalOperateScope,
   [WS_METHODS.serverRunStorageCleanup]: AuthSettingsWriteScope,
+  [WS_METHODS.serverUpdateSettings]: AuthSettingsWriteScope,
   // Restarts the server, as an update does.
   [WS_METHODS.serverReclaimDatabaseSpace]: AuthEnvironmentMaintainScope,
   [WS_METHODS.serverCheckOtlpEndpoint]: AuthSettingsWriteScope,
@@ -51,6 +55,7 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   // Writing a guide runs a model on this environment's providers, which reading one does not.
   [WS_METHODS.pullRequestsGenerateReviewGuide]: AuthOrchestrationOperateScope,
   [WS_METHODS.projectsCreateFromThread]: AuthOrchestrationOperateScope,
+  [WS_METHODS.projectsWriteFile]: AuthFilesystemWriteScope,
   [WS_METHODS.sourceControlCloneRepository]: AuthSourceControlWriteScope,
   [WS_METHODS.sourceControlPublishRepository]: AuthSourceControlWriteScope,
   [WS_METHODS.sourceControlStar]: AuthSourceControlWriteScope,
@@ -91,11 +96,24 @@ export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
 
 const decodePrepareThread = Schema.decodeUnknownSync(GitPreparePullRequestThreadInput);
 const decodeStackedAction = Schema.decodeUnknownSync(GitRunStackedActionInput);
+const SettingsUpdate = Schema.Struct({
+  patch: ServerSettingsPatch,
+  providerInstanceMutation: Schema.optionalKey(ProviderInstanceMutation),
+});
+const decodeSettingsUpdate = Schema.decodeUnknownSync(Schema.toType(SettingsUpdate));
 
 export function clientRpcRequiredScopes(
   method: string,
   input: unknown,
 ): readonly AuthEnvironmentScope[] {
+  if (method === WS_METHODS.serverUpdateSettings && input !== undefined) {
+    const payload = decodeSettingsUpdate(input);
+    const scopes = requiredScopesForServerSettingsPatch(payload.patch);
+    if (payload.providerInstanceMutation === undefined) return scopes;
+    return Object.values(payload.patch).every((value) => value === undefined)
+      ? [AuthProvidersManageScope]
+      : [...new Set([...scopes, AuthProvidersManageScope])];
+  }
   if (method === WS_METHODS.gitPreparePullRequestThread && input !== undefined) {
     const payload = decodePrepareThread(input);
     if (payload.mode === "worktree" && payload.threadId !== undefined)

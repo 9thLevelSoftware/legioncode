@@ -168,21 +168,17 @@ function makeHarness(options: Harness = {}) {
     ),
   ).pipe(Effect.provideService(HttpRouter.RouterConfig, RELAY_HTTP_ROUTER_CONFIG));
   // Use the Workers request path so pre-response handlers apply.
-  const send = (request: Request) =>
+  const sendRequest = (serverRequest: HttpServerRequest.HttpServerRequest) =>
     Effect.gen(function* () {
       const handler = yield* httpEffect;
       const sent = yield* Deferred.make<HttpServerResponse.HttpServerResponse>();
       yield* HttpEffect.toHandled(handler, (_request, response) =>
         Deferred.succeed(sent, response),
-      ).pipe(
-        Effect.provideService(
-          HttpServerRequest.HttpServerRequest,
-          HttpServerRequest.fromWeb(request),
-        ),
-      );
+      ).pipe(Effect.provideService(HttpServerRequest.HttpServerRequest, serverRequest));
       return yield* Deferred.await(sent);
     });
-  return { sent, rateLimitKeys, held, send, httpEffect };
+  const send = (request: Request) => sendRequest(HttpServerRequest.fromWeb(request));
+  return { sent, rateLimitKeys, held, send, sendRequest, httpEffect };
 }
 
 const hookUrl = (path = "hook-1/secret-token", query = "") =>
@@ -243,6 +239,30 @@ describe("HookForwarder", () => {
       expect(sent.headers["content-length"]).toBe(String(body.length));
       expect(harness.rateLimitKeys).toHaveLength(1);
       expect(harness.rateLimitKeys[0]).toMatch(/^[0-9a-f]{64}$/);
+    }),
+  );
+
+  it.effect("rejects dot-segment and backslash path traversal without forwarding or holding", () =>
+    Effect.gen(function* () {
+      const harness = makeHarness();
+      for (const path of [
+        "%2e%2e/%2e%2e",
+        "%2e%2e/projects",
+        "hook/%2e",
+        "%2e/tok",
+        "hook%5c../tok",
+        "hook-1%2fother/tok",
+      ]) {
+        const response = yield* harness.sendRequest(
+          HttpServerRequest.fromWeb(
+            new Request(hookUrl("hook-1/tok"), { method: "POST", body: "{}" }),
+          ).modify({ url: `/v1/hooks/${endpointKey}/${path}` }),
+        );
+        expect(response.status).toBe(404);
+        expect(yield* readJson(response)).toMatchObject({ error: "hook_not_found" });
+      }
+      expect(harness.sent).toHaveLength(0);
+      expect(harness.held).toHaveLength(0);
     }),
   );
 

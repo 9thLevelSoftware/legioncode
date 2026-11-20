@@ -856,10 +856,17 @@ export const make = Effect.gen(function* () {
     modifier: SnapShotModifier,
     onTrigger: () => void,
     onFailure: (error: Error) => void,
+    options?: { readonly signal?: AbortSignal },
   ) =>
     environment.platform === "darwin"
-      ? startMacModifierPairShortcutProcess(modifier, onTrigger, onFailure)
-      : startGlobalShiftShortcutProcess(shiftShortcutWorkerPath, modifier, onTrigger, onFailure);
+      ? startMacModifierPairShortcutProcess(modifier, onTrigger, onFailure, options)
+      : startGlobalShiftShortcutProcess(
+          shiftShortcutWorkerPath,
+          modifier,
+          onTrigger,
+          onFailure,
+          options,
+        );
 
   const releaseShortcut = () => {
     shortcutGeneration++;
@@ -1081,14 +1088,16 @@ export const make = Effect.gen(function* () {
         return { available: false, message: WAYLAND_MODIFIER_PAIR_UNAVAILABLE_MESSAGE };
       }
       const available = yield* Effect.tryPromise({
-        try: () =>
+        try: (signal) =>
           startPairShortcutProcess(
             snapShotShortcutModifierPair(shortcut),
             () => undefined,
             () => undefined,
+            { signal },
           ),
         catch: shortcutFailure,
       }).pipe(
+        Effect.timeout("5 seconds"),
         Effect.tap((stop) => Effect.sync(stop)),
         Effect.as(true),
         Effect.orElseSucceed(() => false),
@@ -1317,7 +1326,7 @@ export const make = Effect.gen(function* () {
     let registered = false;
     if (isModifierPairShortcut(shortcut)) {
       registered = yield* Effect.tryPromise({
-        try: () =>
+        try: (signal) =>
           startPairShortcutProcess(
             snapShotShortcutModifierPair(shortcut),
             onCurrentShortcut,
@@ -1328,9 +1337,11 @@ export const make = Effect.gen(function* () {
                 runPromise,
               ).catch(() => undefined);
             },
+            { signal },
           ),
         catch: shortcutFailure,
       }).pipe(
+        Effect.timeout("5 seconds"),
         Effect.tap((stop) =>
           Effect.sync(() => {
             stopShiftShortcut = stop;

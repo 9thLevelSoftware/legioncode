@@ -1,6 +1,13 @@
-import { DEFAULT_UNIFIED_SETTINGS } from "@t3tools/contracts";
+import {
+  ClientSettingsSchema,
+  DEFAULT_CLIENT_SETTINGS,
+  DEFAULT_SERVER_SETTINGS,
+  DEFAULT_UNIFIED_SETTINGS,
+  ProviderInstanceId,
+  ServerSettings,
+} from "@t3tools/contracts";
 import * as Duration from "effect/Duration";
-import { describe, expect, it } from "vite-plus/test";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import {
   autoSettleDaysField,
   type AutoSettleDaysField,
@@ -13,6 +20,74 @@ import {
   hasChangedBackgroundActivitySettings,
   syncAutoSettleDaysField,
 } from "./SettingsPanels.logic";
+
+const restoreState = vi.hoisted(() => ({
+  clientSettings: null as Record<string, unknown> | null,
+  serverSettings: null as Record<string, unknown> | null,
+  theme: "system" as string,
+  followSystem: true,
+  themeHalves: null as { light?: string; dark?: string } | null,
+  setTheme: vi.fn(() => true),
+  setFollowSystem: vi.fn(() => true),
+  setThemeHalf: vi.fn(() => true),
+  clearThemeHalves: vi.fn(() => true),
+  updateClientSettings: vi.fn(async () => undefined),
+  updateScopedSettings: vi.fn(),
+  confirm: vi.fn(async () => true),
+}));
+
+vi.mock("react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("react")>()),
+  useState: (initial: unknown) => [typeof initial === "function" ? initial() : initial, vi.fn()],
+  useRef: (initial: unknown) => ({ current: initial }),
+}));
+
+vi.mock("gt-react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("gt-react")>()),
+  useGT: () => (text: string) => text,
+  useMessages: () => (text: string) => text,
+}));
+
+vi.mock("../../hooks/useTheme", () => ({
+  useTheme: () => ({
+    theme: restoreState.theme,
+    setTheme: restoreState.setTheme,
+    followSystem: restoreState.followSystem,
+    setFollowSystem: restoreState.setFollowSystem,
+    setThemeHalf: restoreState.setThemeHalf,
+    clearThemeHalves: restoreState.clearThemeHalves,
+    themeHalves: restoreState.themeHalves,
+  }),
+  readThemePreference: () => restoreState.theme,
+  readThemeHalves: () => restoreState.themeHalves,
+  readAppearanceModePreference: () => (restoreState.followSystem ? "system" : "dark"),
+}));
+
+vi.mock("../../hooks/useSettings", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../hooks/useSettings")>()),
+  useClientSettings: (selector?: (settings: Record<string, unknown>) => unknown) => {
+    const current = restoreState.clientSettings!;
+    return selector ? selector(current) : current;
+  },
+  updateClientSettings: (...args: unknown[]) =>
+    (restoreState.updateClientSettings as (...input: unknown[]) => unknown)(...args),
+}));
+
+vi.mock("./useScopedSettings", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./useScopedSettings")>()),
+  useScopedSettings: () => ({
+    ...restoreState.serverSettings!,
+    ...restoreState.clientSettings!,
+  }),
+  useUpdateScopedSettings: () => restoreState.updateScopedSettings,
+}));
+
+vi.mock("../../localApi", () => ({
+  readLocalApi: () => ({ dialogs: { confirm: restoreState.confirm } }),
+  ensureLocalApi: () => ({ dialogs: { confirm: restoreState.confirm } }),
+}));
+
+import { useSettingsRestore } from "./SettingsPanels";
 
 describe("background activity settings restore", () => {
   it("detects legacy interval values even when the structured setting is at its default", () => {
@@ -170,5 +245,66 @@ describe("auto-settle days field", () => {
   it("keeps a draft in progress when the saved value changes underneath it", () => {
     const typing = type(autoSettleDaysField(14), "4");
     expect(syncAutoSettleDaysField(typing, 30)).toMatchObject({ saved: 30, draft: "4" });
+  });
+});
+
+describe("useSettingsRestore", () => {
+  const clientKeys = new Set<string>(Object.keys(ClientSettingsSchema.fields));
+  const serverKeys = new Set<string>(Object.keys(ServerSettings.fields));
+
+  beforeEach(() => {
+    restoreState.clientSettings = { ...DEFAULT_CLIENT_SETTINGS };
+    restoreState.serverSettings = {
+      ...DEFAULT_SERVER_SETTINGS,
+      enableProviderUpdateChecks: false,
+      sidebarAutoSettleAfterDays: 30,
+      defaultThreadEnvMode: "worktree",
+      enableAgentBrowserAccess: false,
+      backgroundActivityProfile: "performance",
+      textGenerationModelSelection: {
+        instanceId: ProviderInstanceId.make("codex"),
+        model: "gpt-5.6-mini",
+        options: [],
+      },
+    };
+    restoreState.theme = "system";
+    restoreState.followSystem = true;
+    restoreState.themeHalves = null;
+    restoreState.setTheme.mockClear();
+    restoreState.setFollowSystem.mockClear();
+    restoreState.setThemeHalf.mockClear();
+    restoreState.clearThemeHalves.mockClear();
+    restoreState.updateClientSettings.mockClear();
+    restoreState.updateScopedSettings.mockClear();
+    restoreState.confirm.mockReset().mockResolvedValue(true);
+  });
+
+  it("ignores dirty server settings and restores only client keys and theme storage", async () => {
+    expect(useSettingsRestore().changedSettingLabels).toEqual([]);
+
+    restoreState.clientSettings = {
+      ...DEFAULT_CLIENT_SETTINGS,
+      wordWrap: false,
+    };
+    restoreState.theme = "custom-dark";
+    const onRestored = vi.fn();
+    const restore = useSettingsRestore(onRestored);
+
+    expect(restore.changedSettingLabels).toEqual(["Theme", "Word wrap"]);
+
+    await restore.restoreDefaults();
+
+    expect(restoreState.setTheme).toHaveBeenCalledWith("system");
+    expect(restoreState.updateScopedSettings).not.toHaveBeenCalled();
+    expect(restoreState.updateClientSettings).toHaveBeenCalledOnce();
+    const patch = (
+      restoreState.updateClientSettings.mock.calls[0] as unknown[] | undefined
+    )?.[0] as Record<string, unknown> | undefined;
+    expect(patch).toBeDefined();
+    for (const key of Object.keys(patch!)) {
+      expect(clientKeys.has(key)).toBe(true);
+      expect(serverKeys.has(key)).toBe(false);
+    }
+    expect(onRestored).toHaveBeenCalledOnce();
   });
 });

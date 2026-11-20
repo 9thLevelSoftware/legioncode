@@ -5,15 +5,22 @@ import {
   ProjectId,
   SourceControlProviderKind,
   type PullRequestDetailView,
+  type PullRequestStack,
 } from "@t3tools/contracts";
 import { expect, it, vi } from "vite-plus/test";
-import { userEvent } from "vite-plus/test/browser";
+import { page, userEvent } from "vite-plus/test/browser";
 import { DraftId, useComposerDraftStore } from "~/composerDraftStore";
 import { act, fakeTimers, render } from "../../../test/render";
 
 const { permissions, reads } = vi.hoisted(() => ({
   permissions: { checkout: true, operate: true },
-  reads: { diff: [] as unknown[] },
+  reads: {
+    diff: [] as unknown[],
+    detailAtoms: new WeakSet<object>(),
+    useRealDetailHook: false,
+    detailOverride: null as PullRequestDetailView | null,
+    stackOverride: null as PullRequestStack | null,
+  },
 }));
 
 vi.mock(import("~/state/session"), async (original) => ({
@@ -31,34 +38,72 @@ vi.mock(import("~/state/sourceControlActions"), async (original) => ({
     error: null,
   })) as never,
 }));
-vi.mock(import("./usePullRequestDetail"), async (original) => ({
-  ...(await original()),
-  usePullRequestDetail: (() => ({
-    canWriteSourceControl: permissions.checkout,
-    detailQuery: { isPending: false, refresh: vi.fn() },
-    activityQuery: { isPending: false, refresh: vi.fn(), error: null },
-    activity: null,
-    sharedSummary: detail,
-    coreDetail: detail,
-    detail,
-  })) as never,
-}));
+vi.mock(import("./usePullRequestDetail"), async (original) => {
+  const actual = await original();
+  return {
+    ...actual,
+    usePullRequestDetail: ((...args: Parameters<typeof actual.usePullRequestDetail>) =>
+      reads.useRealDetailHook
+        ? actual.usePullRequestDetail(...args)
+        : {
+            canWriteSourceControl: permissions.checkout,
+            detailQuery: { isPending: false, refresh: vi.fn() },
+            activityQuery: { isPending: false, refresh: vi.fn(), error: null },
+            activity: null,
+            sharedSummary: detail,
+            coreDetail: detail,
+            detail,
+          }) as never,
+  };
+});
 vi.mock(import("~/state/usePullRequestStack"), async (original) => ({
   ...(await original()),
   usePullRequestStack: (() => ({
-    data: null,
+    data: reads.stackOverride,
     isFresh: true,
     isPending: false,
     error: null,
     refresh: vi.fn(),
   })) as never,
 }));
+vi.mock(import("~/state/entities"), async (original) => {
+  const actual = await original();
+  return {
+    ...actual,
+    useServerConfigs: (() =>
+      reads.useRealDetailHook
+        ? new Map([[environmentId, { environment: { capabilities: {} } }]])
+        : actual.useServerConfigs()) as never,
+  };
+});
+vi.mock(import("~/state/query"), async (original) => {
+  const actual = await original();
+  return {
+    ...actual,
+    useEnvironmentQuery: ((atom: unknown, ...rest: unknown[]) =>
+      reads.useRealDetailHook && atom !== null && reads.detailAtoms.has(atom as object)
+        ? {
+            data: reads.detailOverride,
+            isPending: false,
+            dataUpdatedAt: 1,
+            error: null,
+            isSuccess: true,
+            refresh: vi.fn(),
+          }
+        : actual.useEnvironmentQuery(atom as never, ...(rest as []))) as never,
+  };
+});
 vi.mock(import("~/state/pullRequests"), async (original) => {
   const actual = await original();
   return {
     ...actual,
     pullRequestEnvironment: {
       ...actual.pullRequestEnvironment,
+      detail: ((target: unknown) => {
+        const atom = actual.pullRequestEnvironment.detail(target as never);
+        reads.detailAtoms.add(atom);
+        return atom;
+      }) as never,
       diff: ((target: unknown) => {
         reads.diff.push(target);
         return actual.pullRequestEnvironment.diff(target as never);
@@ -149,6 +194,9 @@ function setup() {
   permissions.checkout = true;
   permissions.operate = true;
   reads.diff = [];
+  reads.useRealDetailHook = false;
+  reads.detailOverride = null;
+  reads.stackOverride = null;
   useComposerDraftStore.setState({ draftsByThreadKey: {} });
 }
 
@@ -165,6 +213,35 @@ it.each([AuthSourceControlWriteScope, AuthOrchestrationOperateScope])(
     await expect.element(resolve).toBeDisabled();
   },
 );
+
+it("hides stack rebase when source control write permission is missing", async () => {
+  setup();
+  reads.useRealDetailHook = true;
+  reads.detailOverride = {
+    ...detail,
+    capabilities: { ...detail.capabilities, stacks: true, stackActions: true },
+    viewerPermissions: { ...detail.viewerPermissions, stackRebase: true },
+  };
+  reads.stackOverride = {
+    id: "stack",
+    number: 1,
+    url: "https://github.com/owner/repo/stack/1",
+    base: "main",
+    layers: [{ number: 1, headBranch: "feature", headSha: "abc123", state: "open" }],
+  };
+  await using screen = await render(panel());
+  const trigger = screen.getByRole("button", { name: "Stack 1, layer 1 of 1" });
+  await trigger.click();
+  await expect.element(page.getByRole("menuitem", { name: "Rebase stack" })).toBeVisible();
+  await userEvent.keyboard("{Escape}");
+
+  permissions.checkout = false;
+  await screen.rerender(panel());
+  await trigger.click();
+  await expect
+    .element(page.getByRole("menuitem", { name: "Rebase stack" }))
+    .not.toBeInTheDocument();
+});
 
 it("can still add conflict resolution to an existing composer without checkout scopes", async () => {
   setup();

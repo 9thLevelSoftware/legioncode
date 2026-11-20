@@ -272,6 +272,7 @@ const makeTestRelay = Effect.fnUntraced(function* (
   const publications: Array<{
     readonly url: string;
     readonly authorization: string | null;
+    readonly redirect: RequestInit["redirect"] | undefined;
     readonly state: RelayAgentActivityState | null;
   }> = [];
   const fetch: typeof globalThis.fetch = Object.assign(
@@ -289,6 +290,7 @@ const makeTestRelay = Effect.fnUntraced(function* (
       publications.push({
         url: String(input),
         authorization: new Headers(init?.headers).get("authorization"),
+        redirect: init?.redirect,
         state: payload.state,
       });
       try {
@@ -371,6 +373,7 @@ describe("AgentAwarenessRelay", () => {
       );
       yield* relay.publishThread(THREAD_ID);
       assert.equal(publications.length, 3);
+      assert.equal(publications[0]?.redirect, "error");
       assert.equal(publications[2]?.state?.threadTitle, "Renamed thread");
       assert.equal(publications[2]?.state?.updatedAt, publications[1]?.state?.updatedAt);
 

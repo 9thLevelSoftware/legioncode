@@ -25,7 +25,9 @@ describe("PREVIEW_WEBVIEW_PREFERENCES", () => {
     }
   });
 
-  it("keeps the renderer sandbox enabled (so the page cannot reach Node APIs)", () => {
+  it("keeps the renderer sandbox and context isolation enabled", () => {
     expect(parsed["sandbox"]).toBe("true");
+    expect(parsed["contextIsolation"]).toBe("true");
+    expect(parsed["nodeIntegration"]).toBe("false");
   });
 });

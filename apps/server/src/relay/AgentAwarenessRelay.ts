@@ -9,7 +9,6 @@ import {
   type ThreadId,
 } from "@t3tools/contracts";
 import {
-  RelayApi,
   type RelayAgentActivityPublishProofPayload,
   type RelayAgentActivityState,
 } from "@t3tools/contracts/relay";
@@ -35,10 +34,6 @@ import * as Queue from "effect/Queue";
 import * as Ref from "effect/Ref";
 import type * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
-import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
-import * as HttpApiClient from "effect/http-api/HttpApiClient";
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import {
@@ -54,6 +49,7 @@ import * as ThreadManagement from "../orchestration-v2/ThreadManagementService.t
 import { isSnoozed } from "../orchestration-v2/ThreadSettlementService.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import { forkParked } from "../serverActivation.ts";
+import { makeRelayEnvironmentClient } from "./relayEnvironmentClient.ts";
 
 export class AgentAwarenessRelay extends Context.Service<
   AgentAwarenessRelay,
@@ -220,10 +216,6 @@ function sanitizeRelayAgentActivityState(
     .slice(0, RELAY_AGENT_ACTIVITY_DETAIL_MAX_LENGTH)
     .trim();
   return detail ? { ...rest, detail } : rest;
-}
-
-function relayEnvironmentClient(token: string) {
-  return HttpClient.mapRequest(HttpClientRequest.setHeader("authorization", `Bearer ${token}`));
 }
 
 function deliveryStats(
@@ -463,16 +455,7 @@ export const make = Effect.gen(function* () {
     Effect.map(isAgentActivityPublishingEnabledValue),
   );
 
-  const makeRelayClient = (relayConfig: {
-    readonly url: string;
-    readonly environmentCredential: string;
-  }) =>
-    HttpApiClient.make(RelayApi, {
-      baseUrl: relayConfig.url,
-      transformClient: relayEnvironmentClient(relayConfig.environmentCredential),
-    }).pipe(Effect.provide(FetchHttpClient.layer));
-
-  let cachedRelayClient: Effect.Success<ReturnType<typeof makeRelayClient>> | undefined;
+  let cachedRelayClient: Effect.Success<ReturnType<typeof makeRelayEnvironmentClient>> | undefined;
   let publishedRelayConfig: NonNullable<Effect.Success<typeof readRelayConfig>> | undefined;
 
   // Confirm through the same worker so tombstones cannot race live updates; recovery clears the deadline.
@@ -537,7 +520,7 @@ export const make = Effect.gen(function* () {
       readonly reason: string;
     }) {
       if (cachedRelayClient === undefined) {
-        cachedRelayClient = yield* makeRelayClient(relayConfig);
+        cachedRelayClient = yield* makeRelayEnvironmentClient(relayConfig);
       }
       const relayClient = cachedRelayClient;
       const proof = yield* makePublishProof({

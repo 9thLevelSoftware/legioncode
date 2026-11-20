@@ -5,11 +5,11 @@ import {
   type ScopedThreadRef,
   type ThreadId,
 } from "@t3tools/contracts";
-import { scopeProjectRef } from "@t3tools/client-runtime/environment";
+import { scopedThreadKey, scopeProjectRef } from "@t3tools/client-runtime/environment";
 import { projectScriptCwd, projectScriptRuntimeEnv } from "@t3tools/shared/projectScripts";
 import { resolveTerminalSessionLabel } from "@t3tools/shared/terminalLabelsCopy";
 import { useMessages } from "gt-react";
-import { memo, useEffect } from "react";
+import { memo, useEffect, useState } from "react";
 import { useComposerDraftStore } from "../composerDraftStore";
 import { useStableCallback } from "../hooks/useStableCallback";
 import type { TerminalContextSelection } from "../lib/terminalContext";
@@ -38,6 +38,96 @@ interface TerminalLaunchLocationWithEnv {
   readonly cwd: string;
   readonly worktreePath: string | null;
   readonly runtimeEnv: Record<string, string>;
+}
+
+interface KnownTerminalSessionSummary {
+  readonly target: { readonly terminalId: string };
+  readonly state: {
+    readonly summary: { readonly cwd: string; readonly worktreePath: string | null } | null;
+  };
+}
+
+function launchLocationsEqual(
+  left: TerminalLaunchLocationWithEnv,
+  right: TerminalLaunchLocationWithEnv,
+): boolean {
+  if (left.cwd !== right.cwd || left.worktreePath !== right.worktreePath) {
+    return false;
+  }
+  const leftKeys = Object.keys(left.runtimeEnv);
+  const rightKeys = Object.keys(right.runtimeEnv);
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+  return leftKeys.every((key) => left.runtimeEnv[key] === right.runtimeEnv[key]);
+}
+
+function useResolvedTerminalLaunchLocations(input: {
+  readonly threadKey: string;
+  readonly openTerminalIds: readonly string[];
+  readonly knownSessions: readonly KnownTerminalSessionSummary[] | undefined;
+  readonly project: { readonly workspaceRoot: string } | null;
+  readonly defaultLocation: TerminalLaunchLocationWithEnv | null;
+}): Map<string, TerminalLaunchLocationWithEnv> {
+  const [cachedState, setCachedState] = useState<{
+    readonly threadKey: string;
+    readonly locations: ReadonlyMap<string, TerminalLaunchLocationWithEnv>;
+  }>(() => ({
+    threadKey: input.threadKey,
+    locations: new Map(),
+  }));
+
+  const previousLocations =
+    cachedState.threadKey === input.threadKey ? cachedState.locations : null;
+  const resolvedLocations = new Map<string, TerminalLaunchLocationWithEnv>();
+  if (input.project) {
+    for (const terminalId of input.openTerminalIds) {
+      const summary =
+        input.knownSessions?.find((session) => session.target.terminalId === terminalId)?.state
+          .summary ?? null;
+      const previousLocation = previousLocations?.get(terminalId);
+      if (summary) {
+        const nextLocation: TerminalLaunchLocationWithEnv = {
+          cwd: summary.cwd,
+          worktreePath: summary.worktreePath,
+          runtimeEnv: projectScriptRuntimeEnv({
+            project: { cwd: input.project.workspaceRoot },
+            worktreePath: summary.worktreePath,
+          }),
+        };
+        resolvedLocations.set(
+          terminalId,
+          previousLocation && launchLocationsEqual(previousLocation, nextLocation)
+            ? previousLocation
+            : nextLocation,
+        );
+        continue;
+      }
+      const nextLocation = previousLocation ?? input.defaultLocation;
+      if (nextLocation) {
+        resolvedLocations.set(terminalId, nextLocation);
+      }
+    }
+  }
+
+  let changed = previousLocations === null || previousLocations.size !== resolvedLocations.size;
+  if (!changed && previousLocations !== null) {
+    for (const [terminalId, nextLocation] of resolvedLocations) {
+      const previousLocation = previousLocations.get(terminalId);
+      if (!previousLocation || !launchLocationsEqual(previousLocation, nextLocation)) {
+        changed = true;
+        break;
+      }
+    }
+  }
+  if (changed) {
+    setCachedState({
+      threadKey: input.threadKey,
+      locations: resolvedLocations,
+    });
+  }
+
+  return resolvedLocations;
 }
 
 interface PersistentThreadTerminalDrawerProps {
@@ -101,21 +191,6 @@ export const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerm
       resolveTerminalSessionLabel(session.target.terminalId, session.state.summary, messages),
     );
   }
-  const terminalLaunchLocationsById = new Map<string, TerminalLaunchLocationWithEnv>();
-  for (const session of drawerTerminalSessions) {
-    const summary = session.state.summary;
-    if (!project || !summary) continue;
-    const worktreePathForLaunch =
-      launchContext !== null ? launchContext.worktreePath : summary.worktreePath;
-    terminalLaunchLocationsById.set(session.target.terminalId, {
-      cwd: launchContext?.cwd ?? summary.cwd,
-      worktreePath: worktreePathForLaunch,
-      runtimeEnv: projectScriptRuntimeEnv({
-        project: { cwd: project.workspaceRoot },
-        worktreePath: worktreePathForLaunch,
-      }),
-    });
-  }
   const serverOrderedTerminalIds = drawerTerminalSessions.map(
     (session) => session.target.terminalId,
   );
@@ -150,6 +225,18 @@ export const PersistentThreadTerminalDrawer = memo(function PersistentThreadTerm
         worktreePath: effectiveWorktreePath,
       })
     : {};
+  const shouldRenderDrawer = Boolean(project && (terminalUiState.terminalOpen || active) && cwd);
+  const drawerTerminalIds = canOperateTerminal
+    ? terminalUiState.terminalIds
+    : serverOrderedTerminalIds;
+  const terminalLaunchLocationsById = useResolvedTerminalLaunchLocations({
+    threadKey: scopedThreadKey(threadRef),
+    openTerminalIds: shouldRenderDrawer ? drawerTerminalIds : [],
+    knownSessions: knownTerminalSessions,
+    project,
+    defaultLocation:
+      project && cwd ? { cwd, worktreePath: effectiveWorktreePath, runtimeEnv } : null,
+  });
 
   const setTerminalHeight = (height: number) => {
     storeSetTerminalHeight(threadRef, height);
@@ -295,46 +382,55 @@ export const PersistentThreadTerminalPanel = memo(function PersistentThreadTermi
   const activeSummary =
     knownTerminalSessions?.find((session) => session.target.terminalId === surface.activeTerminalId)
       ?.state.summary ?? null;
-  const worktreePath = resolveTerminalWorktreePath({
+  const defaultWorktreePath = resolveTerminalWorktreePath({
     launchContext,
-    summary: activeSummary,
+    summary: null,
     threadWorktreePath,
   });
-  const cwd =
+  const defaultCwd =
     launchContext?.cwd ??
-    activeSummary?.cwd ??
-    (project ? projectScriptCwd({ project: { cwd: project.workspaceRoot }, worktreePath }) : null);
-  const runtimeEnv = project
-    ? projectScriptRuntimeEnv({ project: { cwd: project.workspaceRoot }, worktreePath })
+    (project
+      ? projectScriptCwd({
+          project: { cwd: project.workspaceRoot },
+          worktreePath: defaultWorktreePath,
+        })
+      : null);
+  const defaultRuntimeEnv = project
+    ? projectScriptRuntimeEnv({
+        project: { cwd: project.workspaceRoot },
+        worktreePath: defaultWorktreePath,
+      })
     : {};
   const terminalLabelsById = new Map<string, string>();
-  const terminalLaunchLocationsById = new Map<string, TerminalLaunchLocationWithEnv>();
   for (const terminalId of surface.terminalIds) {
     const summary =
       knownTerminalSessions?.find((session) => session.target.terminalId === terminalId)?.state
         .summary ?? null;
     terminalLabelsById.set(terminalId, resolveTerminalSessionLabel(terminalId, summary, messages));
-    if (!project) continue;
-    const terminalWorktreePath = resolveTerminalWorktreePath({
-      launchContext,
-      summary,
-      threadWorktreePath,
-    });
-    terminalLaunchLocationsById.set(terminalId, {
-      cwd:
-        launchContext?.cwd ??
-        summary?.cwd ??
-        projectScriptCwd({
-          project: { cwd: project.workspaceRoot },
-          worktreePath: terminalWorktreePath,
-        }),
-      worktreePath: terminalWorktreePath,
-      runtimeEnv: projectScriptRuntimeEnv({
-        project: { cwd: project.workspaceRoot },
-        worktreePath: terminalWorktreePath,
-      }),
-    });
   }
+  const terminalLaunchLocationsById = useResolvedTerminalLaunchLocations({
+    threadKey: scopedThreadKey(threadRef),
+    openTerminalIds: project && defaultCwd ? surface.terminalIds : [],
+    knownSessions: knownTerminalSessions ?? undefined,
+    project,
+    defaultLocation:
+      project && defaultCwd
+        ? { cwd: defaultCwd, worktreePath: defaultWorktreePath, runtimeEnv: defaultRuntimeEnv }
+        : null,
+  });
+  const activeLocation = terminalLaunchLocationsById.get(surface.activeTerminalId);
+  const worktreePath = activeSummary
+    ? activeSummary.worktreePath
+    : (activeLocation?.worktreePath ?? defaultWorktreePath);
+  const cwd = activeSummary?.cwd ?? activeLocation?.cwd ?? defaultCwd;
+  const runtimeEnv = activeSummary
+    ? project
+      ? projectScriptRuntimeEnv({
+          project: { cwd: project.workspaceRoot },
+          worktreePath: activeSummary.worktreePath,
+        })
+      : {}
+    : (activeLocation?.runtimeEnv ?? defaultRuntimeEnv);
 
   if (!project || !cwd) return null;
 

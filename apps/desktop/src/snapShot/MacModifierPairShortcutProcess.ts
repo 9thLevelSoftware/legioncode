@@ -1,3 +1,4 @@
+// @effect-diagnostics globalTimers:off -- Startup deadline runs at a child-process boundary outside any Effect fiber.
 // @effect-diagnostics nodeBuiltinImport:off -- This macOS platform boundary spawns the native modifier-key poller with Node.
 
 import * as NodeChildProcess from "node:child_process";
@@ -36,6 +37,7 @@ export function startMacModifierPairShortcutProcess(
   modifier: SnapShotModifier,
   onTrigger: () => void,
   onFailure: (error: Error) => void,
+  options?: { readonly signal?: AbortSignal; readonly startupTimeoutMs?: number },
 ): Promise<() => void> {
   const [left, right] = MAC_MODIFIER_PAIR_DEVICE_MASKS[modifier];
   const poller = NodeChildProcess.spawn(
@@ -48,12 +50,23 @@ export function startMacModifierPairShortcutProcess(
     let settled = false;
     let stopped = false;
     let buffered = "";
+    let startupTimer: ReturnType<typeof setTimeout> | undefined;
+    const onAbort = () => fail(new Error("Snapshot shortcut helper startup aborted"));
+    const clearStartup = () => {
+      if (startupTimer !== undefined) {
+        clearTimeout(startupTimer);
+        startupTimer = undefined;
+      }
+      options?.signal?.removeEventListener("abort", onAbort);
+    };
     const stop = () => {
+      clearStartup();
       if (stopped) return;
       stopped = true;
       poller.kill();
     };
     const fail = (error: Error) => {
+      clearStartup();
       if (stopped) return;
       if (settled) {
         stop();
@@ -65,6 +78,17 @@ export function startMacModifierPairShortcutProcess(
       reject(error);
     };
 
+    if (options?.signal?.aborted) {
+      fail(new Error("Snapshot shortcut helper startup aborted"));
+      return;
+    }
+    options?.signal?.addEventListener("abort", onAbort, { once: true });
+    startupTimer = setTimeout(
+      () => fail(new Error("Snapshot shortcut helper timed out waiting for ready")),
+      options?.startupTimeoutMs ?? 5_000,
+    );
+    startupTimer.unref?.();
+
     poller.stderr.on("data", (chunk: Buffer) => {
       buffered += chunk.toString();
       const lines = buffered.split("\n");
@@ -73,6 +97,7 @@ export function startMacModifierPairShortcutProcess(
         const message = line.trim();
         if (message === "ready" && !settled) {
           settled = true;
+          clearStartup();
           resolve(stop);
           continue;
         }

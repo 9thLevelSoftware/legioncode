@@ -3,6 +3,7 @@ import {
   expandAssistantCitationsForProvider,
 } from "@t3tools/shared/assistantCitations";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
+import * as NodePath from "@effect/platform-node/NodePath";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it, vi } from "vite-plus/test";
 import { it as effectIt } from "@effect/vitest";
@@ -100,9 +101,9 @@ const normalize = (target: string) => {
   }
   return `/${parts.join("/")}`;
 };
-const layerWorktreeLocation = (worktreesDir = managedWorktreesDir) =>
+const layerWorktreeLocation = (worktreesDir = managedWorktreesDir, usePlatformPath = false) =>
   Layer.mergeAll(
-    Path.layer,
+    usePlatformPath ? NodePath.layer : Path.layer,
     Layer.mock(ServerConfig.ServerConfig)({ worktreesDir } as ServerConfig.ServerConfig["Service"]),
     ServerSettings.layerTest(),
   );
@@ -479,6 +480,7 @@ function makeLocalCommandHarness(input: {
   readonly writeFailure?: unknown;
   readonly failReadsAfterRunning?: boolean;
   readonly missingProviderSession?: boolean;
+  readonly archived?: boolean;
   readonly recoveryReadFailure?: string;
   readonly previousTurn?: {
     readonly runStatus: "failed" | "completed" | "interrupted";
@@ -580,6 +582,7 @@ function makeLocalCommandHarness(input: {
       projectId: ProjectId.make("project-native-account-command"),
       branch: input.worktreePath === undefined ? null : "feature/restore",
       worktreePath: input.worktreePath ?? null,
+      archivedAt: input.archived ? now : null,
       lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: threadId },
     } as OrchestrationV2ThreadProjection["thread"],
     runs: [
@@ -1345,7 +1348,7 @@ function makeLocalCommandHarness(input: {
         }),
         IdAllocator.layer,
         Layer.mock(TurnItemPositionStore.TurnItemPositionStoreV2)({}),
-        layerWorktreeLocation(input.worktreesDir),
+        layerWorktreeLocation(input.worktreesDir, input.fileSystem !== undefined),
         input.fileSystem === undefined
           ? FileSystem.layerNoop({ exists: () => Effect.succeed(true) })
           : Layer.succeed(FileSystem.FileSystem, input.fileSystem),
@@ -3405,4 +3408,18 @@ effectIt.effect("rejects citation expansion before opening a provider session", 
     ]);
     expect(harness.projection().messages[0]?.text).toBe(text);
   }),
+);
+
+effectIt.effect(
+  "cancels a starting run without opening a provider session when the thread is archived",
+  () =>
+    Effect.gen(function* () {
+      const harness = makeLocalCommandHarness({ text: "Run after archive", archived: true });
+      yield* harness.start;
+      expect(harness.open).not.toHaveBeenCalled();
+      expect(harness.startTurn).not.toHaveBeenCalled();
+      expect(harness.projection().runs.at(-1)?.status).toBe("cancelled");
+      expect(harness.projection().attempts.at(-1)?.status).toBe("cancelled");
+      expect(harness.projection().nodes.at(-1)?.status).toBe("cancelled");
+    }),
 );

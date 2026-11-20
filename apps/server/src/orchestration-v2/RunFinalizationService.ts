@@ -50,6 +50,11 @@ export class RunFinalizationService extends Context.Service<
       readonly runId: RunId;
       readonly scopeId: CheckpointScopeId;
     }) => Effect.Effect<void, RunFinalizationError>;
+    readonly settleWithoutCheckpoint: (input: {
+      readonly threadId: ThreadId;
+      readonly runId: RunId;
+      readonly scopeId: CheckpointScopeId;
+    }) => Effect.Effect<void, RunFinalizationError>;
   }
 >()("t3/orchestration-v2/RunFinalizationService") {}
 
@@ -59,16 +64,11 @@ const make = Effect.gen(function* () {
   const observer = yield* RunFinalizationObserver;
   const refreshes = yield* FiberSet.make<void>();
 
-  const finalize: RunFinalizationService["Service"]["finalize"] = Effect.fn(
-    "RunFinalizationService.finalize",
-  )(function* (input) {
-    yield* checkpointCapture
-      .execute(input)
-      .pipe(
-        Effect.mapError(
-          (cause) => new RunFinalizationError({ ...input, operation: "capture-checkpoint", cause }),
-        ),
-      );
+  const refreshWorkspace = Effect.fn("RunFinalizationService.refreshWorkspace")(function* (input: {
+    readonly threadId: ThreadId;
+    readonly runId: RunId;
+    readonly scopeId: CheckpointScopeId;
+  }) {
     const projection = yield* projections
       .getCheckpointContext(input.threadId)
       .pipe(
@@ -92,7 +92,34 @@ const make = Effect.gen(function* () {
       );
     }
   });
-  return RunFinalizationService.of({ finalize });
+
+  const finalize: RunFinalizationService["Service"]["finalize"] = Effect.fn(
+    "RunFinalizationService.finalize",
+  )(function* (input) {
+    yield* checkpointCapture
+      .execute(input)
+      .pipe(
+        Effect.mapError(
+          (cause) => new RunFinalizationError({ ...input, operation: "capture-checkpoint", cause }),
+        ),
+      );
+    yield* refreshWorkspace(input);
+  });
+
+  const settleWithoutCheckpoint: RunFinalizationService["Service"]["settleWithoutCheckpoint"] =
+    Effect.fn("RunFinalizationService.settleWithoutCheckpoint")(function* (input) {
+      yield* checkpointCapture
+        .settleWithoutCheckpoint(input)
+        .pipe(
+          Effect.mapError(
+            (cause) =>
+              new RunFinalizationError({ ...input, operation: "capture-checkpoint", cause }),
+          ),
+        );
+      yield* refreshWorkspace(input);
+    });
+
+  return RunFinalizationService.of({ finalize, settleWithoutCheckpoint });
 });
 
 export const layer = Layer.effect(RunFinalizationService, make);

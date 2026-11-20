@@ -3,8 +3,11 @@ import {
   CheckpointId,
   CheckpointScopeId,
   CommandId,
+  EventId,
+  MessageId,
   NodeId,
   ProjectId,
+  ProviderDriverKind,
   ProviderInstanceId,
   ProviderSessionId,
   ProviderThreadId,
@@ -14,6 +17,7 @@ import {
   RuntimeRequestId,
   ThreadId,
   VcsProcessExitError,
+  type OrchestrationV2DomainEvent,
   type OrchestrationV2ThreadProjection,
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
@@ -30,10 +34,14 @@ import * as SqlError from "effect/sql/SqlError";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 
+import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import * as CheckpointCaptureService from "./CheckpointCaptureService.ts";
 import * as CheckpointRollbackService from "./CheckpointRollbackService.ts";
 import * as CheckpointService from "./CheckpointService.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
 import * as EffectWorker from "./EffectWorker.ts";
+import * as EventSink from "./EventSink.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as RunFinalizationService from "./RunFinalizationService.ts";
 import * as ProviderSessionManager from "./ProviderSessionManager.ts";
@@ -149,7 +157,10 @@ function layerExecutorFor(input: {
     ),
     Layer.succeed(
       RunFinalizationService.RunFinalizationService,
-      RunFinalizationService.RunFinalizationService.of({ finalize: () => Effect.void }),
+      RunFinalizationService.RunFinalizationService.of({
+        finalize: () => Effect.void,
+        settleWithoutCheckpoint: () => Effect.void,
+      }),
     ),
     Layer.succeed(
       CheckpointRollbackService.CheckpointRollbackServiceV2,
@@ -712,6 +723,296 @@ it.effect("settles a delegated child once its restart continuation fails for goo
       assert.deepEqual(yield* Ref.get(recovered), [threadId]);
     }).pipe(Effect.provide(layer));
   }),
+);
+
+it.effect(
+  "settles a waiting run and recovers delegated work once checkpoint.capture fails permanently",
+  () =>
+    Effect.gen(function* () {
+      const t0 = yield* DateTime.now;
+      const attemptCompletedAt = DateTime.add(t0, { seconds: 5 });
+      const scopeId = CheckpointScopeId.make("scope:effect-worker-capture-fail");
+      const rootNodeId = NodeId.make("node:effect-worker-capture-fail");
+      const projectId = ProjectId.make("project:effect-worker-capture-fail");
+      const providerInstanceId = ProviderInstanceId.make("codex");
+      const driver = ProviderDriverKind.make("codex");
+      const modelSelection = { instanceId: providerInstanceId, model: "gpt-5.4" } as const;
+      const recovered = yield* Ref.make<ReadonlyArray<ThreadId>>([]);
+
+      const layerStores = Layer.mergeAll(
+        ProjectionStore.layer.pipe(Layer.provideMerge(SqlitePersistence.layerMemory)),
+        SqlitePersistence.layerMemory,
+      );
+
+      yield* Effect.gen(function* () {
+        const projectionStore = yield* ProjectionStore.ProjectionStoreV2;
+        yield* Effect.forEach(
+          [
+            {
+              id: EventId.make("event:worker-capture-fail:thread"),
+              type: "thread.created" as const,
+              threadId,
+              occurredAt: t0,
+              payload: {
+                createdBy: "user" as const,
+                creationSource: "web" as const,
+                id: threadId,
+                projectId,
+                title: "Permanent capture failure",
+                providerInstanceId,
+                modelSelection,
+                runtimeMode: "full-access" as const,
+                interactionMode: "default" as const,
+                branch: null,
+                worktreePath: null,
+                activeProviderThreadId: null,
+                lineage: {
+                  parentThreadId: null,
+                  relationshipToParent: null,
+                  rootThreadId: threadId,
+                },
+                forkedFrom: null,
+                createdAt: t0,
+                updatedAt: t0,
+                archivedAt: null,
+                settledOverride: null,
+                settledAt: null,
+                lastVisitedAt: null,
+                deletedAt: null,
+              },
+            },
+            {
+              id: EventId.make("event:worker-capture-fail:provider-thread"),
+              type: "provider-thread.updated" as const,
+              threadId,
+              nodeId: rootNodeId,
+              driver,
+              providerInstanceId,
+              occurredAt: t0,
+              payload: {
+                id: providerThreadId,
+                driver,
+                providerInstanceId,
+                providerSessionId: null,
+                appThreadId: threadId,
+                ownerNodeId: rootNodeId,
+                nativeThreadRef: null,
+                nativeConversationHeadRef: null,
+                status: "idle" as const,
+                firstRunOrdinal: 1,
+                lastRunOrdinal: 1,
+                handoffIds: [],
+                forkedFrom: null,
+                createdAt: t0,
+                updatedAt: t0,
+              },
+            },
+            {
+              id: EventId.make("event:worker-capture-fail:attempt"),
+              type: "run-attempt.updated" as const,
+              threadId,
+              runId,
+              nodeId: rootNodeId,
+              providerInstanceId,
+              occurredAt: attemptCompletedAt,
+              payload: {
+                id: attemptId,
+                runId,
+                attemptOrdinal: 1,
+                rootNodeId,
+                providerInstanceId,
+                providerThreadId,
+                providerTurnId,
+                reason: "initial" as const,
+                status: "completed" as const,
+                startedAt: t0,
+                completedAt: attemptCompletedAt,
+              },
+            },
+            {
+              id: EventId.make("event:worker-capture-fail:run"),
+              type: "run.updated" as const,
+              threadId,
+              runId,
+              nodeId: rootNodeId,
+              providerInstanceId,
+              occurredAt: attemptCompletedAt,
+              payload: {
+                id: runId,
+                threadId,
+                ordinal: 1,
+                providerInstanceId,
+                modelSelection,
+                providerThreadId,
+                userMessageId: MessageId.make("message:worker-capture-fail"),
+                rootNodeId,
+                activeAttemptId: attemptId,
+                status: "waiting" as const,
+                requestedAt: t0,
+                startedAt: t0,
+                completedAt: null,
+                checkpointId: null,
+                contextHandoffId: null,
+              },
+            },
+            {
+              id: EventId.make("event:worker-capture-fail:node"),
+              type: "node.updated" as const,
+              threadId,
+              runId,
+              nodeId: rootNodeId,
+              providerInstanceId,
+              occurredAt: attemptCompletedAt,
+              payload: {
+                id: rootNodeId,
+                threadId,
+                runId,
+                parentNodeId: null,
+                rootNodeId,
+                kind: "root_turn" as const,
+                status: "waiting" as const,
+                countsForRun: true,
+                providerThreadId,
+                providerTurnId,
+                nativeItemRef: null,
+                runtimeRequestId: null,
+                checkpointScopeId: scopeId,
+                startedAt: t0,
+                completedAt: null,
+              },
+            },
+            {
+              id: EventId.make("event:worker-capture-fail:scope"),
+              type: "checkpoint-scope.created" as const,
+              threadId,
+              runId,
+              nodeId: rootNodeId,
+              occurredAt: t0,
+              payload: {
+                id: scopeId,
+                threadId,
+                runId,
+                nodeId: rootNodeId,
+                parentScopeId: null,
+                providerThreadId,
+                kind: "root_run" as const,
+                ordinalWithinParent: 0,
+                advancesAppRunCount: true,
+                cwd: "/repo",
+                createdAt: t0,
+              },
+            },
+          ] satisfies ReadonlyArray<OrchestrationV2DomainEvent>,
+          (event) => projectionStore.apply(event),
+        );
+
+        yield* TestClock.adjust("20 seconds");
+
+        const layerCheckpointCapture = CheckpointCaptureService.layer.pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              IdAllocator.layer,
+              Layer.mock(CheckpointService.CheckpointServiceV2)({
+                materializeBaselineCheckpoint: () =>
+                  Effect.fail(
+                    new CheckpointService.CheckpointBaselineCaptureError({
+                      scopeId,
+                      ordinalWithinScope: 0,
+                      cause: "simulated git baseline failure",
+                    }),
+                  ),
+                capture: () =>
+                  Effect.fail(
+                    new CheckpointService.CheckpointCaptureError({
+                      scopeId,
+                      cause: "simulated git capture failure",
+                    }),
+                  ),
+              }),
+              Layer.mock(EventSink.EventSinkV2)({
+                commitCommand: (input) =>
+                  Effect.forEach(input.events, (event) => projectionStore.apply(event)).pipe(
+                    Effect.as({ committed: true } as never),
+                    Effect.orDie,
+                  ),
+              }),
+            ),
+          ),
+        );
+        const layerRunFinalization = RunFinalizationService.layer.pipe(
+          Layer.provide(Layer.mergeAll(layerCheckpointCapture)),
+        );
+        const layerExecutor = EffectWorker.layerExecutor.pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              layerRunFinalization,
+              Layer.mock(ProviderSessionManager.ProviderSessionManagerV2)({}),
+              Layer.mock(ProviderTurnControlService.ProviderTurnControlServiceV2)({}),
+              Layer.mock(ProviderTurnStartService.ProviderTurnStartServiceV2)({}),
+              Layer.mock(CheckpointRollbackService.CheckpointRollbackServiceV2)({}),
+              Layer.mock(RuntimeRequestService.RuntimeRequestServiceV2)({}),
+              Layer.mock(ThreadTitleRegenerationService.ThreadTitleRegenerationService)({}),
+              Layer.mock(ThreadManagementService.ThreadManagementService)({
+                recoverDelegatedTask: (targetThreadId) =>
+                  Ref.update(recovered, (ids) => [...ids, targetThreadId]),
+              }),
+              ServerSettings.layerTest(),
+            ),
+          ),
+        );
+
+        const timestamp = DateTime.formatIso(t0);
+        const effect: EffectOutbox.OrchestrationEffectV2 = {
+          id: `effect:checkpoint.capture:${runId}`,
+          commandId: CommandId.make(`command:effect:checkpoint.capture:${runId}`),
+          threadId,
+          request: { type: "checkpoint.capture", runId, scopeId },
+          status: "running",
+          attemptCount: 1,
+          availableAt: timestamp,
+          leaseOwner: "test-worker",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          completedAt: null,
+          lastError: null,
+        };
+
+        yield* Effect.gen(function* () {
+          const executor = yield* EffectWorker.OrchestrationEffectExecutorV2;
+          assert.isTrue(
+            Exit.isFailure(yield* Effect.exit(executor.execute(effect, { willRetry: true }))),
+          );
+          assert.deepEqual(yield* Ref.get(recovered), []);
+          const whileRetrying = yield* projectionStore.getThreadRecords(threadId, [
+            "runs",
+            "nodes",
+          ]);
+          assert.equal(whileRetrying.runs[0]?.status, "waiting");
+          assert.equal(whileRetrying.nodes[0]?.status, "waiting");
+
+          assert.isTrue(
+            Exit.isFailure(yield* Effect.exit(executor.execute(effect, { willRetry: false }))),
+          );
+          assert.deepEqual(yield* Ref.get(recovered), [threadId]);
+          const afterFailure = yield* projectionStore.getThreadRecords(threadId, ["runs", "nodes"]);
+          assert.equal(afterFailure.runs[0]?.status, "completed");
+          assert.isNull(afterFailure.runs[0]?.checkpointId ?? null);
+          assert.equal(
+            afterFailure.runs[0]?.completedAt
+              ? DateTime.formatIso(afterFailure.runs[0].completedAt)
+              : null,
+            DateTime.formatIso(attemptCompletedAt),
+          );
+          assert.equal(afterFailure.nodes[0]?.status, "completed");
+          assert.equal(
+            afterFailure.nodes[0]?.completedAt
+              ? DateTime.formatIso(afterFailure.nodes[0].completedAt)
+              : null,
+            DateTime.formatIso(attemptCompletedAt),
+          );
+        }).pipe(Effect.provide(layerExecutor));
+      }).pipe(Effect.provide(layerStores));
+    }),
 );
 
 it.effect.each(["confirmed", "unconfirmed", "failed"] as const)(

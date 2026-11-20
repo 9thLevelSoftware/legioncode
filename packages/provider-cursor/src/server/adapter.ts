@@ -1397,7 +1397,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
           >;
           const outputText =
             cursorToolOutputText(toolCall) ||
-            active.streamedOutput.slice(-MAX_CURSOR_STREAMED_OUTPUT_CHARS);
+            (input.completed ? active.streamedOutput.slice(-MAX_CURSOR_STREAMED_OUTPUT_CHARS) : "");
           let turnItem: OrchestrationV2TurnItem;
           switch (toolCall.type) {
             case "shell":

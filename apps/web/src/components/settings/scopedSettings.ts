@@ -309,14 +309,17 @@ export function planScopedSettingsPatch(
         ...serverKeys.filter((key) => !isProjectScopedSettingKey(key)),
       ]
     : [];
+  const hasUnscopableKeys = unscopableKeys.length > 0;
   const clientPatch = Object.fromEntries(
-    refusesClientKeys ? [] : Object.entries(patch).filter(([key]) => clientKeys.includes(key)),
+    refusesClientKeys || hasUnscopableKeys
+      ? []
+      : Object.entries(patch).filter(([key]) => clientKeys.includes(key)),
   ) as ClientSettingsPatch;
   const serverWrites: ScopedServerWrite[] =
     serverKeys.length === 0
       ? []
       : isProjectScope
-        ? unscopableKeys.length > 0
+        ? hasUnscopableKeys
           ? []
           : projectOverrideWrites(scope, environments, (current, settings, projectId) => {
               // Override entries store whole objects; complete partial patches from each target's effective
@@ -399,22 +402,21 @@ export function planScopedSettingsPatch(
           : [];
   const hasClientWrite = Object.keys(clientPatch).length > 0;
   const hasWrite = hasClientWrite || serverWrites.length > 0;
-  const unavailableReason =
-    hasWrite || Object.keys(patch).length === 0
+  const unavailableReason = hasUnscopableKeys
+    ? m(msg("This setting is environment-wide and cannot be overridden by a project."))
+    : hasWrite || Object.keys(patch).length === 0
       ? null
       : scope.kind === "unavailable"
         ? scope.message
-        : unscopableKeys.length > 0
-          ? m(msg("This setting is environment-wide and cannot be overridden by a project."))
-          : isProjectScope
-            ? m(
-                msg(
-                  "Connect the selected checkouts, or update their environments, to save a project override.",
-                ),
-              )
-            : scope.kind === "environment"
-              ? m(msg("Connect {environment} to save this setting.", { environment: scope.label }))
-              : m(msg("Connect an environment to save this setting."));
+        : isProjectScope
+          ? m(
+              msg(
+                "Connect the selected checkouts, or update their environments, to save a project override.",
+              ),
+            )
+          : scope.kind === "environment"
+            ? m(msg("Connect {environment} to save this setting.", { environment: scope.label }))
+            : m(msg("Connect an environment to save this setting."));
   return { clientPatch, hasClientWrite, serverWrites, unavailableReason };
 }
 

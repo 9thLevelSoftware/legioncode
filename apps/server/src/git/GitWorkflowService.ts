@@ -1,9 +1,13 @@
+import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as FileSystem from "effect/FileSystem";
 
 import {
+  CommandId,
   GitManagerError,
   GitCommandError,
   type VcsSwitchRefInput,
@@ -30,6 +34,12 @@ import {
 } from "@t3tools/contracts";
 
 import * as GitManager from "./GitManager.ts";
+import { linkCreatedPullRequest } from "./linkCreatedPullRequest.ts";
+import { refreshPushedPullRequests } from "./refreshPushedPullRequests.ts";
+import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
+import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
+import * as ProjectService from "../project/ProjectService.ts";
+import * as PullRequestService from "../pullRequest/PullRequestService.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as VcsDriverRegistry from "../vcs/VcsDriverRegistry.ts";
 import { withWorkspaceLease } from "../workspace/workspaceLease.ts";
@@ -287,6 +297,8 @@ export const make = Effect.gen(function* () {
     (input: Input) =>
       ensureGit(operation, input.cwd).pipe(Effect.andThen(run(input)));
 
+  let fallbackLinkSequence = 0;
+
   return GitWorkflowService.of({
     repositoryRoot: Effect.fn("GitWorkflowService.repositoryRoot")(function (cwd) {
       return registry.detect({ cwd }).pipe(
@@ -418,14 +430,98 @@ export const make = Effect.gen(function* () {
         Effect.andThen(git.pullCurrentBranch(cwd)),
       );
     }),
-    runStackedAction: Effect.fn("GitWorkflowService.runStackedAction")(function (input, options) {
-      return ensureGit("GitWorkflowService.runStackedAction", input.cwd).pipe(
-        Effect.flatMap((handle) =>
-          withCheckoutLease(
-            handle.repository.rootPath,
-            gitManager.runStackedAction(input, options),
+    runStackedAction: Effect.fn("GitWorkflowService.runStackedAction")(function* (input, options) {
+      const handle = yield* ensureGit("GitWorkflowService.runStackedAction", input.cwd);
+      const [orchestrator, projects, projectStore, pullRequests, random] = yield* Effect.all([
+        Effect.serviceOption(Orchestrator.OrchestratorV2),
+        Effect.serviceOption(ProjectService.ProjectService),
+        Effect.serviceOption(ProjectStore.ProjectStoreV2),
+        Effect.serviceOption(PullRequestService.PullRequestService),
+        Effect.serviceOption(SecureRandom.SecureRandom),
+      ]);
+      const commandId = Option.isSome(random)
+        ? random.value.uuidV4().pipe(
+            Effect.orDie,
+            Effect.map((id) => CommandId.make(`server:pr-created-link:${id}`)),
+          )
+        : Effect.sync(() =>
+            CommandId.make(`server:pr-created-link:${input.actionId}:${++fallbackLinkSequence}`),
+          );
+      const linkCreated = (result: GitRunStackedActionResult) =>
+        input.threadId === undefined || Option.isNone(orchestrator) || Option.isNone(projects)
+          ? Effect.void
+          : linkCreatedPullRequest({
+              threadId: input.threadId,
+              result,
+              commandId,
+            }).pipe(
+              Effect.provideService(Orchestrator.OrchestratorV2, orchestrator.value),
+              Effect.provideService(ProjectService.ProjectService, projects.value),
+            );
+      const refreshPushed = (push: GitRunStackedActionResult["push"]) => {
+        if (push.status !== "pushed" || Option.isNone(pullRequests)) return Effect.void;
+        if (input.threadId !== undefined && Option.isNone(orchestrator)) return Effect.void;
+        if (
+          input.threadId === undefined &&
+          input.projectId === undefined &&
+          Option.isNone(projectStore)
+        ) {
+          return Effect.void;
+        }
+        return refreshPushedPullRequests(input, { push }).pipe(
+          Effect.provideService(PullRequestService.PullRequestService, pullRequests.value),
+          Effect.provideService(
+            Orchestrator.OrchestratorV2,
+            Option.getOrElse(
+              orchestrator,
+              () =>
+                ({
+                  getThreadShell: () => Effect.succeed(null),
+                }) as unknown as Orchestrator.OrchestratorV2["Service"],
+            ),
           ),
-        ),
+          Effect.provideService(
+            ProjectStore.ProjectStoreV2,
+            Option.getOrElse(
+              projectStore,
+              () =>
+                ({
+                  listShells: () => Effect.succeed([]),
+                }) as unknown as ProjectStore.ProjectStoreV2["Service"],
+            ),
+          ),
+        );
+      };
+      const pushedRef = { current: false };
+      const wrappedOptions: GitManager.GitRunStackedActionOptions = {
+        ...options,
+        onPushSucceeded: () =>
+          Effect.sync(() => {
+            pushedRef.current = true;
+          }).pipe(Effect.andThen(options?.onPushSucceeded?.() ?? Effect.void)),
+      };
+      return yield* withCheckoutLease(
+        handle.repository.rootPath,
+        gitManager.runStackedAction(input, wrappedOptions),
+      ).pipe(
+        Effect.matchCauseEffect({
+          onFailure: (cause) =>
+            (pushedRef.current && !Cause.hasInterruptsOnly(cause)
+              ? refreshPushed({ status: "pushed" })
+              : Effect.void
+            ).pipe(Effect.andThen(Effect.failCause(cause))),
+          onSuccess: (result) =>
+            linkCreated(result).pipe(
+              Effect.andThen(
+                refreshPushed(
+                  pushedRef.current && result.push.status !== "pushed"
+                    ? { status: "pushed" }
+                    : result.push,
+                ),
+              ),
+              Effect.as(result),
+            ),
+        }),
       );
     }),
     resolvePullRequest: routeGitManager(

@@ -546,6 +546,35 @@ it.each([
       );
     });
     expect(importContextFragment).toHaveBeenCalledTimes(imports);
+    if (literalText) {
+      expect(serializeEditorDoc(editor.state.doc).value).toBe(
+        formatComposerContextReference(record),
+      );
+    }
+  },
+);
+
+it.each([false, true])(
+  "pastes text/plain instead of falling back to HTML when clipboard also includes files (literalText=%s)",
+  async (literalText) => {
+    await using screen = await render(
+      <Composer value="" richTextEnabled={!literalText} skills={[]} literalText={literalText} />,
+    );
+    const editor = editorIn(screen.container);
+    await act(async () => {
+      const clipboardData = new DataTransfer();
+      clipboardData.items.add(
+        new File([new Uint8Array([1, 2, 3])], "word.png", { type: "image/png" }),
+      );
+      clipboardData.setData("text/plain", "Hello **from** Word\nsecond line");
+      clipboardData.setData("text/html", "<p><strong>Rich</strong> <em>HTML</em></p>");
+      editor.view.dom.dispatchEvent(
+        new ClipboardEvent("paste", { clipboardData, cancelable: true }),
+      );
+    });
+    expect(serializeEditorDoc(editor.state.doc).value).toBe("Hello **from** Word\nsecond line");
+    expect(textWithMark(editor, "bold")).toEqual(literalText ? [] : ["from"]);
+    expect(textWithMark(editor, "italic")).toEqual([]);
   },
 );
 

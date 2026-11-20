@@ -22,12 +22,14 @@ import {
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Statement from "effect/sql/Statement";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import { ClaudeProviderCapabilitiesV2 } from "./Adapters/ClaudeAdapterV2.ts";
+import * as EffectOutbox from "./EffectOutbox.ts";
 import * as EffectWorker from "./EffectWorker.ts";
 import * as EventSink from "./EventSink.ts";
 import * as Orchestrator from "./Orchestrator.ts";
@@ -1331,6 +1333,7 @@ it.effect(
     Effect.gen(function* () {
       const orchestrator = yield* Orchestrator.OrchestratorV2;
       const eventSink = yield* EventSink.EventSinkV2;
+      const effectOutbox = yield* EffectOutbox.EffectOutboxV2;
       const { driver, instanceId } = forkCases[0]!;
       const parentId = ThreadId.make("side-chat-archive-parent");
       const busy = ThreadId.make("side-chat-archive-busy");
@@ -1449,11 +1452,29 @@ it.effect(
       assert.isNull(yield* archivedAt(parentId));
       yield* TestClock.adjust("1 second");
 
+      const busyTurnEffectId = "effect:side-chat-archive-busy-turn-start";
+      yield* effectOutbox.enqueue([
+        {
+          id: busyTurnEffectId,
+          commandId: CommandId.make("side-chat-archive-busy-turn-cmd"),
+          threadId: busy,
+          request: {
+            type: "provider-turn.start",
+            runId: runningRunId,
+          },
+        },
+      ]);
+
       yield* archive("side-chat-archive-parent", parentId);
       assert.isNotNull(yield* archivedAt(parentId));
       const archivedBusy = yield* orchestrator.getThreadProjection(busy);
       assert.isNotNull(archivedBusy.thread.archivedAt);
+      assert.equal(archivedBusy.runs.find((run) => run.id === runningRunId)?.status, "cancelled");
       assert.equal(archivedBusy.runs.find((run) => run.id === queuedRunId)?.status, "cancelled");
+      assert.equal(
+        Option.getOrNull(Option.map(yield* effectOutbox.get(busyTurnEffectId), (e) => e.status)),
+        "cancelled",
+      );
       assert.isEmpty(archivedBusy.providerSessions);
       assert.deepEqual(yield* archivedAt(archivedFirst), childArchivedAt);
       // Archive refuses a thread still waiting on delegated tasks, so the cascade leaves it active.

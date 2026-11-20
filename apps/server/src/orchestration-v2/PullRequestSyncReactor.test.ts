@@ -1,6 +1,11 @@
 import * as NodeV8 from "node:v8";
 
+import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts/settings";
 import { SourceControlProviderKind } from "@t3tools/contracts";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
+import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as KeyValueStore from "effect/persistence/KeyValueStore";
+import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";
 import {
   EventId,
@@ -39,10 +44,22 @@ import * as Ref from "effect/Ref";
 import { ChildProcessSpawner } from "effect/process";
 import { TestClock } from "effect/testing";
 
+import { fakePullRequestProvider } from "@t3tools/source-control-testing/fakeSourceControlDriver";
+import * as SourceControlRateLimit from "@t3tools/source-control-core/server/SourceControlRateLimit";
+import type { SourceControlProvider } from "@t3tools/source-control-core/server/SourceControlProvider";
+
 import * as GitManager from "../git/GitManager.ts";
 import * as ProcessRunner from "../processRunner.ts";
+import * as SqlitePersistence from "../persistence/Sqlite.ts";
+import * as PullRequestFilesViewed from "../persistence/PullRequestFilesViewed.ts";
+import * as PullRequestProviderRegistry from "../pullRequest/PullRequestProviderRegistry.ts";
+import * as PullRequestReadCache from "../pullRequest/PullRequestReadCache.ts";
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
+import * as ProjectService from "../project/ProjectService.ts";
+import * as RepositoryIdentityResolver from "../project/RepositoryIdentityResolver.ts";
 import * as ServerActivation from "../serverActivation.ts";
+import * as ServerSettingsService from "../serverSettings.ts";
+import * as SourceControlProviderRegistry from "../sourceControl/SourceControlProviderRegistry.ts";
 import * as VcsProcess from "../vcs/VcsProcess.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
@@ -1135,6 +1152,205 @@ describe("PullRequestSyncReactor", () => {
         );
       }).pipe(Effect.provide(fixture.layer));
     }),
+  );
+
+  it.effect(
+    "syncs a pull request closed >= 24h via PullRequestService.runAction and explicit invalidate without looping",
+    () =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(Date.parse(NOW));
+        const activation = yield* Deferred.make<void>();
+        const snapshotReads = yield* Queue.unbounded<void>();
+        const syncCommands = yield* Ref.make<ReadonlyArray<SyncCommand>>([]);
+        const summaryCalls = yield* Ref.make<ReadonlyArray<number>>([]);
+        const prStates = new Map<number, PullRequestSummary["state"]>([
+          [1, "closed"],
+          [2, "closed"],
+        ]);
+        const projectShell: OrchestrationProjectShell = {
+          ...makeProject(PROJECT_ID),
+          repositoryIdentity: {
+            canonicalKey: "github.com/owner/repository",
+            locator: {
+              source: "git-remote",
+              remoteName: "origin",
+              remoteUrl: "https://github.com/owner/repository.git",
+            },
+            provider: SourceControlProviderKind.make("github"),
+            displayName: "owner/repository",
+          },
+        };
+        const thread = makeThread("closed-final", {
+          pullRequests: [
+            makeLink(1, { state: "closed", closedAt: "2026-08-20T00:00:00.000Z" }),
+            makeLink(2, { state: "closed", closedAt: "2026-08-20T00:00:00.000Z" }),
+          ],
+        });
+        const snapshots = yield* Ref.make(makeSnapshot([thread]));
+        const provider = fakePullRequestProvider(SourceControlProviderKind.make("github"), {
+          capabilities: {
+            diff: true,
+            comment: true,
+            actions: ["merge", "reopen"],
+            mergeMethods: ["merge"],
+            search: true,
+            reactions: true,
+            review: { inlineComment: true, reply: true, resolve: true, verdicts: ["comment"] },
+            reviewers: { request: true, listCandidates: true },
+          },
+          getViewerPermissions: () =>
+            Effect.succeed({
+              actions: ["merge", "reopen"],
+              comment: true,
+              resolve: true,
+              verdicts: ["comment"],
+              requestReviewers: true,
+            }),
+          runAction: (input) =>
+            Effect.sync(() => {
+              if (input.action === "merge") prStates.set(input.number, "merged");
+            }),
+          getChangeRequestSummary: (input) =>
+            Ref.update(summaryCalls, (calls) => [...calls, input.number]).pipe(
+              Effect.as({
+                number: input.number,
+                title: "Pull request",
+                url: `https://github.com/owner/repository/pull/${input.number}`,
+                author: { login: "octocat", name: null, avatarUrl: null },
+                headBranch: "feature",
+                baseBranch: "main",
+                state: prStates.get(input.number) ?? "closed",
+                isDraft: false,
+                mergeability: "mergeable",
+                additions: 1,
+                deletions: 0,
+                createdAt: "2026-08-10T00:00:00.000Z",
+                updatedAt: "2026-08-27T00:00:00.000Z",
+                closedAt:
+                  prStates.get(input.number) === "closed" ? "2026-08-20T00:00:00.000Z" : null,
+                mergedAt: prStates.get(input.number) === "merged" ? NOW : null,
+                reviewRequestLogins: [],
+                labels: [],
+              }),
+            ),
+        });
+        const prServiceLayer = PullRequestService.layer.pipe(
+          Layer.provide(
+            Layer.mergeAll(
+              Layer.mock(ServerSettingsService.ServerSettingsService)({
+                getSettings: Effect.succeed(DEFAULT_SERVER_SETTINGS),
+              }),
+              Layer.succeed(
+                PullRequestProviderRegistry.PullRequestProviderRegistry,
+                PullRequestProviderRegistry.fromProviders([provider]),
+              ),
+              Layer.mock(SourceControlProviderRegistry.SourceControlProviderRegistry)({
+                resolveLink: () => undefined,
+                resolveHandle: () => Effect.die("Unexpected provider refinement"),
+                get: () => Effect.succeed({} as SourceControlProvider["Service"]),
+              }),
+              Layer.mock(ProjectService.ProjectService)({
+                listShells: () => Effect.succeed([projectShell]),
+                getShell: (id) =>
+                  Effect.succeed(id === PROJECT_ID ? Option.some(projectShell) : Option.none()),
+              }),
+              Layer.mock(RepositoryIdentityResolver.RepositoryIdentityResolver)({
+                resolve: () => Effect.succeed(null),
+              }),
+              SourceControlRateLimit.layer,
+              PullRequestFilesViewed.layer.pipe(Layer.provide(SqlitePersistence.layerMemory)),
+              Layer.effect(
+                PullRequestReadCache.PullRequestReadCache,
+                PullRequestReadCache.make,
+              ).pipe(
+                Layer.provide(KeyValueStore.layerMemory),
+                Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
+              ),
+            ),
+          ),
+        );
+        const testLayer = Layer.provideMerge(
+          PullRequestSyncReactor.layer,
+          Layer.mergeAll(
+            prServiceLayer,
+            Layer.mock(GitManager.GitManager)({
+              subscribePullRequestStateChanges: Effect.succeed(Stream.empty),
+            }),
+            Layer.mock(ProjectionStore.ProjectionStoreV2)({
+              getThreadsWithPullRequests: () =>
+                Queue.offer(snapshotReads, undefined).pipe(
+                  Effect.andThen(Ref.get(snapshots)),
+                  Effect.map((snapshot) =>
+                    snapshot.threads.map((entry) => ({
+                      id: entry.id,
+                      projectId: entry.projectId,
+                      lineage: {
+                        parentThreadId: null,
+                        relationshipToParent: null,
+                        rootThreadId: entry.id,
+                      },
+                      settledOverride: entry.settledOverride,
+                      settledAt: null,
+                      pullRequests: entry.pullRequests,
+                    })),
+                  ),
+                ),
+            }),
+            Layer.mock(Orchestrator.OrchestratorV2)({
+              dispatch: (command) =>
+                command.type === "thread.pull-request-link.sync"
+                  ? Ref.update(syncCommands, (recorded) => [...recorded, command]).pipe(
+                      Effect.as({ sequence: 1, storedEvents: [] }),
+                    )
+                  : Effect.die(new Error(`Unexpected command: ${command.type}`)),
+              streamDomainEvents: Stream.empty,
+            }),
+            Layer.succeed(ServerActivation.ServerActivation, Deferred.await(activation)),
+            Layer.succeed(SecureRandom.SecureRandom, testCrypto),
+          ),
+        );
+
+        yield* Effect.gen(function* () {
+          const reactor = yield* PullRequestSyncReactor.PullRequestSyncReactor;
+          const pullRequests = yield* PullRequestService.PullRequestService;
+          yield* reactor.start();
+          yield* Deferred.succeed(activation, undefined);
+          yield* Queue.take(snapshotReads);
+          yield* reactor.drain;
+          assert.deepStrictEqual(yield* Ref.get(summaryCalls), []);
+
+          yield* pullRequests.runAction({
+            projectId: PROJECT_ID,
+            repository: "owner/repository",
+            number: 1,
+            action: "merge",
+          });
+          yield* Queue.take(snapshotReads);
+          yield* reactor.drain;
+
+          prStates.set(2, "open");
+          yield* pullRequests.invalidate(
+            {
+              reference: { projectId: PROJECT_ID, repository: "owner/repository", number: 2 },
+            },
+            { notifyReaders: true, syncLinkedThreads: true },
+          );
+          yield* Queue.take(snapshotReads);
+          yield* reactor.drain;
+
+          assert.deepStrictEqual(
+            (yield* Ref.get(syncCommands)).map((command) => [
+              command.number,
+              command.snapshot.state,
+            ]),
+            [
+              [1, "merged"],
+              [2, "open"],
+            ],
+          );
+          assert.deepStrictEqual(yield* Ref.get(summaryCalls), [1, 1, 2]);
+        }).pipe(Effect.provide(testLayer));
+      }),
   );
 
   it.effect.each([true, false])(

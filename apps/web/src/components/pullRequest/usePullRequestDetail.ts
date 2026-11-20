@@ -167,6 +167,7 @@ export function usePullRequestDetail(
             ? coreDetail.viewerPermissions
             : {
                 ...coreDetail.viewerPermissions,
+                stackRebase: false,
                 actions: [],
                 comment: false,
                 resolve: false,

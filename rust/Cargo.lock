@@ -3162,6 +3162,7 @@ dependencies = [
  "t3-persistence",
  "t3-process-ffi",
  "t3-shared",
+ "t3-speech",
  "t3-surfaces",
  "tao",
  "thiserror 2.0.21",

@@ -7,10 +7,6 @@ use t3_protocol::provider_env::SanitizedEnv;
 
 use super::{ProviderLaunchSpec, ProviderProbeSpec, build_child_env};
 
-/// Minimum supported `OpenCode` server version.
-pub const MINIMUM_OPENCODE_VERSION: &str = "1.14.19";
-/// Minimum supported Pi CLI version.
-pub const MINIMUM_PI_VERSION: &str = "0.84.3";
 /// Supported Muse Server Protocol (MSP) schema version.
 pub const MUSE_PROTOCOL_VERSION: u32 = 1;
 

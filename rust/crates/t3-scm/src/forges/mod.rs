@@ -5,11 +5,13 @@
 //! safety guards, and response normalizers producing `t3-contracts` types.
 
 pub mod azure_devops;
+pub mod azure_devops_auth;
 pub mod bitbucket;
 pub mod cursor_origin;
 pub mod forgejo;
 pub mod gitcafe;
 pub mod github;
+pub mod github_graphql;
 pub mod gitlab;
 pub mod linear;
 

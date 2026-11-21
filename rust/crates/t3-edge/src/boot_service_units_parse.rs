@@ -1,5 +1,7 @@
 //! Byte decoding and field extraction for systemd, launchd, and Windows Task Scheduler units.
 
+use t3_contracts::brand::{ACTIVE_BRAND, BrandConfig};
+
 fn unquote_systemd_value(raw: &str) -> String {
     let unquoted = if raw.len() >= 2 && raw.starts_with('"') && raw.ends_with('"') {
         raw[1..raw.len() - 1]
@@ -96,11 +98,21 @@ pub fn extract_service_unit_environment_value(contents: &str, name: &str) -> Opt
     extract_plist_string_for_key(contents, name)
 }
 
-/// Extracts the served `T3CODE_HOME` / `--base-dir` from a systemd unit, launchd plist, or
-/// Windows Task Scheduler XML (`serviceProtocol.ts:72-77`).
+/// Extracts the served `<BRAND>_HOME` / `--base-dir` from a systemd unit, launchd plist, or
+/// Windows Task Scheduler XML using [`ACTIVE_BRAND`] (`serviceProtocol.ts:72-77`).
 pub fn extract_service_unit_base_dir(contents: &str) -> Option<String> {
-    if let Some(unix) = extract_service_unit_environment_value(contents, "T3CODE_HOME") {
-        return Some(unix);
+    extract_service_unit_base_dir_for_brand(contents, &ACTIVE_BRAND)
+}
+
+/// Extracts the served `<BRAND>_HOME` / `--base-dir` parameterized by `brand` (`serviceProtocol.ts:72-77`).
+pub fn extract_service_unit_base_dir_for_brand(
+    contents: &str,
+    brand: &BrandConfig,
+) -> Option<String> {
+    for env_name in brand.env_var_candidates("HOME") {
+        if let Some(unix) = extract_service_unit_environment_value(contents, &env_name) {
+            return Some(unix);
+        }
     }
     let args = extract_task_arguments(contents)?;
     let flag = " \"--base-dir\" \"";

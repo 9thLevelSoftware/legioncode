@@ -1,8 +1,10 @@
 //! OS-specific unit, plist, and Task Scheduler XML renderers (`bootService.ts:72-272`).
 
+use t3_contracts::brand::{ACTIVE_BRAND, BrandConfig};
+
 use crate::boot_service_units::{
-    BOOT_SERVICE_LAUNCHD_LABEL, BOOT_SERVICE_PLIST_FILE, BOOT_SERVICE_TASK_FILE,
-    BOOT_SERVICE_UNIT_FILE, BootServicePlan, BootServiceRenderError, SERVICE_UNIT_ENV,
+    BootServicePlan, BootServiceRenderError, launchd_plist_file_for_brand,
+    service_unit_env_for_brand, windows_task_file_for_brand,
 };
 
 fn escape_systemd_specifiers(value: &str) -> String {
@@ -46,15 +48,26 @@ fn quote_windows_argument(value: &str) -> String {
     out
 }
 
-/// Renders a Linux `systemd` user unit matching `renderBootServiceUnit` in `bootService.ts:102-147`.
+/// Renders a Linux `systemd` user unit using [`ACTIVE_BRAND`] (`renderBootServiceUnit`).
 pub fn render_boot_service_systemd_unit(
     plan: &BootServicePlan,
+) -> Result<String, BootServiceRenderError> {
+    render_boot_service_systemd_unit_for_brand(plan, &ACTIVE_BRAND)
+}
+
+/// Renders a Linux `systemd` user unit parameterized by `brand` (`renderBootServiceUnit` in `bootService.ts:102-147`).
+pub fn render_boot_service_systemd_unit_for_brand(
+    plan: &BootServicePlan,
+    brand: &BrandConfig,
 ) -> Result<String, BootServiceRenderError> {
     if is_systemd_unsafe_executable(plan) {
         return Err(BootServiceRenderError::UnsupportedBaseDir {
             base_dir: plan.base_dir.clone(),
         });
     }
+    let home_env = format!("{}HOME", brand.primary_env_prefix);
+    let install_bin_env = format!("{}INSTALL_BIN_DIR", brand.primary_env_prefix);
+    let unit_env = service_unit_env_for_brand(brand);
     let exec_args: Vec<String> = plan
         .program
         .iter()
@@ -62,7 +75,7 @@ pub fn render_boot_service_systemd_unit(
         .collect();
     let mut lines = vec![
         "[Unit]".to_owned(),
-        "Description=T3 Code server".to_owned(),
+        format!("Description={} server", brand.product_name),
         "StartLimitIntervalSec=300".to_owned(),
         "StartLimitBurst=5".to_owned(),
         String::new(),
@@ -70,18 +83,18 @@ pub fn render_boot_service_systemd_unit(
         "Type=simple".to_owned(),
         "WorkingDirectory=%h".to_owned(),
         format!(
-            "Environment=T3CODE_HOME={}",
+            "Environment={home_env}={}",
             quote_systemd_value(&plan.base_dir)
         ),
     ];
     if let Some(bin_dir) = plan.install_bin_dir.as_deref() {
         lines.push(format!(
-            "Environment=T3CODE_INSTALL_BIN_DIR={}",
+            "Environment={install_bin_env}={}",
             quote_systemd_value(bin_dir)
         ));
     }
     lines.extend([
-        format!("Environment={SERVICE_UNIT_ENV}={BOOT_SERVICE_UNIT_FILE}"),
+        format!("Environment={unit_env}={}", brand.systemd_unit_name),
         format!("ExecStart={}", exec_args.join(" ")),
         "KillMode=mixed".to_owned(),
         "OOMPolicy=continue".to_owned(),
@@ -108,19 +121,33 @@ pub fn render_boot_service_systemd_unit(
     Ok(lines.join("\n"))
 }
 
-/// Renders a macOS `launchd` user agent plist matching `renderBootServicePlist` in `bootService.ts:154-207`.
+/// Renders a macOS `launchd` user agent plist using [`ACTIVE_BRAND`] (`renderBootServicePlist`).
 pub fn render_boot_service_launchd_plist(
     plan: &BootServicePlan,
     home_dir: &str,
     environment_path: &str,
 ) -> String {
+    render_boot_service_launchd_plist_for_brand(plan, home_dir, environment_path, &ACTIVE_BRAND)
+}
+
+/// Renders a macOS `launchd` user agent plist parameterized by `brand` (`renderBootServicePlist` in `bootService.ts:154-207`).
+pub fn render_boot_service_launchd_plist_for_brand(
+    plan: &BootServicePlan,
+    home_dir: &str,
+    environment_path: &str,
+    brand: &BrandConfig,
+) -> String {
+    let home_env = format!("{}HOME", brand.primary_env_prefix);
+    let install_bin_env = format!("{}INSTALL_BIN_DIR", brand.primary_env_prefix);
+    let unit_env = service_unit_env_for_brand(brand);
+    let plist_file = launchd_plist_file_for_brand(brand);
     let mut lines = vec![
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>".to_owned(),
         "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">".to_owned(),
         "<plist version=\"1.0\">".to_owned(),
         "<dict>".to_owned(),
         "  <key>Label</key>".to_owned(),
-        format!("  <string>{BOOT_SERVICE_LAUNCHD_LABEL}</string>"),
+        format!("  <string>{}</string>", brand.launchd_label),
         "  <key>ProgramArguments</key>".to_owned(),
         "  <array>".to_owned(),
     ];
@@ -133,16 +160,16 @@ pub fn render_boot_service_launchd_plist(
         "  <dict>".to_owned(),
         "    <key>PATH</key>".to_owned(),
         format!("    <string>{}</string>", escape_xml_text(environment_path)),
-        "    <key>T3CODE_HOME</key>".to_owned(),
+        format!("    <key>{home_env}</key>"),
         format!("    <string>{}</string>", escape_xml_text(&plan.base_dir)),
     ]);
     if let Some(bin_dir) = plan.install_bin_dir.as_deref() {
-        lines.push("    <key>T3CODE_INSTALL_BIN_DIR</key>".to_owned());
+        lines.push(format!("    <key>{install_bin_env}</key>"));
         lines.push(format!("    <string>{}</string>", escape_xml_text(bin_dir)));
     }
     lines.extend([
-        format!("    <key>{SERVICE_UNIT_ENV}</key>"),
-        format!("    <string>{BOOT_SERVICE_PLIST_FILE}</string>"),
+        format!("    <key>{unit_env}</key>"),
+        format!("    <string>{plist_file}</string>"),
         "  </dict>".to_owned(),
         "  <key>WorkingDirectory</key>".to_owned(),
         format!("  <string>{}</string>", escape_xml_text(home_dir)),
@@ -167,13 +194,31 @@ pub fn render_boot_service_launchd_plist(
     lines.join("\n")
 }
 
-/// Renders a Windows Task Scheduler XML task definition matching `renderBootServiceTask` in `bootService.ts:214-272`.
+/// Renders a Windows Task Scheduler XML task definition using [`ACTIVE_BRAND`] (`renderBootServiceTask`).
 pub fn render_boot_service_windows_task_xml(
     plan: &BootServicePlan,
     user_id: &str,
     home_dir: &str,
     conhost_path: &str,
 ) -> String {
+    render_boot_service_windows_task_xml_for_brand(
+        plan,
+        user_id,
+        home_dir,
+        conhost_path,
+        &ACTIVE_BRAND,
+    )
+}
+
+/// Renders a Windows Task Scheduler XML task definition parameterized by `brand` (`renderBootServiceTask` in `bootService.ts:214-272`).
+pub fn render_boot_service_windows_task_xml_for_brand(
+    plan: &BootServicePlan,
+    user_id: &str,
+    home_dir: &str,
+    conhost_path: &str,
+    brand: &BrandConfig,
+) -> String {
+    let task_file = windows_task_file_for_brand(brand);
     let mut raw_args: Vec<&str> = plan.program.iter().map(String::as_str).collect();
     raw_args.extend([
         "--base-dir",
@@ -181,7 +226,7 @@ pub fn render_boot_service_windows_task_xml(
         "--log-file",
         &plan.log_path,
         "--service-unit",
-        BOOT_SERVICE_TASK_FILE,
+        &task_file,
     ]);
     let launcher_arguments: Vec<String> =
         raw_args.into_iter().map(quote_windows_argument).collect();
@@ -190,7 +235,10 @@ pub fn render_boot_service_windows_task_xml(
     [
         "<Task version=\"1.2\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">",
         "  <RegistrationInfo>",
-        "    <Description>T3 Code server</Description>",
+        &format!(
+            "    <Description>{} server</Description>",
+            escape_xml_text(brand.product_name)
+        ),
         "  </RegistrationInfo>",
         "  <Triggers>",
         "    <LogonTrigger>",

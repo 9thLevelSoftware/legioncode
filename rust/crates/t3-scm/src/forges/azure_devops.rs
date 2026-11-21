@@ -6,6 +6,11 @@ use t3_contracts::pull_requests::{
 };
 
 use crate::core::discovery::ParsedRemote;
+pub use crate::forges::azure_devops_auth::{
+    AzureAuthenticatedViewer, azure_pat_cli_env, build_azure_connection_data_cli_spec,
+    build_azure_connection_data_http_request, build_azure_project_list_cli_spec,
+    encode_azure_pat_basic_auth, verify_azure_connection_data,
+};
 use crate::forges::{CliCommandSpec, ForgeError, NormalizedPullRequest, json_str, json_u64};
 
 /// Resolved `Azure` CLI launcher details.

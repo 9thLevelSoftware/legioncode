@@ -2,11 +2,32 @@
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use t3_contracts::brand::{ACTIVE_BRAND, BrandConfig};
 
-use crate::boot_service_units::BOOT_SERVICE_UNIT_FILE;
+use crate::boot_service_units::protect_drop_in_for_brand;
+
+const fn str_eq(left: &str, right: &str) -> bool {
+    let a = left.as_bytes();
+    let b = right.as_bytes();
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut idx = 0;
+    while idx < a.len() {
+        if a[idx] != b[idx] {
+            return false;
+        }
+        idx += 1;
+    }
+    true
+}
 
 /// Drop-in configuration filename applied to cgroup slices and services (`serviceProtection.ts:12`).
-pub const PROTECT_DROP_IN: &str = "90-t3code-protect.conf";
+pub const PROTECT_DROP_IN: &str = if str_eq(ACTIVE_BRAND.url_scheme, "legioncode") {
+    "90-legioncode-protect.conf"
+} else {
+    "90-t3code-protect.conf"
+};
 
 /// Default host system systemd unit directory (`serviceProtection.ts:13`).
 pub const SYSTEM_UNIT_DIR: &str = "/etc/systemd/system";
@@ -64,6 +85,7 @@ fn build_drop_in(
     section: &str,
     properties: &[&str],
     shared: bool,
+    drop_in_file: &str,
 ) -> SystemdDropIn {
     let mut contents = format!("[{section}]\n");
     for prop in properties {
@@ -72,32 +94,65 @@ fn build_drop_in(
     }
     SystemdDropIn {
         unit: unit.to_owned(),
-        path: format!("{directory}/{unit}.d/{PROTECT_DROP_IN}"),
+        path: format!("{directory}/{unit}.d/{drop_in_file}"),
         contents,
         shared,
     }
 }
 
-/// Builds a [`ServiceProtectionPlan`] matching `protectionPlan` in `serviceProtection.ts:60-96`.
+/// Builds a [`ServiceProtectionPlan`] using [`ACTIVE_BRAND`] (`protectionPlan`).
 pub fn build_service_protection_plan(
     uid: u32,
     user_unit_dir: &str,
     remote_access_units: &[&str],
     system_unit_dir: Option<&str>,
 ) -> ServiceProtectionPlan {
+    build_service_protection_plan_for_brand(
+        uid,
+        user_unit_dir,
+        remote_access_units,
+        system_unit_dir,
+        &ACTIVE_BRAND,
+    )
+}
+
+/// Builds a [`ServiceProtectionPlan`] parameterized by `brand` (`protectionPlan` in `serviceProtection.ts:60-96`).
+pub fn build_service_protection_plan_for_brand(
+    uid: u32,
+    user_unit_dir: &str,
+    remote_access_units: &[&str],
+    system_unit_dir: Option<&str>,
+    brand: &BrandConfig,
+) -> ServiceProtectionPlan {
+    let drop_in = protect_drop_in_for_brand(brand);
     let manager = format!("user@{uid}.service");
     let sys_dir = system_unit_dir.unwrap_or(SYSTEM_UNIT_DIR);
     let user_slice = format!("user-{uid}.slice");
 
     let mut system = vec![
-        build_drop_in(sys_dir, "user.slice", "Slice", &[USER_CHAIN_LOW], true),
-        build_drop_in(sys_dir, &user_slice, "Slice", &[USER_CHAIN_LOW], false),
+        build_drop_in(
+            sys_dir,
+            "user.slice",
+            "Slice",
+            &[USER_CHAIN_LOW],
+            true,
+            &drop_in,
+        ),
+        build_drop_in(
+            sys_dir,
+            &user_slice,
+            "Slice",
+            &[USER_CHAIN_LOW],
+            false,
+            &drop_in,
+        ),
         build_drop_in(
             sys_dir,
             &manager,
             "Service",
             &[USER_CHAIN_LOW, PROTECTED_OOM_SCORE],
             false,
+            &drop_in,
         ),
     ];
     if !remote_access_units.is_empty() {
@@ -107,6 +162,7 @@ pub fn build_service_protection_plan(
             "Slice",
             &["MemoryLow=512M"],
             true,
+            &drop_in,
         ));
         for unit in remote_access_units {
             system.push(build_drop_in(
@@ -115,6 +171,7 @@ pub fn build_service_protection_plan(
                 "Service",
                 &["MemoryLow=256M", PROTECTED_OOM_SCORE],
                 true,
+                &drop_in,
             ));
         }
     }
@@ -122,7 +179,7 @@ pub fn build_service_protection_plan(
     let config_root = user_unit_dir.strip_suffix("/user").unwrap_or(user_unit_dir);
     let manager_defaults = SystemdDropIn {
         unit: "user.conf".to_owned(),
-        path: format!("{config_root}/user.conf.d/{PROTECT_DROP_IN}"),
+        path: format!("{config_root}/user.conf.d/{drop_in}"),
         contents: "[Manager]\nDefaultOOMScoreAdjust=200\n".to_owned(),
         shared: false,
     };
@@ -134,6 +191,7 @@ pub fn build_service_protection_plan(
             "Slice",
             &["MemoryLow=1536M"],
             false,
+            &drop_in,
         ),
         build_drop_in(
             user_unit_dir,
@@ -141,13 +199,15 @@ pub fn build_service_protection_plan(
             "Scope",
             &["MemoryLow=256M"],
             false,
+            &drop_in,
         ),
         build_drop_in(
             user_unit_dir,
-            BOOT_SERVICE_UNIT_FILE,
+            brand.systemd_unit_name,
             "Service",
             &[PROTECTED_OOM_SCORE],
             false,
+            &drop_in,
         ),
     ];
 
@@ -175,11 +235,23 @@ fn directory_of(file: &str) -> &str {
 }
 
 /// Renders the POSIX shell script executed via `sudo` to apply or undo system drop-ins
-/// (`serviceProtection.ts:101-142`).
+/// using [`ACTIVE_BRAND`] (`serviceProtection.ts:101-142`).
 pub fn render_protection_privileged_script(
     plan: &ServiceProtectionPlan,
     mode: ProtectionMode,
 ) -> String {
+    render_protection_privileged_script_for_brand(plan, mode, &ACTIVE_BRAND)
+}
+
+/// Renders the POSIX shell script executed via `sudo` to apply or undo system drop-ins
+/// parameterized by `brand` (`serviceProtection.ts:101-142`).
+pub fn render_protection_privileged_script_for_brand(
+    plan: &ServiceProtectionPlan,
+    mode: ProtectionMode,
+    brand: &BrandConfig,
+) -> String {
+    let drop_in = protect_drop_in_for_brand(brand);
+    let heredoc_tag = format!("{}PROTECT", brand.primary_env_prefix);
     let mut lines = vec!["set -e".to_owned()];
     let push_remove = |lines: &mut Vec<String>, drop_ins: &[&SystemdDropIn], indent: &str| {
         for drop in drop_ins {
@@ -199,18 +271,18 @@ pub fn render_protection_privileged_script(
                     quote_shell(directory_of(&drop.path))
                 ));
                 lines.push(format!(
-                    "cat >{} <<'T3CODE_PROTECT'",
+                    "cat >{} <<'{heredoc_tag}'",
                     quote_shell(&drop.path)
                 ));
                 lines.push(drop.contents.trim_end().to_owned());
-                lines.push("T3CODE_PROTECT".to_owned());
+                lines.push(heredoc_tag.clone());
             }
         }
         ProtectionMode::Undo => {
             let owned: Vec<&SystemdDropIn> = plan.system.iter().filter(|d| !d.shared).collect();
             push_remove(&mut lines, &owned, "");
             let other_users = format!(
-                "{}/user@*.service.d/{PROTECT_DROP_IN}",
+                "{}/user@*.service.d/{drop_in}",
                 quote_shell(&plan.system_unit_dir)
             );
             lines.push(format!("set -- {other_users}"));

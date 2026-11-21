@@ -6,11 +6,9 @@ use std::process::Stdio;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
-use crate::checkpoints::diff_query::{
-    CheckpointDiffQuery, ComputedDiff, DiffFileInput, DiffQueryOptions,
-};
 use crate::core::discovery::{ParsedRemote, parse_git_remote_url};
 use crate::forges::CliCommandSpec;
+pub use crate::live_git_perf::compute_live_git_diff;
 use crate::live_http::LiveClientError;
 
 const SAFE_BASE_ENV_KEYS: &[&str] = &[
@@ -108,125 +106,14 @@ pub async fn discover_workspace_remote(
     Ok(parse_git_remote_url(out.stdout.trim())?)
 }
 
-/// Computes a unified diff against `base_ref` in a real `git` repository via [`CheckpointDiffQuery`].
-///
-/// Compares tracked changes (`git diff --no-renames -z --name-status <base_ref>`) and
-/// untracked non-ignored files (`git ls-files --others --exclude-standard -z`) against `base_ref`.
-pub async fn compute_live_git_diff(
-    repo_dir: &Path,
-    base_ref: &str,
-    opts: &DiffQueryOptions,
-    base_env: &[(String, String)],
-) -> Result<ComputedDiff, LiveClientError> {
-    let clean_ref = base_ref.trim();
-    if clean_ref.is_empty() || clean_ref.starts_with('-') || clean_ref.contains('\0') {
-        return Err(LiveClientError::InvalidInput(format!(
-            "unsafe git base_ref `{base_ref}`"
-        )));
-    }
-
-    let diff_raw = execute_git_checked(
-        repo_dir,
-        &["diff", "--no-renames", "-z", "--name-status", clean_ref],
-        base_env,
-    )
-    .await?;
-    let mut tracked_entries = parse_name_status_z(&diff_raw);
-
-    let untracked_raw = execute_git_checked(
-        repo_dir,
-        &["ls-files", "--others", "--exclude-standard", "-z"],
-        base_env,
-    )
-    .await?;
-    for slice in untracked_raw.split(|&b| b == 0) {
-        if !slice.is_empty()
-            && let Ok(path) = std::str::from_utf8(slice)
-            && !tracked_entries.iter().any(|(_, p)| p == path)
-        {
-            tracked_entries.push(('A', path.to_owned()));
-        }
-    }
-
-    tracked_entries.sort_by(|a, b| a.1.cmp(&b.1));
-
-    let mut buffers: Vec<OwnedDiffPair> = Vec::with_capacity(tracked_entries.len());
-    for (status, path) in tracked_entries {
-        let old_bytes = if status == 'A' {
-            Vec::new()
-        } else {
-            read_git_blob(repo_dir, clean_ref, &path, base_env).await?
-        };
-        let new_bytes = if status == 'D' {
-            Vec::new()
-        } else {
-            read_working_file_or_empty(&repo_dir.join(&path)).await?
-        };
-        buffers.push(OwnedDiffPair::from_bytes(path, old_bytes, new_bytes));
-    }
-
-    let inputs: Vec<DiffFileInput<'_>> = buffers.iter().map(OwnedDiffPair::as_input).collect();
-    Ok(CheckpointDiffQuery::compute_files(&inputs, *opts))
+pub(crate) struct RawProcessOutput {
+    pub status_code: Option<i32>,
+    pub success: bool,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
 }
 
-async fn read_working_file_or_empty(path: &Path) -> Result<Vec<u8>, LiveClientError> {
-    match tokio::fs::read(path).await {
-        Ok(bytes) => Ok(bytes),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
-        Err(err) => Err(LiveClientError::InvalidInput(format!(
-            "failed reading `{}`: {err}",
-            path.display()
-        ))),
-    }
-}
-
-struct OwnedDiffPair {
-    path: String,
-    old_text: String,
-    new_text: String,
-    is_binary: bool,
-}
-
-impl OwnedDiffPair {
-    fn as_input(&self) -> DiffFileInput<'_> {
-        DiffFileInput {
-            old_path: &self.path,
-            new_path: &self.path,
-            old_content: &self.old_text,
-            new_content: &self.new_text,
-            is_binary: self.is_binary,
-        }
-    }
-    fn from_bytes(path: String, old_bytes: Vec<u8>, new_bytes: Vec<u8>) -> Self {
-        match (String::from_utf8(old_bytes), String::from_utf8(new_bytes)) {
-            (Ok(old_text), Ok(new_text))
-                if !old_text.contains('\0') && !new_text.contains('\0') =>
-            {
-                Self {
-                    path,
-                    old_text,
-                    new_text,
-                    is_binary: false,
-                }
-            }
-            _ => Self {
-                path,
-                old_text: String::new(),
-                new_text: String::new(),
-                is_binary: true,
-            },
-        }
-    }
-}
-
-struct RawProcessOutput {
-    status_code: Option<i32>,
-    success: bool,
-    stdout: Vec<u8>,
-    stderr: Vec<u8>,
-}
-
-async fn execute_raw_bytes(
+pub(crate) async fn execute_raw_bytes(
     program: &str,
     args: &[String],
     base_env: &[(String, String)],
@@ -281,68 +168,9 @@ async fn execute_raw_bytes(
     })
 }
 
-fn cli_io_err(program: &str, err: &std::io::Error) -> LiveClientError {
+pub(crate) fn cli_io_err(program: &str, err: &std::io::Error) -> LiveClientError {
     LiveClientError::Cli {
         program: program.to_owned(),
         reason: err.to_string(),
     }
-}
-
-async fn execute_git_checked(
-    repo_dir: &Path,
-    args: &[&str],
-    base_env: &[(String, String)],
-) -> Result<Vec<u8>, LiveClientError> {
-    let owned: Vec<String> = args.iter().map(|s| (*s).to_owned()).collect();
-    let raw = execute_raw_bytes("git", &owned, base_env, &[], None, Some(repo_dir)).await?;
-    if !raw.success {
-        return Err(LiveClientError::CliExit {
-            program: "git".to_owned(),
-            code: raw.status_code,
-            stderr: String::from_utf8_lossy(&raw.stderr).trim().to_owned(),
-        });
-    }
-    Ok(raw.stdout)
-}
-
-async fn read_git_blob(
-    repo_dir: &Path,
-    base_ref: &str,
-    path: &str,
-    base_env: &[(String, String)],
-) -> Result<Vec<u8>, LiveClientError> {
-    let args = ["show".to_owned(), format!("{base_ref}:{path}")];
-    let raw = execute_raw_bytes("git", &args, base_env, &[], None, Some(repo_dir)).await?;
-    if raw.success {
-        return Ok(raw.stdout);
-    }
-    let stderr = String::from_utf8_lossy(&raw.stderr);
-    if stderr.contains("does not exist in") || stderr.contains("exists on disk, but not in") {
-        Ok(Vec::new())
-    } else {
-        Err(LiveClientError::CliExit {
-            program: "git".to_owned(),
-            code: raw.status_code,
-            stderr: stderr.trim().to_owned(),
-        })
-    }
-}
-
-fn parse_name_status_z(raw: &[u8]) -> Vec<(char, String)> {
-    let tokens: Vec<&[u8]> = raw.split(|&b| b == 0).collect();
-    let mut out = Vec::new();
-    let mut i = 0usize;
-    while i + 1 < tokens.len() {
-        let status_bytes = tokens[i];
-        let path_bytes = tokens[i + 1];
-        i += 2;
-        if status_bytes.is_empty() || path_bytes.is_empty() {
-            continue;
-        }
-        let status = char::from(status_bytes[0]);
-        if let Ok(path) = std::str::from_utf8(path_bytes) {
-            out.push((status, path.to_owned()));
-        }
-    }
-    out
 }

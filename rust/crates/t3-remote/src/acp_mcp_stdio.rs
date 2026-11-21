@@ -3,11 +3,20 @@
 use std::sync::Arc;
 
 use serde_json::{Value, json};
+use t3_contracts::brand::ACTIVE_BRAND;
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::Mutex;
 use tokio::task::JoinSet;
 
 use crate::acp_mcp_bridge::{McpBridgeError, McpHttpClient, strip_duplicate_structured_text};
+
+fn acp_cli_client_name() -> String {
+    let product_slug = ACTIVE_BRAND
+        .product_name
+        .to_ascii_lowercase()
+        .replace(' ', "-");
+    format!("{product_slug}-acp-cli")
+}
 
 /// Calls a single MCP tool (`acp-mcp-call`), normalizing duplicated `structuredContent` text and closing via `DELETE`.
 pub async fn call_mcp_tool(
@@ -25,7 +34,8 @@ pub async fn call_mcp_tool(
             detail: "acp-mcp-call arguments must be a JSON object.".to_owned(),
         });
     }
-    let client = McpHttpClient::connect(endpoint, authorization, "t3-code-acp-cli").await?;
+    let client_name = acp_cli_client_name();
+    let client = McpHttpClient::connect(endpoint, authorization, &client_name).await?;
     let outcome = client.call_tool(tool, &parsed).await;
     client.close().await;
     let mut result = outcome?;
@@ -116,7 +126,10 @@ async fn forward_line_task<W: AsyncWrite + Unpin>(
             if let Some(id) = envelope.get("id") {
                 let err_msg = match err {
                     McpBridgeError::HttpStatus { .. } => err.to_string(),
-                    other => format!("T3 Code MCP bridge request failed: {other}"),
+                    other => format!(
+                        "{} MCP bridge request failed: {other}",
+                        ACTIVE_BRAND.product_name
+                    ),
                 };
                 let _ = write_ndjson(
                     output,

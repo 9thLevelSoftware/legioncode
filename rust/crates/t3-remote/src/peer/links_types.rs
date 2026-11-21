@@ -3,6 +3,10 @@
 use serde::{Deserialize, Serialize};
 use t3_contracts::ids::EnvironmentId;
 use t3_contracts::orchestration::McpClientAccess;
+use t3_contracts::peer_links::{
+    PeerLinkError as ContractPeerLinkError, PeerLinkErrorReason as ContractPeerLinkErrorReason,
+    PeerLinkFailureKind, peer_link_failure_kind as contract_failure_kind,
+};
 use t3_persistence::auth_records::PeerLinkRecord;
 use thiserror::Error;
 
@@ -38,6 +42,8 @@ pub struct PeerLinkError {
     pub reason: PeerLinkErrorReason,
     /// Actionable user-facing message.
     pub message: String,
+    /// Display label/ID of the environment that unexpectedly answered instead (`#39426`).
+    pub answered_as: Option<String>,
 }
 
 impl PeerLinkError {
@@ -46,7 +52,39 @@ impl PeerLinkError {
         Self {
             reason,
             message: message.into(),
+            answered_as: None,
         }
+    }
+
+    /// Attaches the `answered_as` identity returned when another peer answered at this address.
+    #[must_use]
+    pub fn with_answered_as(mut self, answered_as: impl Into<String>) -> Self {
+        self.answered_as = Some(answered_as.into());
+        self
+    }
+
+    /// Maps into [`ContractPeerLinkError`] and classifies via `t3_contracts::peer_links`.
+    #[must_use]
+    pub fn failure_kind(&self) -> PeerLinkFailureKind {
+        let reason = match self.reason {
+            PeerLinkErrorReason::Unreachable => ContractPeerLinkErrorReason::Unreachable,
+            PeerLinkErrorReason::NotAT3Environment => {
+                ContractPeerLinkErrorReason::NotAT3Environment
+            }
+            PeerLinkErrorReason::Incompatible => ContractPeerLinkErrorReason::Incompatible,
+            PeerLinkErrorReason::SelfLink => ContractPeerLinkErrorReason::SelfLink,
+            PeerLinkErrorReason::PairingRejected => ContractPeerLinkErrorReason::PairingRejected,
+            PeerLinkErrorReason::Expired => ContractPeerLinkErrorReason::Expired,
+            PeerLinkErrorReason::UnknownLink => ContractPeerLinkErrorReason::UnknownLink,
+            PeerLinkErrorReason::Storage => ContractPeerLinkErrorReason::Storage,
+            PeerLinkErrorReason::Disabled => ContractPeerLinkErrorReason::Disabled,
+        };
+        let contract = ContractPeerLinkError {
+            reason,
+            message: self.message.clone(),
+            answered_as: self.answered_as.clone(),
+        };
+        contract_failure_kind(&contract)
     }
 }
 

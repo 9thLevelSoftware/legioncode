@@ -10,6 +10,8 @@ mod config;
 mod hosts;
 #[path = "ssh_known_hosts.rs"]
 mod known_hosts;
+#[path = "ssh_reconnect.rs"]
+mod reconnect;
 #[path = "ssh_state.rs"]
 mod state;
 #[path = "ssh_types.rs"]
@@ -20,9 +22,8 @@ use std::sync::OnceLock;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use t3_contracts::brand::ACTIVE_BRAND;
 use thiserror::Error;
-
-use crate::host_class::is_local_loopback_host;
 
 pub use args::{
     base_ssh_args, build_control_master_cancel_args, build_control_master_check_args,
@@ -33,6 +34,13 @@ pub use args::{
 pub use config::{ParsedConfigLine, parse_ssh_config_line};
 pub use hosts::{DiscoveredSshHost, SshHostSource, discover_ssh_hosts};
 pub use known_hosts::{KnownHost, parse_known_hosts};
+pub use reconnect::{
+    ExistingForwardDecision, ExistingForwardProbe, ForwardHttpOutcome, RemoteReconnectDecision,
+    evaluate_existing_forward, evaluate_remote_stopping_reconnect,
+    evaluate_remote_stopping_reconnect_for_brand, is_ssh_agent_signing_failure,
+    is_ssh_auth_failure, probe_existing_forward_async, resolve_loopback_http_base_url,
+    validate_archive_version,
+};
 pub use state::{SshTunnelStateMachine, append_stderr_tail};
 pub use types::{
     RemoteServerKind, SshTunnelState, TUNNEL_STDERR_TAIL_CHARS, TunnelAction, TunnelEndpoints,
@@ -93,13 +101,19 @@ pub enum SshError {
         message: String,
     },
     /// Archive version failed strict `SemVer` segment validation (`SshInvalidArchiveVersionError`).
-    #[error("'{archive_version}' is not an exact t3 version and cannot name a runtime directory.")]
+    #[error(
+        "'{archive_version}' is not an exact {} version and cannot name a runtime directory.",
+        ACTIVE_BRAND.cli_bin_name
+    )]
     InvalidArchiveVersion {
         /// Rejected archive version string.
         archive_version: String,
     },
     /// Remote runner lacked both `nodeScriptPath` and `archiveVersion` (`SshMissingRunnerError`).
-    #[error("A remote t3 runner needs an archive version or a node script path.")]
+    #[error(
+        "A remote {} runner needs an archive version or a node script path.",
+        ACTIVE_BRAND.cli_bin_name
+    )]
     MissingRunner,
     /// Failed to discover local SSH hosts (`SshHostDiscoveryError`).
     #[error("{message}")]
@@ -123,17 +137,6 @@ pub enum SshError {
     },
 }
 
-fn exact_archive_version_regex() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        let compiled = Regex::new(
-            r"^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$",
-        );
-        // INFALLIBLE: constant SemVer pattern matching tunnel.ts:1100-1101.
-        compiled.expect("exact archive SemVer regex must compile")
-    })
-}
-
 fn secret_redaction_regex() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
@@ -151,28 +154,6 @@ fn safe_shell_arg_regex() -> &'static Regex {
         let compiled = Regex::new(r"^[\w@%+=:,./-]+$");
         // INFALLIBLE: constant POSIX/Windows safe token pattern matching command.ts:182.
         compiled.expect("safe shell arg regex must compile")
-    })
-}
-
-fn auth_failure_regex() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        let compiled = Regex::new(
-            r"(?i)permission denied \((?:publickey|password|keyboard-interactive|hostbased|gssapi-with-mic)[^)]*\)|authentication failed|too many authentication failures",
-        );
-        // INFALLIBLE: constant SSH auth failure pattern matching auth.ts:242-246.
-        compiled.expect("SSH auth failure regex must compile")
-    })
-}
-
-fn agent_signing_regex() -> &'static Regex {
-    static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| {
-        let compiled = Regex::new(
-            r"sign_and_send_pubkey: signing failed(?: for [^\n]* from agent:|: (?:agent refused operation|communication with agent failed))",
-        );
-        // INFALLIBLE: constant SSH agent signing failure pattern matching auth.ts:253.
-        compiled.expect("SSH agent signing failure regex must compile")
     })
 }
 
@@ -288,63 +269,4 @@ pub fn host_key_verification_message(
         )
     };
     Some(format!("{guidance}\n\n{}", stderr.trim()))
-}
-
-/// Validates an exact `SemVer` archive directory segment (`tunnel.ts:1100-1120`).
-///
-/// # Errors
-///
-/// Returns [`SshError::InvalidArchiveVersion`] if `archive_version` is not exact `X.Y.Z[-prerelease]`.
-pub fn validate_archive_version(archive_version: &str) -> Result<(), SshError> {
-    if exact_archive_version_regex().is_match(archive_version) {
-        Ok(())
-    } else {
-        Err(SshError::InvalidArchiveVersion {
-            archive_version: archive_version.to_owned(),
-        })
-    }
-}
-
-/// Validates that a forwarded SSH bridge base URL targets loopback (`tunnel.ts:1418-1438`).
-///
-/// # Errors
-///
-/// Returns [`SshError::HttpBridge`] when the URL scheme is not HTTP(S) or the host is not loopback.
-pub fn resolve_loopback_http_base_url(raw: &str) -> Result<String, SshError> {
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return Err(SshError::HttpBridge {
-            message: "Invalid SSH forwarded http base URL.".to_owned(),
-        });
-    }
-    let rest = trimmed
-        .strip_prefix("http://")
-        .or_else(|| trimmed.strip_prefix("https://"))
-        .ok_or_else(|| SshError::HttpBridge {
-            message: "Invalid SSH forwarded http base URL.".to_owned(),
-        })?;
-    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
-    let host_part = if authority.starts_with('[') {
-        authority.find(']').map_or("", |idx| &authority[..=idx])
-    } else {
-        authority.split(':').next().unwrap_or("")
-    };
-    if host_part.is_empty() || !is_local_loopback_host(host_part) {
-        return Err(SshError::HttpBridge {
-            message: "SSH desktop bridge only supports loopback forwarded URLs.".to_owned(),
-        });
-    }
-    Ok(trimmed.to_owned())
-}
-
-/// Returns `true` when `message` indicates an SSH authentication rejection (`auth.ts:238-248`).
-#[must_use]
-pub fn is_ssh_auth_failure(message: &str) -> bool {
-    auth_failure_regex().is_match(message)
-}
-
-/// Returns `true` when `message` indicates a local SSH agent signing failure (`auth.ts:251-256`).
-#[must_use]
-pub fn is_ssh_agent_signing_failure(message: &str) -> bool {
-    agent_signing_regex().is_match(message)
 }

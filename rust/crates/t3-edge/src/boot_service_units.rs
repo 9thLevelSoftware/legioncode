@@ -63,43 +63,96 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
+use t3_contracts::brand::{ACTIVE_BRAND, BrandConfig};
 use thiserror::Error;
 
 pub use crate::boot_service_units_parse::{
     decode_service_unit_bytes, disable_service_task, extract_service_unit_base_dir,
-    extract_service_unit_environment_value, extract_service_unit_log_path,
-    extract_service_unit_program, service_task_is_disabled, systemd_unit_directory_of,
+    extract_service_unit_base_dir_for_brand, extract_service_unit_environment_value,
+    extract_service_unit_log_path, extract_service_unit_program, service_task_is_disabled,
+    systemd_unit_directory_of,
 };
 pub use crate::boot_service_units_protection::{
     PROTECT_DROP_IN, ProtectionMode, REMOTE_ACCESS_UNITS, SYSTEM_UNIT_DIR, ServiceProtectionPlan,
-    SystemdDropIn, build_service_protection_plan, parse_loaded_remote_access_units,
-    render_protection_privileged_script,
+    SystemdDropIn, build_service_protection_plan, build_service_protection_plan_for_brand,
+    parse_loaded_remote_access_units, render_protection_privileged_script,
+    render_protection_privileged_script_for_brand,
 };
 pub use crate::boot_service_units_render::{
     encode_windows_task_utf16le_bom, render_boot_service_launchd_plist,
-    render_boot_service_systemd_unit, render_boot_service_windows_task_xml,
+    render_boot_service_launchd_plist_for_brand, render_boot_service_systemd_unit,
+    render_boot_service_systemd_unit_for_brand, render_boot_service_windows_task_xml,
+    render_boot_service_windows_task_xml_for_brand,
 };
 
+const fn str_eq(left: &str, right: &str) -> bool {
+    let a = left.as_bytes();
+    let b = right.as_bytes();
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut idx = 0;
+    while idx < a.len() {
+        if a[idx] != b[idx] {
+            return false;
+        }
+        idx += 1;
+    }
+    true
+}
+
 /// Canonical service base name (`bootService.ts:59`).
-pub const BOOT_SERVICE_NAME: &str = "t3code";
+pub const BOOT_SERVICE_NAME: &str = ACTIVE_BRAND.windows_task_name;
 
 /// Linux systemd user unit file name (`bootService.ts:60`).
-pub const BOOT_SERVICE_UNIT_FILE: &str = "t3code.service";
+pub const BOOT_SERVICE_UNIT_FILE: &str = ACTIVE_BRAND.systemd_unit_name;
 
 /// macOS launchd bundle/label (`bootService.ts:63`).
-pub const BOOT_SERVICE_LAUNCHD_LABEL: &str = "com.t3tools.t3code.service";
+pub const BOOT_SERVICE_LAUNCHD_LABEL: &str = ACTIVE_BRAND.launchd_label;
 
 /// macOS launchd plist file name (`bootService.ts:64`).
-pub const BOOT_SERVICE_PLIST_FILE: &str = "com.t3tools.t3code.service.plist";
+pub const BOOT_SERVICE_PLIST_FILE: &str = if str_eq(ACTIVE_BRAND.url_scheme, "legioncode") {
+    "dev.legioncode.service.plist"
+} else {
+    "com.t3tools.t3code.service.plist"
+};
 
 /// Default boot service log filename (`bootService.ts:65`).
 pub const BOOT_SERVICE_LOG_FILE: &str = "boot-service.log";
 
 /// Windows Task Scheduler XML copy filename (`bootService.ts:69`).
-pub const BOOT_SERVICE_TASK_FILE: &str = "t3code-task.xml";
+pub const BOOT_SERVICE_TASK_FILE: &str = if str_eq(ACTIVE_BRAND.url_scheme, "legioncode") {
+    "legioncode-task.xml"
+} else {
+    "t3code-task.xml"
+};
 
 /// Environment variable naming the boot-service definition file (`serviceProtocol.ts:19`).
-pub const SERVICE_UNIT_ENV: &str = "T3_BOOT_SERVICE_UNIT";
+pub const SERVICE_UNIT_ENV: &str = if str_eq(ACTIVE_BRAND.url_scheme, "legioncode") {
+    "LEGION_BOOT_SERVICE_UNIT"
+} else {
+    "T3_BOOT_SERVICE_UNIT"
+};
+
+pub(crate) fn launchd_plist_file_for_brand(brand: &BrandConfig) -> String {
+    format!("{}.plist", brand.launchd_label)
+}
+
+pub(crate) fn windows_task_file_for_brand(brand: &BrandConfig) -> String {
+    format!("{}-task.xml", brand.windows_task_name)
+}
+
+pub(crate) fn service_unit_env_for_brand(brand: &BrandConfig) -> String {
+    if brand.url_scheme == "t3code" {
+        format!("{}BOOT_SERVICE_UNIT", brand.fallback_env_prefix)
+    } else {
+        format!("{}BOOT_SERVICE_UNIT", brand.primary_env_prefix)
+    }
+}
+
+pub(crate) fn protect_drop_in_for_brand(brand: &BrandConfig) -> String {
+    format!("90-{}-protect.conf", brand.url_scheme)
+}
 
 /// Launcher configuration passed to OS boot-service renderers (`bootService.ts:86-94`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -148,7 +201,9 @@ impl BootServicePlan {
 pub enum BootServiceRenderError {
     /// `systemd` rejects executables containing control characters, quotes, or backslashes.
     #[error(
-        "systemd cannot run T3 Code from {base_dir:?}: the path contains a quote, backslash or control character. Choose another T3 home with --base-dir."
+        "systemd cannot run {} from {base_dir:?}: the path contains a quote, backslash or control character. Choose another {} home with --base-dir.",
+        ACTIVE_BRAND.product_name,
+        ACTIVE_BRAND.product_name
     )]
     UnsupportedBaseDir {
         /// Unsupported `base_dir` path.
@@ -187,33 +242,55 @@ impl BootServiceProblem {
         }
     }
 
-    /// Formats remediation guidance using the default `t3 service install` / `t3 service restart` commands.
+    /// Formats remediation guidance using the active brand's default `<cli> service install` /
+    /// `<cli> service restart` commands.
     pub fn format_default(self) -> String {
-        format_boot_service_problem(self, "t3 service install", "t3 service restart")
+        let install_cmd = format!("{} service install", ACTIVE_BRAND.cli_bin_name);
+        let restart_cmd = format!("{} service restart", ACTIVE_BRAND.cli_bin_name);
+        format_boot_service_problem(self, &install_cmd, &restart_cmd)
     }
 }
 
-/// Formats actionable remediation text for `problem` matching `bootService.ts:657-678`.
+/// Formats actionable remediation text for `problem` using [`ACTIVE_BRAND`].
 pub fn format_boot_service_problem(
     problem: BootServiceProblem,
     install_cmd: &str,
     restart_cmd: &str,
 ) -> String {
+    format_boot_service_problem_for_brand(problem, install_cmd, restart_cmd, &ACTIVE_BRAND)
+}
+
+/// Formats actionable remediation text for `problem` parameterized by `brand`.
+pub fn format_boot_service_problem_for_brand(
+    problem: BootServiceProblem,
+    install_cmd: &str,
+    restart_cmd: &str,
+    brand: &BrandConfig,
+) -> String {
+    let product = brand.product_name;
+    let short = brand.cli_bin_name.to_ascii_uppercase();
+    let unit = brand.systemd_unit_name;
     match problem {
         BootServiceProblem::UserManagerUnavailable => {
-            "Cannot reach the systemd user manager. Run `systemctl --user status` in a login session for the service user. Install your distribution's systemd user-session support if it is missing; do not run T3 with sudo.".to_owned()
+            format!(
+                "Cannot reach the systemd user manager. Run `systemctl --user status` in a login session for the service user. Install your distribution's systemd user-session support if it is missing; do not run {short} with sudo."
+            )
         }
         BootServiceProblem::LingerUnavailable => {
             "Cannot check whether this user can run services after logout. Run `loginctl show-user \"$(id -un)\" --property=Linger` and check that systemd-logind is available.".to_owned()
         }
         BootServiceProblem::LingerDisabled => {
-            "Lingering is disabled. T3 Code will stop when your last login session ends and will not start at boot. Run `sudo loginctl enable-linger \"$(id -un)\"` on this machine, then retry the service command as your normal user.".to_owned()
+            format!(
+                "Lingering is disabled. {product} will stop when your last login session ends and will not start at boot. Run `sudo loginctl enable-linger \"$(id -un)\"` on this machine, then retry the service command as your normal user."
+            )
         }
         BootServiceProblem::ServiceDisabled => {
             format!("The service is not enabled to start automatically. Run `{install_cmd}` to repair it.")
         }
         BootServiceProblem::ServiceStopped => {
-            format!("The service is not running. Check the service log (on Linux, also `systemctl --user status t3code.service`), then run `{install_cmd}`.")
+            format!(
+                "The service is not running. Check the service log (on Linux, also `systemctl --user status {unit}`), then run `{install_cmd}`."
+            )
         }
         BootServiceProblem::RestartPending => {
             format!("A newer version is installed but the service is still running the previous one. Run `{restart_cmd}` to switch.")

@@ -21,8 +21,9 @@ use t3_persistence::ownership::{
 
 use net::is_loopback_http_origin;
 pub use net::{
-    answers_on_loopback, can_bind_loopback, format_picked_port, pick_port,
-    probe_loopback_ready_async, wait_ready, wait_ready_async,
+    ProbeOutcome, WaitReadyOutcome, answers_on_loopback, can_bind_loopback, format_picked_port,
+    pick_port, probe_loopback_outcome_async, probe_loopback_ready_async, wait_ready,
+    wait_ready_async, wait_ready_outcome_async,
 };
 
 /// TTL window in milliseconds enforced for `DesktopUpdateMarker` (`contracts/desktopBootstrap.ts:42`).

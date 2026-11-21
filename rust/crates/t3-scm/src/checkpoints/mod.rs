@@ -4,6 +4,7 @@
 //! checkpoint refs (`refs/t3/checkpoints/<thread_id>/turn-<n>`), whitespace-preserving
 //! unified diff computation, and SQLite pending-intent verification before git restore.
 
+pub mod diff_patch_fast;
 pub mod diff_query;
 pub mod rollback;
 pub mod store;

@@ -8,6 +8,7 @@ use reqwest::header::ACCEPT;
 use reqwest::{Client, StatusCode};
 use rusqlite::Connection;
 use serde_json::json;
+use t3_contracts::brand::ACTIVE_BRAND;
 use t3_contracts::environment::ExecutionEnvironmentDescriptor;
 
 use super::types::{
@@ -64,15 +65,18 @@ impl LivePeerClient {
         self
     }
 
-    /// Validates `url` and probes `<origin>/.well-known/t3/environment`.
+    /// Validates `url` and probes `<origin>/.well-known/<brand>/environment`.
     pub async fn probe_environment(
         &self,
         url: &str,
     ) -> Result<(String, ExecutionEnvironmentDescriptor), PeerLinkError> {
         let origin = validate_peer_origin(url)?;
+        let well_known_prefix = ACTIVE_BRAND.cli_bin_name;
         let resp = self
             .http
-            .get(format!("{origin}/.well-known/t3/environment"))
+            .get(format!(
+                "{origin}/.well-known/{well_known_prefix}/environment"
+            ))
             .header(ACCEPT, "application/json")
             .timeout(self.probe_timeout)
             .send()
@@ -87,8 +91,9 @@ impl LivePeerClient {
             return Err(PeerLinkError::new(
                 PeerLinkErrorReason::NotAT3Environment,
                 format!(
-                    "{origin} answered HTTP {}, not as a T3 Code environment.",
-                    resp.status().as_u16()
+                    "{origin} answered HTTP {}, not as a {} environment.",
+                    resp.status().as_u16(),
+                    ACTIVE_BRAND.product_name
                 ),
             ));
         }
@@ -99,7 +104,8 @@ impl LivePeerClient {
                 PeerLinkError::new(
                     PeerLinkErrorReason::NotAT3Environment,
                     format!(
-                        "{origin} answered, but not as a T3 Code environment this version understands."
+                        "{origin} answered, but not as a {} environment this version understands.",
+                        ACTIVE_BRAND.product_name
                     ),
                 )
             })?;
@@ -131,7 +137,8 @@ impl LivePeerClient {
                     "{primary_origin} answered as another environment, {}.",
                     descriptor.label
                 ),
-            ));
+            )
+            .with_answered_as(descriptor.label));
         }
         if input.self_environment_id.as_ref() == Some(&descriptor.environment_id) {
             return Err(PeerLinkError::new(
@@ -146,8 +153,8 @@ impl LivePeerClient {
             return Err(PeerLinkError::new(
                 PeerLinkErrorReason::Incompatible,
                 format!(
-                    "{} runs a T3 Code version that cannot keep a linked agent's limits. Update it, then link again.",
-                    descriptor.label
+                    "{} runs a {} version that cannot keep a linked agent's limits. Update it, then link again.",
+                    descriptor.label, ACTIVE_BRAND.product_name
                 ),
             ));
         }

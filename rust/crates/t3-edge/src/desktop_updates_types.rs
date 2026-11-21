@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::desktop_updates_aur::DesktopUpdateChannel;
+
 /// Lifecycle status of `DesktopUpdateMachine` (`packages/contracts/src/ipc.ts:76-84`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -99,4 +101,59 @@ pub enum DesktopUpdateError {
     /// Machine is disabled by policy or environment.
     #[error("desktop updates are disabled")]
     UpdatesDisabled,
+}
+
+/// Track mismatch recorded when a build on one release track queries a feed configured for
+/// another saved track (`#38506`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrackMismatch {
+    /// Release track that built the running desktop binary.
+    pub build_channel: DesktopUpdateChannel,
+}
+
+/// Determines the build update channel from `version` (`updateChannels.ts`).
+#[must_use]
+pub fn desktop_update_channel_of(version: &str) -> DesktopUpdateChannel {
+    if is_nightly_desktop_version(version) {
+        DesktopUpdateChannel::Nightly
+    } else {
+        DesktopUpdateChannel::Latest
+    }
+}
+
+fn is_nightly_desktop_version(version: &str) -> bool {
+    let Some((base, rest)) = version.split_once('-') else {
+        return false;
+    };
+    if base.is_empty() || base.contains('+') {
+        return false;
+    }
+    let Some(suffix) = rest
+        .strip_prefix("nightly.")
+        .or_else(|| rest.strip_prefix("preview."))
+    else {
+        return false;
+    };
+    let Some((date, build)) = suffix.split_once('.') else {
+        return false;
+    };
+    date.len() == 8
+        && date.bytes().all(|b| b.is_ascii_digit())
+        && !build.is_empty()
+        && build.bytes().all(|b| b.is_ascii_digit())
+}
+
+/// Formats an actionable check failure explaining a build vs saved update track mismatch (`#38506`).
+#[must_use]
+pub fn track_mismatch_message(build: DesktopUpdateChannel, saved: DesktopUpdateChannel) -> String {
+    let track_label = |channel: DesktopUpdateChannel| match channel {
+        DesktopUpdateChannel::Latest => "Stable",
+        DesktopUpdateChannel::Nightly => "Nightly",
+    };
+    let build_label = track_label(build);
+    let saved_label = track_label(saved);
+    format!(
+        "This {build_label} build can't update from the {saved_label} track on its own. Switch the update track back to {build_label}, or use Review beside Update track to retry the switch to {saved_label}."
+    )
 }

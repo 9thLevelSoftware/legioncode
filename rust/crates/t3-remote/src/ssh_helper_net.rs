@@ -91,27 +91,89 @@ pub fn format_picked_port(port: u16) -> String {
     port.to_string()
 }
 
-/// Performs a single HTTP `GET http://127.0.0.1:<port>/` probe returning `true` for status `200..300`.
-pub async fn probe_loopback_ready_async(port: u16, probe_timeout_ms: u64) -> bool {
+/// Single-probe readiness status matching `__ssh-helper wait-ready` (`#39807`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ProbeOutcome {
+    /// Loopback HTTP server answered with a 2xx status.
+    Ready,
+    /// Loopback TCP connect was actively refused (`ECONNREFUSED`).
+    Refused,
+    /// Timeout, non-2xx HTTP status, or transient transport error.
+    NotReady,
+}
+
+/// Aggregated result of a bounded `wait-ready` loop (`#39807`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum WaitReadyOutcome {
+    /// Server responded 2xx (CLI exit code `0`).
+    Ready,
+    /// Every probe saw `ECONNREFUSED`, meaning nothing listens on the port (CLI exit code `2`).
+    RefusedOnly,
+    /// At least one probe stalled/errored without immediate refusal (CLI exit code `1`).
+    NotReady,
+}
+
+impl WaitReadyOutcome {
+    /// Process exit code matching `apps/server/src/cli/sshHelper.ts` (`0`, `1`, or `2`).
+    #[must_use]
+    pub const fn exit_code(self) -> i32 {
+        match self {
+            Self::Ready => 0,
+            Self::NotReady => 1,
+            Self::RefusedOnly => 2,
+        }
+    }
+}
+
+fn error_is_connection_refused(err: &(dyn std::error::Error + 'static)) -> bool {
+    let mut current: Option<&dyn std::error::Error> = Some(err);
+    while let Some(source) = current {
+        if let Some(io_err) = source.downcast_ref::<std::io::Error>()
+            && io_err.kind() == ErrorKind::ConnectionRefused
+        {
+            return true;
+        }
+        current = source.source();
+    }
+    let text = err.to_string().to_ascii_lowercase();
+    text.contains("connection refused") || text.contains("econnrefused")
+}
+
+/// Performs a single HTTP `GET http://127.0.0.1:<port>/` probe returning structured readiness (`#39807`).
+pub async fn probe_loopback_outcome_async(port: u16, probe_timeout_ms: u64) -> ProbeOutcome {
     let Ok(client) = Client::builder()
         .timeout(Duration::from_millis(probe_timeout_ms.max(1)))
         .build()
     else {
-        return false;
+        return ProbeOutcome::NotReady;
     };
     let url = format!("http://127.0.0.1:{port}/");
     match client.get(&url).send().await {
-        Ok(resp) => resp.status().is_success(),
-        Err(_) => false,
+        Ok(resp) if resp.status().is_success() => ProbeOutcome::Ready,
+        Err(err) if err.is_connect() && error_is_connection_refused(&err) => ProbeOutcome::Refused,
+        Ok(_) | Err(_) => ProbeOutcome::NotReady,
     }
 }
 
-/// Polls `http://127.0.0.1:<port>/` every 100ms up to `timeout_ms` until HTTP 2xx (`sshHelper.ts:84-99`).
-pub async fn wait_ready_async(port: u16, timeout_ms: u64, probe_timeout_ms: u64) -> bool {
+/// Performs a single HTTP `GET http://127.0.0.1:<port>/` probe returning `true` for status `200..300`.
+pub async fn probe_loopback_ready_async(port: u16, probe_timeout_ms: u64) -> bool {
+    probe_loopback_outcome_async(port, probe_timeout_ms).await == ProbeOutcome::Ready
+}
+
+/// Polls `http://127.0.0.1:<port>/` every 100ms up to `timeout_ms` distinguishing refused-only exits
+/// (`exit code 2`) from stalled startups (`exit code 1`) (`#39807`).
+pub async fn wait_ready_outcome_async(
+    port: u16,
+    timeout_ms: u64,
+    probe_timeout_ms: u64,
+) -> WaitReadyOutcome {
     let deadline = Instant::now() + Duration::from_millis(timeout_ms);
+    let mut refused_only = true;
     while Instant::now() < deadline {
-        if probe_loopback_ready_async(port, probe_timeout_ms).await {
-            return true;
+        match probe_loopback_outcome_async(port, probe_timeout_ms).await {
+            ProbeOutcome::Ready => return WaitReadyOutcome::Ready,
+            ProbeOutcome::Refused => {}
+            ProbeOutcome::NotReady => refused_only = false,
         }
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
@@ -119,7 +181,16 @@ pub async fn wait_ready_async(port: u16, timeout_ms: u64, probe_timeout_ms: u64)
         }
         tokio::time::sleep(remaining.min(Duration::from_millis(100))).await;
     }
-    false
+    if refused_only {
+        WaitReadyOutcome::RefusedOnly
+    } else {
+        WaitReadyOutcome::NotReady
+    }
+}
+
+/// Polls `http://127.0.0.1:<port>/` every 100ms up to `timeout_ms` until HTTP 2xx (`sshHelper.ts:84-99`).
+pub async fn wait_ready_async(port: u16, timeout_ms: u64, probe_timeout_ms: u64) -> bool {
+    wait_ready_outcome_async(port, timeout_ms, probe_timeout_ms).await == WaitReadyOutcome::Ready
 }
 
 /// Blocking wrapper around [`wait_ready_async`] for synchronous CLI `__ssh-helper wait-ready` callers.

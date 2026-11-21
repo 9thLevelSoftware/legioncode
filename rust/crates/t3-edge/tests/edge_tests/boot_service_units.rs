@@ -1,16 +1,21 @@
 //! Tests for `t3_edge::boot_service_units` (systemd, launchd, Task XML, protection).
 
 use proptest::prelude::*;
+use t3_contracts::brand::LEGION_CODE;
 use t3_edge::boot_service_units::{
     BOOT_SERVICE_LAUNCHD_LABEL, BOOT_SERVICE_PLIST_FILE, BOOT_SERVICE_UNIT_FILE, BootServicePlan,
     BootServiceProblem, BootServiceRenderError, ProtectionMode, REMOTE_ACCESS_UNITS,
-    build_service_protection_plan, decode_service_unit_bytes, disable_service_task,
-    encode_windows_task_utf16le_bom, extract_service_unit_base_dir,
+    build_service_protection_plan, build_service_protection_plan_for_brand,
+    decode_service_unit_bytes, disable_service_task, encode_windows_task_utf16le_bom,
+    extract_service_unit_base_dir, extract_service_unit_base_dir_for_brand,
     extract_service_unit_environment_value, extract_service_unit_log_path,
     extract_service_unit_program, format_boot_service_base_dir_option, format_boot_service_problem,
-    parse_loaded_remote_access_units, render_boot_service_launchd_plist,
-    render_boot_service_systemd_unit, render_boot_service_windows_task_xml,
-    render_protection_privileged_script, service_task_is_disabled, systemd_unit_directory_of,
+    format_boot_service_problem_for_brand, parse_loaded_remote_access_units,
+    render_boot_service_launchd_plist, render_boot_service_launchd_plist_for_brand,
+    render_boot_service_systemd_unit, render_boot_service_systemd_unit_for_brand,
+    render_boot_service_windows_task_xml, render_boot_service_windows_task_xml_for_brand,
+    render_protection_privileged_script, render_protection_privileged_script_for_brand,
+    service_task_is_disabled, systemd_unit_directory_of,
 };
 
 fn sample_plan(base_dir: &str) -> BootServicePlan {
@@ -241,6 +246,62 @@ fn protection_plan_scripts_and_loaded_units_match_service_protection_ts() -> Res
         vec!["sshd.service"]
     );
     assert_eq!(REMOTE_ACCESS_UNITS.len(), 3);
+    Ok(())
+}
+
+#[test]
+fn brand_parameterized_boot_service_units_and_protection_follow_brand_config() -> Result<(), String>
+{
+    let plan = sample_plan("/home/legion/data").with_install_bin_dir("/opt/legion/bin");
+    let unit = render_boot_service_systemd_unit_for_brand(&plan, &LEGION_CODE)
+        .map_err(|e| e.to_string())?;
+    assert!(unit.contains("Description=Legion Code server"));
+    assert!(unit.contains("Environment=LEGION_HOME=/home/legion/data"));
+    assert!(unit.contains("Environment=LEGION_BOOT_SERVICE_UNIT=legioncode.service"));
+    assert_eq!(
+        extract_service_unit_base_dir_for_brand(&unit, &LEGION_CODE).as_deref(),
+        Some("/home/legion/data")
+    );
+
+    let plist =
+        render_boot_service_launchd_plist_for_brand(&plan, "/Users/l", "/bin", &LEGION_CODE);
+    assert!(plist.contains("dev.legioncode.service"));
+    assert!(plist.contains("<key>LEGION_HOME</key>"));
+    assert_eq!(
+        extract_service_unit_base_dir_for_brand(&plist, &LEGION_CODE).as_deref(),
+        Some("/home/legion/data")
+    );
+
+    let task_xml = render_boot_service_windows_task_xml_for_brand(
+        &plan,
+        "PC\\l",
+        "C:\\l",
+        "conhost.exe",
+        &LEGION_CODE,
+    );
+    assert!(task_xml.contains("<Description>Legion Code server</Description>"));
+    assert!(task_xml.contains("legioncode-task.xml"));
+
+    let problem = format_boot_service_problem_for_brand(
+        BootServiceProblem::ServiceStopped,
+        "legion service install",
+        "legion service restart",
+        &LEGION_CODE,
+    );
+    assert!(problem.contains("legioncode.service"));
+
+    let prot = build_service_protection_plan_for_brand(
+        1000,
+        "/home/l/.config/systemd/user",
+        &[],
+        Some("/tmp/sys"),
+        &LEGION_CODE,
+    );
+    assert!(prot.user.iter().any(|d| d.unit == "legioncode.service"));
+    let script =
+        render_protection_privileged_script_for_brand(&prot, ProtectionMode::Apply, &LEGION_CODE);
+    assert!(script.contains("90-legioncode-protect.conf"));
+    assert!(script.contains("LEGION_PROTECT"));
     Ok(())
 }
 

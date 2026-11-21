@@ -1,15 +1,19 @@
-//! `GitHub` REST, GraphQL, `gh` CLI, and 10% quota-reserve policy adapter.
+//! `GitHub` REST, GHE host detection, `gh` CLI / `git credential fill` auth, and quota helpers.
 
-use http::{HeaderMap, Method, StatusCode};
-use serde_json::{Value, json};
-use t3_contracts::pull_requests::{PullRequestChecksState, PullRequestMergeability};
+use std::sync::OnceLock;
 
-use crate::core::pr_helpers::{CheckEntry, RawCheckState, rollup_check_statuses};
-use crate::core::rate_limit::QuotaSnapshot;
-use crate::forges::{
-    ForgeError, HttpRequestSpec, NormalizedPullRequest, json_str, json_u64,
-    parse_standard_pr_state, validate_hostname,
+use http::Method;
+use regex::Regex;
+use serde_json::Value;
+
+use crate::core::discovery::parse_git_remote_url;
+pub use crate::forges::github_graphql::{
+    GITHUB_GRAPHQL_ALIAS_BATCH_SIZE, GitHubRateLimitSignal, PrLookupItem, ReviewCommentBatchTarget,
+    build_aliased_pr_summary_batch, build_github_graphql_request,
+    build_review_thread_comments_batch, build_review_threads_page_request, check_github_quota,
+    classify_github_response, normalize_github_pr_json, parse_aliased_pr_summary_batch,
 };
+use crate::forges::{CliCommandSpec, ForgeError, HttpRequestSpec, validate_hostname};
 
 /// Default per-host concurrent HTTP API request cap for `GitHub`.
 pub const GITHUB_API_CONCURRENCY: usize = 8;
@@ -26,19 +30,49 @@ pub const GITHUB_API_VERSION: &str = "2022-11-28";
 /// `User-Agent` header sent to `GitHub` endpoints.
 pub const GITHUB_USER_AGENT: &str = "t3code";
 
-/// Resolved `GitHub` REST and GraphQL endpoint URLs for `github.com` or Enterprise Server.
+fn github_host_regex() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        let compiled = Regex::new(
+            r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::\d{1,5})?$",
+        );
+        // INFALLIBLE: constant hostname validation pattern (`fd475bd722`).
+        compiled.expect("github_host_regex must compile")
+    })
+}
+
+/// Validates that `host` is a normalized bare hostname without scheme, userinfo, or path (`fd475bd722`).
+#[must_use]
+pub fn is_github_host(host: &str) -> bool {
+    github_host_regex().is_match(&host.trim().to_ascii_lowercase())
+}
+
+/// Returns `true` when `host` uses `GitHub` Cloud endpoints (`github.com` or `*.ghe.com` cloud tenants).
+#[must_use]
+pub fn is_github_dot_com_or_ghe_cloud(host: &str) -> bool {
+    let lower = host.trim().to_ascii_lowercase();
+    lower == "github.com" || lower == "api.github.com" || lower.ends_with(".ghe.com")
+}
+
+/// Resolved `GitHub` REST and GraphQL endpoint URLs for `github.com`, `*.ghe.com`, or GHE Server.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GitHubEndpoint {
-    /// Normalized lowercase hostname (`github.com` or GHE host).
+    /// Normalized lowercase hostname (`github.com`, `<tenant>.ghe.com`, or GHE Server host).
     pub hostname: String,
-    /// REST base URL (`https://api.github.com` or `https://<host>/api/v3`).
+    /// REST base URL (`https://api.github.com`, `https://api.<tenant>.ghe.com`, or `https://<host>/api/v3`).
     pub api_base_url: String,
-    /// GraphQL endpoint URL (`https://api.github.com/graphql` or `https://<host>/api/graphql`).
+    /// GraphQL endpoint URL (`https://api.github.com/graphql`, `https://api.<tenant>.ghe.com/graphql`, or `https://<host>/api/graphql`).
     pub graphql_url: String,
 }
 
 impl GitHubEndpoint {
-    /// Resolves REST and GraphQL endpoints for `hostname`.
+    /// Returns `true` when this endpoint targets a `*.ghe.com` cloud tenant or GHE Server host.
+    #[must_use]
+    pub fn is_enterprise(&self) -> bool {
+        self.hostname != "github.com" && self.hostname != "api.github.com"
+    }
+
+    /// Resolves REST and GraphQL endpoints for `hostname` (`fd475bd722`).
     ///
     /// # Errors
     ///
@@ -50,6 +84,9 @@ impl GitHubEndpoint {
     /// let cloud = GitHubEndpoint::for_host("github.com")?;
     /// assert_eq!(cloud.api_base_url, "https://api.github.com");
     /// assert_eq!(cloud.graphql_url, "https://api.github.com/graphql");
+    ///
+    /// let ghe_cloud = GitHubEndpoint::for_host("acme.ghe.com")?;
+    /// assert_eq!(ghe_cloud.api_base_url, "https://api.acme.ghe.com");
     ///
     /// let ghe = GitHubEndpoint::for_host("git.corp.example")?;
     /// assert_eq!(ghe.api_base_url, "https://git.corp.example/api/v3");
@@ -63,6 +100,12 @@ impl GitHubEndpoint {
                 api_base_url: "https://api.github.com".to_owned(),
                 graphql_url: "https://api.github.com/graphql".to_owned(),
             })
+        } else if host.ends_with(".ghe.com") {
+            Ok(Self {
+                api_base_url: format!("https://api.{host}"),
+                graphql_url: format!("https://api.{host}/graphql"),
+                hostname: host,
+            })
         } else {
             Ok(Self {
                 api_base_url: format!("https://{host}/api/v3"),
@@ -73,30 +116,16 @@ impl GitHubEndpoint {
     }
 }
 
-/// Classification of upstream `GitHub` REST or GraphQL rate-limit responses.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GitHubRateLimitSignal {
-    /// Not rate-limited.
-    Clear,
-    /// Secondary or primary `429` / abuse limit / `RATE_LIMITED` GraphQL signal.
-    RateLimited {
-        /// Reason string from headers or error payload.
-        reason: String,
-    },
-    /// Quota fell inside the protected 10% reserve for non-priority calls.
-    QuotaReserveReached {
-        /// Remaining calls reported.
-        remaining: u64,
-        /// Window limit reported.
-        limit: u64,
-    },
+/// Detects the target [`GitHubEndpoint`] directly from an HTTPS or SSH git remote URL (`fd475bd722`).
+pub fn detect_github_endpoint_from_remote(remote_url: &str) -> Result<GitHubEndpoint, ForgeError> {
+    let parsed = parse_git_remote_url(remote_url).map_err(|err| ForgeError::InvalidHost {
+        host: remote_url.to_owned(),
+        reason: err.to_string(),
+    })?;
+    GitHubEndpoint::for_host(&parsed.host)
 }
 
 /// Validates bearer token header safety and builds a `GitHub` REST [`HttpRequestSpec`].
-///
-/// # Errors
-///
-/// Returns [`ForgeError::InvalidCredentials`] if `token` is empty or contains newlines.
 pub fn build_github_rest_request(
     endpoint: &GitHubEndpoint,
     token: &str,
@@ -124,31 +153,7 @@ pub fn build_github_rest_request(
     })
 }
 
-/// Builds a `GitHub` GraphQL POST [`HttpRequestSpec`].
-///
-/// # Errors
-///
-/// Returns [`ForgeError::InvalidCredentials`] if `token` is empty or contains newlines.
-pub fn build_github_graphql_request(
-    endpoint: &GitHubEndpoint,
-    token: &str,
-    query: &str,
-    variables: Option<Value>,
-) -> Result<HttpRequestSpec, ForgeError> {
-    let trimmed_token = validate_token(token)?;
-    let payload = match variables {
-        Some(vars) => json!({ "query": query, "variables": vars }),
-        None => json!({ "query": query }),
-    };
-    Ok(HttpRequestSpec {
-        method: Method::POST,
-        url: endpoint.graphql_url.clone(),
-        headers: github_headers(trimmed_token, "application/json", true, false),
-        body: Some(payload.to_string()),
-    })
-}
-
-fn github_headers(
+pub(crate) fn github_headers(
     token: &str,
     accept: &str,
     has_body: bool,
@@ -171,17 +176,54 @@ fn github_headers(
     headers
 }
 
+/// Resolves an environment variable GitHub token, scoping `GH_ENTERPRISE_TOKEN` to `GH_HOST`
+/// so enterprise credentials cannot leak to arbitrary hosts.
+#[must_use]
+pub fn resolve_github_env_token<F>(hostname: &str, get_env: F) -> Option<String>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let host = hostname.trim().to_ascii_lowercase();
+    if !is_github_host(&host) {
+        return None;
+    }
+    let candidates: &[&str] = if is_github_dot_com_or_ghe_cloud(&host) {
+        &["GH_TOKEN", "GITHUB_TOKEN"]
+    } else if get_env("GH_HOST")
+        .map(|v| v.trim().to_ascii_lowercase())
+        .as_deref()
+        == Some(host.as_str())
+    {
+        &["GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"]
+    } else {
+        &[]
+    };
+    candidates.iter().find_map(|name| {
+        get_env(name)
+            .map(|v| v.trim().to_owned())
+            .filter(|v| !v.is_empty())
+    })
+}
+
 /// Returns isolated `gh` CLI environment overrides, gating `GH_ENTERPRISE_TOKEN` on Enterprise hosts.
 #[must_use]
 pub fn build_gh_cli_env(hostname: &str, token: Option<&str>) -> Vec<(String, String)> {
     let normalized = hostname.trim().to_ascii_lowercase();
-    let mut env = vec![("GH_PROMPT_DISABLED".to_owned(), "1".to_owned())];
+    let mut env = vec![
+        ("GH_PROMPT_DISABLED".to_owned(), "1".to_owned()),
+        ("GH_DEBUG".to_owned(), String::new()),
+    ];
     if !normalized.is_empty() && normalized != "github.com" {
-        env.push(("GH_HOST".to_owned(), normalized));
+        env.push(("GH_HOST".to_owned(), normalized.clone()));
         if let Some(tok) = token
             && !tok.trim().is_empty()
         {
-            env.push(("GH_ENTERPRISE_TOKEN".to_owned(), tok.trim().to_owned()));
+            let var = if normalized.ends_with(".ghe.com") {
+                "GH_TOKEN"
+            } else {
+                "GH_ENTERPRISE_TOKEN"
+            };
+            env.push((var.to_owned(), tok.trim().to_owned()));
         }
     } else if let Some(tok) = token
         && !tok.trim().is_empty()
@@ -191,162 +233,96 @@ pub fn build_gh_cli_env(hostname: &str, token: Option<&str>) -> Vec<(String, Str
     env
 }
 
-/// Enforces `GitHub`'s 10% quota reserve policy against a parsed [`QuotaSnapshot`].
-#[must_use]
-pub fn check_github_quota(snapshot: &QuotaSnapshot, allow_reserve: bool) -> GitHubRateLimitSignal {
-    if snapshot.has_headroom(GITHUB_QUOTA_RESERVE_PERCENT, allow_reserve) {
-        GitHubRateLimitSignal::Clear
-    } else if snapshot.remaining == 0 {
-        GitHubRateLimitSignal::RateLimited {
-            reason: "GitHub primary rate limit exhausted (remaining=0)".to_owned(),
-        }
-    } else {
-        GitHubRateLimitSignal::QuotaReserveReached {
-            remaining: snapshot.remaining,
-            limit: snapshot.limit,
-        }
-    }
+/// Parsed output from `git credential fill` (`550cb3363c`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GitCredentialFillResult {
+    /// Credential protocol (typically `"https"`).
+    pub protocol: Option<String>,
+    /// Matched host reported by git credential helper.
+    pub host: Option<String>,
+    /// Username if supplied by helper.
+    pub username: Option<String>,
+    /// Secret password / personal access token / OAuth token.
+    pub password: String,
 }
 
-/// Inspects an HTTP response status, headers, and optional JSON/text body for `GitHub` rate limits.
-#[must_use]
-pub fn classify_github_response(
-    status: StatusCode,
-    headers: &HeaderMap,
-    body: &str,
-) -> GitHubRateLimitSignal {
-    if status == StatusCode::TOO_MANY_REQUESTS {
-        return GitHubRateLimitSignal::RateLimited {
-            reason: "HTTP 429 Too Many Requests".to_owned(),
-        };
-    }
-
-    let remaining_zero = headers
-        .get("x-ratelimit-remaining")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.trim().parse::<u64>().ok())
-        == Some(0);
-    let lower_body = body.to_ascii_lowercase();
-    if status == StatusCode::FORBIDDEN
-        && (remaining_zero
-            || lower_body.contains("rate limit")
-            || lower_body.contains("secondary rate")
-            || lower_body.contains("abuse detection"))
-    {
-        return GitHubRateLimitSignal::RateLimited {
-            reason: "HTTP 403 rate limit or abuse detection".to_owned(),
-        };
-    }
-
-    if let Ok(parsed) = serde_json::from_str::<Value>(body)
-        && let Some(errors) = parsed.get("errors").and_then(Value::as_array)
-        && errors.iter().any(|err| {
-            json_str(err, "type") == Some("RATE_LIMITED")
-                || json_str(err, "message")
-                    .is_some_and(|m| m.to_ascii_lowercase().contains("rate limit"))
-        })
-    {
-        return GitHubRateLimitSignal::RateLimited {
-            reason: "GraphQL RATE_LIMITED".to_owned(),
-        };
-    }
-
-    GitHubRateLimitSignal::Clear
-}
-
-/// Normalizes a `GitHub` REST or GraphQL pull request JSON object into [`NormalizedPullRequest`].
+/// Builds a non-interactive `git credential fill` [`CliCommandSpec`] for `host` (`550cb3363c`).
 ///
-/// # Errors
-///
-/// Returns [`ForgeError::MalformedResponse`] if required fields (`number`, `title`, branches) are missing.
-pub fn normalize_github_pr_json(json: &Value) -> Result<NormalizedPullRequest, ForgeError> {
-    let number = json_u64(json, "number")
-        .ok_or_else(|| ForgeError::MalformedResponse("missing GitHub PR `number`".to_owned()))?;
-    let title = json_str(json, "title")
-        .ok_or_else(|| ForgeError::MalformedResponse("missing GitHub PR `title`".to_owned()))?
-        .to_owned();
-    let url = json_str(json, "html_url")
-        .or_else(|| json_str(json, "url"))
-        .unwrap_or("")
-        .to_owned();
-
-    let is_merged = json.get("merged").and_then(Value::as_bool) == Some(true)
-        || json.get("merged_at").is_some_and(|v| !v.is_null())
-        || json.get("mergedAt").is_some_and(|v| !v.is_null());
-    let state = parse_standard_pr_state(json_str(json, "state").unwrap_or("open"), is_merged);
-    let is_draft = json
-        .get("draft")
-        .and_then(Value::as_bool)
-        .or_else(|| json.get("isDraft").and_then(Value::as_bool))
-        .unwrap_or(false);
-
-    let head_branch = json
-        .get("head")
-        .and_then(|h| json_str(h, "ref"))
-        .or_else(|| json_str(json, "headRefName"))
-        .ok_or_else(|| ForgeError::MalformedResponse("missing GitHub PR head branch".to_owned()))?
-        .to_owned();
-    let base_branch = json
-        .get("base")
-        .and_then(|b| json_str(b, "ref"))
-        .or_else(|| json_str(json, "baseRefName"))
-        .ok_or_else(|| ForgeError::MalformedResponse("missing GitHub PR base branch".to_owned()))?
-        .to_owned();
-    let head_sha = json
-        .get("head")
-        .and_then(|h| json_str(h, "sha"))
-        .or_else(|| json_str(json, "headRefOid"))
-        .map(str::to_owned);
-
-    let mergeability = match json.get("mergeable").and_then(Value::as_bool) {
-        Some(true) => PullRequestMergeability::Mergeable,
-        Some(false) => PullRequestMergeability::Conflicting,
-        None => match json_str(json, "mergeable") {
-            Some("MERGEABLE") => PullRequestMergeability::Mergeable,
-            Some("CONFLICTING") => PullRequestMergeability::Conflicting,
-            _ => PullRequestMergeability::Unknown,
-        },
-    };
-
-    let checks_state = extract_checks_state(json);
-
-    Ok(NormalizedPullRequest {
-        number,
-        title,
-        url,
-        state,
-        is_draft,
-        head_branch,
-        base_branch,
-        head_sha,
-        mergeability,
-        checks_state,
+/// Rejects line breaks, `NUL`, or invalid hostnames to prevent git credential attribute injection.
+pub fn build_git_credential_fill_spec(
+    protocol: &str,
+    host: &str,
+    path: Option<&str>,
+) -> Result<CliCommandSpec, ForgeError> {
+    let clean_proto = protocol.trim().to_ascii_lowercase();
+    if !matches!(clean_proto.as_str(), "https" | "http") {
+        return Err(ForgeError::InvalidHost {
+            host: protocol.to_owned(),
+            reason: "git credential protocol must be `http` or `https`".to_owned(),
+        });
+    }
+    let clean_host = validate_hostname(host)?;
+    let mut stdin = format!("protocol={clean_proto}\nhost={clean_host}\n");
+    if let Some(p) = path.map(str::trim).filter(|p| !p.is_empty()) {
+        if p.contains(['\r', '\n', '\0']) {
+            return Err(ForgeError::InvalidCredentials(
+                "git credential path contains forbidden control characters".to_owned(),
+            ));
+        }
+        stdin.push_str("path=");
+        stdin.push_str(p.trim_start_matches('/'));
+        stdin.push('\n');
+    }
+    stdin.push('\n');
+    Ok(CliCommandSpec {
+        program: "git".to_owned(),
+        args: vec!["credential".to_owned(), "fill".to_owned()],
+        env: vec![("GIT_TERMINAL_PROMPT".to_owned(), "0".to_owned())],
+        stdin: Some(stdin),
     })
 }
 
-fn extract_checks_state(json: &Value) -> PullRequestChecksState {
-    let Some(arr) = json.get("checks").and_then(Value::as_array) else {
-        return PullRequestChecksState::Pending;
-    };
-    let entries: Vec<CheckEntry> = arr
-        .iter()
-        .map(|item| CheckEntry {
-            name: json_str(item, "name").unwrap_or("check").to_owned(),
-            context: None,
-            state: RawCheckState::from_forge_str(
-                json_str(item, "conclusion")
-                    .or_else(|| json_str(item, "status"))
-                    .unwrap_or("pending"),
-            ),
-            required: false,
-            updated_at: None,
-            details_url: None,
-        })
-        .collect();
-    rollup_check_statuses(&entries)
+/// Parses `key=value` output emitted by `git credential fill` (`550cb3363c`).
+///
+/// Stops at the blank terminator line and requires a non-empty `password`.
+pub fn parse_git_credential_fill_output(
+    stdout: &str,
+) -> Result<GitCredentialFillResult, ForgeError> {
+    let mut protocol = None;
+    let mut host = None;
+    let mut username = None;
+    let mut password = None;
+
+    for raw_line in stdout.lines() {
+        let line = raw_line.trim_end_matches('\r');
+        if line.is_empty() {
+            break;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let val = value.trim();
+        match key.trim() {
+            "protocol" if !val.is_empty() => protocol = Some(val.to_owned()),
+            "host" if !val.is_empty() => host = Some(val.to_owned()),
+            "username" if !val.is_empty() => username = Some(val.to_owned()),
+            "password" if !val.is_empty() => password = Some(val.to_owned()),
+            _ => {}
+        }
+    }
+
+    let password = password.ok_or_else(|| {
+        ForgeError::AuthRequired("git credential fill returned no password for host".to_owned())
+    })?;
+    Ok(GitCredentialFillResult {
+        protocol,
+        host,
+        username,
+        password,
+    })
 }
 
-fn validate_token(token: &str) -> Result<&str, ForgeError> {
+pub(crate) fn validate_token(token: &str) -> Result<&str, ForgeError> {
     let trimmed = token.trim();
     if trimmed.is_empty() || trimmed.contains(['\r', '\n']) {
         return Err(ForgeError::InvalidCredentials(

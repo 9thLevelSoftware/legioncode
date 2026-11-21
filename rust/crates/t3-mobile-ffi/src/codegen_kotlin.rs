@@ -48,6 +48,10 @@ internal interface T3MobileFfiLibrary : Library {
     ): Int
     fun t3_mobile_ffi_host_swap_chunks_json(inputJson: String, outJson: PointerByReference): Int
     fun t3_mobile_ffi_theme_plan_json(inputJson: String, outJson: PointerByReference): Int
+    fun t3_mobile_ffi_filter_review_files_json(inputJson: String, outJson: PointerByReference): Int
+    fun t3_mobile_ffi_linked_lines_json(inputJson: String, outJson: PointerByReference): Int
+    fun t3_mobile_ffi_tunnel_guard_json(inputJson: String, outJson: PointerByReference): Int
+    fun t3_mobile_ffi_secret_card_json(inputJson: String, outJson: PointerByReference): Int
     fun t3_mobile_ffi_sdk_sources_json(outJson: PointerByReference): Int
     fun t3_mobile_ffi_free_string(ptr: Pointer): Int
     fun t3_mobile_ffi_free_bytes(ptr: Pointer, len: SizeT): Int
@@ -110,6 +114,18 @@ object T3MobileCore {
 
     fun themePlanJson(inputJson: String): String =
         invokeJson { out -> lib.t3_mobile_ffi_theme_plan_json(inputJson, out) }
+
+    fun filterReviewFilesJson(inputJson: String): String =
+        invokeJson { out -> lib.t3_mobile_ffi_filter_review_files_json(inputJson, out) }
+
+    fun linkedLinesJson(inputJson: String): String =
+        invokeJson { out -> lib.t3_mobile_ffi_linked_lines_json(inputJson, out) }
+
+    fun tunnelGuardJson(inputJson: String): String =
+        invokeJson { out -> lib.t3_mobile_ffi_tunnel_guard_json(inputJson, out) }
+
+    fun secretCardJson(inputJson: String): String =
+        invokeJson { out -> lib.t3_mobile_ffi_secret_card_json(inputJson, out) }
 
     fun sdkSourcesJson(): String =
         invokeJson { out -> lib.t3_mobile_ffi_sdk_sources_json(out) }

@@ -221,6 +221,8 @@ pub struct WebAppState {
     pub right_tab: RightPaneTab,
     /// Responsive sidebar drawer visibility.
     pub sidebar_open: bool,
+    /// Wave 5 UI feature states (errors, Environments Map, linked pane, repos, secrets, MCP, updates).
+    pub features: crate::state_features::WebFeatureState,
 }
 
 impl WebAppState {
@@ -249,6 +251,7 @@ impl WebAppState {
             command_palette: CommandPaletteState::default(),
             right_tab: RightPaneTab::Chat,
             sidebar_open: true,
+            features: crate::state_features::WebFeatureState::default(),
         }
     }
 

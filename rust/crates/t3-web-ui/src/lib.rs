@@ -22,24 +22,34 @@
 #![forbid(unsafe_code)]
 
 pub mod actions;
+pub mod actions_features;
 pub mod actions_types;
 pub mod bundle;
 pub mod effects;
+pub mod hdl_highlight;
+mod hdl_keywords;
 mod i18n_web;
+mod i18n_web_features;
 mod i18n_web_intl;
 pub mod state;
+pub mod state_features;
 pub mod state_snapshot;
 pub mod state_types;
 pub mod update;
 mod update_dispatch;
+mod update_dispatch_features;
+mod update_features;
+mod update_fleet;
 mod update_palette;
 mod update_panels;
 mod update_projection;
+mod update_settings_features;
 mod update_stream;
 mod update_timeline;
 mod update_workspace;
 pub mod view;
 mod view_chat;
+mod view_features;
 mod view_palette;
 mod view_panels;
 

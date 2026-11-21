@@ -53,7 +53,7 @@ unsafe fn write_json_out(
 }
 
 // SAFETY: Private FFI helper; caller upholds `# Safety` pointer contracts.
-unsafe fn run_json_bridge(
+pub(crate) unsafe fn run_json_bridge(
     input_json: *const c_char,
     out_json: *mut *mut c_char,
     op: fn(&str) -> Result<String, MobileFfiError>,

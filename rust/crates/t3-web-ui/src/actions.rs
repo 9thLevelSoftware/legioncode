@@ -247,6 +247,71 @@ pub enum WebAppAction {
         #[serde(default)]
         index: Option<usize>,
     },
+    /// Records a repeatable thread error occurrence banner (`5872b0a488`, `aa6fe390db`).
+    RecordThreadError(crate::actions_features::RecordThreadErrorPayload),
+    /// Dismisses a thread error banner by monotonic occurrence ID.
+    DismissThreadError(crate::actions_features::DismissThreadErrorPayload),
+    /// Updates Environments Map topology (routes + P2P links, NO cloud relay).
+    SetEnvironmentsFleet(crate::actions_features::SetEnvironmentsFleetPayload),
+    /// Opens or closes the Environments Map panel.
+    #[serde(rename_all = "camelCase")]
+    SetEnvironmentsMapOpen { open: bool },
+    /// Starts concurrency-capped batch P2P linking (`8e8ff9b243`).
+    #[serde(rename_all = "camelCase")]
+    StartBatchLink {
+        #[serde(default)]
+        candidate_ids: Vec<String>,
+    },
+    /// Advances batch link status for one environment without halting siblings.
+    AdvanceBatchLink(crate::actions_features::AdvanceBatchLinkPayload),
+    /// Opens or switches the unified read-only right-hand thread pane (`1cb3a8c753`).
+    OpenLinkedThreadPane(crate::actions_features::OpenLinkedThreadPanePayload),
+    /// Synchronizes working/history/error status on the open linked-thread pane.
+    SyncLinkedThreadPane(crate::actions_features::SyncLinkedThreadPanePayload),
+    /// Closes the unified read-only linked-thread pane.
+    CloseLinkedThreadPane,
+    /// Reopens the previously closed linked-thread pane.
+    ReopenLinkedThreadPane,
+    /// Opens or closes the multi-repo project picker (`60863edc41`).
+    #[serde(rename_all = "camelCase")]
+    SetRepoPickerOpen { open: bool },
+    /// Sets tracked/scanned folders and worktree repository defaults for a project.
+    SetProjectRepositories(crate::actions_features::SetProjectRepositoriesPayload),
+    /// Toggles tracking a repository folder on a project (`60863edc41`).
+    ToggleProjectRepository(crate::actions_features::ProjectRepoFolderPayload),
+    /// Pins or unpins a repository in a thread's repo switcher.
+    TogglePinThreadRepository(crate::actions_features::ThreadRepoPinPayload),
+    /// Registers or updates a multi-value secret request card (`0bc9b57b93`).
+    UpsertSecretCard(crate::actions_features::UpsertSecretCardPayload),
+    /// Updates input value on a secret request card field.
+    SetSecretFieldValue(crate::actions_features::SecretFieldValuePayload),
+    /// Toggles show/hide mask state on a revealable secret field.
+    ToggleSecretFieldReveal(crate::actions_features::SecretFieldKeyPayload),
+    /// Saves or declines a secret request card (`secrets.answerRequest`).
+    AnswerSecretCard(crate::actions_features::AnswerSecretCardPayload),
+    /// Registers an MCP OAuth sign-in notice (`669d8941e2`).
+    UpsertMcpSignIn(crate::actions_features::UpsertMcpSignInPayload),
+    /// Starts MCP OAuth sign-in (`provider.mcpSignIn.start`).
+    StartMcpSignIn(crate::actions_features::StartMcpSignInPayload),
+    /// Completes MCP OAuth sign-in callback (`provider.mcpSignIn.complete`).
+    CompleteMcpSignIn(crate::actions_features::CompleteMcpSignInPayload),
+    /// Applies MCP OAuth sign-in completion, cancellation, or error status.
+    ResolveMcpSignIn(crate::actions_features::ResolveMcpSignInPayload),
+    /// Locks or unlocks composer text input during dictation while keeping chip removal active (`b19ca97827`).
+    #[serde(rename_all = "camelCase")]
+    SetDictationActive { active: bool },
+    /// Replaces keybindings list evaluated against `when` conditions (`342b58a79f`).
+    SetKeybindings(crate::actions_features::KeybindingListPayload),
+    /// Filters keybinding entries in settings/palette (`3d31ffcd9a`).
+    #[serde(rename_all = "camelCase")]
+    SearchKeybindings { query: String },
+    /// Sets compact sidebar update capsule state and computes countdown seconds.
+    SetUpdateCapsule(crate::actions_features::SetUpdateCapsulePayload),
+    /// Advances update countdown timer against `now_ms`.
+    #[serde(rename_all = "camelCase")]
+    TickUpdateCountdown { now_ms: i64 },
+    /// Postpones/dismisses the update countdown (`Later`).
+    PostponeUpdateCapsule,
 }
 
 const fn default_true() -> bool {

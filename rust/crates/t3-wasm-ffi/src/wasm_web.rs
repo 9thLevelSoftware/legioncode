@@ -43,6 +43,27 @@ impl WasmWebApp {
             .state_snapshot_json()
             .map_err(|err| JsValue::from_str(&err))
     }
+
+    /// Applies one `StreamItem` JSON payload onto the web UI state at `now_ms`.
+    #[wasm_bindgen]
+    pub fn dispatch_stream_json(
+        &mut self,
+        stream_json: &str,
+        now_ms: f64,
+    ) -> Result<String, JsValue> {
+        let ts = bridge::js_ms_to_u64(now_ms).map_err(|err| JsValue::from_str(&err))?;
+        self.inner
+            .dispatch_stream_json(stream_json, ts)
+            .map_err(|err| JsValue::from_str(&err))
+    }
+
+    /// Tokenizes Verilog, `SystemVerilog`, or VHDL snippets (`t3_web_ui::hdl_highlight`).
+    #[wasm_bindgen]
+    pub fn highlight_hdl_json(&self, lang_or_path: &str, source: &str) -> Result<String, JsValue> {
+        self.inner
+            .highlight_hdl_json(lang_or_path, source)
+            .map_err(|err| JsValue::from_str(&err))
+    }
 }
 
 /// Emits the deterministic static web bundle (`indexHtml`, `stylesCss`, `appMjs`) as JSON.

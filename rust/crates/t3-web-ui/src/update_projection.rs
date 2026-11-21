@@ -183,10 +183,9 @@ fn apply_domain_event(state: &mut WebAppState, sequence: u64, event: DomainEvent
             upsert_timeline_message(&mut timeline.messages, entry);
         }
         DomainEventPayload::TurnItemUpdated(item) => {
-            upsert_timeline_message(
-                &mut timeline.messages,
-                turn_item_to_timeline(*item, sequence),
-            );
+            sync_turn_item_features(state, &tid, &item, sequence);
+            let tl = state.timelines.entry(tid).or_default();
+            upsert_timeline_message(&mut tl.messages, turn_item_to_timeline(*item, sequence));
         }
         DomainEventPayload::RunUpdated { run, .. } => {
             timeline.active_run_status = Some(format!("{:?}", run.status).to_ascii_lowercase());
@@ -216,6 +215,57 @@ fn apply_domain_event(state: &mut WebAppState, sequence: u64, event: DomainEvent
                 status: Some(cp.status),
             };
             upsert_timeline_message(&mut timeline.messages, entry);
+        }
+        _ => {}
+    }
+}
+
+fn sync_turn_item_features(
+    state: &mut WebAppState,
+    thread_id: &str,
+    item: &t3_contracts::orchestration::TurnItem,
+    sequence: u64,
+) {
+    use t3_contracts::orchestration::TurnItemKind;
+    let item_id = item.base.id.as_str();
+    match &item.kind {
+        TurnItemKind::Error { failure, .. } => {
+            let key = format!("{thread_id}:{item_id}:{sequence}");
+            crate::update_features::record_thread_error(
+                state,
+                thread_id,
+                &failure.message,
+                crate::state_features::ThreadErrorSource::Runtime,
+                Some(&key),
+                false,
+            );
+        }
+        TurnItemKind::SecretRequest {
+            label,
+            reason,
+            url,
+            placeholder,
+            delivery,
+            fields,
+            ..
+        } => {
+            let payload = crate::actions_features::UpsertSecretCardPayload {
+                thread_id: thread_id.to_owned(),
+                turn_item_id: item_id.to_owned(),
+                label: label.clone(),
+                placeholder: placeholder.clone(),
+                reason: Some(reason.clone()),
+                url: url.clone(),
+                delivery_file: delivery.as_deref() == Some("file"),
+                fields: fields.clone(),
+            };
+            crate::update_features::upsert_secret_card(state, &payload);
+        }
+        TurnItemKind::SystemNotice {
+            mcp_sign_in: Some(notice),
+            ..
+        } => {
+            crate::update_features::upsert_mcp_sign_in(state, thread_id, item_id, notice);
         }
         _ => {}
     }

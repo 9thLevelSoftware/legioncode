@@ -223,3 +223,71 @@ fn window_bounds_respect_edge_tolerance_minimum_size_and_display_clamping() {
         }
     );
 }
+
+#[test]
+fn desktop_shortcuts_format_accelerators_detect_conflicts_and_build_zoom_menu() {
+    use t3_surfaces::desktop_shortcuts::{
+        DesktopKeyChord, DesktopModifier, DesktopPlatform, DesktopShortcut, DesktopZoomAction,
+        same_shortcut, shortcut_registration_failure_message, shortcut_system_conflict,
+        to_electron_accelerator, zoom_accelerators_for_platform,
+    };
+
+    let plus = DesktopKeyChord::new("+").with_mod().with_shift();
+    assert_eq!(
+        to_electron_accelerator(&plus),
+        "CommandOrControl+Shift+Plus"
+    );
+    let up = DesktopKeyChord::new("arrowup").with_alt();
+    assert_eq!(to_electron_accelerator(&up), "Alt+Up");
+
+    let mod_c = DesktopKeyChord::new("c").with_mod();
+    assert_eq!(
+        shortcut_system_conflict(&mod_c).as_deref(),
+        Some("This shortcut is Copy in most apps.")
+    );
+    let shift_only = DesktopKeyChord::new("k").with_shift();
+    assert!(
+        shortcut_system_conflict(&shift_only)
+            .is_some_and(|msg| msg.contains("Add another modifier"))
+    );
+    let dual = DesktopKeyChord::new("k").with_mod().with_shift();
+    assert_eq!(shortcut_system_conflict(&dual), None);
+
+    let pair = DesktopShortcut::BothShiftKeys;
+    assert_eq!(
+        shortcut_registration_failure_message(&pair, true),
+        "Shift + Shift is not available on this system."
+    );
+    let pair_alt = DesktopShortcut::ModifierPair {
+        modifier: DesktopModifier::Alt,
+    };
+    assert_eq!(
+        shortcut_registration_failure_message(&pair_alt, true),
+        "Option + Option is not available on this system."
+    );
+    assert_eq!(
+        shortcut_registration_failure_message(&pair_alt, false),
+        "Alt + Alt is not available on this system."
+    );
+    assert!(same_shortcut(
+        &pair,
+        &DesktopShortcut::ModifierPair {
+            modifier: DesktopModifier::Shift
+        }
+    ));
+
+    let mac_zoom = zoom_accelerators_for_platform(DesktopPlatform::MacOs);
+    let win_zoom = zoom_accelerators_for_platform(DesktopPlatform::Windows);
+    assert!(
+        mac_zoom
+            .iter()
+            .any(|item| item.action == DesktopZoomAction::In
+                && item.accelerator == "CmdOrCtrl+Shift+="
+                && !item.visible)
+    );
+    assert!(
+        !win_zoom
+            .iter()
+            .any(|item| item.accelerator == "CmdOrCtrl+Shift+=")
+    );
+}

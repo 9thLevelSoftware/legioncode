@@ -61,20 +61,27 @@
 mod cf_worker_cache;
 mod cf_worker_hooks;
 mod desktop_bounds;
+mod desktop_scheme;
 mod mobile_diff_types;
 mod mobile_i18n_activity;
 mod mobile_i18n_activity_catalog;
 mod mobile_i18n_activity_catalog_intl;
 mod mobile_i18n_activity_types;
 mod mobile_i18n_nav_catalog;
+mod mobile_review_approvals;
+mod mobile_review_filters;
+mod mobile_review_i18n;
+mod mobile_review_secrets;
 mod mobile_tunnel_proxy;
 mod mobile_tunnel_theme;
 
 pub mod cf_worker;
 pub mod desktop;
+pub mod desktop_shortcuts;
 pub mod mobile_composer;
 pub mod mobile_diff;
 pub mod mobile_i18n;
+pub mod mobile_review;
 pub mod mobile_tunnel;
 
 /// Protocol version shared across web, desktop, and mobile client surfaces.

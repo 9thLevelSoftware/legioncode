@@ -33,8 +33,10 @@
 //! # }
 //! ```
 
+pub mod commit_batch;
 pub mod event_codec;
 pub mod projection_apply;
+pub mod projection_load;
 pub mod tx;
 pub mod types;
 

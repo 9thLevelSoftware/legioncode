@@ -55,6 +55,7 @@
 mod http_gate;
 mod mode_limit;
 mod sse;
+mod tool_prefix;
 
 pub use http_gate::{
     McpGateOutcome, McpGateRejection, McpHttpRequest, evaluate_mcp_http_request,
@@ -68,4 +69,8 @@ pub use mode_limit::{
 pub use sse::{
     DEFAULT_WAIT_TIMEOUT_MS, MAX_WAIT_TIMEOUT_MS, McpSseError, PeerMcpSessionMap,
     PeerMcpSessionState, PeerSessionKey, clamp_wait_timeout_ms, parse_sse_json_rpc_response,
+};
+pub use tool_prefix::{
+    canonical_mcp_tool_name, has_branded_mcp_tool_prefix, is_branded_mcp_tool, matches_mcp_header,
+    mcp_header_candidates, mcp_tool_candidates, mcp_tool_candidates_for,
 };

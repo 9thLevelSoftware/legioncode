@@ -10,6 +10,8 @@
 
 use std::collections::{BTreeMap, HashSet};
 
+use t3_contracts::brand::{ACTIVE_BRAND, LEGION_CODE, T3_COMPAT};
+
 /// Terminal environment variables stripped when launching child shells/providers.
 pub const TERMINAL_ENV_BLOCKLIST: &[&str] = &[
     "PORT",
@@ -40,7 +42,10 @@ pub fn is_blocked_ambient_env_key(key: &str) -> bool {
     if upper.is_empty() {
         return true;
     }
-    if upper.starts_with("T3CODE_") || upper.starts_with("VITE_") {
+    let brand_match = [ACTIVE_BRAND, T3_COMPAT, LEGION_CODE].iter().any(|brand| {
+        upper.starts_with(brand.primary_env_prefix) || upper.starts_with(brand.fallback_env_prefix)
+    });
+    if brand_match || upper.starts_with("VITE_") {
         return true;
     }
     TERMINAL_ENV_BLOCKLIST.contains(&upper.as_str()) || APPIMAGE_ENV_VARS.contains(&upper.as_str())

@@ -23,3 +23,5 @@ pub mod auth;
 pub mod mcp;
 pub mod provider_env;
 pub mod rpc_codec;
+pub mod tunnel;
+pub mod url_redaction;

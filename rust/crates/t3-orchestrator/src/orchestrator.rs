@@ -23,6 +23,7 @@
 //!     thread_id: ThreadId::new("thread-1")?,
 //!     project_id: ProjectId::new("proj-1")?,
 //!     title: "Orchestrate safely".to_owned(),
+//!     generate_title: None,
 //!     model_selection: ModelSelection {
 //!         instance_id: ProviderInstanceId::new("codex")?,
 //!         model: "gpt-5".to_owned(),
@@ -49,12 +50,16 @@ use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
 use t3_contracts::ids::{CommandId, ThreadId};
-use t3_contracts::orchestration::{AppThread, OrchestrationCommand};
+use t3_contracts::orchestration::{AppThread, OrchestrationCommand, SubmitRunOutputCommand};
 use t3_persistence::sqlite::SqliteStore;
 use thiserror::Error;
 
-use crate::decider::{CommandDecision, DeciderError, RollbackIntent, decide_command};
+use crate::decider::{
+    CommandDecision, DeciderError, RollbackIntent, decide_command, decide_pop_next_queued_run,
+    decide_submit_run_output,
+};
 use crate::locks::{LockError, OrchestratorLocks};
+use crate::orchestrator_replay::{command_thread_id, replay_existing_receipt};
 use crate::outbox::{EffectOutboxWorker, OutboxEffectExecutor, OutboxSignal, OutboxWorkerOptions};
 use crate::projections::{
     ProjectionError, PruneEventStoreReport, ShellSnapshot, ShellSnapshotOptions, prune_event_store,
@@ -62,9 +67,7 @@ use crate::projections::{
 };
 use crate::sink::projection_apply::{DeciderThreadState, load_decider_state};
 use crate::sink::tx::load_receipt;
-use crate::sink::{
-    CommitCommandOutcome, EventPubSub, EventSink, EventSubscriber, ReceiptStatus, SinkError,
-};
+use crate::sink::{CommitCommandOutcome, EventPubSub, EventSink, EventSubscriber, SinkError};
 use crate::time::now_iso_utc;
 
 /// Errors returned by [`Orchestrator`] command dispatch and queries.
@@ -236,6 +239,43 @@ impl Orchestrator {
         }
     }
 
+    /// Dispatches a server-internal `run.output.submit` command atomically against `SQLite`.
+    pub async fn dispatch_submit_run_output(
+        &self,
+        command: &SubmitRunOutputCommand,
+        now_iso: &str,
+    ) -> Result<DispatchResult, OrchestratorError> {
+        let _s1 = self
+            .locks
+            .session()
+            .acquire_child_thread(command.thread_id.clone())
+            .await?;
+        self.execute_locked_decision(
+            &command.command_id,
+            "run.output.submit",
+            &command.thread_id,
+            now_iso,
+            |state| decide_submit_run_output(state, command, now_iso),
+        )
+    }
+
+    /// Pops and starts the next ready queued run on `thread_id`, inheriting live model selection.
+    pub async fn pop_next_queued_run(
+        &self,
+        command_id: &CommandId,
+        thread_id: &ThreadId,
+        now_iso: &str,
+    ) -> Result<DispatchResult, OrchestratorError> {
+        let _s1 = self
+            .locks
+            .session()
+            .acquire_child_thread(thread_id.clone())
+            .await?;
+        self.execute_locked_decision(command_id, "queued-run.pop", thread_id, now_iso, |state| {
+            decide_pop_next_queued_run(state, command_id, thread_id, now_iso)
+        })
+    }
+
     /// Queries the current [`ShellSnapshot`] at `now_iso`.
     pub fn shell_snapshot(
         &self,
@@ -270,21 +310,39 @@ impl Orchestrator {
         thread_id: &ThreadId,
         now_iso: &str,
     ) -> Result<DispatchResult, OrchestratorError> {
-        let command_id = command.command_id().clone();
-        let command_type = command.command_type();
+        self.execute_locked_decision(
+            command.command_id(),
+            command.command_type(),
+            thread_id,
+            now_iso,
+            |state| decide_command(state, command, now_iso),
+        )
+    }
+
+    fn execute_locked_decision<F>(
+        &self,
+        command_id: &CommandId,
+        command_type: &str,
+        thread_id: &ThreadId,
+        now_iso: &str,
+        decide: F,
+    ) -> Result<DispatchResult, OrchestratorError>
+    where
+        F: FnOnce(&DeciderThreadState) -> Result<CommandDecision, DeciderError>,
+    {
         let mut tx = self.sink.begin_tx()?;
 
-        if let Some(existing) = load_receipt(tx.conn()?, &command_id)? {
-            return replay_existing_receipt(tx, existing, command_id, thread_id);
+        if let Some(existing) = load_receipt(tx.conn()?, command_id)? {
+            return replay_existing_receipt(tx, existing, command_id.clone(), thread_id);
         }
 
         let state = load_decider_state(tx.conn()?, thread_id)?;
-        let decision: CommandDecision = match decide_command(&state, command, now_iso) {
+        let decision: CommandDecision = match decide(&state) {
             Ok(dec) => dec,
             Err(err) => {
                 let msg = err.to_string();
                 tx.commit_rejected_command(
-                    &command_id,
+                    command_id,
                     command_type,
                     thread_id.as_str(),
                     &msg,
@@ -306,53 +364,4 @@ impl Orchestrator {
             resulting_thread,
         })
     }
-}
-
-fn replay_existing_receipt(
-    tx: crate::sink::SinkTransaction<'_>,
-    existing: crate::sink::CommandReceipt,
-    command_id: CommandId,
-    thread_id: &ThreadId,
-) -> Result<DispatchResult, OrchestratorError> {
-    if existing.aggregate_id != thread_id.as_str() {
-        return Err(SinkError::CommandIdConflict {
-            command_id,
-            existing_thread_id: existing.aggregate_id,
-            requested_thread_id: thread_id.as_str().to_owned(),
-        }
-        .into());
-    }
-    if existing.status == ReceiptStatus::Rejected {
-        return Err(SinkError::CommandPreviouslyRejected {
-            command_id,
-            error: existing
-                .error
-                .unwrap_or_else(|| "command previously rejected".to_owned()),
-        }
-        .into());
-    }
-    let events = crate::sink::event_codec::load_events_by_command(tx.conn()?, &command_id)?;
-    let resulting_thread =
-        crate::sink::projection_apply::load_thread_projection(tx.conn()?, thread_id)?;
-    tx.rollback()?;
-    Ok(DispatchResult {
-        outcome: CommitCommandOutcome {
-            events,
-            receipt: existing,
-            replayed: true,
-        },
-        rollback_intent: None,
-        resulting_thread,
-    })
-}
-
-fn command_thread_id(command: &OrchestrationCommand) -> Option<ThreadId> {
-    serde_json::to_value(command)
-        .ok()
-        .and_then(|val| {
-            val.get("threadId")
-                .and_then(|v| v.as_str())
-                .map(str::to_owned)
-        })
-        .and_then(|raw| ThreadId::new(raw).ok())
 }

@@ -1,7 +1,7 @@
 //! Pure thread settle/unsettle, snooze/unsnooze, and pin/unpin command transitions.
 
 use t3_contracts::ids::{CommandId, RunId, ThreadId};
-use t3_contracts::orchestration::ThreadUnsettleCommand;
+use t3_contracts::orchestration::{ModelSelection, ThreadUnsettleCommand};
 
 use crate::decider::thread_ops::{is_run_active, make_thread_event, require_live_thread};
 use crate::decider::types::{CommandDecision, DeciderError};
@@ -45,6 +45,56 @@ pub(crate) fn decide_thread_settle(
     Ok(CommandDecision {
         command_id: command_id.clone(),
         command_type: "thread.settle".to_owned(),
+        thread_id: thread_id.clone(),
+        events: vec![event],
+        outbox_effects: Vec::new(),
+        rollback_intent: None,
+        resulting_thread: Some(thread),
+    })
+}
+
+/// Evaluates whether a thread may auto-settle; suppresses settlement when any run is active or
+/// a live PTY terminal subprocess is still running (`6cbda0cd0a` / #39835).
+#[must_use]
+pub fn can_auto_settle_thread(state: &DeciderThreadState) -> bool {
+    !state.has_active_terminal_subprocess && !state.runs.iter().any(is_run_active)
+}
+
+pub(crate) fn decide_thread_auto_settle(
+    state: &DeciderThreadState,
+    command_id: &CommandId,
+    thread_id: &ThreadId,
+    snapshot_at: &str,
+    settled_at: Option<&str>,
+    now_iso: &str,
+) -> Result<CommandDecision, DeciderError> {
+    let mut thread = require_live_thread(state, thread_id)?;
+    if !can_auto_settle_thread(state) || thread.updated_at != snapshot_at {
+        return Ok(CommandDecision {
+            command_id: command_id.clone(),
+            command_type: "thread.auto-settle".to_owned(),
+            thread_id: thread_id.clone(),
+            events: Vec::new(),
+            outbox_effects: Vec::new(),
+            rollback_intent: None,
+            resulting_thread: Some(thread),
+        });
+    }
+    thread.settled_override = Some("settled".to_owned());
+    thread.settled_at = Some(settled_at.unwrap_or(now_iso).to_owned());
+    thread.unsettled_at = Some(None);
+    now_iso.clone_into(&mut thread.updated_at);
+    let event = make_thread_event(
+        command_id,
+        0,
+        thread_id,
+        now_iso,
+        "thread.settled",
+        thread.clone(),
+    )?;
+    Ok(CommandDecision {
+        command_id: command_id.clone(),
+        command_type: "thread.auto-settle".to_owned(),
         thread_id: thread_id.clone(),
         events: vec![event],
         outbox_effects: Vec::new(),
@@ -221,6 +271,36 @@ pub(crate) fn decide_thread_unpin(
     Ok(CommandDecision {
         command_id: command_id.clone(),
         command_type: "thread.unpin".to_owned(),
+        thread_id: thread_id.clone(),
+        events: vec![event],
+        outbox_effects: Vec::new(),
+        rollback_intent: None,
+        resulting_thread: Some(thread),
+    })
+}
+
+pub(crate) fn decide_thread_model_selection_set(
+    state: &DeciderThreadState,
+    command_id: &CommandId,
+    thread_id: &ThreadId,
+    model_selection: &ModelSelection,
+    now_iso: &str,
+) -> Result<CommandDecision, DeciderError> {
+    let mut thread = require_live_thread(state, thread_id)?;
+    thread.provider_instance_id = model_selection.instance_id.clone();
+    thread.model_selection = model_selection.clone();
+    now_iso.clone_into(&mut thread.updated_at);
+    let event = make_thread_event(
+        command_id,
+        0,
+        thread_id,
+        now_iso,
+        "thread.model-selection-updated",
+        thread.clone(),
+    )?;
+    Ok(CommandDecision {
+        command_id: command_id.clone(),
+        command_type: "thread.model-selection.set".to_owned(),
         thread_id: thread_id.clone(),
         events: vec![event],
         outbox_effects: Vec::new(),

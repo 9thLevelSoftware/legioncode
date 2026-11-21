@@ -206,3 +206,18 @@ pub enum SessionRenewalError {
         session_id: String,
     },
 }
+
+/// Default sliding lifetime extended on active peer-link sessions (30 days in ms).
+pub const PEER_LINK_SESSION_TTL_MS: i64 = 30 * 24 * 60 * 60 * 1_000;
+
+/// Minimum remaining expiry delta required before persisting a peer-link renewal (1 day in ms).
+pub const PEER_LINK_RENEWAL_STEP_MS: i64 = 24 * 60 * 60 * 1_000;
+
+/// Outcome of touching an active linked-environment session lease (`f6d941fa4f` / #39399).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PeerLeaseTouch {
+    /// Current lease state after the touch (`db_expires_at_ms` advances if renewed).
+    pub lease: SessionLease,
+    /// `true` when `db_expires_at_ms` was extended by at least [`PEER_LINK_RENEWAL_STEP_MS`].
+    pub renewed: bool,
+}

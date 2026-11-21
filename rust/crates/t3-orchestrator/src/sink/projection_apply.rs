@@ -1,13 +1,17 @@
-//! Materialized projection updates and decider-state queries inside `SQLite` transactions.
+//! Materialized projection updates inside `SQLite` transactions.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, params};
 use serde_json::Value;
-use t3_contracts::ids::{CheckpointId, ThreadId};
+use t3_contracts::ids::{CheckpointId, MessageId};
 use t3_contracts::orchestration::{AppThread, ConversationMessage, DomainEventPayload, Run};
 
-use crate::sink::event_codec::{PersistedEvent, load_thread_events};
+use crate::sink::event_codec::PersistedEvent;
+pub use crate::sink::projection_load::{
+    load_decider_state, load_run_projection, load_thread_messages, load_thread_projection,
+    load_thread_runs,
+};
 use crate::sink::types::SinkError;
 
 const THREAD_PROJECTION_NAME: &str = "thread-projections";
@@ -24,6 +28,10 @@ pub struct DeciderThreadState {
     pub known_checkpoints: HashSet<CheckpointId>,
     /// Known child threads spawned by this thread (to guard `thread.archive`).
     pub child_threads: Vec<AppThread>,
+    /// Known thread messages indexed by [`MessageId`] (used for queued-sender ordering/selection).
+    pub messages_by_id: HashMap<MessageId, ConversationMessage>,
+    /// True when any PTY terminal on this thread still has an active subprocess (`#39835`).
+    pub has_active_terminal_subprocess: bool,
 }
 
 /// Applies persisted domain events to V2 projection tables in the caller's active transaction.
@@ -44,6 +52,19 @@ pub fn apply_events_to_projections(
             }
             DomainEventPayload::RunUpdated { run, .. } => {
                 upsert_run_projection(conn, run)?;
+            }
+            DomainEventPayload::RunOutputSubmitted(submitted) => {
+                if let Some(mut run) = load_run_projection(conn, &submitted.run_id)? {
+                    run.output = Some(submitted.output.clone());
+                    upsert_run_projection(conn, &run)?;
+                }
+            }
+            DomainEventPayload::RunBackgroundWorkCancelled(cancelled) => {
+                if let Some(mut run) = load_run_projection(conn, &cancelled.run_id)? {
+                    run.restart_cancelled_background_work =
+                        Some(cancelled.restart_cancelled_background_work.clone());
+                    upsert_run_projection(conn, &run)?;
+                }
             }
             DomainEventPayload::MessageUpdated(message) => {
                 upsert_message_projection(conn, message)?;
@@ -70,62 +91,6 @@ pub fn apply_events_to_projections(
         )?;
     }
     Ok(())
-}
-
-/// Loads the materialized [`AppThread`] row from `orchestration_v2_projection_threads`.
-pub fn load_thread_projection(
-    conn: &Connection,
-    thread_id: &ThreadId,
-) -> Result<Option<AppThread>, SinkError> {
-    let raw: Option<String> = conn
-        .query_row(
-            "SELECT payload_json FROM orchestration_v2_projection_threads WHERE thread_id = ?1",
-            params![thread_id.as_str()],
-            |row| row.get(0),
-        )
-        .optional()?;
-    raw.map(|json| serde_json::from_str::<AppThread>(&json))
-        .transpose()
-        .map_err(|err| SinkError::Codec(err.to_string()))
-}
-
-/// Loads all materialized [`Run`] rows for `thread_id` ordered by `ordinal ASC`.
-pub fn load_thread_runs(conn: &Connection, thread_id: &ThreadId) -> Result<Vec<Run>, SinkError> {
-    let mut stmt = conn.prepare(
-        "SELECT payload_json
-         FROM orchestration_v2_projection_runs
-         WHERE thread_id = ?1
-         ORDER BY ordinal ASC",
-    )?;
-    let rows = stmt
-        .query_map(params![thread_id.as_str()], |row| row.get::<_, String>(0))?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
-    rows.into_iter()
-        .map(|json| serde_json::from_str::<Run>(&json))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|err| SinkError::Codec(err.to_string()))
-}
-
-/// Loads [`DeciderThreadState`] for `thread_id` from projections and checkpoint events.
-pub fn load_decider_state(
-    conn: &Connection,
-    thread_id: &ThreadId,
-) -> Result<DeciderThreadState, SinkError> {
-    let thread = load_thread_projection(conn, thread_id)?;
-    let runs = load_thread_runs(conn, thread_id)?;
-    let mut known_checkpoints = load_known_checkpoints(conn, thread_id)?;
-    for run in &runs {
-        if let Some(cp_id) = &run.checkpoint_id {
-            known_checkpoints.insert(cp_id.clone());
-        }
-    }
-    let child_threads = load_child_threads(conn, thread_id)?;
-    Ok(DeciderThreadState {
-        thread,
-        runs,
-        known_checkpoints,
-        child_threads,
-    })
 }
 
 fn upsert_thread_projection(
@@ -191,11 +156,24 @@ fn upsert_thread_projection(
 }
 
 fn upsert_run_projection(conn: &Connection, run: &Run) -> Result<(), SinkError> {
+    let mut effective_run = run.clone();
+    if (effective_run.output.is_none() || effective_run.restart_cancelled_background_work.is_none())
+        && let Some(existing) = load_run_projection(conn, &run.id)?
+    {
+        if effective_run.output.is_none() {
+            effective_run.output = existing.output;
+        }
+        if effective_run.restart_cancelled_background_work.is_none() {
+            effective_run.restart_cancelled_background_work =
+                existing.restart_cancelled_background_work;
+        }
+    }
+
     let payload_value =
-        serde_json::to_value(run).map_err(|err| SinkError::Codec(err.to_string()))?;
+        serde_json::to_value(&effective_run).map_err(|err| SinkError::Codec(err.to_string()))?;
     let payload_json =
         serde_json::to_string(&payload_value).map_err(|err| SinkError::Codec(err.to_string()))?;
-    let provider = run.provider_instance_id.as_str();
+    let provider = effective_run.provider_instance_id.as_str();
     let provider_thread_id = str_field(&payload_value, "providerThreadId");
     let status = str_field(&payload_value, "status").unwrap_or("queued");
     let requested_at = str_field(&payload_value, "requestedAt").unwrap_or("");
@@ -223,8 +201,8 @@ fn upsert_run_projection(conn: &Connection, run: &Run) -> Result<(), SinkError> 
            payload_json = excluded.payload_json,
            provider_instance_id = excluded.provider_instance_id",
         params![
-            run.id.as_str(),
-            run.thread_id.as_str(),
+            effective_run.id.as_str(),
+            effective_run.thread_id.as_str(),
             ordinal,
             provider,
             provider_thread_id,
@@ -289,40 +267,6 @@ fn upsert_message_projection(
         ],
     )?;
     Ok(())
-}
-
-fn load_known_checkpoints(
-    conn: &Connection,
-    thread_id: &ThreadId,
-) -> Result<HashSet<CheckpointId>, SinkError> {
-    let mut set = HashSet::new();
-    for persisted in load_thread_events(conn, thread_id, 0)? {
-        if let DomainEventPayload::CheckpointCaptured(cp) = persisted.event.payload {
-            set.insert(cp.id);
-        }
-    }
-    Ok(set)
-}
-
-fn load_child_threads(
-    conn: &Connection,
-    parent_thread_id: &ThreadId,
-) -> Result<Vec<AppThread>, SinkError> {
-    let mut stmt = conn.prepare(
-        "SELECT payload_json
-         FROM orchestration_v2_projection_threads
-         WHERE deleted_at IS NULL
-           AND json_extract(payload_json, '$.lineage.parentThreadId') = ?1",
-    )?;
-    let rows = stmt
-        .query_map(params![parent_thread_id.as_str()], |row| {
-            row.get::<_, String>(0)
-        })?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
-    rows.into_iter()
-        .map(|json| serde_json::from_str::<AppThread>(&json))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|err| SinkError::Codec(err.to_string()))
 }
 
 fn str_field<'a>(value: &'a Value, key: &str) -> Option<&'a str> {

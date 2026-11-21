@@ -8,3 +8,7 @@ mod diff_markdown;
 mod steady_shells;
 #[path = "client_core_tests/thread_families.rs"]
 mod thread_families;
+#[path = "client_core_tests/wave2_linked_threads.rs"]
+mod wave2_linked_threads;
+#[path = "client_core_tests/wave2_recovery_caches.rs"]
+mod wave2_recovery_caches;

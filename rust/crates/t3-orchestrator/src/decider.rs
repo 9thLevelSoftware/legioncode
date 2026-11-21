@@ -25,6 +25,7 @@
 //!     thread_id: ThreadId::new("thread-1")?,
 //!     project_id: ProjectId::new("proj-1")?,
 //!     title: "Fix nested savepoint leak".to_owned(),
+//!     generate_title: None,
 //!     model_selection: ModelSelection {
 //!         instance_id: ProviderInstanceId::new("codex")?,
 //!         model: "gpt-5".to_owned(),
@@ -47,7 +48,11 @@
 
 pub mod create_ops;
 pub mod message_ops;
+pub mod output_ops;
+mod output_schema;
 pub mod pr_ops;
+mod queue_edit_ops;
+pub mod queue_ops;
 pub mod run_ops;
 pub mod state_ops;
 pub mod thread_ops;
@@ -56,6 +61,8 @@ pub mod types;
 use t3_contracts::orchestration::OrchestrationCommand;
 
 use crate::sink::projection_apply::DeciderThreadState;
+pub use output_ops::decide_submit_run_output;
+pub use queue_ops::decide_pop_next_queued_run;
 pub use types::{CommandDecision, DeciderError, RollbackIntent};
 
 /// Purely evaluates `command` against `state` at `now_iso`, returning events and outbox effects.
@@ -71,6 +78,22 @@ pub fn decide_command(
         OrchestrationCommand::MessageDispatch(cmd) => {
             message_ops::decide_message_dispatch(state, cmd, now_iso)
         }
+        OrchestrationCommand::QueuedMessagePromoteToSteer {
+            command_id,
+            thread_id,
+            queued_run_id,
+            target_run_id,
+        } => queue_edit_ops::decide_queued_message_promote_to_steer(
+            state,
+            command_id,
+            thread_id,
+            queued_run_id,
+            target_run_id,
+            now_iso,
+        ),
+        OrchestrationCommand::QueuedRunEdit(cmd) => {
+            queue_edit_ops::decide_queued_run_edit(state, cmd, now_iso)
+        }
         OrchestrationCommand::RunInterrupt(cmd) => {
             run_ops::decide_run_interrupt(state, cmd, now_iso)
         }
@@ -78,6 +101,17 @@ pub fn decide_command(
         OrchestrationCommand::CheckpointRollback(cmd) => {
             run_ops::decide_checkpoint_rollback(state, cmd, now_iso)
         }
+        OrchestrationCommand::ThreadModelSelectionSet {
+            command_id,
+            thread_id,
+            model_selection,
+        } => state_ops::decide_thread_model_selection_set(
+            state,
+            command_id,
+            thread_id,
+            model_selection,
+            now_iso,
+        ),
         other => Err(DeciderError::UnsupportedCommand {
             command_type: other.command_type().to_owned(),
         }),
@@ -122,6 +156,19 @@ fn decide_thread_state_command(
             command_id,
             thread_id,
             expected_latest_run_id.as_ref(),
+            settled_at.as_deref(),
+            now_iso,
+        ),
+        OrchestrationCommand::ThreadAutoSettle {
+            command_id,
+            thread_id,
+            snapshot_at,
+            settled_at,
+        } => state_ops::decide_thread_auto_settle(
+            state,
+            command_id,
+            thread_id,
+            snapshot_at,
             settled_at.as_deref(),
             now_iso,
         ),

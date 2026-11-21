@@ -17,7 +17,8 @@ use tokio::sync::Notify;
 use super::lease_state::{LiveConnection, RegistryState};
 use super::lease_types::{
     ActiveSessionSummary, ConnectionInvalidationReason, ConnectionState, NewSessionLease,
-    RenewDpopSessionInput, SessionLease, SessionRenewalError, SessionVerificationError,
+    PEER_LINK_RENEWAL_STEP_MS, PEER_LINK_SESSION_TTL_MS, PeerLeaseTouch, RenewDpopSessionInput,
+    SessionLease, SessionRenewalError, SessionVerificationError,
 };
 
 /// Thread-safe registry tracking session leases, `DPoP` renewals, and socket connections.
@@ -90,6 +91,74 @@ impl SessionLeaseRegistry {
             });
         }
         Ok(lease.clone())
+    }
+
+    /// Extends an active linked-environment session's `db_expires_at_ms` on RPC/MCP activity
+    /// using the default 30-day TTL and 1-day renewal cadence (`f6d941fa4f` / #39399).
+    pub fn touch_active_peer_lease(
+        &self,
+        session_id: &str,
+        now_ms: i64,
+    ) -> Result<PeerLeaseTouch, SessionVerificationError> {
+        self.touch_active_peer_lease_with(
+            session_id,
+            now_ms,
+            PEER_LINK_SESSION_TTL_MS,
+            PEER_LINK_RENEWAL_STEP_MS,
+        )
+    }
+
+    /// Extends an active linked-environment session's `db_expires_at_ms` by `ttl_ms` only
+    /// when `now_ms + ttl_ms` exceeds the stored expiry by at least `min_step_ms`.
+    pub fn touch_active_peer_lease_with(
+        &self,
+        session_id: &str,
+        now_ms: i64,
+        ttl_ms: i64,
+        min_step_ms: i64,
+    ) -> Result<PeerLeaseTouch, SessionVerificationError> {
+        let mut guard = self.state.write().unwrap_or_else(PoisonError::into_inner);
+        let current =
+            guard
+                .leases
+                .get(session_id)
+                .ok_or_else(|| SessionVerificationError::NotFound {
+                    session_id: session_id.to_owned(),
+                })?;
+        if let Some((revoked_id, revoked_at_ms)) = guard.find_revocation_in_ancestors(session_id) {
+            return Err(SessionVerificationError::Revoked {
+                session_id: revoked_id,
+                revoked_at_ms,
+            });
+        }
+        if current.db_expires_at_ms <= now_ms {
+            return Err(SessionVerificationError::DatabaseLeaseExpired {
+                expired_at_ms: current.db_expires_at_ms,
+            });
+        }
+        let candidate = now_ms.saturating_add(ttl_ms.max(0));
+        let min_step = min_step_ms.max(0);
+        if candidate.saturating_sub(current.db_expires_at_ms) < min_step {
+            return Ok(PeerLeaseTouch {
+                lease: current.clone(),
+                renewed: false,
+            });
+        }
+        let updated = {
+            let entry = guard.leases.get_mut(session_id).ok_or_else(|| {
+                SessionVerificationError::NotFound {
+                    session_id: session_id.to_owned(),
+                }
+            })?;
+            entry.db_expires_at_ms = candidate;
+            entry.clone()
+        };
+        drop(guard);
+        self.notify.notify_waiters();
+        Ok(PeerLeaseTouch {
+            lease: updated,
+            renewed: true,
+        })
     }
 
     /// Renews a `DPoP` session in place or rotates to `new_session_id`, migrating sockets.

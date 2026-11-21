@@ -209,6 +209,7 @@ pub extern "system" fn Java_codes_t3_mobile_T3MobileBridge_nativeAbiVersion(
 /// Shared `JNI` `JString -> Result<String, E> -> JString` helper guarded by `catch_unwind`.
 /// # Safety
 /// `env` must be valid `JNIEnv*`; `input` must be a valid `JString` or null.
+// SAFETY: `env` and `input` validity is enforced by the JNI native call contract and checked on entry.
 pub(crate) unsafe fn run_jstr_bridge<E: std::fmt::Display>(
     env: EnvPtr,
     input: JString,

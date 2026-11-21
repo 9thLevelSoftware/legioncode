@@ -1,27 +1,29 @@
-//! `t3 policy` subcommands (`show`, `check`, `templates`) matching `apps/server/src/cli/policy.ts`.
+//! `t3 policy` subcommands (`show`, `check`, `settings`, `templates`) matching `apps/server/src/cli/policy.ts`.
 
-use std::env;
 use std::fs;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
+use t3_contracts::brand::ACTIVE_BRAND;
 use t3_contracts::policy::{
-    LoadedPolicySummary, ManagedPolicyDocument, RunningServerState, describe_policy,
-    describe_running_server, macos_profile, policy_fingerprint_12hex, sample_policy, windows_adml,
-    windows_admx,
+    LoadedPolicySummary, ManagedPolicyDocument, RunningServerState, describe_manageable_settings,
+    describe_policy, describe_running_server, macos_profile, policy_fingerprint_12hex,
+    sample_policy, windows_adml, windows_admx,
 };
 use t3_persistence::ownership::{ManagedPolicyState, read_live_server_runtime_state};
 use uuid::Uuid;
 
 use crate::cli_global::fail_with_command_help;
-use crate::fallback::{delegate_to_node, derive_paths, take_flag_value, unit_forced_original};
+use crate::fallback::{
+    delegate_to_node, derive_paths, take_flag_value, unit_forced_original, write_stdout_line,
+};
 
 /// Unit identifier for `RUST_ANYTHING_UNIT_POLICY` and fallback logs.
 pub const UNIT_POLICY: &str = "POLICY";
 
-const MANAGED_POLICY_FILE_ENV: &str = "T3CODE_MANAGED_POLICY_FILE";
+const MANAGED_POLICY_FILE_SUFFIX: &str = "MANAGED_POLICY_FILE";
 
-/// Runs `t3 policy show|check|templates` natively unless `RUST_ANYTHING_UNIT_POLICY=original`.
+/// Runs `t3 policy show|check|settings|templates` natively unless `RUST_ANYTHING_UNIT_POLICY=original`.
 pub fn run(args: &[String]) -> i32 {
     if unit_forced_original(UNIT_POLICY) {
         return delegate_to_node(UNIT_POLICY, args);
@@ -47,6 +49,7 @@ pub fn run(args: &[String]) -> i32 {
                 "Missing or invalid <file> argument for `t3 policy check`.",
             ),
         },
+        "settings" => run_settings(rest),
         "templates" => match parse_templates_args(rest) {
             Some((directory, policy)) => run_templates(&directory, policy.as_deref()),
             None => fail_with_command_help(
@@ -190,6 +193,18 @@ fn run_show(base_dir: Option<&str>) -> i32 {
     0
 }
 
+fn run_settings(rest: &[String]) -> i32 {
+    if let Some(unexpected) = rest.first() {
+        let msg = if unexpected.starts_with('-') {
+            format!("Unrecognized flag: {unexpected} in command t3 policy settings")
+        } else {
+            format!("Unexpected argument: {unexpected}")
+        };
+        return fail_with_command_help(&["policy", "settings"], &msg);
+    }
+    write_stdout_line(&describe_manageable_settings(), "policy settings")
+}
+
 fn run_templates(directory: &str, policy_file: Option<&str>) -> i32 {
     let document = if let Some(file) = policy_file {
         if !Path::new(file).exists() {
@@ -244,13 +259,10 @@ fn run_templates(directory: &str, policy_file: Option<&str>) -> i32 {
     0
 }
 
-/// Resolves the managed policy file path from `T3CODE_MANAGED_POLICY_FILE` or the platform default.
+/// Resolves the managed policy file path from `<BRAND>_MANAGED_POLICY_FILE` or the platform default.
 pub fn resolve_managed_policy_path() -> String {
-    if let Ok(val) = env::var(MANAGED_POLICY_FILE_ENV) {
-        let trimmed = val.trim();
-        if !trimmed.is_empty() {
-            return trimmed.to_owned();
-        }
+    if let Some(val) = ACTIVE_BRAND.read_env(MANAGED_POLICY_FILE_SUFFIX) {
+        return val.trim().to_owned();
     }
     default_managed_policy_path().to_owned()
 }

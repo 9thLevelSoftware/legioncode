@@ -20,6 +20,11 @@ use crate::invocation::non_empty_env;
 /// Unit identifier for `RUST_ANYTHING_UNIT_UPDATE` and fallback logs.
 pub const UNIT_UPDATE: &str = "UPDATE";
 
+/// Repoints recorded and discovered CLI launchers referencing `versions_dir` onto `new_entry`.
+pub fn repoint_launchers(versions_dir: &std::path::Path, new_entry: &std::path::Path) {
+    crate::cmd_update_net::repoint_recorded_launchers_for_versions(versions_dir, new_entry);
+}
+
 struct UpdateFlags {
     base_dir: Option<String>,
     channel: Option<String>,

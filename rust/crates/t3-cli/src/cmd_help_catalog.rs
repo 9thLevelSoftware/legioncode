@@ -95,6 +95,7 @@ fn lookup_nested_tail_help(path: &[&str], cloud_enabled: bool) -> Option<&'stati
         ["policy"] => Some(include_str!("../assets/help/policy.txt")),
         ["policy", "show"] => Some(include_str!("../assets/help/policy__show.txt")),
         ["policy", "check"] => Some(include_str!("../assets/help/policy__check.txt")),
+        ["policy", "settings"] => Some(include_str!("../assets/help/policy__settings.txt")),
         ["policy", "templates"] => Some(include_str!("../assets/help/policy__templates.txt")),
         ["connect"] => Some(if cloud_enabled {
             include_str!("../assets/help/enabled__connect.txt")

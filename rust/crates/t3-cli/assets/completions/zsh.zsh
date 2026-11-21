@@ -690,11 +690,14 @@ _t3_thread_start() {
   specs=(
     '(--base-dir)--base-dir[Explicit T3 Code data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME).]:value:'
     '(--title)--title[Thread title. Defaults to the message'\''s first line.]:value:'
+    '(--generate-title --no-generate-title)--generate-title[Generate the thread'\''s title from the message. Until it'\''s ready, the thread shows --title or the first line.]'
+    '(--generate-title --no-generate-title)--no-generate-title[Disable generate-title]'
     '(--provider)--provider[Provider instance id. Pass with --model.]:value:'
     '(--model)--model[Model slug. Defaults to the project'\''s default model.]:value:'
     '*--option[Model option as id=value, such as effort=high. Repeat for more. Needs --provider and --model.]:value:'
     '(--worktree)--worktree[Run in a new git worktree based on this branch, tag, or commit, instead of the project folder.]:value:'
     '(--branch)--branch[Branch name for the new worktree.]:value:'
+    '(--output-schema)--output-schema[File holding a JSON Schema. The agent must return data matching it; --wait --json prints it as `output`.]:value:'
     '(--wait --no-wait)--wait[Wait for the agent to finish and print its reply. Exits 1 if the run fails and 2 if it waits for an answer.]'
     '(--wait --no-wait)--no-wait[Disable wait]'
     '(--json --no-json)--json[Print JSON instead of text.]'
@@ -709,6 +712,7 @@ _t3_thread_send() {
   local -a specs
   specs=(
     '(--base-dir)--base-dir[Explicit T3 Code data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME).]:value:'
+    '(--output-schema)--output-schema[File holding a JSON Schema. The agent must return data matching it; --wait --json prints it as `output`.]:value:'
     '(--wait --no-wait)--wait[Wait for the agent to finish and print its reply. Exits 1 if the run fails and 2 if it waits for an answer.]'
     '(--wait --no-wait)--no-wait[Disable wait]'
     '(--json --no-json)--json[Print JSON instead of text.]'
@@ -1005,6 +1009,7 @@ _t3_policy() {
   commands=(
     'show:Show the policy installed on this machine, and whether the running server loaded it.'
     'check:Validate a policy file before deploying it.'
+    'settings:List the settings a policy can manage, with their defaults.'
     'templates:Write the Windows Group Policy template and a macOS configuration profile.'
   )
 
@@ -1028,6 +1033,9 @@ _t3_policy() {
         check)
           _t3_policy_check
           ;;
+        settings)
+          _t3_policy_settings
+          ;;
         templates)
           _t3_policy_templates
           ;;
@@ -1049,6 +1057,12 @@ _t3_policy_check() {
   specs=(
     ':Policy file to validate.:'
   )
+  _arguments "${specs[@]}"
+}
+
+_t3_policy_settings() {
+  local -a specs
+  specs=()
   _arguments "${specs[@]}"
 }
 

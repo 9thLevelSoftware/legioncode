@@ -309,6 +309,7 @@ async fn thread_client_discovery_exit2_and_cli_formatting() -> TestResult {
             thread_id: "th-1".to_owned(),
             message: "Check status".to_owned(),
             mode: Some(ThreadSendMode::Queue),
+            ..ThreadSendRequest::default()
         })
         .await?;
     assert_eq!(sent.delivery, ThreadSendDelivery::Queued);

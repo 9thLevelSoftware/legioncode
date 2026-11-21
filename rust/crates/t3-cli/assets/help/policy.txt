@@ -14,4 +14,5 @@ GLOBAL FLAGS
 SUBCOMMANDS
   show         Show the policy installed on this machine, and whether the running server loaded it.
   check        Validate a policy file before deploying it.
+  settings     List the settings a policy can manage, with their defaults.
   templates    Write the Windows Group Policy template and a macOS configuration profile.

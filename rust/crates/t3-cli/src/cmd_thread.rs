@@ -2,16 +2,18 @@
 
 #[path = "cmd_thread_ops.rs"]
 mod ops;
+#[path = "cmd_thread_start.rs"]
+pub(crate) mod start;
 
-use std::env;
 use std::path::Path;
 
 use serde::Deserialize;
 use serde_json::json;
+use t3_contracts::brand::ACTIVE_BRAND;
 use t3_remote::acp_mcp_bridge::McpHttpClient;
 use t3_remote::thread_client::{
-    ThreadClientError, ThreadListRequest, ThreadMcpClient, ThreadReadRequest,
-    discover_live_server_runtime, format_thread_list_line,
+    ThreadClientError, ThreadListRequest, ThreadMcpClient, discover_live_server_runtime,
+    format_thread_list_line,
 };
 
 use crate::cli_global::fail_with_command_help;
@@ -25,7 +27,8 @@ use crate::fallback::{
     delegate_to_node, resolve_base_dir, unit_forced_original, write_stdout_line,
 };
 use ops::{
-    acquire_local_thread_auth, print_json_value, revoke_fallback_thread_session, run_send, run_wait,
+    acquire_local_thread_auth, print_json_value, revoke_fallback_thread_session, run_read,
+    run_send, run_wait,
 };
 
 /// Unit identifier for `RUST_ANYTHING_UNIT_THREAD` and fallback logs.
@@ -52,51 +55,56 @@ pub fn run(args: &[String]) -> i32 {
     rt.block_on(execute(parsed))
 }
 
-async fn execute(parsed: ParsedThreadCli) -> i32 {
-    let (origin, mcp_endpoint, bearer, local_db_session) =
-        if let Some(ref remote_url) = parsed.remote_url {
-            let base = remote_url.trim_end_matches('/').to_owned();
-            let tok = parsed
-                .token
-                .clone()
-                .filter(|s| !s.trim().is_empty())
-                .or_else(|| {
-                    env::var("T3CODE_TOKEN")
-                        .or_else(|_| env::var("T3CODE_BEARER_TOKEN"))
-                        .ok()
-                        .map(|s| s.trim().to_owned())
-                        .filter(|s| !s.is_empty())
-                });
-            let Some(tok) = tok else {
-                eprintln!("--remote-url requires --token <bearer> (or T3CODE_TOKEN).");
-                return 1;
-            };
-            (base.clone(), format!("{base}/mcp"), tok, None)
-        } else {
-            let (base_dir, _) = resolve_base_dir(parsed.action.base_dir());
-            let discovered = match discover_live_server_runtime(&base_dir) {
-                Ok(found) => found,
-                Err(err) => {
-                    eprintln!("{err}");
-                    return err.exit_code();
-                }
-            };
-            let db_path = discovered.state_dir.join("statev2.sqlite");
-            let (bearer, session_id) =
-                match acquire_local_thread_auth(&db_path, &discovered.runtime.origin).await {
-                    Ok(auth) => auth,
-                    Err(msg) => {
-                        eprintln!("{msg}");
-                        return 1;
-                    }
-                };
-            (
-                discovered.runtime.origin,
-                discovered.mcp_endpoint,
-                bearer,
-                session_id.map(|id| (db_path, id)),
-            )
+type McpTarget = (String, String, String, Option<(std::path::PathBuf, String)>);
+
+async fn resolve_mcp_target(parsed: &ParsedThreadCli) -> Result<McpTarget, i32> {
+    if let Some(ref remote_url) = parsed.remote_url {
+        let base = remote_url.trim_end_matches('/').to_owned();
+        let tok = parsed
+            .token
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| {
+                ACTIVE_BRAND
+                    .read_env("TOKEN")
+                    .or_else(|| ACTIVE_BRAND.read_env("BEARER_TOKEN"))
+                    .map(|s| s.trim().to_owned())
+            });
+        let Some(tok) = tok else {
+            eprintln!(
+                "--remote-url requires --token <bearer> (or {}TOKEN).",
+                ACTIVE_BRAND.primary_env_prefix
+            );
+            return Err(1);
         };
+        return Ok((base.clone(), format!("{base}/mcp"), tok, None));
+    }
+
+    let (base_dir, _) = resolve_base_dir(parsed.action.base_dir());
+    let discovered = discover_live_server_runtime(&base_dir).map_err(|err| {
+        eprintln!("{err}");
+        err.exit_code()
+    })?;
+    let db_path = discovered.state_dir.join("statev2.sqlite");
+    let (bearer, session_id) = acquire_local_thread_auth(&db_path, &discovered.runtime.origin)
+        .await
+        .map_err(|msg| {
+            eprintln!("{msg}");
+            1
+        })?;
+    Ok((
+        discovered.runtime.origin,
+        discovered.mcp_endpoint,
+        bearer,
+        session_id.map(|id| (db_path, id)),
+    ))
+}
+
+async fn execute(parsed: ParsedThreadCli) -> i32 {
+    let (origin, mcp_endpoint, bearer, local_db_session) = match resolve_mcp_target(&parsed).await {
+        Ok(target) => target,
+        Err(code) => return code,
+    };
 
     let auth_header = format!("Bearer {bearer}");
     let mcp = match McpHttpClient::connect(&mcp_endpoint, auth_header, "t3-thread-cli").await {
@@ -113,6 +121,7 @@ async fn execute(parsed: ParsedThreadCli) -> i32 {
         ThreadAction::List {
             project, all, json, ..
         } => run_list(&mcp, &client, project.as_deref(), all, json).await,
+        ThreadAction::Start(opts) => start::run_start(&mcp, &client, opts).await,
         ThreadAction::Read {
             thread_id,
             view,
@@ -125,10 +134,22 @@ async fn execute(parsed: ParsedThreadCli) -> i32 {
             thread_id,
             message,
             mode,
+            output_schema,
             wait,
             json,
             ..
-        } => run_send(&client, &thread_id, &message, mode, wait, json).await,
+        } => {
+            run_send(
+                &client,
+                &thread_id,
+                &message,
+                mode,
+                output_schema.as_deref(),
+                wait,
+                json,
+            )
+            .await
+        }
         ThreadAction::Wait {
             thread_id,
             run_id,
@@ -252,47 +273,6 @@ async fn resolve_project_id(
             "No T3 Code project matches '{identifier}'. Pass a project id or a path inside a project."
         ),
     })
-}
-
-async fn run_read(
-    client: &ThreadMcpClient,
-    thread_id: &str,
-    view: Option<String>,
-    limit: Option<u32>,
-    after_position: Option<i64>,
-    json: bool,
-) -> Result<i32, ThreadClientError> {
-    let result = client
-        .read_thread(&ThreadReadRequest {
-            thread_id: thread_id.to_owned(),
-            view,
-            after_position,
-            limit,
-            ..ThreadReadRequest::default()
-        })
-        .await?;
-    if json {
-        return Ok(print_json_value(&result));
-    }
-    let header = format!(
-        "{}\n{}  {}  {}/{}",
-        result.thread.title,
-        result.thread.thread_id,
-        result.thread.status,
-        result.thread.provider_instance_id,
-        result.thread.model
-    );
-    if write_stdout_line(&header, "thread read") != 0 {
-        return Ok(1);
-    }
-    for item in &result.items {
-        if let Some(ref text) = item.text
-            && write_stdout_line(&format!("\n[{}]\n{text}", item.item_type), "thread read") != 0
-        {
-            return Ok(1);
-        }
-    }
-    Ok(0)
 }
 
 pub(crate) fn parse_wait(tail: &[String]) -> Result<ParsedThreadCli, i32> {

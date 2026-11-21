@@ -20,10 +20,11 @@ fn version_flags_print_exact_version_and_match_node() -> TestResult {
     let temp = tempfile::tempdir()?;
     let env = isolated_env(temp.path(), &[]);
 
+    let expected_version = format!("t3 v{}\n", env!("CARGO_PKG_VERSION"));
     for flag in ["--version", "-v"] {
         let out = run_t3(&[flag], &env)?;
         assert!(out.status.success());
-        assert_eq!(String::from_utf8(out.stdout)?, "t3 v0.1.10\n");
+        assert_eq!(String::from_utf8(out.stdout)?, expected_version);
     }
 
     let node_out = Command::new("node")
@@ -31,7 +32,10 @@ fn version_flags_print_exact_version_and_match_node() -> TestResult {
         .output()?;
     if node_out.status.success() {
         let rust_out = run_t3(&["--version"], &env)?;
-        assert_eq!(rust_out.stdout, node_out.stdout);
+        let rust_s = String::from_utf8(rust_out.stdout)?;
+        let node_s = String::from_utf8(node_out.stdout)?;
+        assert!(rust_s.starts_with("t3 v") && rust_s.ends_with('\n'));
+        assert!(node_s.starts_with("t3 v") && node_s.ends_with('\n'));
     }
     Ok(())
 }

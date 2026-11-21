@@ -4,6 +4,8 @@
 
 #[path = "thread_client_format.rs"]
 mod format;
+#[path = "thread_client_ops.rs"]
+mod ops;
 #[path = "thread_client_types.rs"]
 mod types;
 
@@ -21,9 +23,10 @@ pub use format::{
     format_title_from_message,
 };
 pub use types::{
-    ThreadDetail, ThreadListItem, ThreadListRequest, ThreadListResult, ThreadReadRequest,
-    ThreadReadResult, ThreadRunSummary, ThreadSendDelivery, ThreadSendMode, ThreadSendRequest,
-    ThreadSendResult, ThreadTimelineItem, ThreadWaitRequest, ThreadWaitResult,
+    ThreadDetail, ThreadLaunchRequest, ThreadLaunchResult, ThreadListItem, ThreadListRequest,
+    ThreadListResult, ThreadReadRequest, ThreadReadResult, ThreadRunSummary, ThreadSendDelivery,
+    ThreadSendMode, ThreadSendRequest, ThreadSendResult, ThreadTimelineItem, ThreadWaitRequest,
+    ThreadWaitResult, ThreadWaitResultRun,
 };
 
 /// Live T3 Code server discovered from `<base_dir>/{userdata,dev}/server-runtime.json`.
@@ -74,7 +77,7 @@ pub fn discover_live_server_runtime(
 }
 
 /// Result of awaiting a run (`wait_for_run`, `thread.ts:514-520`).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ThreadWaitOutcome {
     /// Run settled at a terminal status.
     Ended {
@@ -82,6 +85,8 @@ pub enum ThreadWaitOutcome {
         run_id: Option<String>,
         /// Terminal status string.
         status: String,
+        /// Optional typed JSON output submitted against `outputSchema`.
+        output: Option<Value>,
     },
     /// Run is blocked on user input (`ThreadNeedsInputError`, exit code `2`).
     NeedsInput,
@@ -150,6 +155,15 @@ impl ThreadMcpClient {
         self.call_typed_tool("t3_thread_read", &args).await
     }
 
+    /// Calls `t3_thread_launch`.
+    pub async fn launch_thread(
+        &self,
+        req: &ThreadLaunchRequest,
+    ) -> Result<ThreadLaunchResult, ThreadClientError> {
+        let args = serialize_args("t3_thread_launch", req)?;
+        self.call_typed_tool("t3_thread_launch", &args).await
+    }
+
     /// Calls `t3_thread_send`.
     pub async fn send_message(
         &self,
@@ -176,6 +190,18 @@ impl ThreadMcpClient {
         run_id: &str,
         slice_ms: u64,
     ) -> Result<ThreadWaitOutcome, ThreadClientError> {
+        self.wait_for_run_with_output(thread_id, run_id, slice_ms, false)
+            .await
+    }
+
+    /// Polls `t3_thread_wait` in bounded slices, optionally waiting until `untilOutput` resolves.
+    pub async fn wait_for_run_with_output(
+        &self,
+        thread_id: &str,
+        run_id: &str,
+        slice_ms: u64,
+        until_output: bool,
+    ) -> Result<ThreadWaitOutcome, ThreadClientError> {
         loop {
             let waited = self
                 .wait_thread(&ThreadWaitRequest {
@@ -183,12 +209,14 @@ impl ThreadMcpClient {
                     run_id: Some(run_id.to_owned()),
                     timeout_ms: Some(slice_ms),
                     until_delegated_work_settled: None,
+                    until_output: until_output.then_some(true),
                 })
                 .await?;
             if !waited.timed_out {
                 return Ok(ThreadWaitOutcome::Ended {
                     run_id: waited.run_id,
                     status: waited.status,
+                    output: waited.output,
                 });
             }
             let snapshot = self
@@ -206,6 +234,7 @@ impl ThreadMcpClient {
                         run_id: Some(run_id.to_owned()),
                         timeout_ms: Some(1),
                         until_delegated_work_settled: None,
+                        until_output: until_output.then_some(true),
                     })
                     .await?;
                 return Ok(if recheck.timed_out {
@@ -214,6 +243,7 @@ impl ThreadMcpClient {
                     ThreadWaitOutcome::Ended {
                         run_id: recheck.run_id,
                         status: recheck.status,
+                        output: recheck.output,
                     }
                 });
             }

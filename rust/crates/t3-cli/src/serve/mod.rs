@@ -13,7 +13,6 @@ pub mod voice_ws;
 pub mod ws_mcp;
 
 use std::collections::HashSet;
-use std::env;
 use std::net::SocketAddr;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
@@ -204,10 +203,9 @@ pub async fn spawn_server(config: ServeConfig) -> Result<RunningServer, ServeErr
     let outbox_worker =
         orchestrator.spawn_outbox_worker(outbox_executor, OutboxWorkerOptions::default());
     let terminal_runtime = Arc::new(TerminalRuntime::default());
-    let dev_auth_token = env::var("T3CODE_DEV_AUTH_TOKEN")
-        .ok()
-        .map(|v| v.trim().to_owned())
-        .filter(|v| !v.is_empty());
+    let dev_auth_token = t3_contracts::brand::ACTIVE_BRAND
+        .read_env("DEV_AUTH_TOKEN")
+        .map(|v| v.trim().to_owned());
     let runtime_http = Arc::new(
         RuntimeHttpState::new(Arc::clone(orchestrator.sink().db()), paths.logs_dir.clone())
             .with_static_dir(config.static_dir.clone())

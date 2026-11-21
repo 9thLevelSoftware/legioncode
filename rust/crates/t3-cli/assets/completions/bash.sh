@@ -1248,16 +1248,18 @@ _t3_thread_start()
   case "$prev" in
   esac
 
-  local _used_0="" _used_1="" _used_2="" _used_3="" _used_4="" _used_5="" _used_6="" _used_7="" _used_8=""
+  local _used_0="" _used_1="" _used_2="" _used_3="" _used_4="" _used_5="" _used_6="" _used_7="" _used_8="" _used_9="" _used_10=""
   for ((i = 1; i < cword; i++)); do
     case "${words[i]%%=*}" in
       --base-dir) _used_0=1 ;;
       --title) _used_1=1 ;;
+      --generate-title|--no-generate-title) _used_9=1 ;;
       --provider) _used_2=1 ;;
       --model) _used_3=1 ;;
       --option) _used_4=1 ;;
       --worktree) _used_5=1 ;;
       --branch) _used_6=1 ;;
+      --output-schema) _used_10=1 ;;
       --wait|--no-wait) _used_7=1 ;;
       --json|--no-json) _used_8=1 ;;
     esac
@@ -1265,11 +1267,13 @@ _t3_thread_start()
   local _filtered_flags=""
   [[ -n "$_used_0" ]] || _filtered_flags+=" --base-dir"
   [[ -n "$_used_1" ]] || _filtered_flags+=" --title"
+  [[ -n "$_used_9" ]] || _filtered_flags+=" --generate-title --no-generate-title"
   [[ -n "$_used_2" ]] || _filtered_flags+=" --provider"
   [[ -n "$_used_3" ]] || _filtered_flags+=" --model"
   _filtered_flags+=" --option"
   [[ -n "$_used_5" ]] || _filtered_flags+=" --worktree"
   [[ -n "$_used_6" ]] || _filtered_flags+=" --branch"
+  [[ -n "$_used_10" ]] || _filtered_flags+=" --output-schema"
   [[ -n "$_used_7" ]] || _filtered_flags+=" --wait --no-wait"
   [[ -n "$_used_8" ]] || _filtered_flags+=" --json --no-json"
 
@@ -1291,16 +1295,18 @@ _t3_thread_send()
   case "$prev" in
   esac
 
-  local _used_0="" _used_1="" _used_2=""
+  local _used_0="" _used_1="" _used_2="" _used_3=""
   for ((i = 1; i < cword; i++)); do
     case "${words[i]%%=*}" in
       --base-dir) _used_0=1 ;;
+      --output-schema) _used_3=1 ;;
       --wait|--no-wait) _used_1=1 ;;
       --json|--no-json) _used_2=1 ;;
     esac
   done
   local _filtered_flags=""
   [[ -n "$_used_0" ]] || _filtered_flags+=" --base-dir"
+  [[ -n "$_used_3" ]] || _filtered_flags+=" --output-schema"
   [[ -n "$_used_1" ]] || _filtered_flags+=" --wait --no-wait"
   [[ -n "$_used_2" ]] || _filtered_flags+=" --json --no-json"
 
@@ -1900,6 +1906,10 @@ _t3_policy()
         _t3_policy_check "$i"
         return
         ;;
+      settings)
+        _t3_policy_settings "$i"
+        return
+        ;;
       templates)
         _t3_policy_templates "$i"
         return
@@ -1912,7 +1922,7 @@ _t3_policy()
     return
   fi
 
-  _t3--choices "$cur" "$_comp_word" 'show' 'check' 'templates'
+  _t3--choices "$cur" "$_comp_word" 'show' 'check' 'settings' 'templates'
 }
 
 _t3_policy_show()
@@ -1943,6 +1953,14 @@ _t3_policy_show()
 }
 
 _t3_policy_check()
+{
+  local cur prev words cword i
+  local _command_index="$1"
+  _init_completion -n "$COMP_WORDBREAKS" || return
+
+}
+
+_t3_policy_settings()
 {
   local cur prev words cword i
   local _command_index="$1"

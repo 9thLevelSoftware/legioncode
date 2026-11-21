@@ -126,7 +126,7 @@ fn service_preflight_checks_protocol_and_migrations() -> TestResult {
         )?;
     for &(migration_id, name) in V2_MIGRATION_MANIFEST {
         store.connection().execute(
-            "INSERT INTO effect_sql_migrations (migration_id, created_at, name) VALUES (?1, '2026-11-20', ?2)",
+            "INSERT OR REPLACE INTO effect_sql_migrations (migration_id, created_at, name) VALUES (?1, '2026-11-20', ?2)",
             rusqlite::params![migration_id, name],
         )?;
     }

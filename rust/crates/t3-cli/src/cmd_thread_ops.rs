@@ -67,6 +67,7 @@ pub(super) async fn run_send(
     thread_id: &str,
     raw_message: &str,
     mode: ThreadSendMode,
+    output_schema_path: Option<&str>,
     wait: bool,
     json: bool,
 ) -> Result<i32, ThreadClientError> {
@@ -75,11 +76,14 @@ pub(super) async fn run_send(
             tool: "t3_thread_send".to_owned(),
             detail,
         })?;
+    let schema = super::start::read_output_schema_file(output_schema_path)?;
+    let has_output = schema.is_some();
     let sent = client
         .send_message(&ThreadSendRequest {
             thread_id: thread_id.to_owned(),
             message,
             mode: Some(mode),
+            output_schema: schema,
         })
         .await?;
     if !wait {
@@ -90,7 +94,7 @@ pub(super) async fn run_send(
         });
     }
 
-    finish_wait(client, thread_id, &sent.run_id, None, json).await
+    finish_wait(client, thread_id, &sent.run_id, None, json, has_output).await
 }
 
 pub(super) async fn run_wait(
@@ -122,15 +126,16 @@ pub(super) async fn run_wait(
         };
         latest.run_id.clone()
     };
-    finish_wait(client, thread_id, &target_run, timeout_ms, json).await
+    finish_wait(client, thread_id, &target_run, timeout_ms, json, false).await
 }
 
-async fn finish_wait(
+pub(super) async fn finish_wait(
     client: &ThreadMcpClient,
     thread_id: &str,
     run_id: &str,
     timeout_ms: Option<u64>,
     json: bool,
+    until_output: bool,
 ) -> Result<i32, ThreadClientError> {
     if let Some(bounded_ms) = timeout_ms {
         let waited = client
@@ -139,6 +144,7 @@ async fn finish_wait(
                 run_id: Some(run_id.to_owned()),
                 timeout_ms: Some(bounded_ms),
                 until_delegated_work_settled: None,
+                until_output: until_output.then_some(true),
             })
             .await?;
         if json {
@@ -153,22 +159,106 @@ async fn finish_wait(
     }
 
     let outcome = client
-        .finish_run_error_check(thread_id, run_id, THREAD_WAIT_SLICE_MS, None)
-        .await;
+        .wait_for_run_settled(thread_id, run_id, THREAD_WAIT_SLICE_MS, until_output)
+        .await?;
     match outcome {
-        Ok(ThreadWaitOutcome::Ended { status, .. }) => Ok(if json {
-            print_json_value(&json!({ "threadId": thread_id, "runId": run_id, "status": status }))
-        } else {
-            write_stdout_line(&status, "thread wait")
-        }),
-        Ok(ThreadWaitOutcome::NeedsInput) => Err(ThreadClientError::NeedsInput {
+        ThreadWaitOutcome::Ended {
+            run_id: settled_run_id,
+            status,
+            output,
+        } => {
+            if status != "completed" {
+                let error = client.run_result_text(thread_id, run_id, "error").await?;
+                return Err(ThreadClientError::RunEnded {
+                    thread_id: thread_id.to_owned(),
+                    status,
+                    error,
+                });
+            }
+            let effective_run_id = settled_run_id.unwrap_or_else(|| run_id.to_owned());
+            let reply = client
+                .run_result_text(thread_id, &effective_run_id, "assistant_message")
+                .await?;
+            Ok(if json {
+                let mut payload = json!({
+                    "threadId": thread_id,
+                    "runId": effective_run_id,
+                    "status": status,
+                    "reply": reply,
+                });
+                if let Some(val) = output
+                    && let Some(obj) = payload.as_object_mut()
+                {
+                    obj.insert("output".to_owned(), val);
+                }
+                print_json_value(&payload)
+            } else if let Some(text) = reply {
+                write_stdout_line(&text, "thread wait")
+            } else {
+                write_stdout_line(&status, "thread wait")
+            })
+        }
+        ThreadWaitOutcome::NeedsInput => Err(ThreadClientError::NeedsInput {
             thread_id: thread_id.to_owned(),
         }),
-        Err(err) => Err(err),
     }
 }
 
-fn read_message_text(arg: &str) -> Result<String, String> {
+pub(super) async fn run_read(
+    client: &ThreadMcpClient,
+    thread_id: &str,
+    view: Option<String>,
+    limit: Option<u32>,
+    after_position: Option<i64>,
+    json: bool,
+) -> Result<i32, ThreadClientError> {
+    let result = client
+        .read_thread(&ThreadReadRequest {
+            thread_id: thread_id.to_owned(),
+            view,
+            after_position,
+            limit,
+            ..ThreadReadRequest::default()
+        })
+        .await?;
+    let run_error = client.latest_run_error(&result.thread).await?;
+    if json {
+        let mut payload = serde_json::to_value(&result).unwrap_or_else(|_| json!({}));
+        if let Some(obj) = payload.as_object_mut() {
+            obj.insert(
+                "error".to_owned(),
+                run_error.map_or(serde_json::Value::Null, serde_json::Value::String),
+            );
+        }
+        return Ok(print_json_value(&payload));
+    }
+    let header = format!(
+        "{}\n{}  {}  {}/{}",
+        result.thread.title,
+        result.thread.thread_id,
+        result.thread.status,
+        result.thread.provider_instance_id,
+        result.thread.model
+    );
+    if write_stdout_line(&header, "thread read") != 0 {
+        return Ok(1);
+    }
+    if let Some(ref err) = run_error
+        && write_stdout_line(&format!("Error: {err}"), "thread read") != 0
+    {
+        return Ok(1);
+    }
+    for item in &result.items {
+        if let Some(ref text) = item.text
+            && write_stdout_line(&format!("\n[{}]\n{text}", item.item_type), "thread read") != 0
+        {
+            return Ok(1);
+        }
+    }
+    Ok(0)
+}
+
+pub(super) fn read_message_text(arg: &str) -> Result<String, String> {
     let text = if arg == "-" {
         let mut buf = String::new();
         io::stdin()

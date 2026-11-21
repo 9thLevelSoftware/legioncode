@@ -125,7 +125,7 @@ pub(super) fn thread_read(
         )
         .map_err(|_| format!("Thread `{thread_id}` not found."))?;
 
-    let (_, status) = run_status_for(conn, thread_id, None)?;
+    let (latest_run_id, status) = run_status_for(conn, thread_id, None)?;
     let recent_runs = query_recent_runs(conn, thread_id)?;
     let (all_items, total_items) = query_thread_items(conn, thread_id, max_chars)?;
     let filtered: Vec<Value> = all_items
@@ -151,6 +151,7 @@ pub(super) fn thread_read(
             "model": model,
             "branch": branch,
             "worktreePath": worktree,
+            "latestRunId": latest_run_id,
             "pendingRequestCount": 0,
             "itemCount": total_items,
         },
@@ -185,6 +186,25 @@ pub(super) fn run_status_for(
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok((None, "idle".to_owned())),
         Err(err) => Err(err.to_string()),
     }
+}
+
+/// Reads stored typed run output JSON value (`$.output.value`) for `run_id`, if submitted.
+pub(super) fn read_run_output_for(
+    conn: &Connection,
+    thread_id: &str,
+    run_id: Option<&str>,
+) -> Option<Value> {
+    let rid = run_id?;
+    let raw: Option<String> = conn
+        .query_row(
+            "SELECT json_extract(payload_json, '$.output.value')
+             FROM orchestration_v2_projection_runs
+             WHERE thread_id = ?1 AND run_id = ?2 LIMIT 1",
+            params![thread_id, rid],
+            |r| r.get(0),
+        )
+        .ok()?;
+    raw.and_then(|s| serde_json::from_str::<Value>(&s).ok())
 }
 
 fn query_recent_runs(conn: &Connection, thread_id: &str) -> Result<Vec<Value>, String> {

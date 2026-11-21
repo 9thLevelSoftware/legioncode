@@ -40,6 +40,7 @@ fn make_thread_create(
         thread_id: ThreadId::new(thread_id)?,
         project_id: ProjectId::new("proj-1")?,
         title: title.to_owned(),
+        generate_title: None,
         model_selection: ModelSelection {
             instance_id: ProviderInstanceId::new("codex")?,
             model: "gpt-5".to_owned(),
@@ -73,6 +74,7 @@ fn make_msg_dispatch(
             linked_sender: None,
             idle_compaction: None,
             fresh_context: None,
+            output_schema: None,
             command_id: CommandId::new(cmd_id)?,
             thread_id: ThreadId::new(thread_id)?,
             message_id: MessageId::new(msg_id)?,
@@ -318,7 +320,7 @@ async fn serve_exposes_environment_ws_rpc_frame_parts_mcp_and_owner_lock() -> Te
     let descriptor: ExecutionEnvironmentDescriptor = env_resp.json().await?;
     assert_eq!(&descriptor.environment_id, server.environment_id());
     assert_eq!(descriptor.orchestration_protocol_version, Some(2));
-    assert_eq!(descriptor.database_migration, Some(102));
+    assert_eq!(descriptor.database_migration, Some(105));
 
     let ws_no_proto = http.get(format!("{base_url}/ws")).send().await?;
     assert_eq!(ws_no_proto.status(), 426);

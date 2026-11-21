@@ -7,6 +7,7 @@ use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use serde::Serialize;
+use t3_contracts::brand::ACTIVE_BRAND;
 use t3_persistence::paths::ServerDerivedPaths;
 
 /// Absolute path to the legacy TypeScript CLI entrypoint invoked on fallback.
@@ -111,13 +112,13 @@ pub fn resolve_base_dir(explicit: Option<&str>) -> (PathBuf, bool) {
             return (resolve_platform_path(&expand_home(trimmed)), true);
         }
     }
-    if let Ok(val) = env::var("T3CODE_HOME") {
-        let trimmed = val.trim();
-        if !trimmed.is_empty() {
-            return (resolve_platform_path(&expand_home(trimmed)), true);
-        }
+    if let Some(val) = ACTIVE_BRAND.read_env("HOME") {
+        return (resolve_platform_path(&expand_home(val.trim())), true);
     }
-    (resolve_platform_path(&user_home_dir().join(".t3")), false)
+    (
+        resolve_platform_path(&user_home_dir().join(ACTIVE_BRAND.home_dir_name)),
+        false,
+    )
 }
 
 /// Derives `base_dir` and [`ServerDerivedPaths`] for CLI commands using `dev_url_present = false`.

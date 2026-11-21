@@ -343,11 +343,13 @@ $global:_t3_Completions['thread start'] = @{
   flags = @(
     @{ name = 'base-dir'; forms = @('--base-dir'); takesValue = $true; values = @(); pathType = $null; description = 'Explicit T3 Code data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME).' }
     @{ name = 'title'; forms = @('--title'); takesValue = $true; values = @(); pathType = $null; description = 'Thread title. Defaults to the message''s first line.' }
+    @{ name = 'generate-title'; forms = @('--generate-title'); takesValue = $false; negation = '--no-generate-title'; values = @(); pathType = $null; description = 'Generate the thread''s title from the message. Until it''s ready, the thread shows --title or the first line.' }
     @{ name = 'provider'; forms = @('--provider'); takesValue = $true; values = @(); pathType = $null; description = 'Provider instance id. Pass with --model.' }
     @{ name = 'model'; forms = @('--model'); takesValue = $true; values = @(); pathType = $null; description = 'Model slug. Defaults to the project''s default model.' }
     @{ name = 'option'; forms = @('--option'); takesValue = $true; repeatable = $true; values = @(); pathType = $null; description = 'Model option as id=value, such as effort=high. Repeat for more. Needs --provider and --model.' }
     @{ name = 'worktree'; forms = @('--worktree'); takesValue = $true; values = @(); pathType = $null; description = 'Run in a new git worktree based on this branch, tag, or commit, instead of the project folder.' }
     @{ name = 'branch'; forms = @('--branch'); takesValue = $true; values = @(); pathType = $null; description = 'Branch name for the new worktree.' }
+    @{ name = 'output-schema'; forms = @('--output-schema'); takesValue = $true; values = @(); pathType = $null; description = 'File holding a JSON Schema. The agent must return data matching it; --wait --json prints it as `output`.' }
     @{ name = 'wait'; forms = @('--wait'); takesValue = $false; negation = '--no-wait'; values = @(); pathType = $null; description = 'Wait for the agent to finish and print its reply. Exits 1 if the run fails and 2 if it waits for an answer.' }
     @{ name = 'json'; forms = @('--json'); takesValue = $false; negation = '--no-json'; values = @(); pathType = $null; description = 'Print JSON instead of text.' }
   )
@@ -360,6 +362,7 @@ $global:_t3_Completions['thread send'] = @{
   subcommands = @()
   flags = @(
     @{ name = 'base-dir'; forms = @('--base-dir'); takesValue = $true; values = @(); pathType = $null; description = 'Explicit T3 Code data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME).' }
+    @{ name = 'output-schema'; forms = @('--output-schema'); takesValue = $true; values = @(); pathType = $null; description = 'File holding a JSON Schema. The agent must return data matching it; --wait --json prints it as `output`.' }
     @{ name = 'wait'; forms = @('--wait'); takesValue = $false; negation = '--no-wait'; values = @(); pathType = $null; description = 'Wait for the agent to finish and print its reply. Exits 1 if the run fails and 2 if it waits for an answer.' }
     @{ name = 'json'; forms = @('--json'); takesValue = $false; negation = '--no-json'; values = @(); pathType = $null; description = 'Print JSON instead of text.' }
   )
@@ -534,6 +537,7 @@ $global:_t3_Completions['policy'] = @{
   subcommands = @(
     @{ name = 'show'; description = 'Show the policy installed on this machine, and whether the running server loaded it.' }
     @{ name = 'check'; description = 'Validate a policy file before deploying it.' }
+    @{ name = 'settings'; description = 'List the settings a policy can manage, with their defaults.' }
     @{ name = 'templates'; description = 'Write the Windows Group Policy template and a macOS configuration profile.' }
   )
   flags = @()
@@ -552,6 +556,11 @@ $global:_t3_Completions['policy check'] = @{
   arguments = @(
     @{ name = 'file'; variadic = $false; values = @(); pathType = $null; description = 'Policy file to validate.' }
   )
+}
+$global:_t3_Completions['policy settings'] = @{
+  subcommands = @()
+  flags = @()
+  arguments = @()
 }
 $global:_t3_Completions['policy templates'] = @{
   subcommands = @()

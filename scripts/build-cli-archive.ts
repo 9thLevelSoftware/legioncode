@@ -90,6 +90,22 @@ export class CliArchiveInputMissingError extends Schema.TaggedError<CliArchiveIn
   }
 }
 
+const NODE_SEA_BLOB_MARKER = Buffer.from("NODE_SEA_BLOB", "utf8");
+
+/** Identifies standalone Rust `t3` executables when legacy Node mode is not forced. */
+export function isStandaloneRustExecutable(
+  bytes: Uint8Array,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const legacyNode = env.T3CODE_LEGACY_NODE?.trim().toLowerCase();
+  if (legacyNode === "1" || legacyNode === "true") {
+    return false;
+  }
+  return !Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).includes(
+    NODE_SEA_BLOB_MARKER,
+  );
+}
+
 export function cliArchivePlatformKey(platform: BuildPlatform, arch: BuildArch): string {
   const nodePlatform = platform === "mac" ? "darwin" : platform === "win" ? "win32" : "linux";
   return `${nodePlatform}-${arch}`;
@@ -612,7 +628,9 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
     : targetKey === hostKey
       ? path.join(serverDir, "dist-exe", executableName)
       : targetExecutable;
-  const webClient = path.join(serverDir, "dist/client");
+  const env = yield* HostProcess.Environment;
+  const serverWebClient = path.join(serverDir, "dist/client");
+  const rustWebClient = path.join(repoRoot, "rust/dist/web-app");
   const resourceMonitorDir = Option.getOrElse(input.resourceMonitorDir, () =>
     path.join(serverDir, "dist/resource-monitor"),
   );
@@ -621,11 +639,24 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
     builtExecutable,
     `Run \`node apps/server/scripts/cli.ts build-exe${targetKey === hostKey ? "" : ` --target ${targetKey}`}\` first.`,
   );
+  const builtExecutableBytes = yield* fs.readFile(builtExecutable);
+  const standaloneRust = isStandaloneRustExecutable(builtExecutableBytes, env);
+
+  const webClient =
+    standaloneRust &&
+    !(yield* fs.exists(path.join(serverWebClient, "index.html"))) &&
+    (yield* fs.exists(path.join(rustWebClient, "index.html")))
+      ? rustWebClient
+      : serverWebClient;
   yield* requireInput(path.join(webClient, "index.html"), "Run `vp run --filter t3 build` first.");
-  yield* requireInput(
-    resourceMonitorDir,
-    "Build the resource monitor or pass --resource-monitor-dir.",
-  );
+
+  const hasResourceMonitor = yield* fs.exists(resourceMonitorDir);
+  if (!standaloneRust && !hasResourceMonitor) {
+    yield* requireInput(
+      resourceMonitorDir,
+      "Build the resource monitor or pass --resource-monitor-dir.",
+    );
+  }
 
   const stem = cliArchiveStem(input.version, input.platform, input.arch);
   const stageRoot = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cli-archive-" });
@@ -635,21 +666,25 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
   yield* Effect.log(`[cli-archive] Staging ${stem}...`);
   yield* fs.copyFile(builtExecutable, path.join(contentDir, executableName));
   yield* stageWebClient(webClient, path.join(contentDir, "client"));
-  yield* fs.copy(resourceMonitorDir, path.join(contentDir, "resource-monitor"));
-  yield* stageRuntimeExternals({
-    repoRoot,
-    stageDir: contentDir,
-    platform: input.platform,
-    arch: input.arch,
-    version: input.version,
-  });
+  if (hasResourceMonitor) {
+    yield* fs.copy(resourceMonitorDir, path.join(contentDir, "resource-monitor"));
+  }
+  if (!standaloneRust) {
+    yield* stageRuntimeExternals({
+      repoRoot,
+      stageDir: contentDir,
+      platform: input.platform,
+      arch: input.arch,
+      version: input.version,
+    });
+  }
 
   const executablePath = path.join(contentDir, executableName);
-  if (input.platform === "linux") {
+  if (input.platform === "linux" && !standaloneRust) {
     yield* bundleLinuxLibatomic({ repoRoot, contentDir, executablePath });
   }
   // TEMPORARY one-time Node fix. Remove when fixed: https://github.com/nodejs/node/issues/67048
-  if (input.platform === "linux" && input.arch === "arm64") {
+  if (input.platform === "linux" && input.arch === "arm64" && !standaloneRust) {
     const bytes = yield* fs.readFile(executablePath);
     yield* Effect.try({
       try: () => assertLinuxArm64PageCompatibility(bytes),

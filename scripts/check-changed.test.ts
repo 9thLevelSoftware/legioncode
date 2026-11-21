@@ -16,6 +16,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as TestClock from "effect/testing/TestClock";
 
 import {
+  chunkArgsByLength,
   comparisonBase,
   defaultConcurrency,
   docReaderTests,
@@ -337,7 +338,10 @@ it("lists the ignored inputs that main's pathspecs list, without entering node_m
     NodeFS.mkdirSync(NodePath.dirname(NodePath.join(project.root, file)), { recursive: true });
     NodeFS.writeFileSync(NodePath.join(project.root, file), content);
   };
-  write(".gitignore", "node_modules/\ndist/\n.generated/\n.env*\n*.gen.d.ts\nreplaced/\nskipped/");
+  write(
+    ".gitignore",
+    "node_modules/\ndist/\n.generated/\n.env*\n*.gen.d.ts\nreplaced/\nskipped/\nrust/target/\nrust/dist/",
+  );
   for (const file of ["replaced", "skipped"]) write(file);
   git("add", ".");
   git("commit", "-m", "files that directories replace");
@@ -355,16 +359,21 @@ it("lists the ignored inputs that main's pathspecs list, without entering node_m
     "old/node_modules/pkg/index.d.ts",
     "replaced/sub/a.d.ts",
     "skipped/a.d.ts",
+    "rust/target/release/out.d.ts",
+    "rust/dist/wasm-web/t3_wasm_ffi.d.ts",
   ])
     write(file);
   const command =
-    "ls-files -o -i --exclude-standard -- :(glob)**/.generated/** :(glob)**/.astro/** :(glob)**/*.d.ts :(glob)**/.env* :(exclude,glob)**/node_modules/**";
+    "ls-files -o -i --exclude-standard -- :(glob)**/.generated/** :(glob)**/.astro/** :(glob)**/*.d.ts :(glob)**/.env* :(exclude,glob)**/node_modules/** :(exclude,glob)rust/target/** :(exclude,glob)rust/dist/**";
   const old = git(...command.split(" "))
     .split("\n")
     .filter(Boolean)
     .sort();
   assert.includeMembers(old, ["old/dist/a.d.ts", "replaced/sub/a.d.ts", "skipped/a.d.ts"]);
-  assert.deepStrictEqual(await inFixture(ignoredCheckInputs(project.root)), old);
+  const result = await inFixture(ignoredCheckInputs(project.root));
+  assert.notInclude(result, "rust/target/release/out.d.ts");
+  assert.notInclude(result, "rust/dist/wasm-web/t3_wasm_ffi.d.ts");
+  assert.deepStrictEqual(result, old);
 });
 
 function launcherFixture() {
@@ -528,4 +537,16 @@ it.each(["install", "lint"])("reports a failing %s step with its output", (step)
   expect(
     NodeFS.existsSync(NodePath.join(project.root, "node_modules/.cache/check-changed.json")),
   ).toBe(false);
+});
+
+it("splits oversized argument lists without exceeding the command-line budget", () => {
+  const chunks = chunkArgsByLength(
+    ["fmt", "--check"],
+    ["alpha.ts", "bravo.ts", "charlie.ts", "delta.ts"],
+    40,
+  );
+  expect(chunks).toEqual([
+    ["alpha.ts", "bravo.ts"],
+    ["charlie.ts", "delta.ts"],
+  ]);
 });

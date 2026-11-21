@@ -4,6 +4,7 @@ import * as NodeSea from "node:sea";
 import * as NodeURL from "node:url";
 
 import { isEntrypoint } from "./entrypoint.ts";
+import { tryRunRustCliCutover } from "./rustCutover.ts";
 
 // Loads the CLI outside the launcher's module graph. Packaged builds embed it as a raw asset.
 async function loadCliMain(): Promise<typeof import("./binMain.ts")> {
@@ -45,16 +46,23 @@ if (
   process.stdout.on("error", ignoreOutputError);
   process.stderr.on("error", ignoreOutputError);
 
-  // The launcher owns shutdown until its child exits, so it bypasses the Effect CLI runtime.
-  // A service unit passes nothing, or on Windows the launcher's own flags; help and anything
-  // else go through the full CLI.
-  const launcher =
-    process.argv[2] === "__service-launcher" ? await import("./cli/serviceLauncher.ts") : undefined;
-  const launcherOptions = launcher?.parseServiceLauncherArgs(process.argv.slice(3));
-  if (launcher !== undefined && launcherOptions !== undefined) {
-    await launcher.runServiceLauncherCli(launcherOptions);
+  const rustExitCode = await tryRunRustCliCutover();
+  if (rustExitCode !== undefined) {
+    process.exitCode = rustExitCode;
   } else {
-    const { runCliCommand } = await loadCliMain();
-    await runCliCommand();
+    // The launcher owns shutdown until its child exits, so it bypasses the Effect CLI runtime.
+    // A service unit passes nothing, or on Windows the launcher's own flags; help and anything
+    // else go through the full CLI.
+    const launcher =
+      process.argv[2] === "__service-launcher"
+        ? await import("./cli/serviceLauncher.ts")
+        : undefined;
+    const launcherOptions = launcher?.parseServiceLauncherArgs(process.argv.slice(3));
+    if (launcher !== undefined && launcherOptions !== undefined) {
+      await launcher.runServiceLauncherCli(launcherOptions);
+    } else {
+      const { runCliCommand } = await loadCliMain();
+      await runCliCommand();
+    }
   }
 }

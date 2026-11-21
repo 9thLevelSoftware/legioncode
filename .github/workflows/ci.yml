@@ -564,7 +564,7 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.rust != 'false' }}
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -579,19 +579,54 @@ jobs:
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: stable
-          components: rustfmt
+          components: rustfmt, clippy
+
+      - name: Cache Cargo dependencies
+        if: hashFiles('rust/Cargo.lock') != ''
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            rust/target/
+          key: cargo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Setup APT mirrors for Rust Linux dependencies
+        if: hashFiles('rust/Cargo.toml') != ''
+        uses: ./.github/actions/setup-apt-mirrors
+
+      - name: Install GTK and WebView2 Linux dependencies
+        if: hashFiles('rust/Cargo.toml') != ''
+        run: |
+          sudo apt-get update -o Acquire::Languages=none \
+            -o Acquire::IndexTargets::deb::DEP-11::DefaultEnabled=false \
+            -o Acquire::IndexTargets::deb::CNF::DefaultEnabled=false &&
+            sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev pkg-config xvfb
 
       - name: Check Rust formatting
         run: |
           for crate in resource-monitor kde-snap-shot hyprland-snap-shot; do
             cargo fmt --manifest-path "native/$crate/Cargo.toml" -- --check
           done
+          if test -f rust/Cargo.toml; then
+            cargo fmt --manifest-path rust/Cargo.toml -- --check
+          fi
+
+      - name: Clippy Rust workspace
+        if: hashFiles('rust/Cargo.toml') != ''
+        run: cargo clippy --locked --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings
 
       - name: Test Rust crates
         run: |
           for crate in resource-monitor kde-snap-shot hyprland-snap-shot; do
             cargo test --locked --manifest-path "native/$crate/Cargo.toml"
           done
+          if test -f rust/Cargo.toml; then
+            cargo test --locked --manifest-path rust/Cargo.toml --workspace
+          fi
 
   mobile_native_static_analysis:
     name: Mobile Native Static Analysis

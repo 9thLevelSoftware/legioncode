@@ -59,6 +59,47 @@ const PackageJsonPrettyJson = fromJsonStringPretty(PackageJsonSchema);
 const decodePackageJson = Schema.decodeUnknownEffect(PackageJsonPrettyJson);
 const encodePackageJson = Schema.encodeEffect(PackageJsonPrettyJson);
 
+function updateCargoWorkspacePackageVersion(
+  cargoTomlText: string,
+  version: string,
+): { readonly changed: boolean; readonly text: string } | undefined {
+  const lineEnding = cargoTomlText.includes("\r\n") ? "\r\n" : "\n";
+  const lines = cargoTomlText.split(/\r?\n/u);
+  let inWorkspacePackage = false;
+  let foundVersion = false;
+  let changed = false;
+
+  const updatedLines = lines.map((line) => {
+    const sectionMatch = /^\[([^\]]+)\]\s*(?:#.*)?$/u.exec(line.trim());
+    if (sectionMatch !== null) {
+      inWorkspacePackage = sectionMatch[1]?.trim() === "workspace.package";
+      return line;
+    }
+    if (!inWorkspacePackage || foundVersion) {
+      return line;
+    }
+    const versionMatch = /^(\s*version\s*=\s*)(["'])([^"']*)(["'])(.*)$/u.exec(line);
+    if (versionMatch === null) {
+      return line;
+    }
+    foundVersion = true;
+    const [, prefix, openQuote, currentVersion, closeQuote, suffix] = versionMatch;
+    if (currentVersion === version) {
+      return line;
+    }
+    changed = true;
+    return `${prefix}${openQuote}${version}${closeQuote}${suffix}`;
+  });
+
+  if (!foundVersion) {
+    return undefined;
+  }
+  return {
+    changed,
+    text: updatedLines.join(lineEnding),
+  };
+}
+
 export const updateReleasePackageVersions = Effect.fn("updateReleasePackageVersions")(function* (
   version: string,
   options: UpdateReleasePackageVersionsOptions = {},
@@ -115,6 +156,41 @@ export const updateReleasePackageVersions = Effect.fn("updateReleasePackageVersi
       ),
     );
     changed = true;
+  }
+
+  const cargoTomlPath = path.join(rootDir, "rust/Cargo.toml");
+  if (yield* fs.exists(cargoTomlPath)) {
+    const cargoTomlText = yield* fs.readFileString(cargoTomlPath).pipe(
+      Effect.mapError(
+        (cause) =>
+          new ReleasePackageManifestError({
+            operation: "read",
+            filePath: cargoTomlPath,
+            cause,
+          }),
+      ),
+    );
+    const updatedCargo = updateCargoWorkspacePackageVersion(cargoTomlText, version);
+    if (updatedCargo === undefined) {
+      return yield* new ReleasePackageManifestError({
+        operation: "decode",
+        filePath: cargoTomlPath,
+        cause: new Error("Missing [workspace.package].version in rust/Cargo.toml"),
+      });
+    }
+    if (updatedCargo.changed) {
+      yield* fs.writeFileString(cargoTomlPath, updatedCargo.text).pipe(
+        Effect.mapError(
+          (cause) =>
+            new ReleasePackageManifestError({
+              operation: "write",
+              filePath: cargoTomlPath,
+              cause,
+            }),
+        ),
+      );
+      changed = true;
+    }
   }
 
   return { changed };

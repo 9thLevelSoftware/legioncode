@@ -7,6 +7,8 @@ import * as NodeURL from "node:url";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 
+import { vitePlusCommand } from "./check-changed-command.ts";
+
 const repoRoot = NodePath.resolve(NodePath.dirname(NodeURL.fileURLToPath(import.meta.url)), "..");
 
 const workspaceFiles = [
@@ -56,6 +58,7 @@ const workspaceFiles = [
   "packages/source-control-testing/package.json",
   "packages/effect-acp/package.json",
   "packages/effect-codex-app-server/package.json",
+  "rust/Cargo.toml",
   "scripts/package.json",
 ] as const;
 
@@ -211,6 +214,29 @@ function assertPackageVersion(path: string, version: string): void {
   }
 }
 
+function assertCargoWorkspaceVersion(path: string, version: string): void {
+  const cargoToml = NodeFS.readFileSync(path, "utf8");
+  let inWorkspacePackage = false;
+  for (const line of cargoToml.split(/\r?\n/u)) {
+    const sectionMatch = /^\[([^\]]+)\]\s*(?:#.*)?$/u.exec(line.trim());
+    if (sectionMatch !== null) {
+      inWorkspacePackage = sectionMatch[1]?.trim() === "workspace.package";
+      continue;
+    }
+    if (!inWorkspacePackage) continue;
+    const versionMatch = /^\s*version\s*=\s*(["'])([^"']*)(["'])/u.exec(line);
+    if (versionMatch !== null) {
+      if (versionMatch[2] !== version) {
+        throw new Error(
+          `Expected ${path} [workspace.package].version to be ${version}, got ${versionMatch[2]}.`,
+        );
+      }
+      return;
+    }
+  }
+  throw new Error(`Missing [workspace.package].version in ${path}.`);
+}
+
 function assertMissing(path: string, message: string): void {
   if (NodeFS.existsSync(path)) {
     throw new Error(message);
@@ -220,10 +246,21 @@ function assertMissing(path: string, message: string): void {
 const tempRoot = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-release-smoke-"));
 
 try {
+  const gitBashDir = "C:\\Program Files\\Git\\bin";
+  // oxlint-disable-next-line t3code/no-global-process-runtime -- Release smoke is a standalone Node script without Effect HostProcess.
+  const isWindows = process.platform === "win32";
+  const relayTestEnv =
+    isWindows && NodeFS.existsSync(NodePath.join(gitBashDir, "bash.exe"))
+      ? {
+          ...process.env,
+          PATH: `${gitBashDir};${process.env.PATH ?? process.env.Path ?? ""}`,
+        }
+      : process.env;
+
   NodeChildProcess.execFileSync(
     process.execPath,
     ["--test", NodePath.resolve(repoRoot, ".github/scripts/relay-state-output.test.cjs")],
-    { stdio: "inherit" },
+    { stdio: "inherit", env: relayTestEnv },
   );
 
   copyWorkspaceManifestFixture(tempRoot);
@@ -242,7 +279,8 @@ try {
     },
   );
 
-  NodeChildProcess.execFileSync("vp", ["install", "--lockfile-only", "--ignore-scripts"], {
+  const [vpCommand, vpArgs] = vitePlusCommand(["install", "--lockfile-only", "--ignore-scripts"]);
+  NodeChildProcess.execFileSync(vpCommand, vpArgs, {
     cwd: tempRoot,
     stdio: "inherit",
   });
@@ -258,6 +296,7 @@ try {
   ]) {
     assertPackageVersion(NodePath.resolve(tempRoot, relativePath), "9.9.9-smoke.0");
   }
+  assertCargoWorkspaceVersion(NodePath.resolve(tempRoot, "rust/Cargo.toml"), "9.9.9-smoke.0");
 
   const nightlyReleaseMetadata = NodeChildProcess.execFileSync(
     process.execPath,

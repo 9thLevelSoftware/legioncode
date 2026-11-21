@@ -634,6 +634,10 @@
     "./provider-instance-ids": {
       "types": "./src/providerInstanceIds.ts",
       "default": "./src/providerInstanceIds.ts"
+    },
+    "./wasm/rust-core-bridge": {
+      "types": "./src/wasm/rustCoreBridge.ts",
+      "default": "./src/wasm/rustCoreBridge.ts"
     }
   },
   "scripts": {

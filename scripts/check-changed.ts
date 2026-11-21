@@ -153,6 +153,7 @@ export const gitLines = (cwd: string, args: ReadonlyArray<string>) =>
 // Ignored files that checks read: generated sources, declarations, and env files.
 const checkInput = /(^|\/)\.(generated|astro)\/|\.d\.ts$|(^|\/)\.env[^/]*$/;
 const inNodeModules = /(^|\/)node_modules\//;
+const inRustArtifacts = /^rust\/(target|dist|pgo-data)\//;
 
 // Pathspecs don't stop git from walking an ignored directory, and on Windows it follows pnpm's
 // junctions in node_modules until MAX_PATH. `--directory` lists one without entering it.
@@ -174,7 +175,10 @@ export const ignoredCheckInputs = Effect.fn("checkChanged.ignoredCheckInputs")(f
   // listing it again would walk its node_modules.
   const directories = entries.filter(
     (entry, index) =>
-      entry.endsWith("/") && !inNodeModules.test(entry) && !entries[index + 1]?.startsWith(entry),
+      entry.endsWith("/") &&
+      !inNodeModules.test(entry) &&
+      !inRustArtifacts.test(entry) &&
+      !entries[index + 1]?.startsWith(entry),
   );
   const files = entries.filter((entry) => !entry.endsWith("/"));
   // Calls fit Windows' 32,767-character command line: 16 covers `:(literal)`, quotes, a space.
@@ -183,11 +187,18 @@ export const ignoredCheckInputs = Effect.fn("checkChanged.ignoredCheckInputs")(f
   const size = Math.max(1, Math.floor(30_000 / (longest + 16)));
   for (let start = 0; start < directories.length; start += size) {
     const batch = directories.slice(start, start + size).map((dir) => `:(literal)${dir}`);
-    files.push(...(yield* list([...ignored, "--", ":(literal).git/", ...batch])));
+    for (const item of yield* list([...ignored, "--", ":(literal).git/", ...batch])) {
+      files.push(item);
+    }
   }
   // A nested repository is listed by its directory, as the old pathspecs listed it.
   return files
-    .filter((file) => !inNodeModules.test(file) && (file.endsWith("/") || checkInput.test(file)))
+    .filter(
+      (file) =>
+        !inNodeModules.test(file) &&
+        !inRustArtifacts.test(file) &&
+        (file.endsWith("/") || checkInput.test(file)),
+    )
     .sort();
 });
 
@@ -232,6 +243,32 @@ export const splitTests = (tests: Iterable<string>) => {
     nodeTests: all.filter((file) => NODE_TEST.test(file)),
   };
 };
+
+// Keep each spawned command well below Windows' 32,767-character CreateProcessW limit.
+export function chunkArgsByLength(
+  prefixArgs: ReadonlyArray<string>,
+  items: ReadonlyArray<string>,
+  maxChars = 24_000,
+): ReadonlyArray<ReadonlyArray<string>> {
+  if (items.length === 0) return [];
+  const prefixLength = prefixArgs.reduce((sum, arg) => sum + arg.length + 3, 0);
+  const chunks: Array<Array<string>> = [];
+  let current: Array<string> = [];
+  let currentLength = prefixLength;
+
+  for (const item of items) {
+    const itemLength = item.length + 3;
+    if (current.length > 0 && currentLength + itemLength > maxChars) {
+      chunks.push(current);
+      current = [];
+      currentLength = prefixLength;
+    }
+    current.push(item);
+    currentLength += itemLength;
+  }
+  if (current.length > 0) chunks.push(current);
+  return chunks;
+}
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // A flag wins over its environment variable; either must be a positive integer.
@@ -504,15 +541,33 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
   const filters = (names: ReadonlyArray<string>) => names.flatMap((name) => ["--filter", name]);
   const typecheckWorkers = Math.min(concurrency, affected.length);
   const command = (name: string, args: ReadonlyArray<string>) => ({ name, run: vp(args) });
+  const batchedCommand = (
+    name: string,
+    prefixArgs: ReadonlyArray<string>,
+    items: ReadonlyArray<string>,
+  ) => ({
+    name,
+    run: Effect.gen(function* () {
+      const outputs: Array<string> = [];
+      let ok = true;
+      for (const batch of chunkArgsByLength(prefixArgs, items)) {
+        const result = yield* vp([...prefixArgs, ...batch]);
+        if (!result.ok) ok = false;
+        const trimmed = result.output.trimEnd();
+        if (trimmed) outputs.push(trimmed);
+      }
+      return { ok, output: outputs.join("\n") };
+    }),
+  });
   const compilerFiles = compilerApps.reduce((count, app) => count + app.names.length, 0);
 
   const steps: Array<Step<never>> = [
     ...(runPatchCheck ? [{ name: "unused patches", run: checkPatches }] : []),
     ...(present.length > 0
-      ? [command("format", ["fmt", "--check", "--no-error-on-unmatched-pattern", ...present])]
+      ? [batchedCommand("format", ["fmt", "--check", "--no-error-on-unmatched-pattern"], present)]
       : []),
     ...(code.length > 0
-      ? [command("lint", ["lint", "--no-error-on-unmatched-pattern", ...code])]
+      ? [batchedCommand("lint", ["lint", "--no-error-on-unmatched-pattern"], code)]
       : []),
     ...(runKnip
       ? knipPasses.map((args, index) => command(`knip ${index + 1}/${knipPasses.length}`, args))
@@ -542,24 +597,22 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
     ...(vitestTests.length > 0
       ? [
           {
-            ...command(`test (${vitestTests.length} files)`, [
-              "test",
-              "run",
-              "--passWithNoTests",
-              ...vitestTests,
-            ]),
+            ...batchedCommand(
+              "test (" + vitestTests.length + " files)",
+              ["test", "run", "--passWithNoTests"],
+              vitestTests,
+            ),
             serial: true,
           },
         ]
       : []),
     ...(nodeTests.length > 0
       ? [
-          command(`node --test (${nodeTests.length} files)`, [
-            "exec",
-            "node",
-            "--test",
-            ...nodeTests,
-          ]),
+          batchedCommand(
+            `node --test (${nodeTests.length} files)`,
+            ["exec", "node", "--test"],
+            nodeTests,
+          ),
         ]
       : []),
     ...(compilerApps.length > 0

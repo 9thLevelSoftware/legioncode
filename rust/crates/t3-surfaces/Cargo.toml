@@ -1,0 +1,18 @@
+[package]
+name = "t3-surfaces"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+t3-client-core = { path = "../t3-client-core" }
+t3-contracts = { path = "../t3-contracts" }
+t3-edge = { path = "../t3-edge" }
+thiserror = { workspace = true }

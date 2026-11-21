@@ -38,6 +38,11 @@ pub fn validate_peer_origin(url: &str) -> Result<String, PeerLinkError> {
     }
     let host_port = authority.rsplit_once('@').map_or(authority, |(_, hp)| hp);
     let (normalized_host, display_host, port) = parse_authority_host_port(host_port, url)?;
+    let is_default_port = matches!((scheme, port), ("http", Some(80)) | ("https", Some(443)));
+    let origin = match port {
+        Some(p) if !is_default_port => format!("{scheme}://{display_host}:{p}"),
+        _ => format!("{scheme}://{display_host}"),
+    };
 
     if scheme == "http"
         && !is_local_loopback_host(&normalized_host)
@@ -46,16 +51,12 @@ pub fn validate_peer_origin(url: &str) -> Result<String, PeerLinkError> {
         return Err(PeerLinkError::new(
             PeerLinkErrorReason::Unreachable,
             format!(
-                "{url} is plain http, which would send the link's credentials unencrypted. Use its https address, or its Tailscale address."
+                "{origin} is plain http, which would send the link's credentials unencrypted. Use its https address, or its Tailscale address."
             ),
         ));
     }
 
-    let is_default_port = matches!((scheme, port), ("http", Some(80)) | ("https", Some(443)));
-    match port {
-        Some(p) if !is_default_port => Ok(format!("{scheme}://{display_host}:{p}")),
-        _ => Ok(format!("{scheme}://{display_host}")),
-    }
+    Ok(origin)
 }
 
 fn parse_authority_host_port(
@@ -106,9 +107,10 @@ fn parse_optional_port(suffix: &str, original_url: &str) -> Result<Option<u16>, 
     Ok(Some(port))
 }
 
-fn not_http_err(url: &str) -> PeerLinkError {
+fn not_http_err(_url: &str) -> PeerLinkError {
+    // Never echo raw URLs in errors: callers may include userinfo or secret query parameters.
     PeerLinkError::new(
         PeerLinkErrorReason::Unreachable,
-        format!("{url} is not an http or https address."),
+        "That address is not an http or https address.",
     )
 }

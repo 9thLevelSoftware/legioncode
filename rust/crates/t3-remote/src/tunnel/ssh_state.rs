@@ -87,6 +87,7 @@ impl SshTunnelStateMachine {
             TunnelEvent::StaleDetected => self.begin_close(false),
             TunnelEvent::Disconnect => self.begin_close(true),
             TunnelEvent::ProcessExited { exit_code } => self.on_process_exited(exit_code),
+            TunnelEvent::RemoteShuttingDown { pid } => self.on_remote_shutting_down(pid),
             TunnelEvent::ShutdownCompleted => {
                 if !matches!(self.state, SshTunnelState::Closing { .. }) {
                     return Err(invalid_transition(&self.state, "ShutdownCompleted"));
@@ -295,6 +296,28 @@ impl SshTunnelStateMachine {
             stderr_tail,
         };
         Ok(Vec::new())
+    }
+
+    fn on_remote_shutting_down(&mut self, pid: u32) -> Result<Vec<TunnelAction>, SshError> {
+        match &self.state {
+            SshTunnelState::Resolving { .. }
+            | SshTunnelState::LaunchingRemote { .. }
+            | SshTunnelState::StartingForward { .. }
+            | SshTunnelState::ProbingReadiness { .. }
+            | SshTunnelState::Ready { .. } => {
+                let short = t3_contracts::brand::ACTIVE_BRAND
+                    .cli_bin_name
+                    .to_ascii_uppercase();
+                self.state = SshTunnelState::Failed {
+                    message: format!(
+                        "The previous remote {short} server (PID {pid}) is still shutting down. Retry once it has exited."
+                    ),
+                    stderr_tail: String::new(),
+                };
+                Ok(Vec::new())
+            }
+            _ => Err(invalid_transition(&self.state, "RemoteShuttingDown")),
+        }
     }
 }
 

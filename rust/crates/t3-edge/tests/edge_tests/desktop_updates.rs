@@ -1,13 +1,15 @@
 //! Tests for `t3_edge::desktop_updates` (`BUG-28`, `BUG-31`, `Range` resume, and SHA-512).
 
 use proptest::prelude::*;
+use t3_contracts::brand::LEGION_CODE;
 use t3_contracts::policy::{ManagedUpdatesMode, ManagedUpdatesPolicy};
 use t3_edge::desktop_updates::{
     DOWNLOAD_STALL_RETRIES, DesktopUpdateChannel, DesktopUpdateError, DesktopUpdateMachine,
     DigestError, DownloadFailureKind, DownloadResumePlanner, HttpDownloadResponse, PendingUpdate,
-    ResponseAction, ResumeError, RetryPlan, Sha512Verifier, UpdateErrorContext, UpdateStatus,
-    VerifiedArtifact, compute_sha512_base64, compute_sha512_hex, render_aur_launcher,
-    verify_sha512,
+    ResponseAction, ResumeError, RetryPlan, Sha512Verifier, TrackMismatch, UpdateErrorContext,
+    UpdateStatus, VerifiedArtifact, compute_sha512_base64, compute_sha512_hex,
+    desktop_update_channel_of, render_aur_launcher, render_aur_launcher_for_brand,
+    track_mismatch_message, verify_sha512,
 };
 
 #[test]
@@ -192,6 +194,83 @@ fn bug31_aur_launcher_sets_env_and_distinct_nightly_desktop_id() {
             .contains("StartupWMClass=com.t3tools.T3CodeNightly\n")
     );
     assert_ne!(stable.desktop_entry_id, nightly.desktop_entry_id);
+
+    let legion = render_aur_launcher_for_brand(DesktopUpdateChannel::Latest, &LEGION_CODE);
+    assert_eq!(legion.package_name, "legioncode-bin");
+    assert_eq!(legion.launcher_path, "/usr/bin/legioncode");
+    assert_eq!(legion.desktop_entry_id, "dev.legioncode.LegionCode.desktop");
+    assert!(
+        legion
+            .launcher_script
+            .contains("LEGION_DESKTOP_LAUNCHER_PATH=/usr/bin/legioncode")
+    );
+    assert!(
+        legion
+            .desktop_entry
+            .contains("MimeType=x-scheme-handler/legioncode;\n")
+    );
+}
+
+#[test]
+fn track_mismatch_reported_and_cleared_across_subsequent_transitions() {
+    assert_eq!(
+        desktop_update_channel_of("1.2.4"),
+        DesktopUpdateChannel::Latest
+    );
+    assert_eq!(
+        desktop_update_channel_of("1.2.4-nightly.20261027.1"),
+        DesktopUpdateChannel::Nightly
+    );
+
+    let mut machine = DesktopUpdateMachine::new(DesktopUpdateChannel::Nightly, "1.2.4");
+    machine.begin_check("2026-11-20T00:00:00Z");
+    machine.on_no_offer("2026-11-20T00:00:01Z", false, None);
+    assert_eq!(machine.status(), UpdateStatus::Error);
+    assert_eq!(machine.error_context(), Some(UpdateErrorContext::Check));
+    assert_eq!(
+        machine.track_mismatch(),
+        Some(TrackMismatch {
+            build_channel: DesktopUpdateChannel::Latest
+        })
+    );
+    assert_eq!(
+        machine.last_error(),
+        Some(
+            track_mismatch_message(DesktopUpdateChannel::Latest, DesktopUpdateChannel::Nightly)
+                .as_str()
+        )
+    );
+
+    // Later unrelated failures or new checks clear stale track mismatch.
+    machine.on_check_failure("background updater failure", "2026-11-20T00:00:02Z");
+    assert_eq!(machine.track_mismatch(), None);
+
+    machine.on_no_offer("2026-11-20T00:00:03Z", false, None);
+    assert!(machine.track_mismatch().is_some());
+    machine.begin_check("2026-11-20T00:00:04Z");
+    assert_eq!(machine.status(), UpdateStatus::Checking);
+    assert_eq!(machine.track_mismatch(), None);
+
+    // A release floor disables mismatch because cross-track downgrade is permitted intentionally.
+    machine.on_no_offer("2026-11-20T00:00:05Z", true, None);
+    assert_eq!(machine.status(), UpdateStatus::UpToDate);
+    assert_eq!(machine.track_mismatch(), None);
+
+    // Policy blocking nightly refuses without naming nightly as a switch-back target.
+    let deny_nightly = ManagedUpdatesPolicy {
+        mode: ManagedUpdatesMode::Auto,
+        feed_url: Some("https://updates.example.com".to_owned()),
+        allow_nightly: Some(false),
+    };
+    let mut nightly_on_latest =
+        DesktopUpdateMachine::new(DesktopUpdateChannel::Latest, "1.2.4-nightly.20261027.1");
+    nightly_on_latest.on_no_offer("2026-11-20T00:00:06Z", false, Some(&deny_nightly));
+    assert_eq!(nightly_on_latest.status(), UpdateStatus::Error);
+    assert_eq!(
+        nightly_on_latest.error_context(),
+        Some(UpdateErrorContext::Check)
+    );
+    assert_eq!(nightly_on_latest.track_mismatch(), None);
 }
 
 proptest! {

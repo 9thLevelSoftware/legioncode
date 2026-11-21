@@ -1,10 +1,6 @@
 //! `similar`-backed unified diff computation, merging, filename whitespace preservation, and truncation.
 
-use std::fmt::Write as _;
-
-use similar::{Algorithm, ChangeTag, TextDiff, capture_diff_slices, group_diff_ops};
-
-use crate::core::revisions::quote_git_patch_path;
+use crate::checkpoints::diff_patch_fast::render_file_diff;
 
 /// Default unified diff output ceiling in bytes (`10 MB`), matching T3 Code server limits.
 pub const DEFAULT_MAX_OUTPUT_BYTES: usize = 10_000_000;
@@ -246,105 +242,4 @@ pub fn parse_numstat_z(raw: &[u8]) -> Vec<NumstatEntry> {
         }
     }
     out
-}
-
-fn render_file_diff(input: DiffFileInput<'_>, options: DiffQueryOptions) -> String {
-    let old_label = format!("a/{}", quote_git_patch_path(input.old_path));
-    let new_label = format!("b/{}", quote_git_patch_path(input.new_path));
-
-    if input.is_binary {
-        return format!(
-            "diff --git {old_label} {new_label}\nBinary files {old_label} and {new_label} differ\n"
-        );
-    }
-
-    if !options.ignore_whitespace {
-        let diff = TextDiff::from_lines(input.old_content, input.new_content);
-        let hunks = diff
-            .unified_diff()
-            .context_radius(options.context_lines)
-            .header(&old_label, &new_label)
-            .to_string();
-        if hunks.is_empty() {
-            return String::new();
-        }
-        return format!("diff --git {old_label} {new_label}\n{hunks}");
-    }
-
-    render_ignore_whitespace_diff(input, &old_label, &new_label, options.context_lines)
-}
-
-fn render_ignore_whitespace_diff(
-    input: DiffFileInput<'_>,
-    old_label: &str,
-    new_label: &str,
-    context_lines: usize,
-) -> String {
-    let old_lines: Vec<&str> = split_lines_inclusive(input.old_content);
-    let new_lines: Vec<&str> = split_lines_inclusive(input.new_content);
-
-    let old_norm: Vec<String> = old_lines.iter().map(|l| strip_ws(l)).collect();
-    let new_norm: Vec<String> = new_lines.iter().map(|l| strip_ws(l)).collect();
-    let old_refs: Vec<&str> = old_norm.iter().map(String::as_str).collect();
-    let new_refs: Vec<&str> = new_norm.iter().map(String::as_str).collect();
-
-    let ops = capture_diff_slices(Algorithm::Myers, &old_refs, &new_refs);
-    let groups = group_diff_ops(ops, context_lines);
-    if groups.is_empty() {
-        return String::new();
-    }
-
-    let mut out = format!("diff --git {old_label} {new_label}\n--- {old_label}\n+++ {new_label}\n");
-    for group in groups {
-        let Some((first_op, last_op)) = group.first().zip(group.last()) else {
-            continue;
-        };
-        let old_range_start = first_op.old_range().start;
-        let old_range_end = last_op.old_range().end;
-        let new_range_start = first_op.new_range().start;
-        let new_range_end = last_op.new_range().end;
-        let old_len = old_range_end - old_range_start;
-        let new_len = new_range_end - new_range_start;
-        let old_hdr_start = if old_len == 0 {
-            old_range_start
-        } else {
-            old_range_start + 1
-        };
-        let new_hdr_start = if new_len == 0 {
-            new_range_start
-        } else {
-            new_range_start + 1
-        };
-        let _ = writeln!(
-            out,
-            "@@ -{old_hdr_start},{old_len} +{new_hdr_start},{new_len} @@"
-        );
-
-        for op in &group {
-            for change in op.iter_changes(&old_lines, &new_lines) {
-                let prefix = match change.tag() {
-                    ChangeTag::Equal => ' ',
-                    ChangeTag::Delete => '-',
-                    ChangeTag::Insert => '+',
-                };
-                out.push(prefix);
-                out.push_str(change.value());
-                if change.missing_newline() {
-                    out.push_str("\n\\ No newline at end of file\n");
-                }
-            }
-        }
-    }
-    out
-}
-
-fn split_lines_inclusive(text: &str) -> Vec<&str> {
-    if text.is_empty() {
-        return Vec::new();
-    }
-    text.split_inclusive('\n').collect()
-}
-
-fn strip_ws(line: &str) -> String {
-    line.chars().filter(|c| !c.is_whitespace()).collect()
 }

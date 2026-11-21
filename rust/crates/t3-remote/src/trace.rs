@@ -9,6 +9,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use t3_contracts::brand::{ACTIVE_BRAND, BrandConfig};
 use thiserror::Error;
 
 pub use crate::trace_format::{
@@ -319,4 +320,45 @@ fn usize_to_f64(value: usize) -> f64 {
     let hi = u32::try_from(val_u128 >> 32).unwrap_or(u32::MAX);
     let lo = u32::try_from(val_u128 & 0xFFFF_FFFF).unwrap_or(0);
     f64::from(hi) * 4_294_967_296.0 + f64::from(lo)
+}
+
+/// Candidate environment variable names checked for OTLP NDJSON trace file path overrides.
+#[must_use]
+pub fn trace_file_env_var_candidates() -> Vec<String> {
+    trace_file_env_var_candidates_for_brand(&ACTIVE_BRAND)
+}
+
+/// Candidate environment variable names checked for OTLP trace files under `brand`.
+#[must_use]
+pub fn trace_file_env_var_candidates_for_brand(brand: &BrandConfig) -> Vec<String> {
+    brand.env_var_candidates("TRACE_FILE")
+}
+
+/// Resolves the trace file path from `<BRAND>_TRACE_FILE`, `<BRAND>_HOME`, or `user_home`.
+#[must_use]
+pub fn resolve_trace_file_from_env<F>(lookup: F, user_home: Option<&Path>) -> Option<PathBuf>
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    resolve_trace_file_for_brand(&ACTIVE_BRAND, lookup, user_home)
+}
+
+/// Parameterized variant of [`resolve_trace_file_from_env`] for an explicit [`BrandConfig`].
+#[must_use]
+pub fn resolve_trace_file_for_brand<F>(
+    brand: &BrandConfig,
+    mut lookup: F,
+    user_home: Option<&Path>,
+) -> Option<PathBuf>
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    if let Some(explicit) = brand.read_env_from("TRACE_FILE", &mut lookup) {
+        return Some(PathBuf::from(explicit));
+    }
+    let base_dir = brand
+        .read_env_from("HOME", &mut lookup)
+        .map(PathBuf::from)
+        .or_else(|| user_home.map(|home| home.join(brand.home_dir_name)))?;
+    Some(base_dir.join("userdata").join("logs").join("trace.ndjson"))
 }

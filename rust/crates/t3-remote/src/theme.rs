@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use t3_contracts::brand::{ACTIVE_BRAND, BrandConfig};
 use thiserror::Error;
 
 pub use crate::theme_publish::{PublishedThemeHandle, publish_theme_file};
@@ -328,4 +329,50 @@ pub fn format_theme_show(
         format!("Published themes: {}.", sorted.join(", "))
     };
     format!("{line1}\n{line2}\n")
+}
+
+/// Candidate environment variable names checked for theme overrides under [`ACTIVE_BRAND`].
+#[must_use]
+pub fn theme_env_var_candidates() -> Vec<String> {
+    theme_env_var_candidates_for_brand(&ACTIVE_BRAND)
+}
+
+/// Candidate environment variable names checked for theme overrides under `brand`.
+#[must_use]
+pub fn theme_env_var_candidates_for_brand(brand: &BrandConfig) -> Vec<String> {
+    brand.env_var_candidates("THEME")
+}
+
+/// Resolves a theme identifier override from environment lookup using [`ACTIVE_BRAND`].
+#[must_use]
+pub fn resolve_theme_override_from_env<F>(lookup: F) -> Option<String>
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    resolve_theme_override_for_brand(&ACTIVE_BRAND, lookup)
+}
+
+/// Parameterized variant of [`resolve_theme_override_from_env`] for an explicit [`BrandConfig`].
+#[must_use]
+pub fn resolve_theme_override_for_brand<F>(brand: &BrandConfig, lookup: F) -> Option<String>
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    brand.read_env_from("THEME", lookup)
+}
+
+/// Resolves the themes directory from `<BRAND>_HOME` or `user_home/<home_dir_name>/themes`.
+#[must_use]
+pub fn resolve_themes_dir_for_brand<F>(
+    brand: &BrandConfig,
+    lookup: F,
+    user_home: Option<&Path>,
+) -> Option<PathBuf>
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    if let Some(home) = brand.read_env_from("HOME", lookup) {
+        return Some(PathBuf::from(home).join("themes"));
+    }
+    user_home.map(|home| home.join(brand.home_dir_name).join("themes"))
 }

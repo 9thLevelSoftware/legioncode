@@ -159,6 +159,11 @@ pub enum TunnelEvent {
         /// Process exit code, if available.
         exit_code: Option<i32>,
     },
+    /// Remote managed server closed its listener and is still shutting down (`#39807`).
+    RemoteShuttingDown {
+        /// Previous remote server PID still shutting down.
+        pid: u32,
+    },
     /// Shutdown completed.
     ShutdownCompleted,
 }

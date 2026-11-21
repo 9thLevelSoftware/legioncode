@@ -16,10 +16,17 @@
 pub mod checkpoints;
 pub mod core;
 pub mod forges;
+pub mod git_clone_progress;
+pub mod git_poll_queries;
+pub mod git_ref_cache;
 pub mod live_client;
 mod live_forge_ops;
 pub mod live_git_cli;
+pub mod live_git_perf;
 pub mod live_http;
+pub mod workspace_folders;
+pub mod workspace_folders_parse;
+pub mod workspace_folders_scanner;
 
 pub use crate::checkpoints::diff_query::{
     CheckpointDiffQuery, ComputedDiff, DiffFileInput, DiffQueryOptions,

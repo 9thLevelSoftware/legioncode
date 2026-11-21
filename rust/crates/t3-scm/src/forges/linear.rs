@@ -10,6 +10,73 @@ use crate::forges::{ForgeError, HttpRequestSpec, json_str};
 
 /// Canonical `Linear` GraphQL API endpoint URL.
 pub const LINEAR_GRAPHQL_URL: &str = "https://api.linear.app/graphql";
+/// `Linear` OAuth 2.0 browser authorization endpoint URL (`cfde513d87`).
+pub const LINEAR_OAUTH_AUTHORIZE_URL: &str = "https://linear.app/oauth/authorize";
+/// `Linear` OAuth 2.0 token exchange endpoint URL.
+pub const LINEAR_OAUTH_TOKEN_URL: &str = "https://api.linear.app/oauth/token";
+/// Default OAuth scopes requested for `Linear` issue-tracker connections.
+pub const DEFAULT_LINEAR_OAUTH_SCOPES: &[&str] =
+    &["read", "write", "issues:create", "comments:create"];
+
+/// Merges base `Linear` OAuth scopes with extra user/plugin-configured scopes while deduplicating
+/// and preserving order (`cfde513d87`).
+pub fn merge_linear_oauth_scopes<'a>(
+    base: &[&'a str],
+    additional: &[&'a str],
+) -> Result<Vec<String>, ForgeError> {
+    let mut merged: Vec<String> = Vec::new();
+    for raw in base.iter().chain(additional.iter()) {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if trimmed.chars().any(char::is_whitespace) || trimmed.contains(['\r', '\n', '\0']) {
+            return Err(ForgeError::InvalidCredentials(format!(
+                "invalid Linear OAuth scope `{trimmed}`"
+            )));
+        }
+        if !merged.iter().any(|existing| existing == trimmed) {
+            merged.push(trimmed.to_owned());
+        }
+    }
+    Ok(merged)
+}
+
+/// Builds a `Linear` OAuth authorization URL including default + additional scopes (`cfde513d87`).
+pub fn build_linear_oauth_authorize_url(
+    client_id: &str,
+    redirect_uri: &str,
+    state: &str,
+    additional_scopes: &[&str],
+) -> Result<String, ForgeError> {
+    let cid = validate_linear_secret(client_id)?;
+    let redirect = validate_linear_secret(redirect_uri)?;
+    let clean_state = validate_linear_secret(state)?;
+    let scopes = merge_linear_oauth_scopes(DEFAULT_LINEAR_OAUTH_SCOPES, additional_scopes)?;
+    let scope_param = scopes.join(",");
+    Ok(format!(
+        "{LINEAR_OAUTH_AUTHORIZE_URL}?client_id={}&redirect_uri={}&response_type=code&scope={}&state={}&prompt=consent",
+        percent_encode_component(cid),
+        percent_encode_component(redirect),
+        percent_encode_component(&scope_param),
+        percent_encode_component(clean_state),
+    ))
+}
+
+fn percent_encode_component(raw: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut out = String::with_capacity(raw.len());
+    for byte in raw.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
+            out.push(char::from(byte));
+        } else {
+            out.push('%');
+            out.push(char::from(HEX[usize::from(byte >> 4)]));
+            out.push(char::from(HEX[usize::from(byte & 0x0f)]));
+        }
+    }
+    out
+}
 
 /// Authentication modes accepted by `Linear`'s GraphQL API.
 ///

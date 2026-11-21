@@ -1,5 +1,6 @@
 //! `t3 thread` CLI error mapping and formatting helpers (`cli/thread.ts`).
 
+use t3_contracts::brand::ACTIVE_BRAND;
 use thiserror::Error;
 
 use super::types::{ThreadListItem, ThreadSendDelivery};
@@ -17,13 +18,20 @@ pub const THREAD_TITLE_MAX_CHARS: usize = 80;
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum ThreadClientError {
     /// No running server found in `<base_dir>/userdata` or `<base_dir>/dev` (`exit_code = 1`).
-    #[error("No running T3 Code server uses {base_dir}. Start T3 Code, then retry.")]
+    #[error(
+        "No running {} server uses {base_dir}. Start {}, then retry.",
+        ACTIVE_BRAND.product_name,
+        ACTIVE_BRAND.product_name
+    )]
     ServerNotRunning {
-        /// Base T3 Code home directory checked for a live server.
+        /// Base home directory checked for a live server.
         base_dir: String,
     },
     /// Transport/HTTP error talking to the server's `/mcp` endpoint (`exit_code = 1`).
-    #[error("Could not reach the T3 Code server at {origin}.{detail}")]
+    #[error(
+        "Could not reach the {} server at {origin}.{detail}",
+        ACTIVE_BRAND.product_name
+    )]
     ServerUnreachable {
         /// Server origin URL.
         origin: String,
@@ -46,14 +54,18 @@ pub enum ThreadClientError {
     },
     /// Requested project identifier or path did not match any project (`exit_code = 1`).
     #[error(
-        "No T3 Code project matches '{identifier}'. Pass a project id or a path inside a project."
+        "No {} project matches '{identifier}'. Pass a project id or a path inside a project.",
+        ACTIVE_BRAND.product_name
     )]
     ProjectNotFound {
         /// Unmatched identifier or filesystem path.
         identifier: String,
     },
     /// Active run paused awaiting human input (`ThreadNeedsInputError`, `exit_code = 2`).
-    #[error("Thread {thread_id} is waiting for an answer. Open it in T3 Code to respond.")]
+    #[error(
+        "Thread {thread_id} is waiting for an answer. Open it in {} to respond.",
+        ACTIVE_BRAND.product_name
+    )]
     NeedsInput {
         /// Blocked thread ID.
         thread_id: String,

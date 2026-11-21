@@ -39,8 +39,9 @@ mod grid_edit;
 mod grid_motion;
 mod grid_ops;
 mod grid_view;
+mod history_sanitizer;
+mod history_sanitizer_scan;
 mod parser_dispatch;
-mod parser_osc;
 mod parser_utf8;
 mod sgr;
 mod snapshot_wire;
@@ -52,13 +53,17 @@ pub mod abi;
 pub mod error;
 pub mod palette;
 pub mod parser;
+pub mod parser_osc;
 pub mod paste;
+pub mod powerline;
 pub mod snapshot;
 
 pub use error::VtError;
 pub use palette::{AnsiPalette256, Rgba};
 pub use parser::{TerminalGrid, VtParser};
+pub use parser_osc::{TerminalHistorySanitizer, sanitize_terminal_history};
 pub use paste::sanitize_bracketed_paste;
+pub use powerline::{classify_powerline_char, is_powerline_cell_text, is_powerline_char};
 pub use snapshot::{SnapshotCell, TerminalSnapshot, decode_t3vt, encode_t3vt};
 
 /// Number of indexed color slots in the `VT` terminal palette (`0..=255`).

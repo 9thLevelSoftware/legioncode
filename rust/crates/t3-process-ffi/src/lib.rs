@@ -6,8 +6,10 @@
 //! encapsulates platform `FFI` bindings (`win32_job` and `ffi_boundary`) behind safe Rust
 //! wrappers and a `catch_unwind`-guarded C ABI.
 
+pub mod async_log;
 pub mod env;
 pub mod ffi_boundary;
+pub mod keep_awake;
 pub mod pipes;
 pub mod resource_monitor;
 mod resource_monitor_codec;
@@ -15,6 +17,7 @@ mod resource_monitor_events;
 mod resource_monitor_history;
 mod resource_monitor_sampler;
 mod resource_monitor_types;
+pub mod spawn_flags;
 pub mod supervisor;
 pub mod win32_job;
 

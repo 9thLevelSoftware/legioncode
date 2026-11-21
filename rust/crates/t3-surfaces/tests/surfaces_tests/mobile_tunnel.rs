@@ -167,3 +167,67 @@ fn scoped_webview_tunnel_registry_isolates_multiple_webviews() -> Result<(), Str
     assert_eq!(reg.active_count(), 1);
     Ok(())
 }
+
+#[test]
+fn preview_tunnel_policy_gating_distinguishes_disabled_and_port_refused() {
+    use t3_contracts::policy::{ManagedPolicySummary, ManagedPolicySummaryLimits};
+    use t3_surfaces::mobile_tunnel::{
+        TunnelBindSpec, TunnelNavigationState, classify_tunnel_http_refusal,
+        evaluate_tunnel_navigation,
+    };
+
+    assert_eq!(
+        evaluate_tunnel_navigation(true, None),
+        TunnelNavigationState::Allowed
+    );
+    assert_eq!(
+        evaluate_tunnel_navigation(false, None),
+        TunnelNavigationState::TunnelDisabled
+    );
+
+    let denied_policy = ManagedPolicySummary {
+        organization: "Acme Corp".to_owned(),
+        support_url: None,
+        locked_settings: Vec::new(),
+        limits: Some(ManagedPolicySummaryLimits {
+            preview_tunnel: Some(false),
+            ..Default::default()
+        }),
+    };
+    assert_eq!(
+        evaluate_tunnel_navigation(true, Some(&denied_policy)),
+        TunnelNavigationState::TunnelDisabled
+    );
+
+    assert_eq!(
+        classify_tunnel_http_refusal(503, [("X-T3-Tunnel-Disabled", "1")]),
+        Some(TunnelNavigationState::TunnelDisabled)
+    );
+    assert_eq!(
+        classify_tunnel_http_refusal(502, [("x-t3-tunnel-port-refused", "true")]),
+        Some(TunnelNavigationState::PortRefused)
+    );
+    assert_eq!(
+        classify_tunnel_http_refusal(502, []),
+        Some(TunnelNavigationState::Unreachable)
+    );
+
+    let mut reg = ScopedWebViewTunnelRegistry::new();
+    let spec = TunnelBindSpec {
+        webview_id: "wv-policy",
+        environment_id: "env-a",
+        proxy_host: "127.0.0.1",
+        proxy_port: 41005,
+        stand_in_host: "t3lo.test",
+        tunnel_base_url: None,
+    };
+    assert_eq!(
+        reg.bind_if_allowed(&spec, true, Some(&denied_policy)),
+        Err(TunnelRegistryError::TunnelDisabled)
+    );
+    assert_eq!(
+        reg.bind_if_allowed(&spec, false, None),
+        Err(TunnelRegistryError::TunnelDisabled)
+    );
+    assert!(reg.bind_if_allowed(&spec, true, None).is_ok());
+}

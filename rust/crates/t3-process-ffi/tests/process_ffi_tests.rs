@@ -5,4 +5,5 @@ mod process_ffi_tests {
     mod env_tests;
     mod resource_monitor_tests;
     mod supervisor_tests;
+    mod wave4_process_ffi_tests;
 }

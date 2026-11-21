@@ -239,14 +239,23 @@ fn codex_mcp_env_launch_args_web_search_and_history_recovery() {
         vec!["--cloud-skills-snapshot", "skills.json "]
     );
 
+    let fallback_override =
+        std::collections::BTreeMap::from([("T3_CODEX_LAUNCH_ARGS", "--flag value\\ ")]);
+    assert_eq!(
+        tokenize_cli_args(
+            &t3_providers::drivers::resolve_codex_launch_args_with_lookup(
+                Some("--strict-config"),
+                |key| fallback_override.get(key).map(|value| (*value).to_owned()),
+            )
+        ),
+        vec!["--flag", "value "]
+    );
+
     let sanitized =
         SanitizedEnv::from_entries([("T3_CODEX_LAUNCH_ARGS", "--flag value\\ ")], cfg!(windows));
     assert_eq!(
-        tokenize_cli_args(&resolve_codex_launch_args(
-            Some("--strict-config"),
-            &sanitized
-        )),
-        vec!["--flag", "value "]
+        resolve_codex_launch_args(Some("--strict-config"), &sanitized),
+        "--strict-config"
     );
 
     let blank_env = SanitizedEnv::from_entries([("T3_CODEX_LAUNCH_ARGS", " \t ")], false);

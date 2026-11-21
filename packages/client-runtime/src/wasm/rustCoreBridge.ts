@@ -22,6 +22,10 @@ interface WasmFfiExports {
   readonly split_utf16_frame_parts_json: (inputJson: string) => string;
   readonly emit_web_app_bundle_json: () => string;
   readonly translate_i18n_json?: (inputJson: string) => string;
+  readonly normalize_nfd_filename?: (raw: string) => string;
+  readonly strip_osc4_queries?: (raw: string) => string;
+  readonly allows_preview_tunnel_json?: (inputJson: string) => string;
+  readonly active_brand_json?: () => string;
   readonly default?: (moduleOrPath?: string) => Promise<unknown>;
 }
 
@@ -507,4 +511,489 @@ export function emitWebAppBundleJson(locale?: string): string {
     });
   }
   return fallbackWebAppBundleJson(locale);
+}
+
+const TRAILING_SEPARATORS_RE = /[/\\]+$/;
+
+export interface PreviewTunnelPolicySummary {
+  readonly organization?: string;
+  readonly lockedSettings?: ReadonlyArray<string>;
+  readonly limits?: {
+    readonly previewTunnel?: boolean;
+    readonly [key: string]: unknown;
+  };
+  readonly [key: string]: unknown;
+}
+
+export interface ActiveBrandConfig {
+  readonly productName: string;
+  readonly orgDomain: string;
+  readonly cliBinName: string;
+  readonly desktopBinName: string;
+  readonly primaryEnvPrefix: string;
+  readonly fallbackEnvPrefix: string;
+  readonly homeDirName: string;
+  readonly fallbackHomeDirName: string;
+  readonly urlScheme: string;
+  readonly ipcPipePrefix: string;
+  readonly httpHeaderPrefix: string;
+  readonly fallbackHttpHeaderPrefix: string;
+  readonly mcpToolPrefix: string;
+  readonly fallbackMcpToolPrefix: string;
+  readonly mcpNamespace: string;
+  readonly fallbackMcpNamespace: string;
+  readonly systemdUnitName: string;
+  readonly launchdLabel: string;
+  readonly windowsTaskName: string;
+  readonly windowsPolicyKey: string;
+  readonly macosPolicyDomain: string;
+}
+
+const ACTIVE_BRAND_FALLBACK: ActiveBrandConfig = {
+  productName: "T3 Code",
+  orgDomain: "t3.codes",
+  cliBinName: "t3",
+  desktopBinName: "t3-desktop",
+  primaryEnvPrefix: "T3CODE_",
+  fallbackEnvPrefix: "T3_",
+  homeDirName: ".t3",
+  fallbackHomeDirName: ".t3code",
+  urlScheme: "t3code",
+  ipcPipePrefix: "t3code",
+  httpHeaderPrefix: "x-t3-",
+  fallbackHttpHeaderPrefix: "t3-",
+  mcpToolPrefix: "t3_",
+  fallbackMcpToolPrefix: "legion_",
+  mcpNamespace: "mcp__t3_code__",
+  fallbackMcpNamespace: "mcp__legion_code__",
+  systemdUnitName: "t3code.service",
+  launchdLabel: "com.t3tools.t3code.service",
+  windowsTaskName: "t3code",
+  windowsPolicyKey: "SOFTWARE\\Policies\\T3Tools\\T3Code",
+  macosPolicyDomain: "com.t3tools.t3code",
+};
+
+function normalizeNfdFilenameFallback(path: string): string {
+  const trimmed = path.replace(TRAILING_SEPARATORS_RE, "");
+  const basename =
+    trimmed.length === 0
+      ? path
+      : (() => {
+          const slash = trimmed.lastIndexOf("/");
+          const backslash = trimmed.lastIndexOf("\\");
+          const sepIndex = Math.max(slash, backslash);
+          return sepIndex >= 0 ? trimmed.slice(sepIndex + 1) : trimmed;
+        })();
+  return basename.normalize("NFC");
+}
+
+/**
+ * Extracts the trailing path segment across `/` and `\` separators and composes
+ * macOS NFD filenames into canonical NFC.
+ */
+export function normalizeNfdFilename(raw: string): string {
+  const wasm = resolveActiveWasmExports();
+  if (wasm && typeof wasm.normalize_nfd_filename === "function") {
+    return wasm.normalize_nfd_filename(raw);
+  }
+  return normalizeNfdFilenameFallback(raw);
+}
+
+interface C1Effect {
+  readonly next: string;
+  readonly query: boolean;
+  readonly safe: string;
+}
+
+interface C1Hit {
+  readonly effect: C1Effect;
+  readonly index: number;
+}
+
+interface StringEnd {
+  readonly end: number;
+  readonly c1?: C1Hit;
+}
+
+function utf8BytesOfCodePoint(cp: number): readonly number[] {
+  if (cp <= 0x7ff) {
+    return [0xc0 | (cp >> 6), 0x80 | (cp & 0x3f)];
+  }
+  if (cp <= 0xffff) {
+    return [0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f)];
+  }
+  return [
+    0xf0 | (cp >> 18),
+    0x80 | ((cp >> 12) & 0x3f),
+    0x80 | ((cp >> 6) & 0x3f),
+    0x80 | (cp & 0x3f),
+  ];
+}
+
+function c1Effect(cp: number): C1Effect | undefined {
+  let next: string | undefined;
+  let query = false;
+  let safe = "";
+  for (const byte of utf8BytesOfCodePoint(cp)) {
+    if (next === "") {
+      safe += "\ufffd";
+    } else if (next?.startsWith("\u001b]")) {
+      next += "\ufffd";
+    } else if (byte === 0x9b) {
+      next = "\u001b[";
+    } else if (byte === 0x9d) {
+      next = "\u001b]";
+    } else if (byte === 0x90) {
+      next = "\u001bP";
+    } else if (byte === 0x98 || byte === 0x9e || byte === 0x9f) {
+      next = "\u001b_";
+    } else if (byte >= 0x80 && byte <= 0x9f) {
+      next = "";
+      query = byte === 0x9a;
+      safe = !query && byte !== 0x9c ? `\u001b${String.fromCharCode(byte - 0x40)}` : "";
+    }
+  }
+  return next === undefined ? undefined : { next, query, safe };
+}
+
+function findStringEnd(input: string, start: number, isOsc: boolean): StringEnd | undefined {
+  for (let pos = start; pos < input.length;) {
+    const cp = input.codePointAt(pos)!;
+    const width = cp > 0xffff ? 2 : 1;
+    if ((isOsc && cp === 0x07) || cp === 0x18 || cp === 0x1a) {
+      return { end: pos + 1 };
+    }
+    if (cp === 0x1b) {
+      if (pos + 1 >= input.length) {
+        return undefined;
+      }
+      const end = input.charCodeAt(pos + 1) === 0x5c ? pos + 2 : pos;
+      return { end };
+    }
+    if (!isOsc && cp >= 0x80) {
+      const effect = c1Effect(cp);
+      if (effect) {
+        return { end: pos + width, c1: { effect, index: pos } };
+      }
+    }
+    pos += width;
+  }
+  return undefined;
+}
+
+function findEscapeSequenceEnd(input: string, start: number): number | undefined {
+  let cursor = start;
+  while (cursor < input.length) {
+    const code = input.charCodeAt(cursor);
+    if (code >= 0x20 && code <= 0x2f) {
+      cursor += 1;
+      continue;
+    }
+    if (code === 0x1b) {
+      return cursor;
+    }
+    return code >= 0x30 && code <= 0x7e ? cursor + 1 : start + 1;
+  }
+  return undefined;
+}
+
+function stripStringTerminator(value: string): string {
+  if (value.endsWith("\u001b\\")) {
+    return value.slice(0, -2);
+  }
+  if (value.endsWith("\u0007") || value.endsWith("\u009c")) {
+    return value.slice(0, -1);
+  }
+  return value;
+}
+
+function isTerminatedOscOrDcs(slice: string): boolean {
+  return (
+    slice.endsWith("\u0007") ||
+    slice.endsWith("\u0018") ||
+    slice.endsWith("\u001a") ||
+    slice.endsWith("\u001b\\")
+  );
+}
+
+function isOscPaletteQuery(content: string): boolean {
+  let start = 0;
+  while (start < content.length && content.charCodeAt(start) <= 0x1f) {
+    start += 1;
+  }
+  if (!content.startsWith("4", start) || !content.includes("?")) {
+    return false;
+  }
+  let cleaned = "";
+  for (let i = 0; i < content.length; i += 1) {
+    if (content.charCodeAt(i) > 0x1f) {
+      cleaned += content[i]!;
+    }
+  }
+  const fields = cleaned.split(";").filter((field) => field.length > 0);
+  if (fields[0] !== "4") {
+    return false;
+  }
+  let pairFieldCount = 0;
+  for (let idx = 1; idx < fields.length; idx += 1) {
+    const pairIdx = idx - 1;
+    pairFieldCount += 1;
+    if (pairIdx % 2 === 1 && fields[idx] !== "?") {
+      return false;
+    }
+  }
+  return pairFieldCount > 1;
+}
+
+function shouldStripOscSequence(content: string): boolean {
+  const semi = content.indexOf(";");
+  if (semi < 0) {
+    return false;
+  }
+  const code = content.slice(0, semi);
+  const rest = content.slice(semi + 1);
+  return (
+    (code === "10" || code === "11" || code === "12") &&
+    (rest.startsWith("?") || rest.startsWith("rgb:"))
+  );
+}
+
+function shouldStripDcsSequence(content: string): boolean {
+  const rest = content.startsWith("0") || content.startsWith("1") ? content.slice(1) : content;
+  return (rest.startsWith("$") || rest.startsWith("+")) && (rest[1] === "q" || rest[1] === "r");
+}
+
+function isAsciiDigitOrAny(body: string, allowedPunctuation: string): boolean {
+  for (let i = 0; i < body.length; i += 1) {
+    const ch = body[i]!;
+    const code = body.charCodeAt(i);
+    if ((code < 0x30 || code > 0x39) && !allowedPunctuation.includes(ch)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function shouldStripCsiSequence(body: string, finalCode: number): boolean {
+  if (finalCode === 0x6e) {
+    return true;
+  }
+  if (finalCode === 0x52) {
+    return isAsciiDigitOrAny(body, ";?");
+  }
+  if (finalCode === 0x63) {
+    return isAsciiDigitOrAny(body, ">=;?");
+  }
+  if (finalCode === 0x70 || finalCode === 0x79) {
+    return body.endsWith("$") && isAsciiDigitOrAny(body.slice(0, -1), ";?");
+  }
+  if (finalCode === 0x71) {
+    return body.startsWith(">") && isAsciiDigitOrAny(body.slice(1), ";");
+  }
+  if (finalCode === 0x75) {
+    return body.startsWith("?");
+  }
+  return false;
+}
+
+function stripOsc4QueriesFallback(input: string): string {
+  if (!input.includes("\u001b")) {
+    return input;
+  }
+  let visibleText = "";
+  let index = 0;
+  let c1Introducer = "";
+
+  while (index < input.length) {
+    if (c1Introducer.length > 0 || input.charCodeAt(index) === 0x1b) {
+      const prefix = c1Introducer;
+      c1Introducer = "";
+      const contentStart = prefix.length === 0 ? index + 2 : index;
+      const nextCode =
+        prefix.length === 0
+          ? index + 1 < input.length
+            ? input.charCodeAt(index + 1)
+            : undefined
+          : prefix.length > 1
+            ? prefix.charCodeAt(1)
+            : undefined;
+      if (nextCode === undefined) {
+        visibleText += input.slice(index);
+        break;
+      }
+
+      if (nextCode === 0x5b) {
+        let body = "";
+        let executedControls = "";
+        let advanced = false;
+        for (let pos = contentStart; pos < input.length;) {
+          const cp = input.codePointAt(pos)!;
+          const width = cp > 0xffff ? 2 : 1;
+          const cancelled = cp === 0x18 || cp === 0x1a;
+          if (cancelled || (cp >= 0x40 && cp <= 0x7e)) {
+            if (cancelled || !shouldStripCsiSequence(body, cp)) {
+              visibleText += `${prefix}${input.slice(index, pos + width)}`;
+            } else {
+              visibleText += executedControls;
+            }
+            index = pos + width;
+            advanced = true;
+            break;
+          }
+          if (cp >= 0x80) {
+            const end = pos + width;
+            const effect = c1Effect(cp);
+            if (effect) {
+              if (effect.next.length === 0 && !effect.query) {
+                visibleText += `${prefix}${input.slice(index, end)}`;
+              } else {
+                visibleText += `${executedControls}${effect.safe}`;
+              }
+              c1Introducer = effect.next;
+              index = end;
+              advanced = true;
+              break;
+            }
+            pos = end;
+            continue;
+          }
+          if (cp === 0x1b) {
+            visibleText += executedControls;
+            index = pos;
+            advanced = true;
+            break;
+          }
+          if (cp < 0x10) {
+            executedControls += input.slice(pos, pos + width);
+          } else if (cp >= 0x20 && cp !== 0x7f) {
+            body += input.slice(pos, pos + width);
+          }
+          pos += width;
+        }
+        if (!advanced) {
+          visibleText += `${prefix}${input.slice(index)}`;
+          break;
+        }
+        continue;
+      }
+
+      if (nextCode === 0x5d || nextCode === 0x50 || nextCode === 0x5e || nextCode === 0x5f) {
+        const isOsc = nextCode === 0x5d;
+        const stringEnd = findStringEnd(input, contentStart, isOsc);
+        if (!stringEnd) {
+          visibleText += `${prefix}${input.slice(index)}`;
+          break;
+        }
+        const end = stringEnd.end;
+        const contentEnd = stringEnd.c1 ? stringEnd.c1.index : end;
+        const prefixTail = prefix.length > 2 ? prefix.slice(2) : "";
+        const rawContent = `${prefixTail}${input.slice(contentStart, contentEnd)}`;
+        const content = stripStringTerminator(rawContent);
+
+        if (isOsc && isOscPaletteQuery(content) && isTerminatedOscOrDcs(input.slice(index, end))) {
+          visibleText += "\u001b\\";
+          index = end;
+          continue;
+        }
+
+        const strip =
+          (isOsc && shouldStripOscSequence(content)) ||
+          (nextCode === 0x50 && shouldStripDcsSequence(content));
+        if (!stringEnd.c1) {
+          if (!strip) {
+            visibleText += `${prefix}${input.slice(index, end)}`;
+          }
+        } else {
+          const hit = stringEnd.c1;
+          if (!strip && hit.effect.next.length === 0 && !hit.effect.query) {
+            visibleText += `${prefix}${input.slice(index, end)}`;
+          } else {
+            if (!strip) {
+              visibleText += `${prefix}${input.slice(index, hit.index)}\u009c`;
+            }
+            visibleText += hit.effect.safe;
+            c1Introducer = hit.effect.next;
+          }
+        }
+        index = end;
+        continue;
+      }
+
+      const escEnd = findEscapeSequenceEnd(input, index + 1);
+      if (escEnd === undefined) {
+        visibleText += input.slice(index);
+        break;
+      }
+      if (nextCode !== 0x5a) {
+        visibleText += input.slice(index, escEnd);
+      }
+      index = escEnd;
+      continue;
+    }
+
+    const nextEsc = input.indexOf("\u001b", index + 1);
+    const end = nextEsc >= 0 ? nextEsc : input.length;
+    visibleText += input.slice(index, end);
+    index = end;
+  }
+
+  return `${visibleText}${c1Introducer}`;
+}
+
+/**
+ * Strips standalone `OSC 4` palette queries, `OSC 10/11/12` dynamic color queries,
+ * and replayable `DCS`/`CSI` terminal queries from terminal history.
+ */
+export function stripOsc4Queries(raw: string): string {
+  const wasm = resolveActiveWasmExports();
+  if (wasm && typeof wasm.strip_osc4_queries === "function") {
+    return wasm.strip_osc4_queries(raw);
+  }
+  return stripOsc4QueriesFallback(raw);
+}
+
+/**
+ * Evaluates whether loopback preview tunnels are permitted by user settings
+ * and any loaded managed policy.
+ */
+export function allowsPreviewTunnel(
+  enablePreviewTunnel: boolean,
+  managedPolicy?: PreviewTunnelPolicySummary | null,
+): boolean {
+  const wasm = resolveActiveWasmExports();
+  if (wasm && typeof wasm.allows_preview_tunnel_json === "function") {
+    const normalizedPolicy = managedPolicy
+      ? {
+          organization:
+            typeof managedPolicy.organization === "string" && managedPolicy.organization.length > 0
+              ? managedPolicy.organization
+              : "Organization",
+          lockedSettings: Array.isArray(managedPolicy.lockedSettings)
+            ? managedPolicy.lockedSettings
+            : [],
+          ...managedPolicy,
+        }
+      : null;
+    const response = JSON.parse(
+      wasm.allows_preview_tunnel_json(
+        JSON.stringify({
+          enablePreviewTunnel,
+          managedPolicy: normalizedPolicy,
+        }),
+      ),
+    ) as { readonly allowed: boolean };
+    return response.allowed;
+  }
+  return enablePreviewTunnel && managedPolicy?.limits?.previewTunnel !== false;
+}
+
+/**
+ * Returns the compile-time active product brand configuration.
+ */
+export function activeBrand(): ActiveBrandConfig {
+  const wasm = resolveActiveWasmExports();
+  if (wasm && typeof wasm.active_brand_json === "function") {
+    return JSON.parse(wasm.active_brand_json()) as ActiveBrandConfig;
+  }
+  return { ...ACTIVE_BRAND_FALLBACK };
 }

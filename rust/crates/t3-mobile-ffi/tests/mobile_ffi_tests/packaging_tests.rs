@@ -74,6 +74,10 @@ fn packaging_bundle_contains_all_apple_and_android_artifacts() -> Result<(), Str
         "external fun nativeThemePlanJson(inputJson: String): String",
         "external fun nativeVtRenderSnapshot(inputJson: String): ByteArray",
         "external fun nativeVtDecodeSnapshotJson(bytes: ByteArray): String",
+        "external fun nativeFilterReviewFilesJson(inputJson: String): String",
+        "external fun nativeLinkedLinesJson(inputJson: String): String",
+        "external fun nativeTunnelGuardJson(inputJson: String): String",
+        "external fun nativeSecretCardJson(inputJson: String): String",
     ];
     for sig in expected_kotlin_fns {
         assert!(bridge_kt.contains(sig), "T3MobileBridge.kt missing {sig}");

@@ -55,6 +55,9 @@ pub(crate) fn render_chat_panel(out: &mut String, state: &WebAppState) {
     }
 
     out.push_str("</section>");
+    crate::view_features::render_thread_error_banner(state, out);
+    crate::view_features::render_secret_cards(state, out);
+    crate::view_features::render_mcp_sign_in_cards(state, out);
     render_composer(out, state);
 }
 
@@ -116,6 +119,7 @@ fn render_timeline_messages(out: &mut String, timeline: Option<&ThreadTimeline>,
 
 fn render_composer(out: &mut String, state: &WebAppState) {
     out.push_str(r#"<section class="t3-composer" data-testid="composer">"#);
+    crate::view_features::render_dictation_badge(state, out);
     if !state.composer.context_pills.is_empty() {
         out.push_str(r#"<div class="t3-pills" data-testid="composer-pills">"#);
         for (idx, pill) in state.composer.context_pills.iter().enumerate() {
@@ -129,9 +133,14 @@ fn render_composer(out: &mut String, state: &WebAppState) {
         }
         out.push_str("</div>");
     }
+    let readonly_attr = if state.composer.dictating {
+        r#" readonly="" aria-readonly="true" data-dictating="true""#
+    } else {
+        ""
+    };
     let _ = write!(
         out,
-        r#"<form class="t3-composer-form" data-testid="composer-form" data-action="send-message"><textarea class="t3-composer-input" data-testid="composer-input" data-action="composer-input" rows="3" placeholder="{}">{}</textarea><div class="t3-composer-actions"><button type="submit" class="t3-btn t3-btn-primary" data-testid="composer-send">{}</button></div></form>"#,
+        r#"<form class="t3-composer-form" data-testid="composer-form" data-action="send-message"><textarea class="t3-composer-input" data-testid="composer-input" data-action="composer-input" rows="3"{readonly_attr} placeholder="{}">{}</textarea><div class="t3-composer-actions"><button type="submit" class="t3-btn t3-btn-primary" data-testid="composer-send">{}</button></div></form>"#,
         escape_html(state.locale.web.composer_placeholder),
         escape_html(&state.composer.draft),
         escape_html(state.locale.web.send_button)

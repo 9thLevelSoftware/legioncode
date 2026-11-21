@@ -28,6 +28,10 @@ int32_t t3_mobile_ffi_vt_render_snapshot(const char *input_json, uint8_t **out_p
 int32_t t3_mobile_ffi_vt_decode_snapshot_json(const uint8_t *bytes, size_t len, char **out_json);
 int32_t t3_mobile_ffi_host_swap_chunks_json(const char *input_json, char **out_json);
 int32_t t3_mobile_ffi_theme_plan_json(const char *input_json, char **out_json);
+int32_t t3_mobile_ffi_filter_review_files_json(const char *input_json, char **out_json);
+int32_t t3_mobile_ffi_linked_lines_json(const char *input_json, char **out_json);
+int32_t t3_mobile_ffi_tunnel_guard_json(const char *input_json, char **out_json);
+int32_t t3_mobile_ffi_secret_card_json(const char *input_json, char **out_json);
 int32_t t3_mobile_ffi_sdk_sources_json(char **out_json);
 int32_t t3_mobile_ffi_free_string(char *ptr);
 int32_t t3_mobile_ffi_free_bytes(uint8_t *ptr, size_t len);
@@ -129,6 +133,30 @@ private func c_t3_mobile_ffi_theme_plan_json(
     _ outJson: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32
 
+@_silgen_name("t3_mobile_ffi_filter_review_files_json")
+private func c_t3_mobile_ffi_filter_review_files_json(
+    _ inputJson: UnsafePointer<CChar>?,
+    _ outJson: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> Int32
+
+@_silgen_name("t3_mobile_ffi_linked_lines_json")
+private func c_t3_mobile_ffi_linked_lines_json(
+    _ inputJson: UnsafePointer<CChar>?,
+    _ outJson: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> Int32
+
+@_silgen_name("t3_mobile_ffi_tunnel_guard_json")
+private func c_t3_mobile_ffi_tunnel_guard_json(
+    _ inputJson: UnsafePointer<CChar>?,
+    _ outJson: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> Int32
+
+@_silgen_name("t3_mobile_ffi_secret_card_json")
+private func c_t3_mobile_ffi_secret_card_json(
+    _ inputJson: UnsafePointer<CChar>?,
+    _ outJson: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
+) -> Int32
+
 @_silgen_name("t3_mobile_ffi_sdk_sources_json")
 private func c_t3_mobile_ffi_sdk_sources_json(
     _ outJson: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
@@ -211,6 +239,22 @@ public enum T3MobileCore {
 
     public static func themePlanJson(_ inputJson: String) throws -> String {
         try invokeJson(inputJson, c_t3_mobile_ffi_theme_plan_json)
+    }
+
+    public static func filterReviewFilesJson(_ inputJson: String) throws -> String {
+        try invokeJson(inputJson, c_t3_mobile_ffi_filter_review_files_json)
+    }
+
+    public static func linkedLinesJson(_ inputJson: String) throws -> String {
+        try invokeJson(inputJson, c_t3_mobile_ffi_linked_lines_json)
+    }
+
+    public static func tunnelGuardJson(_ inputJson: String) throws -> String {
+        try invokeJson(inputJson, c_t3_mobile_ffi_tunnel_guard_json)
+    }
+
+    public static func secretCardJson(_ inputJson: String) throws -> String {
+        try invokeJson(inputJson, c_t3_mobile_ffi_secret_card_json)
     }
 
     public static func sdkSourcesJson() throws -> String {

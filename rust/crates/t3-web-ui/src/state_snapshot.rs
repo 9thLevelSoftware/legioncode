@@ -128,6 +128,22 @@ pub struct WebAppStateSnapshot {
     pub right_tab: RightPaneTab,
     /// Responsive sidebar visibility.
     pub sidebar_open: bool,
+    /// Wave 5 feature state summary observables.
+    pub features: WebFeatureSnapshotSummary,
+}
+
+/// JSON-serializable summary of Wave 5 feature states (`state_snapshot_json`).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WebFeatureSnapshotSummary {
+    pub active_error_occurrence_id: Option<u64>,
+    pub environments_map_open: bool,
+    pub environment_node_count: usize,
+    pub linked_pane_open: bool,
+    pub secret_card_count: usize,
+    pub mcp_sign_in_count: usize,
+    pub keybinding_match_count: usize,
+    pub update_capsule: crate::state_features::UpdateCapsuleState,
 }
 
 pub(crate) fn build_state_snapshot(state: &WebAppState) -> WebAppStateSnapshot {
@@ -205,5 +221,23 @@ pub(crate) fn build_state_snapshot(state: &WebAppState) -> WebAppStateSnapshot {
         command_palette: state.command_palette.clone(),
         right_tab: state.right_tab,
         sidebar_open: state.sidebar_open,
+        features: WebFeatureSnapshotSummary {
+            active_error_occurrence_id: state
+                .active_thread_id
+                .as_deref()
+                .and_then(|tid| state.features.thread_errors.get(tid))
+                .map(|b| b.occurrence_id),
+            environments_map_open: state.features.environments_map.open,
+            environment_node_count: state.features.environments_map.nodes.len(),
+            linked_pane_open: state.features.linked_pane.open,
+            secret_card_count: state.features.secret_cards.len(),
+            mcp_sign_in_count: state.features.mcp_sign_ins.len(),
+            keybinding_match_count: crate::update_settings_features::filter_keybindings(
+                &state.features.keybindings,
+                &state.features.keybinding_query,
+            )
+            .len(),
+            update_capsule: state.features.update_capsule.clone(),
+        },
     }
 }

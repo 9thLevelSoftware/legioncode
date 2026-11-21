@@ -21,6 +21,9 @@ pub(crate) fn handle_composer_paste(
     raw_text: &str,
     clipboard_fragment_json: Option<&str>,
 ) {
+    if state.composer.dictating {
+        return;
+    }
     let clean = sanitize_bracketed_paste(raw_text);
     state.composer.draft.push_str(&clean);
     state.composer.last_sanitized_paste = Some(clean.clone());
@@ -134,7 +137,17 @@ pub(crate) fn handle_decorate_diff_tokens(
     word_highlights: &[Utf16Span],
     highlight_background: Option<&str>,
 ) {
-    let syntax_runs = build_syntax_runs_from_tokens(tokens);
+    let fallback_tokens;
+    let effective_tokens = if tokens.is_empty()
+        && let Some(lang) = crate::hdl_highlight::resolve_hdl_language(&file_name)
+    {
+        let raw_line = state.diff.raw_patch.lines().next().unwrap_or("");
+        fallback_tokens = crate::hdl_highlight::tokenize_hdl(lang, raw_line);
+        &fallback_tokens[..]
+    } else {
+        tokens
+    };
+    let syntax_runs = build_syntax_runs_from_tokens(effective_tokens);
     let bg = highlight_background.unwrap_or("#3b2e1e");
     let runs = decorate_diff_runs_with_background(&syntax_runs, word_highlights, bg);
     let line = DecoratedDiffLine {

@@ -153,6 +153,10 @@ object T3MobileBridge {
     external fun nativeThemePlanJson(inputJson: String): String
     external fun nativeVtRenderSnapshot(inputJson: String): ByteArray
     external fun nativeVtDecodeSnapshotJson(bytes: ByteArray): String
+    external fun nativeFilterReviewFilesJson(inputJson: String): String
+    external fun nativeLinkedLinesJson(inputJson: String): String
+    external fun nativeTunnelGuardJson(inputJson: String): String
+    external fun nativeSecretCardJson(inputJson: String): String
 }
 "#;
 

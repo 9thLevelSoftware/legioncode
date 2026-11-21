@@ -206,6 +206,12 @@ pub struct ComposerState {
     pub last_sanitized_paste: Option<String>,
     /// Most recent filtered `<pre data-t3-context-fragment="...">` clipboard HTML (`BUG-23`).
     pub last_clipboard_html: Option<String>,
+    /// Read-only dictation lock (`b19ca97827`): freezes text edits while chip removal stays enabled.
+    #[serde(default)]
+    pub dictating: bool,
+    /// Whether the composer textarea currently holds focus (`composerFocus` keybinding `when` flag).
+    #[serde(default)]
+    pub focused: bool,
 }
 
 /// Single decorated diff line carrying UTF-16 word-diff runs (`BUG-22`).

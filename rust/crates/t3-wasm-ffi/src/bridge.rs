@@ -48,6 +48,10 @@ pub use crate::bridge_surfaces::{
 pub use crate::bridge_terminal::{
     TerminalVtBridge, decode_t3vt_summary_json, encode_t3vt_from_ansi, sanitize_bracketed_paste_str,
 };
+pub use crate::bridge_wave5::{
+    active_brand_json, allows_preview_tunnel_json, highlight_hdl_json, link_batch_plan_json,
+    normalize_nfd_filename, resolve_linked_thread_open_json, strip_osc4_queries,
+};
 pub use crate::bridge_web_ui::{WebAppBridge, emit_web_app_bundle_json};
 pub use crate::bridge_worker::EdgeWorkerBridge;
 

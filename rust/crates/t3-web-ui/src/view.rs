@@ -55,6 +55,11 @@ pub fn render_workspace_html(state: &WebAppState) -> String {
         RightPaneTab::Diff => render_diff_panel(&mut out, state),
         RightPaneTab::Terminal => render_terminal_panel(&mut out, state),
     }
+    crate::view_features::render_linked_thread_pane(state, &mut out);
+    let feature_copy = crate::i18n_web_features::feature_copy(&state.locale);
+    crate::view_features::render_environments_map_panel(state, &mut out, &feature_copy);
+    crate::view_features::render_multi_repo_picker(state, &mut out, &feature_copy);
+    crate::view_features::render_keybinding_search(state, &mut out, &feature_copy);
     out.push_str("</main>");
     render_command_palette_modal(&mut out, state);
     out.push_str("</div>");
@@ -80,6 +85,7 @@ fn render_sidebar(out: &mut String, state: &WebAppState) {
         escape_html(&activity.chip),
         escape_html(&activity.summary)
     );
+    crate::view_features::render_sidebar_update_capsule(state, out);
     out.push_str("</aside>");
 }
 

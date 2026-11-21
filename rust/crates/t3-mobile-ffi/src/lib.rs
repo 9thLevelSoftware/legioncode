@@ -11,13 +11,17 @@ pub mod codegen;
 mod codegen_kotlin;
 mod codegen_templates;
 pub mod core;
+pub mod core_review;
+mod core_review_types;
 mod core_tunnel;
 mod core_tunnel_types;
 mod core_types;
 mod core_vt;
 mod core_vt_types;
 pub mod ffi;
+pub mod ffi_review;
 pub mod jni_bridge;
+pub mod jni_bridge_review;
 pub mod mobile_packaging;
 mod mobile_packaging_templates;
 
@@ -32,6 +36,10 @@ pub use ffi::{
     t3_mobile_ffi_palette_resolve_json, t3_mobile_ffi_sdk_sources_json,
     t3_mobile_ffi_theme_plan_json, t3_mobile_ffi_vt_decode_snapshot_json,
     t3_mobile_ffi_vt_render_snapshot,
+};
+pub use ffi_review::{
+    t3_mobile_ffi_filter_review_files_json, t3_mobile_ffi_linked_lines_json,
+    t3_mobile_ffi_secret_card_json, t3_mobile_ffi_tunnel_guard_json,
 };
 
 /// Returns the C-ABI version implemented by `t3-mobile-ffi`.
@@ -293,7 +301,7 @@ mod tests {
         let sdk_json = unsafe { take_c_string(sdk_ptr) }?;
         let sdk: Value = serde_json::from_str(&sdk_json).map_err(|err| err.to_string())?;
         assert_eq!(sdk["abiVersion"].as_u64(), Some(1));
-        assert_eq!(sdk["exportedSymbols"].as_array().map(Vec::len), Some(13));
+        assert_eq!(sdk["exportedSymbols"].as_array().map(Vec::len), Some(17));
         Ok(())
     }
 }

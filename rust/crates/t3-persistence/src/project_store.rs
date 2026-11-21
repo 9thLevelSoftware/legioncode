@@ -35,6 +35,7 @@
 //! ```
 
 mod db;
+mod favicon;
 mod queries;
 mod row;
 mod schema;
@@ -47,10 +48,13 @@ use thiserror::Error;
 use crate::sqlite::{SqliteStore, SqliteStoreError};
 
 pub use db::ProjectDatabase;
+pub use favicon::{
+    FALLBACK_FAVICON_CANDIDATES, FAVICON_CANDIDATES, ICON_SOURCE_FILES, resolve_project_favicon,
+};
 pub use queries::{
     add_or_unarchive_project, archive_project, create_project, find_project_by_id_or_workspace,
-    list_non_deleted_projects, list_projects, rename_project, soft_delete_project,
-    unarchive_project,
+    list_non_deleted_projects, list_projects, read_project_tracked_folders, rename_project,
+    set_project_tracked_folders, soft_delete_project, unarchive_project,
 };
 pub use schema::ensure_project_store_schema;
 

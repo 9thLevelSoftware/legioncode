@@ -55,7 +55,10 @@ use serde_json::Value;
 use thiserror::Error;
 
 pub use methods::{EmptyWsMethodError, WsMethod};
-pub use rules::{contains_secret_reference, required_scopes_for_server_settings_patch};
+pub use rules::{
+    contains_secret_reference, required_scopes_for_server_settings_patch,
+    server_required_scope_for_ws_method,
+};
 
 impl FromStr for WsMethod {
     type Err = EmptyWsMethodError;

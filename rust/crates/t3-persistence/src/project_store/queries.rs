@@ -280,3 +280,64 @@ pub fn soft_delete_project(
         })
     })
 }
+
+/// Reads persisted tracked workspace folders (`tracked_folders_json`) for a non-deleted project.
+pub fn read_project_tracked_folders(
+    db: impl ProjectDatabase,
+    target: &str,
+) -> Result<Vec<t3_contracts::workspace_folders::ProjectTrackedFolder>, ProjectStoreError> {
+    db.read_projects_with(|maybe_conn| {
+        let Some(conn) = maybe_conn else {
+            return Ok(Vec::new());
+        };
+        let Some(existing) = find_non_deleted_project_conn(conn, target)? else {
+            return Err(ProjectStoreError::NotFound {
+                target: target.to_owned(),
+            });
+        };
+        let raw: String = conn
+            .query_row(
+                "SELECT COALESCE(tracked_folders_json, '[]')
+                 FROM projection_projects
+                 WHERE project_id = ?1",
+                [&existing.id],
+                |row| row.get(0),
+            )
+            .map_err(|source| ProjectStoreError::Sqlite {
+                operation: "read_project_tracked_folders",
+                source,
+            })?;
+        serde_json::from_str(&raw).map_err(|_| ProjectStoreError::InvalidScriptsJson)
+    })
+}
+
+/// Updates `tracked_folders_json` on a non-deleted project matched by ID or workspace root.
+pub fn set_project_tracked_folders(
+    db: impl ProjectDatabase,
+    target: &str,
+    folders: &[t3_contracts::workspace_folders::ProjectTrackedFolder],
+) -> Result<Vec<t3_contracts::workspace_folders::ProjectTrackedFolder>, ProjectStoreError> {
+    let encoded =
+        serde_json::to_string(folders).map_err(|_| ProjectStoreError::InvalidScriptsJson)?;
+    db.write_projects_with(|conn| {
+        let tx = WriteTx::begin(conn)?;
+        let Some(existing) = find_non_deleted_project_conn(conn, target)? else {
+            return Err(ProjectStoreError::NotFound {
+                target: target.to_owned(),
+            });
+        };
+        let now = format_iso8601_utc(SystemTime::now());
+        conn.execute(
+            "UPDATE projection_projects
+             SET tracked_folders_json = ?1, updated_at = ?2
+             WHERE project_id = ?3 AND deleted_at IS NULL",
+            params![encoded, now, existing.id],
+        )
+        .map_err(|source| ProjectStoreError::Sqlite {
+            operation: "set_project_tracked_folders",
+            source,
+        })?;
+        tx.commit()?;
+        Ok(folders.to_vec())
+    })
+}

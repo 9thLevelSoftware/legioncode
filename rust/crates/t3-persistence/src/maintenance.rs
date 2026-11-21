@@ -5,6 +5,7 @@
 
 mod legacy;
 mod prune;
+mod prune_search;
 pub mod report;
 
 use std::fs;
@@ -14,6 +15,7 @@ use rusqlite::{Connection, OpenFlags};
 use thiserror::Error;
 
 pub use legacy::remove_legacy_database;
+pub use prune_search::cleanup_imported_transcript;
 pub use report::{
     DATABASE_COMPACTION_RECOMMENDED_BYTES, DoctorOptions, DoctorRepair, DoctorRepairId,
     format_bytes, plan_doctor_repairs, render_doctor_report,
@@ -127,6 +129,14 @@ pub enum MaintenanceError {
         /// Underlying I/O error.
         #[source]
         source: std::io::Error,
+    },
+    /// Transcript cleanup failure surfacing the specific FS or SQLite reason (`1458a42419`).
+    #[error("Transcript cleanup failed at '{}': {reason}", path.display())]
+    TranscriptCleanup {
+        /// Target transcript file path.
+        path: PathBuf,
+        /// Specific FS or SQLite failure reason.
+        reason: String,
     },
 }
 
@@ -254,7 +264,7 @@ where
     let mut conn =
         Connection::open(database_path).map_err(|err| MaintenanceError::DatabaseCompact {
             path: database_path.to_path_buf(),
-            reason: err.to_string(),
+            reason: format!("open database: {err}"),
         })?;
 
     legacy::lock_exclusively_with(&conn, database_path, |reason| {
@@ -268,33 +278,35 @@ where
     let (deleted_event_count, deleted_receipt_count) = prune::prune_event_store(&mut conn)
         .map_err(|err| MaintenanceError::DatabaseCompact {
             path: database_path.to_path_buf(),
-            reason: err.to_string(),
+            reason: format!("prune event store: {err}"),
         })?;
 
     on_step(DatabaseCompactStep::Vacuum);
     conn.execute_batch("PRAGMA auto_vacuum = INCREMENTAL; VACUUM;")
         .map_err(|err| MaintenanceError::DatabaseCompact {
             path: database_path.to_path_buf(),
-            reason: err.to_string(),
+            reason: format!("vacuum: {err}"),
         })?;
 
     on_step(DatabaseCompactStep::RebuildSearch);
-    prune::rebuild_message_search(&mut conn).map_err(|err| MaintenanceError::DatabaseCompact {
-        path: database_path.to_path_buf(),
-        reason: err.to_string(),
+    prune_search::rebuild_message_search(&mut conn).map_err(|err| {
+        MaintenanceError::DatabaseCompact {
+            path: database_path.to_path_buf(),
+            reason: format!("rebuild search index: {err}"),
+        }
     })?;
 
     on_step(DatabaseCompactStep::Checkpoint);
     conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
         .map_err(|err| MaintenanceError::DatabaseCompact {
             path: database_path.to_path_buf(),
-            reason: err.to_string(),
+            reason: format!("wal checkpoint: {err}"),
         })?;
 
     conn.close()
         .map_err(|(_, err)| MaintenanceError::DatabaseCompact {
             path: database_path.to_path_buf(),
-            reason: err.to_string(),
+            reason: format!("close database: {err}"),
         })?;
 
     let after_bytes = fs::metadata(database_path)

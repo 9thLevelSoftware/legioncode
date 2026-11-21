@@ -1,6 +1,40 @@
 //! Shared URI authority validation and `application/x-www-form-urlencoded` helpers.
 
 use std::fmt::Write as _;
+use std::net::{Ipv4Addr, Ipv6Addr};
+
+/// Returns `true` when `host` identifies the local loopback interface
+/// (`localhost`, `127.0.0.1`, `127.*`, `[::1]`, `::1`, or valid IPv6 loopback).
+#[must_use]
+pub fn is_loopback_host(host: &str) -> bool {
+    if host.is_empty() {
+        return false;
+    }
+    if host.eq_ignore_ascii_case("localhost") {
+        return true;
+    }
+    if let Ok(ipv4) = host.parse::<Ipv4Addr>() {
+        return ipv4.is_loopback();
+    }
+    let ipv6_candidate = if host.starts_with('[') || host.ends_with(']') {
+        host.strip_prefix('[').and_then(|s| s.strip_suffix(']'))
+    } else {
+        Some(host)
+    };
+    ipv6_candidate
+        .and_then(|candidate| candidate.parse::<Ipv6Addr>().ok())
+        .is_some_and(|ipv6| ipv6.is_loopback())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ParsedUrlParts {
+    pub(crate) scheme: String,
+    pub(crate) origin: String,
+    pub(crate) pathname: String,
+    pub(crate) query_params: Vec<(String, String)>,
+    pub(crate) has_userinfo: bool,
+    pub(crate) fragment: Option<String>,
+}
 
 /// Returns `true` if `scheme` obeys RFC 3986 scheme syntax (`ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )`).
 pub(crate) fn is_valid_scheme(scheme: &str) -> bool {
@@ -233,4 +267,70 @@ pub(crate) fn build_pairing_url_impl(connection_string: &str, token: &str) -> Op
     out.push_str("#token=");
     out.push_str(&encoded_token);
     Some(out)
+}
+
+/// Decodes all key/value query parameters in order.
+pub(crate) fn parse_query_params(raw_query: &str) -> Vec<(String, String)> {
+    let mut params = Vec::new();
+    for part in raw_query.split('&') {
+        if part.is_empty() {
+            continue;
+        }
+        let (raw_key, raw_val) = match part.split_once('=') {
+            Some((k, v)) => (k, v),
+            None => (part, ""),
+        };
+        params.push((
+            decode_form_urlencoded(raw_key),
+            decode_form_urlencoded(raw_val),
+        ));
+    }
+    params
+}
+
+/// Parses an explicit-scheme URI into normalized origin, pathname, query params, userinfo flag, and fragment.
+pub(crate) fn parse_url_parts(raw: &str) -> Option<ParsedUrlParts> {
+    if raw.is_empty() || raw.bytes().any(|b| b < 0x20 || b == 0x7F) {
+        return None;
+    }
+    let scheme_end = raw.find("://")?;
+    let raw_scheme = &raw[..scheme_end];
+    if !is_valid_scheme(raw_scheme) {
+        return None;
+    }
+    let scheme = raw_scheme.to_ascii_lowercase();
+    let after_scheme = &raw[scheme_end + 3..];
+    let (before_fragment, fragment) = match after_scheme.split_once('#') {
+        Some((before, frag)) => (before, Some(frag.to_owned())),
+        None => (after_scheme, None),
+    };
+    let (before_query, raw_query) = match before_fragment.split_once('?') {
+        Some((before, q)) => (before, Some(q)),
+        None => (before_fragment, None),
+    };
+    let (authority, pathname) = match before_query.split_once('/') {
+        Some((auth, rest)) => (auth, format!("/{rest}")),
+        None => (before_query, "/".to_owned()),
+    };
+    if authority
+        .bytes()
+        .any(|b| b.is_ascii_whitespace() || b == b'\\')
+    {
+        return None;
+    }
+    let (has_userinfo, host_port) = match authority.rsplit_once('@') {
+        Some((_user, rest)) => (true, rest),
+        None => (false, authority),
+    };
+    let normalized_host_port = normalize_authority(host_port, &scheme)?;
+    let origin = format!("{scheme}://{normalized_host_port}");
+    let query_params = raw_query.map_or_else(Vec::new, parse_query_params);
+    Some(ParsedUrlParts {
+        scheme,
+        origin,
+        pathname,
+        query_params,
+        has_userinfo,
+        fragment,
+    })
 }

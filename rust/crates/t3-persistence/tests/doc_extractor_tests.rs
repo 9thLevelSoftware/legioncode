@@ -301,4 +301,10 @@ fn extracts_odf_and_utf16_epub_and_enforces_limits_and_exit_codes() {
         extract_document_text(&rtf_path, ".rtf").expect("rtf"),
         "Привет é Москва"
     );
+
+    let mac_rtf_path = dir.path().join("macroman.rtf");
+    let mac_rtf = br"{\rtf1\mac\ansicpg10000 Cafe\'8e \emdash  \'d2Apple\'d3 \'f0 {\deleted old typo }kept{\*\deleted hidden}\deleted wiped\deleted0  clean}";
+    fs::write(&mac_rtf_path, mac_rtf).expect("write mac rtf");
+    let mac_out = extract_document_text(&mac_rtf_path, ".rtf").expect("mac rtf");
+    assert_eq!(mac_out, "Cafeé — “Apple” \u{F8FF} kept clean");
 }

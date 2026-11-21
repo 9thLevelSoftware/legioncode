@@ -13,6 +13,50 @@ use thiserror::Error;
 
 pub use crate::claude_history_fork::fork_session;
 
+/// Model marker Claude Code stamps on synthetic local error replies (for example `"Invalid API key"`).
+pub const CLAUDE_SYNTHETIC_MODEL: &str = "<synthetic>";
+
+/// Maximum length in UTF-16 code units for imported session titles (`AgentSessionScanner.ts:460`).
+pub const CLAUDE_IMPORT_TITLE_MAX_UTF16: usize = 100;
+
+/// Truncates an imported session prompt line at a valid UTF-16 / scalar boundary (`272cd38379`).
+#[must_use]
+pub fn derive_imported_title(raw_text: &str) -> Option<String> {
+    let first_line = raw_text.trim().lines().next().unwrap_or("");
+    let cut =
+        t3_shared::text_norm::truncate_prefix_utf16(first_line, CLAUDE_IMPORT_TITLE_MAX_UTF16);
+    let trimmed = cut.trim();
+    (!trimmed.is_empty()).then(|| trimmed.to_owned())
+}
+
+/// Returns `true` when visible assistant entries exist and every assistant `message.model` is `"<synthetic>"` (`c6ad9be183`).
+#[must_use]
+pub fn is_synthetic_error_only_entries(entries: &[Map<String, Value>]) -> bool {
+    let mut saw_synthetic = false;
+    let mut saw_real_model = false;
+    for entry in entries {
+        if entry_str(entry, "type") != Some("assistant")
+            || entry_bool(entry, "isSidechain")
+            || entry_bool(entry, "isMeta")
+            || entry.get("teamName").is_some_and(|v| !v.is_null())
+        {
+            continue;
+        }
+        let model = entry
+            .get("message")
+            .and_then(|msg| msg.get("model"))
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+        match model {
+            Some(CLAUDE_SYNTHETIC_MODEL) => saw_synthetic = true,
+            Some(_) => saw_real_model = true,
+            None => {}
+        }
+    }
+    saw_synthetic && !saw_real_model
+}
+
 /// Errors returned by [`get_session_messages`] and [`fork_session`].
 #[derive(Debug, Error)]
 pub enum ClaudeHistoryError {
@@ -108,6 +152,9 @@ pub fn get_session_messages(
 
     let entries = parse_jsonl_entries(&raw);
     let ordered = build_conversation_chain(&entries);
+    if is_synthetic_error_only_entries(&ordered) {
+        return Ok(Vec::new());
+    }
     let mut messages = Vec::new();
 
     for entry in ordered {

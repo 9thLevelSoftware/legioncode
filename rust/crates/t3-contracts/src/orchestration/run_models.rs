@@ -11,6 +11,7 @@ use crate::ids::{
 
 use super::common::{OrchestrationActor, ProviderRef};
 use super::model_selection::{ModelSelection, WorkspaceStrategy};
+use super::run_output::{RunOutputPayload, RunOutputSchema};
 
 /// Lifecycle state of an orchestration run (`orchestrationV2.ts:680-691`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -111,6 +112,12 @@ pub struct Run {
     /// Whether this run started with a fresh provider context.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fresh_context: Option<bool>,
+    /// JSON Schema describing structured output requested from this run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_schema: Option<RunOutputSchema>,
+    /// Accepted structured output payload submitted for this run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<RunOutputPayload>,
 }
 
 /// Run background-work cancellation payload (`orchestrationV2.ts:737-740`).

@@ -10,13 +10,14 @@ use super::checkpoint_models::{
 };
 use super::items::TurnItem;
 use super::run_models::{ExecutionNode, Run, RunAttempt, RunBackgroundWorkCancelled, Subagent};
+use super::run_output::RunOutputSubmitted;
 use super::runtime_models::{
     ConversationMessage, ProviderSession, ProviderSessionDetached, ProviderThread, ProviderTurn,
     RuntimeRequest,
 };
 use super::state_models::{AppThread, ThreadVisit};
 
-/// All 48 known `OrchestrationV2DomainEvent` `type` strings (`orchestrationV2.ts:2025-2175`).
+/// All 49 known `OrchestrationV2DomainEvent` `type` strings (`orchestrationV2.ts:2025-2175`).
 pub const KNOWN_DOMAIN_EVENT_TYPES: &[&str] = &[
     "thread.created",
     "thread.archived",
@@ -47,6 +48,7 @@ pub const KNOWN_DOMAIN_EVENT_TYPES: &[&str] = &[
     "run.created",
     "run.updated",
     "run.background-work-cancelled",
+    "run.output-submitted",
     "run-attempt.created",
     "run-attempt.updated",
     "node.updated",
@@ -96,6 +98,8 @@ pub enum DomainEventPayload {
     },
     /// `run.background-work-cancelled`.
     RunBackgroundWorkCancelled(RunBackgroundWorkCancelled),
+    /// `run.output-submitted`.
+    RunOutputSubmitted(RunOutputSubmitted),
     /// `run-attempt.created` or `run-attempt.updated`.
     RunAttemptUpdated {
         /// Exact `"type"` literal (`run-attempt.created` or `run-attempt.updated`).
@@ -157,6 +161,7 @@ impl DomainEventPayload {
             Self::ThreadPullRequestLinkUpdated(_) => "thread.pull-request-link-updated",
             Self::ThreadVisitRecorded(_) => "thread.visit-recorded",
             Self::RunBackgroundWorkCancelled(_) => "run.background-work-cancelled",
+            Self::RunOutputSubmitted(_) => "run.output-submitted",
             Self::NodeUpdated(_) => "node.updated",
             Self::SubagentUpdated(_) => "subagent.updated",
             Self::ProviderSessionDetached(_) => "provider-session.detached",
@@ -180,6 +185,7 @@ impl DomainEventPayload {
             Self::ThreadVisitRecorded(visit) => serde_json::to_value(visit),
             Self::RunUpdated { run, .. } => serde_json::to_value(run),
             Self::RunBackgroundWorkCancelled(cancelled) => serde_json::to_value(cancelled),
+            Self::RunOutputSubmitted(submitted) => serde_json::to_value(submitted),
             Self::RunAttemptUpdated { attempt, .. } => serde_json::to_value(attempt),
             Self::NodeUpdated(node) => serde_json::to_value(node),
             Self::SubagentUpdated(subagent) => serde_json::to_value(subagent),
@@ -254,6 +260,9 @@ pub(super) fn decode_payload_for_type(
             run: Box::new(serde_json::from_value(payload).map_err(err_map)?),
         }),
         "run.background-work-cancelled" => Ok(DomainEventPayload::RunBackgroundWorkCancelled(
+            serde_json::from_value(payload).map_err(err_map)?,
+        )),
+        "run.output-submitted" => Ok(DomainEventPayload::RunOutputSubmitted(
             serde_json::from_value(payload).map_err(err_map)?,
         )),
         "run-attempt.created" | "run-attempt.updated" => {

@@ -8,7 +8,9 @@ use super::{EnvironmentScope, GuardEvalError, WsMethod};
 
 pub(super) fn static_guarded_scope(method: &WsMethod) -> Option<EnvironmentScope> {
     match method {
-        WsMethod::ProviderAuthRemoveMethod => Some(EnvironmentScope::ProvidersManage),
+        WsMethod::ProviderAuthRemoveMethod
+        | WsMethod::ProviderMcpSignInStart
+        | WsMethod::ProviderMcpSignInComplete => Some(EnvironmentScope::ProvidersManage),
         WsMethod::PreviewClose => Some(EnvironmentScope::PreviewOperate),
         WsMethod::PreviewStopLocalServer => Some(EnvironmentScope::TerminalOperate),
         WsMethod::ServerRunStorageCleanup
@@ -52,7 +54,8 @@ pub(super) fn static_guarded_scope(method: &WsMethod) -> Option<EnvironmentScope
         | WsMethod::VcsRemoveWorktree
         | WsMethod::VcsCreateRef
         | WsMethod::VcsSwitchRef
-        | WsMethod::VcsInit => Some(EnvironmentScope::SourceControlWrite),
+        | WsMethod::VcsInit
+        | WsMethod::WorkspaceAddTaskFolderRepository => Some(EnvironmentScope::SourceControlWrite),
         WsMethod::PullRequestsGenerateReviewGuide
         | WsMethod::ProjectsCreateFromThread
         | WsMethod::ServerPrepareTriage
@@ -67,7 +70,26 @@ pub(super) fn static_guarded_scope(method: &WsMethod) -> Option<EnvironmentScope
         WsMethod::GuestShareCreate
         | WsMethod::PeerLinksLink
         | WsMethod::PeerLinksUnlink
-        | WsMethod::PeerLinksAnswerRequest => Some(EnvironmentScope::AccessWrite),
+        | WsMethod::PeerLinksAnswerRequest
+        | WsMethod::PeerLinksPairClient
+        | WsMethod::PeerLinksPairLink => Some(EnvironmentScope::AccessWrite),
+        _ => None,
+    }
+}
+
+/// Maps RPC methods (including read methods) to their authoritative server-side required scope (`RpcAuthorization.ts`).
+pub fn server_required_scope_for_ws_method(method: &WsMethod) -> Option<EnvironmentScope> {
+    if let Some(guarded) = static_guarded_scope(method) {
+        return Some(guarded);
+    }
+    match method {
+        WsMethod::WorkspaceListFolders
+        | WsMethod::WorkspaceScanFolders
+        | WsMethod::WorkspaceTaskFolder => Some(EnvironmentScope::FilesystemRead),
+        WsMethod::PeerLinksNames
+        | WsMethod::PeerLinksSubscribeThread
+        | WsMethod::PeerLinksThreadHistoryPage
+        | WsMethod::PeerLinksThreadItem => Some(EnvironmentScope::OrchestrationRead),
         _ => None,
     }
 }
@@ -139,7 +161,7 @@ pub fn required_scopes_for_server_settings_patch(
     let mut changes_access = false;
 
     for key in patch.keys() {
-        if key == "requireConnectDeviceApproval" {
+        if key == "requireConnectDeviceApproval" || key == "enablePreviewTunnel" {
             changes_access = true;
         } else if matches!(
             key.as_str(),

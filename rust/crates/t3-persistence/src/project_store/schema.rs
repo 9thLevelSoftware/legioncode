@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS projection_projects (
   project_icon_json TEXT,
   pinned_at TEXT,
   archived_at TEXT,
-  has_custom_title INTEGER NOT NULL DEFAULT 0
+  has_custom_title INTEGER NOT NULL DEFAULT 0,
+  tracked_folders_json TEXT NOT NULL DEFAULT '[]'
 );
 ";
 
@@ -44,6 +45,7 @@ const COMPAT_COLUMNS: &[(&str, &str)] = &[
     ("pinned_at", "TEXT"),
     ("archived_at", "TEXT"),
     ("has_custom_title", "INTEGER NOT NULL DEFAULT 0"),
+    ("tracked_folders_json", "TEXT NOT NULL DEFAULT '[]'"),
 ];
 
 pub(super) struct WriteTx<'a> {

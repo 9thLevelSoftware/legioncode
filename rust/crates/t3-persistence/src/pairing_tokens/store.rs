@@ -25,6 +25,42 @@ pub fn ensure_pairing_schema(conn: &Connection) -> Result<(), PairingTokenError>
         .map_err(|source| sqlite_err("apply_auth_and_peer_ddl", source))
 }
 
+/// Revokes unspent pairing links matching a Connect proof key, other Connect keys, and optionally
+/// unbound pairing/approval codes (`AuthPairingLinks.revokeUnspentByProofKey`).
+pub(crate) fn revoke_unspent_links(
+    conn: &Connection,
+    proof_key_thumbprint: Option<&str>,
+    keep_proof_key_thumbprint: Option<&str>,
+    include_unbound: bool,
+    revoked_at_iso: &str,
+) -> Result<Vec<String>, rusqlite::Error> {
+    let mut stmt = conn.prepare(
+        "UPDATE auth_pairing_links
+         SET revoked_at = ?1
+         WHERE revoked_at IS NULL
+           AND consumed_at IS NULL
+           AND (
+             (
+               proof_key_thumbprint IS NOT NULL
+               AND (?2 IS NULL OR proof_key_thumbprint = ?2)
+               AND proof_key_thumbprint IS NOT ?3
+             )
+             OR (proof_key_thumbprint IS NULL AND ?4 = 1)
+           )
+         RETURNING id",
+    )?;
+    let rows = stmt.query_map(
+        rusqlite::params![
+            revoked_at_iso,
+            proof_key_thumbprint,
+            keep_proof_key_thumbprint,
+            i64::from(include_unbound),
+        ],
+        |row| row.get::<_, String>(0),
+    )?;
+    rows.collect()
+}
+
 pub(super) struct ConsumedPairingLink {
     pub(super) credential: String,
     pub(super) scopes_json: String,

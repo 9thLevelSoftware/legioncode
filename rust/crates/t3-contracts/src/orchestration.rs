@@ -47,6 +47,7 @@ mod item_kinds;
 mod items;
 mod model_selection;
 mod run_models;
+mod run_output;
 mod runtime_models;
 mod state_models;
 mod stream;
@@ -85,7 +86,7 @@ pub use event_payloads::{
     DomainEventPayload, KNOWN_DOMAIN_EVENT_TYPES, is_known_domain_event_type,
 };
 pub use events::{DomainEvent, StoredDomainEvent};
-pub use item_kinds::{ApprovalDecisionMarker, TurnItemKind};
+pub use item_kinds::{ApprovalDecisionMarker, SecretRequestField, TurnItemKind};
 pub use items::{
     CheckpointFileSummary, CheckpointFileTotals, DeferredWorkCursor, KNOWN_TURN_ITEM_TYPES,
     PlanStep, ProjectedTurnItem, TurnItem, TurnItemBase, TurnItemStatus, TurnItemVisibility,
@@ -95,13 +96,19 @@ pub use model_selection::{
     ContextSourcePoint, LimitRecovery, LimitRecoveryUpdate, ModelSelection,
     OrchestrationNotification, ProviderFailure, ProviderFailureClass, ProviderOptionSelection,
     ProviderOptionValue, ProviderRetry, ThreadForkSourcePoint, WorkspaceStrategy,
+    WorkspaceStrategyRepository,
 };
 pub use run_models::{
     ExecutionNode, Run, RunAttempt, RunBackgroundWorkCancelled, RunStatus, Subagent,
+};
+pub use run_output::{
+    MAX_RUN_OUTPUT_SCHEMA_CHARS, RunOutputPayload, RunOutputSchema, RunOutputSubmitted,
+    RunOutputValidationError, SubmitRunOutputCommand, format_run_output_instructions,
+    validate_run_output_schema_size,
 };
 pub use runtime_models::{
     ConversationMessage, ProviderSession, ProviderSessionDetached, ProviderThread, ProviderTurn,
     RuntimeRequest,
 };
-pub use state_models::{AppThread, ThreadLineage, ThreadVisit};
+pub use state_models::{AppThread, RollbackUnrestored, ThreadLineage, ThreadVisit};
 pub use stream::{StreamItem, ThreadProjection};

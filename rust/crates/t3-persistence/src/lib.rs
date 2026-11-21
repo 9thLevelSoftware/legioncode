@@ -40,6 +40,7 @@ pub mod service_env;
 pub mod service_launcher;
 pub mod service_preflight;
 pub mod sqlite;
+pub mod task_folder_store;
 pub mod triage_session;
 
 pub use auth_connect_devices::{
@@ -50,9 +51,10 @@ pub use auth_connect_devices::{
     revoke_connect_device_by_code_at,
 };
 pub use auth_mutations::{
-    DEFAULT_CLI_SESSION_SUBJECT, IssueSessionInput, IssuedSession,
+    DEFAULT_CLI_SESSION_SUBJECT, IssueSessionInput, IssuedSession, RevokeOtherSessionsOutcome,
     format_issued_pairing_credential, format_issued_session, issue_scoped_session,
-    issue_scoped_session_at, parse_cli_duration_ms, revoke_pairing_link, revoke_pairing_link_at,
+    issue_scoped_session_at, parse_cli_duration_ms, revoke_other_connect_devices_at,
+    revoke_other_sessions, revoke_other_sessions_at, revoke_pairing_link, revoke_pairing_link_at,
     revoke_session, revoke_session_at,
 };
 pub use auth_records::{
@@ -62,8 +64,9 @@ pub use auth_records::{
 };
 
 pub use claude_history::{
-    ClaudeHistoryError, ClaudeHistoryOptions, ForkSessionResult, SessionMessage, fork_session,
-    get_session_messages,
+    CLAUDE_IMPORT_TITLE_MAX_UTF16, CLAUDE_SYNTHETIC_MODEL, ClaudeHistoryError,
+    ClaudeHistoryOptions, ForkSessionResult, SessionMessage, derive_imported_title, fork_session,
+    get_session_messages, is_synthetic_error_only_entries,
 };
 pub use doc_extractor::{
     DOC_MAX_DEPTH, DOC_MAX_EXPANDED_BYTES, DOC_MAX_INPUT_BYTES, DOC_MAX_OUTPUT_CHARS,
@@ -73,8 +76,9 @@ pub use doc_extractor::{
 pub use maintenance::{
     CompactDatabaseResult, DATABASE_COMPACTION_RECOMMENDED_BYTES, DatabaseCompactStep,
     DatabaseInspection, DoctorOptions, DoctorRepair, DoctorRepairId, LegacyOnlyRecords,
-    MaintenanceError, compact_database, compact_database_with_steps, format_bytes,
-    inspect_database, plan_doctor_repairs, remove_legacy_database, render_doctor_report,
+    MaintenanceError, cleanup_imported_transcript, compact_database, compact_database_with_steps,
+    format_bytes, inspect_database, plan_doctor_repairs, remove_legacy_database,
+    render_doctor_report,
 };
 pub use ownership::{
     CancellationToken, ManagedPolicyRecord, ManagedPolicyState, OwnershipError,
@@ -86,16 +90,19 @@ pub use pairing_tokens::{
     ADMINISTRATIVE_CLIENT_SCOPES, DEFAULT_PAIRING_TOKEN_TTL_MS, DEFAULT_SESSION_TTL_MS,
     ExchangedSession, IssuePairingTokenInput, IssuedPairingToken, PAIRING_CODE_ALPHABET,
     PAIRING_CODE_LENGTH, PairingTokenError, STANDARD_CLIENT_SCOPES, VerifiedBearerSession,
-    ensure_pairing_schema, exchange_pairing_token, issue_pairing_token, role_for_scopes,
-    verify_bearer_session,
+    ensure_pairing_schema, exchange_pairing_token, issue_pairing_token,
+    revoke_unspent_pairing_links, role_for_scopes, verify_bearer_session,
 };
-pub use paths::{PathsError, ServerDerivedPaths, ensure_environment_id, ensure_server_directories};
+pub use paths::{
+    PathsError, ServerDerivedPaths, ensure_environment_id, ensure_server_directories,
+    resolve_base_dir, resolve_base_dir_for_brand,
+};
 pub use project_store::{
     CreateProjectInput, ProjectAddResult, ProjectDatabase, ProjectRecord, ProjectStoreError,
     RenameProjectResult, SoftDeleteProjectResult, add_or_unarchive_project, archive_project,
     create_project, ensure_project_store_schema, find_project_by_id_or_workspace,
-    list_non_deleted_projects, list_projects, rename_project, soft_delete_project,
-    unarchive_project,
+    list_non_deleted_projects, list_projects, read_project_tracked_folders, rename_project,
+    resolve_project_favicon, set_project_tracked_folders, soft_delete_project, unarchive_project,
 };
 pub use service_env::{parse_service_env, upsert_service_env, upsert_service_env_map};
 pub use service_launcher::{

@@ -310,4 +310,16 @@ pub struct EnvironmentCapabilities {
     /// Answers `issues.linkedThreads`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub issue_linked_threads: Option<bool>,
+    /// Honors `enablePreviewTunnel` setting and policy limit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview_tunnel_setting: Option<bool>,
+    /// Supports projects tracking multiple repositories and task folders.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub multi_repo_projects: Option<bool>,
+    /// Serves linked environment threads to authorized peer links.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub linked_thread_read: Option<bool>,
+    /// Supports minting peer link pairing codes transitively through a full-access peer link.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transitive_peer_linking: Option<bool>,
 }

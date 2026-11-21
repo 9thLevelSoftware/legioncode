@@ -12,13 +12,12 @@ pub(crate) fn revoke_connect_device_tx(
     proof_key_thumbprint: &str,
     now_iso: &str,
 ) -> Result<bool, AuthRecordsError> {
-    conn.execute(
-        "UPDATE auth_pairing_links
-         SET revoked_at = ?1
-         WHERE proof_key_thumbprint = ?2
-           AND revoked_at IS NULL
-           AND consumed_at IS NULL",
-        params![now_iso, proof_key_thumbprint],
+    crate::pairing_tokens::revoke_unspent_links(
+        conn,
+        Some(proof_key_thumbprint),
+        None,
+        false,
+        now_iso,
     )
     .map_err(|source| sqlite_err("revoke_connect_device:links", source))?;
 
@@ -40,6 +39,32 @@ pub(crate) fn revoke_connect_device_tx(
         .map_err(|source| sqlite_err("revoke_connect_device:sessions", source))?;
 
     Ok(removed_devices > 0 || revoked_sessions > 0)
+}
+
+pub(crate) fn revoke_other_connect_devices_tx(
+    conn: &Connection,
+    keep_proof_key_thumbprint: Option<&str>,
+    now_iso: &str,
+) -> Result<(usize, usize), AuthRecordsError> {
+    // "Revoke all others" promises every other way in is gone, so unspent unbound codes go too.
+    let revoked_links = crate::pairing_tokens::revoke_unspent_links(
+        conn,
+        None,
+        keep_proof_key_thumbprint,
+        true,
+        now_iso,
+    )
+    .map_err(|source| sqlite_err("revoke_other_connect_devices:links", source))?;
+
+    let removed_devices = conn
+        .execute(
+            "DELETE FROM auth_connect_devices
+             WHERE (?1 IS NULL OR proof_key_thumbprint != ?1)",
+            [keep_proof_key_thumbprint],
+        )
+        .map_err(|source| sqlite_err("revoke_other_connect_devices:devices", source))?;
+
+    Ok((revoked_links.len(), removed_devices))
 }
 
 pub(crate) fn ensure_schema(conn: &Connection) -> Result<(), AuthRecordsError> {

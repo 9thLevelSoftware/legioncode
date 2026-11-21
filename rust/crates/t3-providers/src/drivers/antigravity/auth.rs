@@ -1,18 +1,13 @@
-//! Antigravity ACP driver: install-first probing (`BUG-11`), SHA-256
-//! `GEMINI_HOME` derivation, and version lease refcounting.
-
-use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex, PoisonError};
+//! Antigravity installation detection, isolated home derivation, and auth probing.
 
 use sha2::{Digest, Sha256};
-use t3_protocol::provider_env::SanitizedEnv;
 
 use crate::core::{ProbeAvailability, resolve_usage_limits_after_probe};
 
-use super::{ProviderLaunchSpec, ProviderProbeStatus, ProviderSnapshotState, build_child_env};
+use super::super::{ProviderProbeStatus, ProviderSnapshotState};
 
-/// Environment flag forcing Antigravity ACP file-backed session storage.
-pub const ANTIGRAVITY_FORCE_FILE_STORAGE_ENV: &str = "AGY_ACP_FORCE_FILE_STORAGE";
+/// Environment flag preventing managed Antigravity CLI binaries from self-updating in place.
+pub const AGY_CLI_DISABLE_AUTO_UPDATE_ENV: &str = "AGY_CLI_DISABLE_AUTO_UPDATE";
 
 /// Ambient Gemini/Google variables stripped before injecting the isolated `GEMINI_HOME`.
 pub const ANTIGRAVITY_REMOVED_ENV_KEYS: &[&str] = &[
@@ -21,7 +16,45 @@ pub const ANTIGRAVITY_REMOVED_ENV_KEYS: &[&str] = &[
     "GOOGLE_API_KEY",
     "GOOGLE_GENAI_USE_VERTEXAI",
     "GOOGLE_APPLICATION_CREDENTIALS",
+    AGY_CLI_DISABLE_AUTO_UPDATE_ENV,
 ];
+
+/// Supported Antigravity authentication methods.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum AntigravityAuthMethod {
+    /// Consumer Google sign-in isolated per T3 instance (`oauth-personal`).
+    #[default]
+    OauthPersonal,
+    /// Enterprise/workspace Google OAuth (`oauth-business`).
+    OauthBusiness,
+    /// Gemini API key (`api-key`).
+    ApiKey,
+    /// Vertex AI credentials (`vertex-ai`).
+    VertexAi,
+    /// Custom/provider-managed credentials (`custom`).
+    Custom,
+}
+
+impl AntigravityAuthMethod {
+    /// Returns the wire identifier used by Antigravity settings and telemetry.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::OauthPersonal => "oauth-personal",
+            Self::OauthBusiness => "oauth-business",
+            Self::ApiKey => "api-key",
+            Self::VertexAi => "vertex-ai",
+            Self::Custom => "custom",
+        }
+    }
+
+    /// Returns `true` when credentials must stay isolated per instance instead of
+    /// reading/writing the shared OS keyring.
+    #[must_use]
+    pub const fn isolates_personal_oauth(self) -> bool {
+        matches!(self, Self::OauthPersonal)
+    }
+}
 
 /// Detected Antigravity runtime executable target on disk.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -230,146 +263,5 @@ pub fn reconcile_antigravity_snapshot(
             previous.message = None;
             previous
         }
-    }
-}
-
-/// Builds a sanitized Antigravity ACP subprocess launch specification (`BUG-12`).
-#[must_use]
-pub fn build_antigravity_launch_spec(
-    env: &SanitizedEnv,
-    target: &AntigravityInstallTarget,
-    directories: &AntigravityInstanceDirectories,
-    cwd: Option<&str>,
-) -> ProviderLaunchSpec {
-    let mut overrides = BTreeMap::new();
-    overrides.insert("GEMINI_HOME".to_owned(), directories.gemini_home.clone());
-    overrides.insert("TMPDIR".to_owned(), directories.runtime_temp.clone());
-    overrides.insert(
-        ANTIGRAVITY_FORCE_FILE_STORAGE_ENV.to_owned(),
-        "1".to_owned(),
-    );
-    if let AntigravityInstallTarget::AcpServer {
-        localharness_external,
-        ..
-    } = target
-    {
-        overrides.insert(
-            "AGY_LOCALHARNESS_EXTERNAL_PATH".to_owned(),
-            localharness_external.clone(),
-        );
-    }
-
-    let args = match target {
-        AntigravityInstallTarget::AgyCli { .. } => vec!["acp".to_owned()],
-        AntigravityInstallTarget::AcpServer { .. } => Vec::new(),
-    };
-
-    ProviderLaunchSpec {
-        executable: target.executable().to_owned(),
-        args,
-        env: build_child_env(env, ANTIGRAVITY_REMOVED_ENV_KEYS, &overrides),
-        removed_env_keys: ANTIGRAVITY_REMOVED_ENV_KEYS
-            .iter()
-            .map(|k| (*k).to_owned())
-            .collect(),
-        cwd: cwd.map(ToOwned::to_owned),
-        cancel_behavior: "immediate",
-    }
-}
-
-/// Thread-safe reference-counted lease registry protecting active Antigravity
-/// binary versions from background pruning while sessions are still running.
-#[derive(Debug, Clone, Default)]
-pub struct AntigravityVersionLeases {
-    counts: Arc<Mutex<BTreeMap<String, usize>>>,
-}
-
-impl AntigravityVersionLeases {
-    /// Creates an empty version lease registry.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Acquires a lease on `version` and returns an RAII guard that releases it on drop.
-    #[must_use]
-    pub fn acquire(&self, version: &str) -> AntigravityVersionLeaseGuard {
-        let key = version.trim().to_owned();
-        let mut guard = self.counts.lock().unwrap_or_else(PoisonError::into_inner);
-        let entry = guard.entry(key.clone()).or_insert(0);
-        *entry = entry.saturating_add(1);
-        AntigravityVersionLeaseGuard {
-            counts: Arc::clone(&self.counts),
-            version: key,
-            released: false,
-        }
-    }
-
-    /// Returns the active reference count for `version`.
-    #[must_use]
-    pub fn lease_count(&self, version: &str) -> usize {
-        let guard = self.counts.lock().unwrap_or_else(PoisonError::into_inner);
-        guard.get(version.trim()).copied().unwrap_or(0)
-    }
-
-    /// Returns `true` when at least one active session holds a lease on `version`.
-    #[must_use]
-    pub fn is_leased(&self, version: &str) -> bool {
-        self.lease_count(version) > 0
-    }
-
-    /// Filters `installed_versions` to stale versions safe to prune (neither `active`
-    /// nor currently leased).
-    #[must_use]
-    pub fn prunable_versions(
-        &self,
-        installed_versions: &[String],
-        active_version: Option<&str>,
-    ) -> Vec<String> {
-        let guard = self.counts.lock().unwrap_or_else(PoisonError::into_inner);
-        installed_versions
-            .iter()
-            .filter(|v| {
-                let ver = v.trim();
-                active_version != Some(ver) && guard.get(ver).copied().unwrap_or(0) == 0
-            })
-            .cloned()
-            .collect()
-    }
-}
-
-/// RAII lease guard decremented automatically when dropped or released early.
-#[derive(Debug)]
-pub struct AntigravityVersionLeaseGuard {
-    counts: Arc<Mutex<BTreeMap<String, usize>>>,
-    version: String,
-    released: bool,
-}
-
-impl AntigravityVersionLeaseGuard {
-    /// Explicitly releases this version lease immediately.
-    pub fn release(mut self) {
-        self.decrement();
-    }
-
-    fn decrement(&mut self) {
-        if self.released {
-            return;
-        }
-        self.released = true;
-        let mut guard = self.counts.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some(count) = guard.get_mut(&self.version) {
-            if *count <= 1 {
-                guard.remove(&self.version);
-            } else {
-                *count -= 1;
-            }
-        }
-    }
-}
-
-impl Drop for AntigravityVersionLeaseGuard {
-    fn drop(&mut self) {
-        self.decrement();
     }
 }

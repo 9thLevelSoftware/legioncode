@@ -1,0 +1,9 @@
+//! Integration tests for `t3-desktop-shell` (`SidecarController`, `DesktopIpcRouter`,
+//! `DesktopBundleManifest` / `emit_packaging_bundle`, and the `t3-desktop` CLI).
+
+mod desktop_shell_tests {
+    mod bundle_cli_tests;
+    mod ipc_tests;
+    mod sidecar_tests;
+    mod window_control_tests;
+}

@@ -1,0 +1,22 @@
+[package]
+name = "t3-orchestrator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+t3-contracts = { path = "../t3-contracts" }
+t3-persistence = { path = "../t3-persistence" }
+t3-shared = { path = "../t3-shared" }
+thiserror.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+tempfile.workspace = true

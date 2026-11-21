@@ -23,6 +23,7 @@ packages/*/dist
 build/
 .logs/
 release/
+release-cli/
 release-mock/
 .t3
 .idea/
@@ -50,6 +51,9 @@ artifacts/mobile-behavior/
 scripts/.e2e/
 .github/pr-assets/
 native/**/target/
+rust/target/
+rust/dist/
+rust/pgo-data/
 node_modules/
 .alchemy/
 *.log

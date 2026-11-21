@@ -1,0 +1,16 @@
+DESCRIPTION
+  Install T3 Code as a background service for this user. `t3 up` also chooses how your other devices reach it.
+
+USAGE
+  t3 service install [flags]
+
+FLAGS
+  --base-dir string    Explicit T3 Code data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME).
+  --allow-downgrade    Allow replacing a newer installed service with this older CLI version.
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)

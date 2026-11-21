@@ -1,0 +1,22 @@
+DESCRIPTION
+  Link another T3 Code environment, so agents here can work there. It shows up there under Authorized clients in Settings → Sharing & access, where it can be revoked.
+
+USAGE
+  t3 environment link [flags] <url>
+
+ARGUMENTS
+  url string    Where the other environment answers: its T3 Connect, Tailscale, LAN or loopback address.
+
+FLAGS
+  --base-dir string        Explicit T3 Code data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME).
+  --dev-url string         Dev web URL to proxy/redirect to (equivalent to VITE_DEV_SERVER_URL).
+  --url string             Another address for the same environment, tried after the first.
+  --pairing-code string    A pairing code from the other environment (`t3 pair` there).
+  --access choice          What this environment's agents may do there: read-only, or the broadest runtime mode. (choices: read-only, approval-required, auto-accept-edits, auto, full-access)
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)

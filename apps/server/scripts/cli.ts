@@ -23,6 +23,7 @@ import {
   ServerCliDevelopmentIconTargetMissingError,
   ServerCliExecutableImportError,
 } from "./cliErrors.ts";
+import { isLegacyNodeForced, resolveRustCliBinary } from "../src/rustCutover.ts";
 
 const RepoRoot = Effect.service(Path.Path).pipe(
   Effect.flatMap((path) => path.fromFileUrl(new URL("../../..", import.meta.url))),
@@ -67,6 +68,34 @@ const applyDevelopmentIconOverrides = Effect.fn("applyDevelopmentIconOverrides")
   yield* Effect.log("[cli] Applied development icon overrides to dist/client");
 });
 
+const stageWebClientAssets = Effect.fn("stageWebClientAssets")(function* (
+  repoRoot: string,
+  serverDir: string,
+  onlyWhenMissing: boolean,
+) {
+  const path = yield* Path.Path;
+  const fs = yield* FileSystem.FileSystem;
+  const webDist = path.join(repoRoot, "apps/web/dist");
+  const rustWebApp = path.join(repoRoot, "rust/dist/web-app");
+  const clientTarget = path.join(serverDir, "dist/client");
+
+  if (onlyWhenMissing && (yield* fs.exists(path.join(clientTarget, "index.html")))) {
+    return;
+  }
+
+  if (yield* fs.exists(webDist)) {
+    yield* fs.copy(webDist, clientTarget);
+    yield* applyDevelopmentIconOverrides(repoRoot, serverDir);
+    yield* Effect.log("[cli] Bundled web app into dist/client");
+  } else if (yield* fs.exists(path.join(rustWebApp, "index.html"))) {
+    yield* fs.remove(clientTarget, { recursive: true, force: true });
+    yield* fs.copy(rustWebApp, clientTarget);
+    yield* Effect.log("[cli] Bundled Rust web app into dist/client");
+  } else if (!onlyWhenMissing) {
+    yield* Effect.logWarning("[cli] Web dist not found. Skipping client bundle.");
+  }
+});
+
 const buildCmd = Command.make(
   "build",
   {
@@ -75,7 +104,6 @@ const buildCmd = Command.make(
   (config) =>
     Effect.gen(function* () {
       const path = yield* Path.Path;
-      const fs = yield* FileSystem.FileSystem;
       const repoRoot = yield* RepoRoot;
       const serverDir = path.join(repoRoot, "apps/server");
 
@@ -89,16 +117,7 @@ const buildCmd = Command.make(
         }),
       );
 
-      const webDist = path.join(repoRoot, "apps/web/dist");
-      const clientTarget = path.join(serverDir, "dist/client");
-
-      if (yield* fs.exists(webDist)) {
-        yield* fs.copy(webDist, clientTarget);
-        yield* applyDevelopmentIconOverrides(repoRoot, serverDir);
-        yield* Effect.log("[cli] Bundled web app into dist/client");
-      } else {
-        yield* Effect.logWarning("[cli] Web dist not found. Skipping client bundle.");
-      }
+      yield* stageWebClientAssets(repoRoot, serverDir, false);
     }),
 ).pipe(Command.withDescription("Build the server package (tsdown + bundle web client)."));
 
@@ -117,16 +136,64 @@ const buildExeCmd = Command.make(
     Effect.gen(function* () {
       const path = yield* Path.Path;
       const fs = yield* FileSystem.FileSystem;
+      const env = yield* HostProcess.Environment;
+      const hostPlatform = yield* HostProcess.Platform;
+      const hostArch = yield* HostProcess.Architecture;
       const repoRoot = yield* RepoRoot;
       const serverDir = path.join(repoRoot, "apps/server");
 
       yield* Effect.log("[cli] Building single-executable...");
       const target = Option.getOrUndefined(config.target);
+      const hostTarget = `${hostPlatform === "win32" ? "win" : hostPlatform}-${hostArch}`;
+      const matchesHostTarget =
+        target === undefined || target === hostTarget || target === `${hostPlatform}-${hostArch}`;
+
+      if (!isLegacyNodeForced(env) && matchesHostTarget) {
+        const executableName = hostPlatform === "win32" ? "t3.exe" : "t3";
+        const distExeDir = path.join(serverDir, "dist-exe");
+        const outputPath = path.join(distExeDir, executableName);
+        let rustBinary = resolveRustCliBinary({ repoRoot, platform: hostPlatform, env });
+
+        if (rustBinary === undefined) {
+          const cargo = yield* resolveSpawnCommand("cargo", [
+            "build",
+            "--locked",
+            "--release",
+            "--manifest-path",
+            path.join(repoRoot, "rust/Cargo.toml"),
+            "-p",
+            "t3-cli",
+          ]);
+          yield* Effect.log("[cli] Building standalone Rust t3 binary...");
+          yield* runCommand(
+            ChildProcess.make(cargo.command, cargo.args, {
+              cwd: repoRoot,
+              stdout: config.verbose ? "inherit" : "ignore",
+              stderr: "inherit",
+              shell: cargo.shell,
+            }),
+          );
+          rustBinary = path.join(repoRoot, "rust/target/release", executableName);
+          if (!(yield* fs.exists(rustBinary))) {
+            return yield* new ServerCliBuildAssetMissingError({ assetPath: rustBinary });
+          }
+        }
+
+        yield* fs.remove(distExeDir, { recursive: true, force: true });
+        yield* fs.makeDirectory(distExeDir, { recursive: true });
+        yield* fs.copyFile(rustBinary, outputPath);
+        if (hostPlatform !== "win32") {
+          yield* fs.chmod(outputPath, 0o755);
+        }
+        yield* stageWebClientAssets(repoRoot, serverDir, true);
+        yield* Effect.log(
+          `[cli] Staged standalone Rust ${executableName} at dist-exe/${executableName} (from ${path.relative(repoRoot, rustBinary)})`,
+        );
+        return;
+      }
+
       // TEMPORARY one-time Node fix. Remove when fixed: https://github.com/nodejs/node/issues/67048
-      const linuxArm64 =
-        !target &&
-        (yield* HostProcess.Platform) === "linux" &&
-        (yield* HostProcess.Architecture) === "arm64";
+      const linuxArm64 = !target && hostPlatform === "linux" && hostArch === "arm64";
       const spawnCommand = yield* resolveSpawnCommand("vp", ["pack"]);
       const cliAssetDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cli-asset-" });
       const pack = (packMode: "bundle" | "bootstrap" | "1") =>
@@ -134,7 +201,7 @@ const buildExeCmd = Command.make(
           ChildProcess.make(spawnCommand.command, spawnCommand.args, {
             cwd: serverDir,
             env: {
-              ...process.env,
+              ...env,
               T3CODE_PACK_EXE: packMode,
               T3CODE_CLI_ASSET_DIR: cliAssetDir,
               T3CODE_PACK_EXE_TARGET: target ?? "",

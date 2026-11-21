@@ -98,10 +98,11 @@ const smokeCliArchive = Effect.fn("smokeCliArchive")(function* (input: {
   const contentDir = path.join(scratch, root);
   const executable = path.join(contentDir, platform === "win32" ? "t3.exe" : "t3");
   const bundledLibatomic = path.join(contentDir, "lib/libatomic.so.1");
+  const hasBundledLibatomic = platform === "linux" && (yield* fs.exists(bundledLibatomic));
   for (const required of [
     executable,
     path.join(contentDir, "client/index.html"),
-    ...(platform === "linux" ? [bundledLibatomic, `${bundledLibatomic}.LICENSE`] : []),
+    ...(hasBundledLibatomic ? [`${bundledLibatomic}.LICENSE`] : []),
   ]) {
     if (!(yield* fs.exists(required))) {
       return yield* new CliArchiveSmokeError({
@@ -112,7 +113,7 @@ const smokeCliArchive = Effect.fn("smokeCliArchive")(function* (input: {
   }
 
   // The runner has libatomic installed; fresh Ubuntu servers do not.
-  if (platform === "linux") {
+  if (hasBundledLibatomic) {
     const ldd = yield* spawner.string(ChildProcess.make("ldd", [executable]));
     // Older glibc prints the path as given, newer prints it resolved; compare both resolved.
     const loaded = /libatomic\.so\.1 => (\/.*) \(0x[0-9a-f]+\)/.exec(ldd)?.[1];

@@ -1,0 +1,10 @@
+//! Integration and property test suite for `t3-web-ui`.
+
+#[path = "web_ui_tests/client_and_stream.rs"]
+mod client_and_stream;
+#[path = "web_ui_tests/surfaces_and_panels.rs"]
+mod surfaces_and_panels;
+#[path = "web_ui_tests/workflow_e2e.rs"]
+mod workflow_e2e;
+#[path = "web_ui_tests/xss_and_props.rs"]
+mod xss_and_props;

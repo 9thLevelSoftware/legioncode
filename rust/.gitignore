@@ -1,0 +1,10 @@
+/target/
+/dist/
+/pgo-data/
+/fingerprints.json
+/known-diffs.jsonl
+/migration_infographic.html
+/HANDOFF.md
+/MAP.md
+/GLOSSARY.md
+/DECISIONS.md

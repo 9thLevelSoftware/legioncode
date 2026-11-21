@@ -1,0 +1,29 @@
+[package]
+name = "t3-desktop-shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "t3-desktop"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+hex = { workspace = true }
+http = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+t3-contracts = { path = "../t3-contracts" }
+t3-edge = { path = "../t3-edge" }
+t3-persistence = { path = "../t3-persistence" }
+t3-process-ffi = { path = "../t3-process-ffi" }
+t3-shared = { path = "../t3-shared" }
+t3-surfaces = { path = "../t3-surfaces" }
+tao = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+wry = { workspace = true }

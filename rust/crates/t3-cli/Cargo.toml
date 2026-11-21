@@ -1,0 +1,46 @@
+[package]
+name = "t3-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "t3"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+clap.workspace = true
+futures-util.workspace = true
+http.workspace = true
+reqwest.workspace = true
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+t3-client-core = { path = "../t3-client-core" }
+t3-contracts = { path = "../t3-contracts" }
+t3-edge = { path = "../t3-edge" }
+t3-orchestrator = { path = "../t3-orchestrator" }
+t3-persistence = { path = "../t3-persistence" }
+t3-process-ffi = { path = "../t3-process-ffi" }
+t3-protocol = { path = "../t3-protocol" }
+t3-providers = { path = "../t3-providers" }
+t3-remote = { path = "../t3-remote" }
+t3-scm = { path = "../t3-scm" }
+t3-server-runtime = { path = "../t3-server-runtime" }
+t3-shared = { path = "../t3-shared" }
+t3-speech = { path = "../t3-speech" }
+t3-surfaces = { path = "../t3-surfaces" }
+t3-terminal-vt = { path = "../t3-terminal-vt" }
+thiserror.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+t3-desktop-shell = { path = "../t3-desktop-shell" }
+tempfile.workspace = true

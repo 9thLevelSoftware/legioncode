@@ -11,6 +11,7 @@ const TEST_EXCLUDE = [
   "**/dist/**",
   "**/dist-electron/**",
   "**/.{idea,git,cache,output,temp}/**",
+  "rust/**",
 ];
 
 // Directories whose tests belong to a package's own test config. desktop also
@@ -180,6 +181,7 @@ export default defineConfig({
   fmt: {
     ignorePatterns: [
       ".repos/**",
+      "rust/**",
       "infra/task-cache/vendor/**",
       // Macroscope requires one glob per line; Markdown formatting corrupts it.
       ".macroscope/ignore.md",
@@ -216,6 +218,7 @@ export default defineConfig({
     ignorePatterns: [
       ".repos",
       ".repos/**",
+      "rust/**",
       "infra/task-cache/vendor/**",
       "dist",
       "dist-electron",

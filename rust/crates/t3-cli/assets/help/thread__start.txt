@@ -1,0 +1,27 @@
+DESCRIPTION
+  Start a thread in a project and print its id.
+
+USAGE
+  t3 thread start [flags] <project> <message>
+
+ARGUMENTS
+  project string    Project id or a path inside the project, such as .
+  message string    Message for the agent, or - to read it from stdin.
+
+FLAGS
+  --base-dir string    Explicit T3 Code data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME).
+  --title string       Thread title. Defaults to the message's first line.
+  --provider string    Provider instance id. Pass with --model.
+  --model string       Model slug. Defaults to the project's default model.
+  --option string      Model option as id=value, such as effort=high. Repeat for more. Needs --provider and --model.
+  --worktree string    Run in a new git worktree based on this branch, tag, or commit, instead of the project folder.
+  --branch string      Branch name for the new worktree.
+  --wait               Wait for the agent to finish and print its reply. Exits 1 if the run fails and 2 if it waits for an answer.
+  --json               Print JSON instead of text.
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)

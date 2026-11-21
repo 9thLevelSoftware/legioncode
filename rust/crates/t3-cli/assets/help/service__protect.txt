@@ -1,0 +1,17 @@
+DESCRIPTION
+  Protect the T3 Code server from agents under memory pressure (Linux with systemd). Asks for sudo.
+
+USAGE
+  t3 service protect [flags]
+
+FLAGS
+  --base-dir string    Explicit T3 Code data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME).
+  --undo               Remove the protection this command set up.
+  --yes                Answer yes to every question, including SSH and Tailscale.
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)

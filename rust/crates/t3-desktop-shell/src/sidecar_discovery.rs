@@ -248,20 +248,30 @@ fn default_t3_home() -> PathBuf {
     let home = env::var_os("USERPROFILE")
         .or_else(|| env::var_os("HOME"))
         .map_or_else(|| PathBuf::from("."), PathBuf::from);
-    home.join(".t3")
+    home.join(t3_contracts::brand::ACTIVE_BRAND.home_dir_name)
 }
 
 fn default_sidecar_filename() -> &'static str {
-    if cfg!(windows) { "t3.exe" } else { "t3" }
+    let bin = t3_contracts::brand::ACTIVE_BRAND.cli_bin_name;
+    if cfg!(windows) {
+        if bin == "legion" {
+            "legion.exe"
+        } else {
+            "t3.exe"
+        }
+    } else {
+        bin
+    }
 }
 
 fn sidecar_binary_names() -> Vec<String> {
+    let bin = t3_contracts::brand::ACTIVE_BRAND.cli_bin_name;
     let mut names = vec![default_sidecar_filename().to_owned()];
     if let Some(triple) = current_target_triple() {
         let suffixed = if cfg!(windows) {
-            format!("t3-{triple}.exe")
+            format!("{bin}-{triple}.exe")
         } else {
-            format!("t3-{triple}")
+            format!("{bin}-{triple}")
         };
         names.push(suffixed);
     }
@@ -269,8 +279,24 @@ fn sidecar_binary_names() -> Vec<String> {
 }
 
 fn path_binary_names() -> &'static [&'static str] {
+    let bin = t3_contracts::brand::ACTIVE_BRAND.cli_bin_name;
     if cfg!(windows) {
-        &["t3.exe", "t3.cmd", "t3.bat", "t3"]
+        if bin == "legion" {
+            &[
+                "legion.exe",
+                "legion.cmd",
+                "legion.bat",
+                "legion",
+                "t3.exe",
+                "t3.cmd",
+                "t3.bat",
+                "t3",
+            ]
+        } else {
+            &["t3.exe", "t3.cmd", "t3.bat", "t3"]
+        }
+    } else if bin == "legion" {
+        &["legion", "t3"]
     } else {
         &["t3"]
     }

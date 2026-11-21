@@ -15,6 +15,9 @@ use crate::error::ServerRuntimeError;
 pub use crate::preview_browser_diag::{
     PreviewLaunchDiagnostic, diagnose_browser_launch_failure, discover_browser_executable,
 };
+use crate::preview_browser_resize::{
+    PreviewResizeState, execute_resize, notify_cdp_metrics_optional,
+};
 use crate::preview_cdp::{CdpConnection, CdpKeyEventParams, CdpMouseEventParams};
 
 /// Action dispatched against [`PreviewBrowserRuntime`] or `/api/preview/action`.
@@ -81,6 +84,24 @@ pub enum PreviewAction {
     },
     /// Close active CDP connection and kill any spawned browser child tree.
     Close,
+    /// Desktop browser pane resize with frame-draw confirmation tracking (`#40081`).
+    #[serde(rename_all = "camelCase")]
+    Resize {
+        /// Resize mode: `"fill"` or `"freeform"`.
+        mode: String,
+        /// Target width when `mode` is `"freeform"`.
+        #[serde(default)]
+        width: Option<u32>,
+        /// Target height when `mode` is `"freeform"`.
+        #[serde(default)]
+        height: Option<u32>,
+        /// Optional pre-known painted viewport returned synchronously (or `None` to await CDP / fail undrawn).
+        #[serde(default)]
+        measured_viewport: Option<(u32, u32)>,
+        /// Optional draw-confirmation timeout override in milliseconds.
+        #[serde(default)]
+        timeout_ms: Option<u64>,
+    },
 }
 
 const fn default_scale() -> f64 {
@@ -103,6 +124,7 @@ impl Drop for BrowserChild {
 #[derive(Clone, Default)]
 pub struct PreviewBrowserRuntime {
     inner: Arc<TokioMutex<PreviewInner>>,
+    resize_state: Arc<TokioMutex<PreviewResizeState>>,
 }
 
 #[derive(Default)]
@@ -116,6 +138,25 @@ impl PreviewBrowserRuntime {
     /// Construct an idle [`PreviewBrowserRuntime`].
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Configure the frame-draw confirmation timeout used by [`PreviewAction::Resize`].
+    pub async fn set_resize_timeout_ms(&self, timeout_ms: u64) {
+        let mut guard = self.resize_state.lock().await;
+        guard.resize_timeout_ms = Some(timeout_ms);
+    }
+
+    /// Seed the currently drawn viewport (useful for tests or desktop paint callbacks).
+    pub async fn set_drawn_viewport(&self, width: u32, height: u32) {
+        let mut guard = self.resize_state.lock().await;
+        guard.current_viewport = Some((width, height));
+        guard.desktop_resize_undrawn = false;
+    }
+
+    /// Returns whether the most recent fixed resize failed undrawn (`#40081`).
+    pub async fn is_desktop_resize_undrawn(&self) -> bool {
+        let guard = self.resize_state.lock().await;
+        guard.desktop_resize_undrawn
     }
 
     /// Connect to an explicit `ws://` CDP WebSocket URL (closing any previous session).
@@ -152,24 +193,33 @@ impl PreviewBrowserRuntime {
         Ok(ws_url)
     }
 
+    async fn execute_connect(
+        &self,
+        ws_url: Option<String>,
+        target_url: Option<String>,
+    ) -> Result<Value, ServerRuntimeError> {
+        if let Some(url) = ws_url {
+            self.connect_ws(&url).await?;
+        } else {
+            let _ = self.launch_local(None).await?;
+        }
+        if let Some(t_url) = target_url {
+            let mut guard = self.inner.lock().await;
+            let cdp = guard
+                .cdp
+                .as_mut()
+                .ok_or_else(|| ServerRuntimeError::Conflict("no active CDP session".to_owned()))?;
+            let target_id = cdp.create_target(&t_url).await?;
+            return Ok(json!({ "connected": true, "targetId": target_id }));
+        }
+        Ok(json!({ "connected": true }))
+    }
+
     /// Execute one [`PreviewAction`] against the active CDP connection.
     pub async fn execute_action(&self, action: PreviewAction) -> Result<Value, ServerRuntimeError> {
         match action {
             PreviewAction::Connect { ws_url, target_url } => {
-                if let Some(url) = ws_url {
-                    self.connect_ws(&url).await?;
-                } else {
-                    let _ = self.launch_local(None).await?;
-                }
-                if let Some(t_url) = target_url {
-                    let mut guard = self.inner.lock().await;
-                    let cdp = guard.cdp.as_mut().ok_or_else(|| {
-                        ServerRuntimeError::Conflict("no active CDP session".to_owned())
-                    })?;
-                    let target_id = cdp.create_target(&t_url).await?;
-                    return Ok(json!({ "connected": true, "targetId": target_id }));
-                }
-                Ok(json!({ "connected": true }))
+                self.execute_connect(ws_url, target_url).await
             }
             PreviewAction::CreateTarget { url } => {
                 let mut guard = self.inner.lock().await;
@@ -222,12 +272,37 @@ impl PreviewBrowserRuntime {
                 device_scale_factor,
                 mobile,
             } => {
-                let mut guard = self.inner.lock().await;
-                let cdp = guard.cdp.as_mut().ok_or_else(|| {
-                    ServerRuntimeError::Conflict("no active CDP session".to_owned())
-                })?;
-                cdp.set_device_metrics(width, height, device_scale_factor, mobile)
-                    .await
+                let res = {
+                    let mut guard = self.inner.lock().await;
+                    let cdp = guard.cdp.as_mut().ok_or_else(|| {
+                        ServerRuntimeError::Conflict("no active CDP session".to_owned())
+                    })?;
+                    cdp.set_device_metrics(width, height, device_scale_factor, mobile)
+                        .await?
+                };
+                self.set_drawn_viewport(width, height).await;
+                Ok(res)
+            }
+            PreviewAction::Resize {
+                mode,
+                width,
+                height,
+                measured_viewport,
+                timeout_ms,
+            } => {
+                execute_resize(
+                    &self.resize_state,
+                    |w, h| async move {
+                        let mut guard = self.inner.lock().await;
+                        notify_cdp_metrics_optional(guard.cdp.as_mut(), w, h).await
+                    },
+                    &mode,
+                    width,
+                    height,
+                    measured_viewport,
+                    timeout_ms,
+                )
+                .await
             }
             PreviewAction::Close => {
                 self.close().await;

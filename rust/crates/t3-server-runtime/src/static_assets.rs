@@ -20,7 +20,8 @@ use axum::response::Response;
 use crate::static_assets_http::{
     HTML_CSP, ParsedByteRange, SVG_CSP, build_weak_etag, content_type_for_path,
     decode_and_validate_url_path, format_http_date_unix_secs, if_none_match_matches,
-    load_manifest_assets, parse_byte_range, system_time_unix_secs,
+    is_workspace_preview_entry_path, load_manifest_assets, parse_byte_range,
+    resolve_previewable_workspace_asset, system_time_unix_secs,
 };
 
 #[derive(Clone)]
@@ -82,10 +83,18 @@ async fn handle_static_asset(
     }
 
     let candidate = resolve_candidate_path(&canonical_root, &normalized);
+    let is_symlink =
+        std::fs::symlink_metadata(&candidate).is_ok_and(|meta| meta.file_type().is_symlink());
     match std::fs::canonicalize(&candidate) {
         Ok(canonical_file) => {
             if !canonical_file.starts_with(&canonical_root) {
                 return text_response(StatusCode::BAD_REQUEST, "Invalid static file path");
+            }
+            if is_symlink
+                && !canonical_file.is_dir()
+                && !is_workspace_preview_entry_path(&canonical_file)
+            {
+                return text_response(StatusCode::FORBIDDEN, "Symlink target is not previewable");
             }
             if canonical_file.is_dir() {
                 return serve_spa_index(&canonical_root, method == Method::HEAD);
@@ -288,4 +297,66 @@ fn text_response_with_header(
     let mut resp = text_response(status, body);
     insert_hdr(resp.headers_mut(), name, value);
     resp
+}
+
+/// Validates and serves a workspace asset path (following symlinks) returning `403` when missing,
+/// outside `allowed_roots`, or pointing to a non-previewable entry type (`#39491`).
+pub fn serve_workspace_asset_file(
+    candidate: &Path,
+    allowed_roots: &[PathBuf],
+    is_head: bool,
+    req_headers: &HeaderMap,
+) -> Response {
+    let Some(canonical_target) = resolve_previewable_workspace_asset(candidate, allowed_roots)
+    else {
+        return text_response(
+            StatusCode::FORBIDDEN,
+            "Workspace asset target is missing, outside allowed roots, or not previewable",
+        );
+    };
+    let rel = canonical_target
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default();
+    serve_static_file(
+        &canonical_target,
+        rel,
+        &HashSet::new(),
+        is_head,
+        req_headers,
+    )
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WorkspaceAssetQuery {
+    pub path: Option<String>,
+}
+
+/// `GET /api/assets/workspace?path=...` — validates canonical target inside `allowed_workspace_roots`
+/// and checks [`is_workspace_preview_entry_path`] (`#39491`).
+pub(crate) async fn handle_workspace_asset(
+    State(state): State<Arc<crate::http_api::RuntimeHttpState>>,
+    headers: HeaderMap,
+    method: Method,
+    axum::extract::Query(query): axum::extract::Query<WorkspaceAssetQuery>,
+) -> Result<Response, crate::error::ServerRuntimeError> {
+    let _principal = crate::http_auth_guard::authorize_request(
+        &state,
+        &headers,
+        &[t3_contracts::permissions::EnvironmentScope::FilesystemRead],
+        false,
+    )?;
+    let Some(raw_path) = query.path.filter(|s| !s.trim().is_empty()) else {
+        return Err(crate::error::ServerRuntimeError::BadRequest(
+            "path query parameter is required".to_owned(),
+        ));
+    };
+    let candidate = PathBuf::from(&raw_path);
+    Ok(serve_workspace_asset_file(
+        &candidate,
+        &state.allowed_workspace_roots,
+        method == Method::HEAD,
+        &headers,
+    ))
 }

@@ -138,6 +138,8 @@ fn build_checkpoint_events(
             ordinal_within_parent: 1,
             advances_app_run_count: true,
             cwd: ".".to_owned(),
+            label: None,
+            repository_path: None,
             created_at: info.now_iso.to_owned(),
         };
         events.push(wrap_system_event(

@@ -21,6 +21,9 @@ use crate::http_auth_guard::{authorize_request, parse_authorized_json};
 use crate::http_projects_models::{
     HttpProject, HttpProjectSnapshot, ProjectMutateRequest, apply_extra_fields,
 };
+use crate::http_projects_read::{
+    apply_saved_project_settings, apply_saved_project_settings_snapshot,
+};
 use crate::outbox_state::utc_now_iso;
 use t3_contracts::permissions::EnvironmentScope;
 
@@ -40,7 +43,7 @@ pub(crate) async fn handle_get_projects(
         .lock()
         .map_err(|_| ServerRuntimeError::Persistence("db mutex poisoned".to_owned()))?;
     ensure_project_store_schema(&conn)?;
-    let snapshot = build_snapshot(&conn)?;
+    let snapshot = apply_saved_project_settings_snapshot(&state, build_snapshot(&conn)?);
     Ok((StatusCode::OK, Json(snapshot)).into_response())
 }
 
@@ -97,7 +100,8 @@ pub(crate) async fn handle_mutate_project(
         }
     };
 
-    let snapshot = build_snapshot(&conn)?;
+    let project = project.map(|p| apply_saved_project_settings(&state, p));
+    let snapshot = apply_saved_project_settings_snapshot(&state, build_snapshot(&conn)?);
     Ok((
         StatusCode::OK,
         Json(json!({

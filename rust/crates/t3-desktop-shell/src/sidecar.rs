@@ -79,8 +79,26 @@ impl SidecarController {
         for key in DESKTOP_BACKEND_STRIPPED_ENV_KEYS {
             sanitized.remove(key);
         }
+        for suffix in [
+            "PORT",
+            "MODE",
+            "NO_BROWSER",
+            "HOST",
+            "DESKTOP_WS_URL",
+            "DESKTOP_LAN_HOST",
+            "DESKTOP_HTTPS_ENDPOINTS",
+            "TAILSCALE_SERVE",
+            "TAILSCALE_SERVE_PORT",
+        ] {
+            for candidate in t3_contracts::brand::ACTIVE_BRAND.env_var_candidates(suffix) {
+                sanitized.remove(&candidate);
+            }
+        }
         sanitized.set(
-            "T3CODE_HOME",
+            format!(
+                "{}HOME",
+                t3_contracts::brand::ACTIVE_BRAND.primary_env_prefix
+            ),
             self.config.base_dir.to_string_lossy().into_owned(),
         );
         for (key, value) in &self.config.extra_env {
@@ -120,7 +138,7 @@ impl SidecarController {
     /// Discovers the `t3` sidecar executable from explicit config, Tauri `binaries/`, sibling
     /// binaries, `T3CODE_CLI_PATH`, or `PATH`.
     pub fn discover_runtime(&self) -> SidecarRuntimeDiscovery {
-        let cli_path = env::var("T3CODE_CLI_PATH").ok();
+        let cli_path = t3_contracts::brand::ACTIVE_BRAND.read_env("CLI_PATH");
         let path_env = env::var("PATH").ok();
         let current_exe = env::current_exe().ok();
         self.discover_runtime_with_inputs(

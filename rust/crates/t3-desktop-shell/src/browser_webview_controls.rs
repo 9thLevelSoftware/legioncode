@@ -88,7 +88,7 @@ pub enum FocusedWebviewShortcutAction {
 
 /// Evaluates a keyboard chord received while a browser guest webview has focus (`#39769`).
 ///
-/// Returns [`Some(FocusedWebviewShortcutAction::RightPanelNewTab)`] when `Cmd+T` (macOS) or
+/// Returns `Some(`[`FocusedWebviewShortcutAction::RightPanelNewTab`]`)` when `Cmd+T` (macOS) or
 /// `Ctrl+T` (Windows/Linux) is pressed with no extra modifiers so the desktop forwards
 /// `"rightPanel.new"` instead of letting the guest swallow it.
 pub fn match_focused_browser_webview_shortcut(

@@ -297,10 +297,10 @@ describe("DesktopLinuxUrlHandler", () => {
 
     return Effect.gen(function* () {
       yield* runRegister(recorded, {
-        environment: { desktopLauncherPath: Option.some("/opt/LegionCode/legioncode") },
+        environment: { desktopLauncherPath: Option.some("/opt/LegionCode App/legioncode") },
       });
 
-      assert.include(recorded.files[0]?.content, 'Exec="/opt/LegionCode/legioncode" %U');
+      assert.include(recorded.files[0]?.content, 'Exec="/opt/LegionCode App/legioncode" %U');
     });
   });
 

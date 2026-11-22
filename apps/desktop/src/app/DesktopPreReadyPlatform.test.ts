@@ -243,7 +243,7 @@ describe("DesktopPreReadyPlatform", () => {
               DesktopConfig.layerTest({
                 XDG_DATA_HOME: "/xdg",
                 APPIMAGE: "/Applications/current.AppImage",
-                LEGIONCODE_DESKTOP_LAUNCHER_PATH: " /opt/LegionCode/legioncode ",
+                LEGIONCODE_DESKTOP_LAUNCHER_PATH: " /opt/LegionCode App/legioncode ",
               }),
             ),
           ),
@@ -251,7 +251,7 @@ describe("DesktopPreReadyPlatform", () => {
         const entry = writeFileSyncMock.mock.calls.find(
           ([path]) => path === "/xdg/applications/dev.legioncode.LegionCode.desktop",
         )?.[1];
-        assert.include(entry, 'Exec="/opt/LegionCode/legioncode" %U');
+        assert.include(entry, 'Exec="/opt/LegionCode App/legioncode" %U');
       }),
     ).pipe(Effect.ensuring(Effect.sync(() => vi.unstubAllEnvs())));
   });

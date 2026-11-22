@@ -275,7 +275,7 @@ describe("resolveLiveThreadBranchUpdate", () => {
   it("does not regress a semantic thread ref back to a temporary worktree ref", () => {
     const update = resolveLiveThreadBranchUpdate({
       threadBranch: "legioncode/github-query-rate-limit",
-      gitStatus: status({ refName: "legioncode/bda76797" }),
+      gitStatus: status({ refName: "legion/bda76797" }),
     });
 
     assert.equal(update, null);

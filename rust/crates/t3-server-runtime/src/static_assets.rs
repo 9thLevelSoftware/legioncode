@@ -33,10 +33,7 @@ struct StaticAssetState {
 /// Build an Axum fallback [`Router`] serving built static web assets with SPA fallback,
 /// `ETag`/`304`, HTTP byte `Range`/`206`/`416`, traversal rejection (`400`), and frame/CSP headers.
 pub fn static_assets_router(static_dir: Option<PathBuf>) -> Router {
-    let manifest_assets = static_dir
-        .as_deref()
-        .map(load_manifest_assets)
-        .unwrap_or_default();
+    let manifest_assets = static_dir.as_deref().map_or_default(load_manifest_assets);
     let state = Arc::new(StaticAssetState {
         static_dir,
         manifest_assets,
@@ -102,8 +99,7 @@ async fn handle_static_asset(
             let rel = canonical_file
                 .strip_prefix(&canonical_root)
                 .ok()
-                .map(|p| p.to_string_lossy().replace('\\', "/"))
-                .unwrap_or_default();
+                .map_or_default(|p| p.to_string_lossy().replace('\\', "/"));
             if rel == "index.html" {
                 return serve_spa_index(&canonical_root, method == Method::HEAD);
             }

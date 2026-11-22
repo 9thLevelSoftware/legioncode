@@ -193,6 +193,7 @@ pub fn init_sample_git_repo(dir: &Path) -> TestResult {
     run(&["init"])?;
     run(&["config", "user.name", "Test"])?;
     run(&["config", "user.email", "test@example.com"])?;
+    run(&["config", "core.autocrlf", "false"])?;
     run(&[
         "remote",
         "add",

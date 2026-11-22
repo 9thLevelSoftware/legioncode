@@ -96,6 +96,15 @@ fn build_event_loop(config: &DesktopLaunchConfig) -> EventLoop<DesktopUserEvent>
         use tao::platform::unix::EventLoopBuilderExtUnix;
         builder.with_any_thread(config.allow_any_thread);
     }
+    #[cfg(not(any(
+        target_os = "windows",
+        target_os = "linux",
+        target_os = "dragonfly",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd"
+    )))]
+    let _ = config;
     builder.build()
 }
 

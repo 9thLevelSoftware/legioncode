@@ -109,8 +109,7 @@ pub fn normalize_otlp_payload(payload: &Value) -> Result<Vec<String>, ServerRunt
         let resource_attrs = resource_span
             .get("resource")
             .and_then(|r| r.get("attributes"))
-            .map(flatten_attributes)
-            .unwrap_or_default();
+            .map_or_default(flatten_attributes);
         let Some(scope_spans) = resource_span.get("scopeSpans").and_then(Value::as_array) else {
             continue;
         };

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-repo='pingdotgg/t3code'
+repo="${GITHUB_REPOSITORY:-9thLevelSoftware/legioncode}"
 tag="${RELEASE_TAG:?RELEASE_TAG is required}"
 pkgrel="${PKGREL:-1}"
 
@@ -55,6 +55,7 @@ sed -Ei \
   -e "s/^pkgver=.*/pkgver=$pkgver/" \
   -e "s/^pkgrel=.*/pkgrel=$pkgrel/" \
   -e "/# upstream license$/s/'[0-9a-f]{64}'/'$license_sha256'/" \
+  -e "s|9thLevelSoftware/legioncode|$repo|g" \
   PKGBUILD
 
 for architecture in x86_64 aarch64; do

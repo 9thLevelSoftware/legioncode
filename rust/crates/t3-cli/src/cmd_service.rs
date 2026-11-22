@@ -335,8 +335,6 @@ fn run_uninstall(raw_base_dir: Option<&str>) -> i32 {
 }
 
 fn host_cmd_with_base_dir(subcommand: &str, raw_base_dir: Option<&str>) -> String {
-    let extra = raw_base_dir
-        .map(|d| vec!["--base-dir".to_owned(), d.to_owned()])
-        .unwrap_or_default();
+    let extra = raw_base_dir.map_or_default(|d| vec!["--base-dir".to_owned(), d.to_owned()]);
     resolve_host_cli_command(subcommand, &extra)
 }

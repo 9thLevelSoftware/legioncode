@@ -186,7 +186,7 @@ fn xlsx_cell_populated(cell: &XmlNode, populated_strings: &[bool]) -> bool {
     let value = first_matching(cell, "v");
     let cell_type = cell.attrs.get("t").map(String::as_str);
     if cell_type == Some("s") {
-        let idx_str = value.map(XmlNode::text_only_children).unwrap_or_default();
+        let idx_str = value.map_or_default(XmlNode::text_only_children);
         return idx_str
             .trim()
             .parse::<usize>()
@@ -214,7 +214,7 @@ fn emit_xlsx_cell(
     parts: &mut Vec<TextPart>,
 ) -> Result<(), DocInternalErr> {
     let value = first_matching(cell, "v");
-    let raw = value.map(XmlNode::text_only_children).unwrap_or_default();
+    let raw = value.map_or_default(XmlNode::text_only_children);
     let cell_type = cell.attrs.get("t").map(String::as_str);
 
     match cell_type {

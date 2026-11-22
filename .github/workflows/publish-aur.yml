@@ -14,7 +14,7 @@ on:
         type: string
     secrets:
       AUR_SSH_PRIVATE_KEY:
-        required: true
+        required: false
   workflow_dispatch:
     inputs:
       release_tag:
@@ -37,8 +37,7 @@ concurrency:
 jobs:
   publish:
     name: Validate and publish
-    if: github.repository == 'pingdotgg/t3code'
-    runs-on: blacksmith-8vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     container:
       image: archlinux:base-devel
@@ -60,6 +59,7 @@ jobs:
       - name: Validate and publish package sources
         env:
           GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.release_tag }}
           PKGREL: ${{ inputs.pkgrel || '1' }}
           AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}

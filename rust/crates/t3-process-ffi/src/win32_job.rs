@@ -359,6 +359,10 @@ mod imp {
             0
         }
     }
+
+    impl Drop for JobHandle {
+        fn drop(&mut self) {}
+    }
 }
 
 pub use imp::JobHandle;

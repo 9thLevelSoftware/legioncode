@@ -128,7 +128,7 @@ jobs:
       # git data. Do not add dependency installs, build/test scripts, or cache
       # actions here; use pull_request plus workflow_run for that pattern instead.
       - name: Checkout base repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
       - name: Sync PR size label
@@ -150,6 +150,9 @@ jobs:
               ":(glob,exclude)**/__tests__/**",
               ":(glob,exclude)**/test/**",
               ":(glob,exclude)**/tests/**",
+              ":(glob,exclude)rust/crates/*/tests/**",
+              ":(glob,exclude)**/*_tests.rs",
+              ":(glob,exclude)**/tests.rs",
               ":(glob,exclude)apps/server/integration/**",
               ":(glob,exclude)**/*.test.*",
               ":(glob,exclude)**/*.spec.*",

@@ -12,20 +12,15 @@
       "entry": [
         // CodeRabbit loads its configuration by filename.
         ".coderabbit.config.ts",
-        ".github/scripts/thread-transfer-report.cjs",
-        ".github/scripts/pr-limits.cjs",
       ],
       "vite": { "entry": [".github/**/*.test.cjs"] },
       "vitest": { "entry": [".github/**/*.test.cjs"] },
     },
     "scripts": {
       // Knip loads its preprocessor through a CLI option; native verification and
-      // worktree setup (from t3.json) run directly. release-desktop.yml bundles the
-      // Windows verify script with esbuild through a path knip does not trace,
-      // electron-builder loads the macOS signer and the Linux afterPack hook by path, and mobile-e2e.ts runs
+      // worktree setup (from t3.json) run directly. electron-builder loads the
+      // macOS signer and the Linux afterPack hook by path, mobile-e2e.ts runs
       // agent-device's CLI by path, and mobile-behavior.ts spawns its runner by path.
-      // release-desktop.yml runs the desktop launch check through xvfb-run, which knip
-      // does not trace.
       "entry": [
         // These fixture scripts are injected into a browser page by path.
         "fixtures/*/*.js",
@@ -100,9 +95,13 @@
       "ignoreDependencies": ["playwright-core", "electron-builder"],
     },
     "apps/web": {
-      // Worktree setup (scripts/setup-worktree.ts) runs this directly, and evidence
-      // fixtures run under node.
-      "entry": ["scripts/warm-dep-cache.ts", "test/fixtures/**/*.mjs"],
+      // Worktree setup (scripts/setup-worktree.ts) runs warm-dep-cache directly,
+      // evidence fixtures run under node, and verify-built-boot checks built bundles.
+      "entry": [
+        "scripts/verify-built-boot.ts",
+        "scripts/warm-dep-cache.ts",
+        "test/fixtures/**/*.mjs",
+      ],
       // UI component modules are copied and adapted as cohesive sets. Keep their
       // named subcomponents even before they have callers; the file audit still
       // reports an entire component module when nothing imports it.

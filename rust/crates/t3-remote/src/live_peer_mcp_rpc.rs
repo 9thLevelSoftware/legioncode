@@ -147,14 +147,13 @@ fn collect_result_text(result: &Value) -> String {
     result
         .get("content")
         .and_then(Value::as_array)
-        .map(|parts| {
+        .map_or_default(|parts| {
             parts
                 .iter()
                 .filter_map(|part| part.get("text").and_then(Value::as_str))
                 .collect::<Vec<_>>()
                 .join("")
         })
-        .unwrap_or_default()
 }
 
 pub(super) fn build_mcp_request_headers(

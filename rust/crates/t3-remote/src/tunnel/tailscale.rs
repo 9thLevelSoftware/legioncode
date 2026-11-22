@@ -130,14 +130,13 @@ pub fn parse_tailscale_status(raw_status_json: &str) -> Result<TailscaleStatus, 
         .as_ref()
         .and_then(|s| s.tailscale_ips.as_ref())
         .and_then(Value::as_array)
-        .map(|ips| {
+        .map_or_default(|ips| {
             ips.iter()
                 .filter_map(Value::as_str)
                 .filter(|ip| is_tailscale_ipv4_address(ip))
                 .map(str::to_owned)
                 .collect()
-        })
-        .unwrap_or_default();
+        });
     let https_serve_enabled = parsed
         .self_node
         .as_ref()

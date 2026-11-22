@@ -27,10 +27,11 @@ fn version_flags_print_exact_version_and_match_node() -> TestResult {
         assert_eq!(String::from_utf8(out.stdout)?, expected_version);
     }
 
-    let node_out = Command::new("node")
-        .args(["d:/t3code/apps/server/src/bin.ts", "--version"])
-        .output()?;
-    if node_out.status.success() {
+    if let Ok(node_out) = Command::new("node")
+        .args([t3_cli::fallback::LEGACY_BIN_TS, "--version"])
+        .output()
+        && node_out.status.success()
+    {
         let rust_out = run_t3(&["--version"], &env)?;
         let rust_s = String::from_utf8(rust_out.stdout)?;
         let node_s = String::from_utf8(node_out.stdout)?;
@@ -198,16 +199,17 @@ fn policy_check_matches_node_trailing_double_newline_and_rejects_bad_files() -> 
     assert!(stdout.contains("Support: https://acme.example/help"));
     assert!(stdout.contains("  telemetry.enabled = false (locked)"));
 
-    // Verify byte-for-byte parity with Node CLI on the same file.
-    let node_out = Command::new("node")
+    // Verify byte-for-byte parity with Node CLI on the same file when node deps are installed.
+    if let Ok(node_out) = Command::new("node")
         .args([
-            "d:/t3code/apps/server/src/bin.ts",
+            t3_cli::fallback::LEGACY_BIN_TS,
             "policy",
             "check",
             &policy_arg,
         ])
-        .output()?;
-    if node_out.status.success() {
+        .output()
+        && node_out.status.success()
+    {
         assert_eq!(stdout, String::from_utf8(node_out.stdout)?);
     }
 

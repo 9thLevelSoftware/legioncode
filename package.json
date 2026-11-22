@@ -28,6 +28,8 @@
     "build:desktop:bundle": "vp run --filter @t3tools/desktop build:bundle",
     "build:resource-monitor": "cargo build --locked --release --manifest-path native/resource-monitor/Cargo.toml",
     "build:rust": "cargo build --locked --release --manifest-path rust/Cargo.toml",
+    "build:rust:dist": "node rust/scripts/build-dist.mjs",
+    "check:rust": "node rust/scripts/check-rust-gates.mjs",
     "typecheck": "vp run -r --cache --concurrency-limit 4 typecheck",
     "tc": "vp run -r --cache --concurrency-limit 4 typecheck",
     "check:changed": "node scripts/check-changed.ts",

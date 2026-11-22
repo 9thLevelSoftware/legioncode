@@ -18,7 +18,14 @@ pub fn is_process_alive(pid: i64) -> bool {
 
 #[cfg(unix)]
 fn is_other_process_alive(pid: i64) -> bool {
-    let Ok(output) = Command::new("kill").args(["-0", &pid.to_string()]).output() else {
+    if std::path::Path::new(&format!("/proc/{pid}")).exists() {
+        return true;
+    }
+    let pid_arg = pid.to_string();
+    let output = ["kill", "/bin/kill", "/usr/bin/kill"]
+        .into_iter()
+        .find_map(|bin| Command::new(bin).args(["-0", &pid_arg]).output().ok());
+    let Some(output) = output else {
         return false;
     };
     if output.status.success() {
@@ -82,14 +89,21 @@ fn probe_process_start_ms(pid: i64) -> Option<i64> {
             .ok()?
     };
     #[cfg(unix)]
-    let mut child = Command::new("ps")
-        .args(["-p", &pid.to_string(), "-o", "lstart="])
-        .env("LC_ALL", "C")
-        .env("TZ", "UTC")
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .ok()?;
+    let mut child = {
+        let pid_arg = pid.to_string();
+        ["ps", "/bin/ps", "/usr/bin/ps"]
+            .into_iter()
+            .find_map(|bin| {
+                Command::new(bin)
+                    .args(["-p", &pid_arg, "-o", "lstart="])
+                    .env("LC_ALL", "C")
+                    .env("TZ", "UTC")
+                    .stdout(std::process::Stdio::piped())
+                    .stderr(std::process::Stdio::null())
+                    .spawn()
+                    .ok()
+            })?
+    };
 
     let deadline = std::time::Instant::now() + Duration::from_secs(2);
     loop {

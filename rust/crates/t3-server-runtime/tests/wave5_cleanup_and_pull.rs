@@ -32,13 +32,20 @@ fn setup_cloned_upstream_fixture(dir: &Path) -> Result<PathBuf, Box<dyn std::err
     let work_s = work.to_string_lossy().into_owned();
 
     run_git_ok(None, &["init", "--bare", &remote_s])?;
-    run_git_ok(None, &["clone", &remote_s, &seed_s])?;
+    run_git_ok(
+        None,
+        &["-c", "core.autocrlf=false", "clone", &remote_s, &seed_s],
+    )?;
     run_git_cfg(&seed)?;
     std::fs::write(seed.join("README.md"), "v1\n")?;
     run_git_ok(Some(&seed), &["add", "."])?;
     run_git_ok(Some(&seed), &["commit", "-m", "v1"])?;
     run_git_ok(Some(&seed), &["push"])?;
-    run_git_ok(None, &["clone", &remote_s, &work_s])?;
+    run_git_ok(
+        None,
+        &["-c", "core.autocrlf=false", "clone", &remote_s, &work_s],
+    )?;
+    run_git_cfg(&work)?;
     std::fs::write(seed.join("README.md"), "v2\n")?;
     run_git_ok(Some(&seed), &["add", "."])?;
     run_git_ok(Some(&seed), &["commit", "-m", "v2"])?;
@@ -185,7 +192,11 @@ fn storage_cleanup_removes_dangling_gitlinks_checks_fork_prs_and_skips_kept_stat
 }
 
 fn run_git_cfg(dir: &Path) -> TestResult {
-    for (k, v) in [("user.email", "t@example.com"), ("user.name", "Test")] {
+    for (k, v) in [
+        ("user.email", "t@example.com"),
+        ("user.name", "Test"),
+        ("core.autocrlf", "false"),
+    ] {
         let ok = Command::new("git")
             .current_dir(dir)
             .args(["config", k, v])

@@ -299,7 +299,23 @@ fn current_uid_for_test() -> Option<u32> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt as _;
-        fs::metadata("/proc/self").ok().map(|m| m.uid())
+        if let Ok(meta) = fs::metadata("/proc/self") {
+            return Some(meta.uid());
+        }
+        let out = std::process::Command::new("id")
+            .arg("-u")
+            .output()
+            .or_else(|_| std::process::Command::new("/usr/bin/id").arg("-u").output())
+            .ok()?;
+        out.status
+            .success()
+            .then(|| {
+                String::from_utf8_lossy(&out.stdout)
+                    .trim()
+                    .parse::<u32>()
+                    .ok()
+            })
+            .flatten()
     }
     #[cfg(not(unix))]
     {

@@ -20,7 +20,6 @@ missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 
 [dependencies]
-js-sys = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 t3-client-core = { path = "../t3-client-core" }

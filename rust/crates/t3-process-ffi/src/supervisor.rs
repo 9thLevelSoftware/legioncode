@@ -1,6 +1,6 @@
 //! Cross-platform OS process-tree supervisor (`BUG-09` closure).
 //!
-//! Combines [`SanitizedChildEnv`], [`ScopedPipeSet`], and (on Windows) [`JobHandle`]
+//! Combines [`SanitizedChildEnv`], [`ScopedPipeSet`], and (on Windows) `JobHandle`
 //! so spawned child trees receive a sanitized environment, leak zero pipe descriptors
 //! when pre-spawn steps fail, and terminate directly in the kernel without spawning
 //! `taskkill` through a saturated worker pool.
@@ -211,10 +211,12 @@ impl JobProcessSupervisor {
             command.creation_flags(CREATE_NO_WINDOW);
         }
 
-        let (mut child, parent_pipes) = pipes
+        let (child, parent_pipes) = pipes
             .spawn_command(&mut command)
             .map_err(SupervisorError::SpawnFailed)?;
 
+        #[cfg(windows)]
+        let mut child = child;
         #[cfg(windows)]
         if let Err(err) = self.job.assign_child(&child) {
             let _ = child.kill();

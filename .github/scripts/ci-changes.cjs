@@ -7,7 +7,7 @@ const root = path.resolve(__dirname, "../..");
 
 const INERT = [
   /^docs\//,
-  /^\.(agents|cursor|vscode|devcontainer|macroscope|repos)\//,
+  /^\.(agents|cursor|legion-cli|vscode|devcontainer|macroscope|repos)\//,
   /^[^/]+\.md$/,
   /^LICENSE$/,
 ];
@@ -31,6 +31,12 @@ const EXTRA_OWNERS = [
   [/^docs\/user\/t3-connect-troubleshooting\.md$/, ["t3"]],
 ];
 const RUST = /^(native\/(resource-monitor|kde-snap-shot|hyprland-snap-shot)|rust)\//;
+const RUST_CI_TRIGGER = [
+  RUST,
+  /^\.cargo\//,
+  /^(apps\/server\/src\/rustCutover\.ts|apps\/desktop\/scripts\/start-electron\.mjs|apps\/mobile\/scripts\/sync-rust-mobile-ffi\.mjs|packages\/client-runtime\/src\/wasm\/|infra\/(relay|task-cache)\/scripts\/stage-rust-worker\.mjs|scripts\/(build-cli-archive|smoke-cli-archive)\.ts)$/,
+  /^\.github\/(workflows\/ci\.yml|actions\/ci-changes\/|scripts\/ci-changes\.cjs)$/,
+];
 
 // These tests read other packages without declaring dependencies.
 const TEST_ONLY_DEPS = {
@@ -114,6 +120,7 @@ function ownersOf(file, packages) {
   // A manifest can change dependencies or versions other packages read.
   if (path.posix.basename(file) === "package.json") return null;
   if (RUNS_EVERYTHING.some((pattern) => pattern.test(file))) return null;
+  if (/^\.cargo\//.test(file)) return extra;
   // scripts/build-desktop-artifact.test.ts reads the crates' sources.
   if (RUST.test(file)) return ["@t3tools/scripts", ...extra];
 
@@ -131,7 +138,7 @@ function decide(files, packages, full) {
   let rust = false;
 
   for (const file of files ?? []) {
-    if (RUST.test(file)) rust = true;
+    if (RUST_CI_TRIGGER.some((pattern) => pattern.test(file))) rust = true;
     const owners = ownersOf(file, packages);
     if (owners === null) {
       everything = true;
@@ -184,6 +191,15 @@ function decide(files, packages, full) {
       test_web: has("@t3tools/web"),
       test_server: has("t3"),
       rust: everything || rust,
+      js_checks:
+        everything ||
+        affected.size > 0 ||
+        Boolean(
+          files?.some(
+            (file) =>
+              /^\.github\/(workflows|scripts|actions)\//.test(file) || file === "knip.jsonc",
+          ),
+        ),
       release_smoke: scriptsChanged,
       mobile_native: files === null || files.some((file) => MOBILE_NATIVE.test(file)),
     },

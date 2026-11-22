@@ -43,9 +43,9 @@ fn trace_summary_normalizes_paths_and_aggregates_rotated_spans() -> TestResult {
     let env_t3home = isolated_env(&home, &[("T3CODE_HOME", &forward_base)]);
     let out_t3home = run_t3(&["trace", "summary"], &env_t3home)?;
     assert!(out_t3home.status.success());
-    let node_out = Command::new("node")
+    if let Ok(node_out) = Command::new("node")
         .args([
-            "d:/t3code/apps/server/src/bin.ts",
+            t3_cli::fallback::LEGACY_BIN_TS,
             "trace",
             "summary",
             "--base-dir",
@@ -53,8 +53,9 @@ fn trace_summary_normalizes_paths_and_aggregates_rotated_spans() -> TestResult {
         ])
         .env_remove("T3CODE_TRACE_FILE")
         .env_remove("T3CODE_HOME")
-        .output()?;
-    if node_out.status.success() {
+        .output()
+        && node_out.status.success()
+    {
         assert_eq!(out_t3home.stdout, node_out.stdout);
     }
 
@@ -153,17 +154,18 @@ fn theme_show_and_builtin_set_clear_match_node_double_newlines() -> TestResult {
         assert!(!show_stdout.contains('/'));
     }
 
-    let node_show = Command::new("node")
+    if let Ok(node_show) = Command::new("node")
         .args([
-            "d:/t3code/apps/server/src/bin.ts",
+            t3_cli::fallback::LEGACY_BIN_TS,
             "theme",
             "show",
             "--base-dir",
             &forward_base,
         ])
         .env_remove("T3CODE_HOME")
-        .output()?;
-    if node_show.status.success() {
+        .output()
+        && node_show.status.success()
+    {
         assert_eq!(show_stdout, String::from_utf8(node_show.stdout)?);
     }
 

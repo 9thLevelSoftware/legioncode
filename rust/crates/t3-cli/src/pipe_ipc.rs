@@ -1,7 +1,9 @@
 //! Shared synchronous Named Pipe / Unix Domain Socket single-line JSON exchange.
 
 use std::io::{ErrorKind, Read, Write};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+#[cfg(windows)]
+use std::time::Instant;
 
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt as _;
@@ -155,7 +157,11 @@ pub(crate) fn current_unix_uid() -> Option<u32> {
         if let Ok(meta) = std::fs::metadata("/proc/self") {
             return Some(meta.uid());
         }
-        let out = std::process::Command::new("id").arg("-u").output().ok()?;
+        let out = std::process::Command::new("id")
+            .arg("-u")
+            .output()
+            .or_else(|_| std::process::Command::new("/usr/bin/id").arg("-u").output())
+            .ok()?;
         out.status
             .success()
             .then(|| {
@@ -185,5 +191,5 @@ pub(crate) fn validate_unix_socket_dir(dir: &Path, expected_uid: Option<u32>) ->
     if meta.file_type().is_symlink() || !meta.is_dir() {
         return false;
     }
-    meta.uid() == uid && (meta.mode() & 0o077) == 0
+    meta.uid() == uid && meta.mode().trailing_zeros() >= 6
 }

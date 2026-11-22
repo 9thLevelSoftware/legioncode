@@ -87,8 +87,8 @@ impl LiveSshForwardHandle {
     pub fn stderr_tail(&self) -> String {
         self.stderr_tail
             .lock()
-            .map(|guard| guard.clone())
-            .unwrap_or_default()
+            .ok()
+            .map_or_default(|guard| guard.clone())
     }
 
     /// Checks non-blockingly whether the `ssh` child process has exited (`Some(exit_code)`).

@@ -44,6 +44,7 @@ pub(super) fn init_git_repo(dir: &Path) -> TestResult {
         &["init"][..],
         &["config", "user.name", "Test User"][..],
         &["config", "user.email", "test@example.com"][..],
+        &["config", "core.autocrlf", "false"][..],
     ] {
         assert!(
             Command::new("git")

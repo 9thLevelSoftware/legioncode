@@ -1,4 +1,4 @@
-//! Linux-specific AppArmor userns, shared-library, and Fontconfig setup for `t3 browser setup`.
+//! Linux-specific `AppArmor` userns, shared-library, and Fontconfig setup for `t3 browser setup`.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -78,10 +78,7 @@ pub(crate) fn run_linux_browser_setup(explicit_base_dir: Option<&str>) -> i32 {
         String::new()
     };
     let browser = installed_browser(&base_dir_path);
-    let missing = browser
-        .as_deref()
-        .map(missing_libraries)
-        .unwrap_or_default();
+    let missing = browser.as_deref().map_or_default(missing_libraries);
     let needs_fonts = !font_available();
 
     if !needs_profile && missing.is_empty() && !needs_fonts {
@@ -262,7 +259,7 @@ fn install_apt_deps(missing: &[String], needs_fonts: bool) -> i32 {
     }
     if !missing.is_empty() {
         let mut args = vec!["install", "-y", "--no-install-recommends"];
-        args.extend(DEBIAN_PACKAGES.iter().map(|opts| pick_apt_pkg(opts)));
+        args.extend(DEBIAN_PACKAGES.iter().copied().map(pick_apt_pkg));
         if run_cmd("install the browser's libraries", "apt-get", &args) != 0 {
             return 1;
         }

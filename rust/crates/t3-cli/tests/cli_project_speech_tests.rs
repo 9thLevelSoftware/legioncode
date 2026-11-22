@@ -233,9 +233,16 @@ async fn project_runs_natively_over_http_against_live_server_and_honors_kill_swi
     server.shutdown().await?;
     let log_offline = temp.path().join("project-killswitch.jsonl");
     let log_offline_str = log_offline.to_string_lossy().into_owned();
+    let fake_project = temp.path().join("fake-project.cjs");
+    fs::write(
+        &fake_project,
+        "process.stdout.write('Added project stub\\n');\n",
+    )?;
+    let fake_project_str = fake_project.to_string_lossy().into_owned();
     let env_ks = isolated_env(
         temp.path(),
         &[
+            ("T3_BIN_TS", &fake_project_str),
             ("RUST_ANYTHING_UNIT_PROJECT", "original"),
             ("RUST_ANYTHING_FALLBACK_LOG", &log_offline_str),
         ],

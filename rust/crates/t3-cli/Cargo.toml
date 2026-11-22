@@ -12,9 +12,7 @@ name = "t3"
 path = "src/main.rs"
 
 [dependencies]
-anyhow.workspace = true
 axum.workspace = true
-clap.workspace = true
 futures-util.workspace = true
 http.workspace = true
 reqwest.workspace = true

@@ -3,20 +3,20 @@ import {
   resolveSubagentMetadata,
   subagentCardDetail,
   subagentDetailPreview,
-} from "@t3tools/client-runtime/state/subagent-display";
+} from "@legioncode/client-runtime/state/subagent-display";
 import {
   isActiveSubagentStatus,
   type RuntimeSubagent,
   type SubagentWorkflowGroup,
-} from "@t3tools/client-runtime/state/subagentRuntime";
-import { REASONING_EFFORT_OPTION_IDS } from "@t3tools/client-runtime/state/thread-execution";
+} from "@legioncode/client-runtime/state/subagentRuntime";
+import { REASONING_EFFORT_OPTION_IDS } from "@legioncode/client-runtime/state/thread-execution";
 import type {
   EnvironmentId,
   OrchestrationV2Subagent,
   ServerProvider,
   ThreadId,
-} from "@t3tools/contracts";
-import { resolveSelectableModel } from "@t3tools/shared/model";
+} from "@legioncode/contracts";
+import { resolveSelectableModel } from "@legioncode/shared/model";
 import { msg } from "gt-react-native";
 
 import { m, type MessageResolver } from "../../i18n/messages";

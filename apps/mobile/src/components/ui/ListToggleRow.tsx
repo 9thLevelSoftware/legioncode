@@ -31,7 +31,7 @@ export function ListToggleRow(
             className="rounded-full bg-subtle px-3 py-2 active:opacity-70"
             onPress={() => props.onValueChange(true)}
           >
-            <AppText className="text-sm font-t3-medium text-foreground">
+            <AppText className="text-sm font-legion-medium text-foreground">
               <T>Mixed · Set on</T>
             </AppText>
           </Pressable>

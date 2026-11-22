@@ -1,15 +1,15 @@
 included:
-  - ios/T3Code
-  - modules/t3-composer-editor/ios
-  - modules/t3-native-controls/ios
-  - modules/t3-terminal/ios
-  - modules/t3-review-diff/ios
-  - modules/t3-voice-transcription/ios
+  - ios/LegionCode
+  - modules/legion-composer-editor/ios
+  - modules/legion-native-controls/ios
+  - modules/legion-terminal/ios
+  - modules/legion-review-diff/ios
+  - modules/legion-voice-transcription/ios
 
 excluded:
   - ios/Pods
   - ios/build
-  - modules/t3-terminal/Vendor
+  - modules/legion-terminal/Vendor
 
 reporter: xcode
 

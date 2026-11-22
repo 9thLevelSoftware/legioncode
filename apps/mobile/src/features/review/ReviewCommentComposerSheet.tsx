@@ -1,6 +1,6 @@
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { TextInputWrapper } from "expo-paste-input";
-import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import type { EnvironmentId, ThreadId } from "@legioncode/contracts";
 import { T, useGT } from "gt-react-native";
 import { useMemo, useState } from "react";
 import { ScrollView, View, useWindowDimensions } from "react-native";
@@ -157,7 +157,7 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
       >
         {!target ? (
           <View className="rounded-[22px] border border-border bg-card px-4 py-5">
-            <Text className="text-base font-t3-bold text-foreground">
+            <Text className="text-base font-legion-bold text-foreground">
               <T>No selection</T>
             </Text>
             <Text className="mt-1 text-sm leading-normal text-foreground-muted">
@@ -167,7 +167,7 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
         ) : (
           <View className="min-h-0 flex-1 gap-4">
             <View className="gap-1 px-1">
-              <Text className="text-2xs font-t3-bold uppercase text-foreground-muted">
+              <Text className="text-2xs font-legion-bold uppercase text-foreground-muted">
                 {selectionLabel}
               </Text>
               <Text
@@ -228,7 +228,7 @@ export function ReviewCommentComposerSheet(props: ReviewCommentComposerSheetProp
             </View>
 
             <View className="min-h-0 flex-1 gap-2">
-              <Text className="text-sm font-t3-bold text-foreground">
+              <Text className="text-sm font-legion-bold text-foreground">
                 <T context="noun, field label">Comment</T>
               </Text>
               <View className="min-h-[132px] flex-1 overflow-hidden rounded-[20px] border border-border bg-card">

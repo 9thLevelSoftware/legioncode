@@ -8,33 +8,37 @@ import {
   resolveSnoozePresets,
   snoozeWakeLabel,
   threadWokeAt,
-} from "@t3tools/client-runtime/state/thread-settled";
+} from "@legioncode/client-runtime/state/thread-settled";
 import {
   hasUnseenRunFailure,
   type SnoozePreset,
-} from "@t3tools/client-runtime/state/thread-settled";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
-import { resolveThreadProviderStack } from "@t3tools/client-runtime/state/models";
+} from "@legioncode/client-runtime/state/thread-settled";
+import type { EnvironmentThreadShell } from "@legioncode/client-runtime/state/shell";
+import { resolveThreadProviderStack } from "@legioncode/client-runtime/state/models";
 import {
   threadSearchMatchKey,
   threadSearchSubject,
-} from "@t3tools/client-runtime/state/thread-search";
-import { foldSearchQuery, rankSearchItems, scoreThreadSearch } from "@t3tools/shared/paletteSearch";
+} from "@legioncode/client-runtime/state/thread-search";
+import {
+  foldSearchQuery,
+  rankSearchItems,
+  scoreThreadSearch,
+} from "@legioncode/shared/paletteSearch";
 import {
   createInboxReturnTracker,
   isThreadWorking,
   sortInboxThreadsByReturn,
   sortWorkingThreadsBySend,
-} from "@t3tools/client-runtime/state/thread-inbox";
+} from "@legioncode/client-runtime/state/thread-inbox";
 import {
   sortActiveThreadsByOrderKey,
   resolveSettledThreadTimestamp,
   resolveThreadActivityTimestamp,
   sortPinnedThreadsByOrderKey,
   sortSettledThreads,
-} from "@t3tools/client-runtime/state/thread-sort";
-import { isListedThreadLineage, type EnvironmentId, type ProjectId } from "@t3tools/contracts";
-import type { SnoozePresetSetting } from "@t3tools/contracts/settings";
+} from "@legioncode/client-runtime/state/thread-sort";
+import { isListedThreadLineage, type EnvironmentId, type ProjectId } from "@legioncode/contracts";
+import type { SnoozePresetSetting } from "@legioncode/contracts/settings";
 import type { MenuAction } from "@react-native-menu/menu";
 
 import type { ThreadListProvider } from "../../state/thread-list-environments";

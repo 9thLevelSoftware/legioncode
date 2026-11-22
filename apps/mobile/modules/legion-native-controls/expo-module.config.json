@@ -1,0 +1,20 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["LegionNativeControlsModule", "LegionKeyboardCommandsModule"],
+    "appDelegateSubscribers": [
+      "LegionWorkspaceOrientationSubscriber",
+      "LegionMenuDismissTouchGateSubscriber",
+      "LegionBackgroundGraceSubscriber"
+    ]
+  },
+  "android": {
+    "modules": [
+      "dev.legioncode.nativecontrols.LegionNativeControlsModule",
+      "dev.legioncode.nativecontrols.LegionWorkspaceNavigationModule",
+      "dev.legioncode.nativecontrols.LegionKeyboardCommandsModule",
+      "dev.legioncode.nativecontrols.LegionFoldPostureModule",
+      "dev.legioncode.nativecontrols.LegionSecretInputModule"
+    ]
+  }
+}

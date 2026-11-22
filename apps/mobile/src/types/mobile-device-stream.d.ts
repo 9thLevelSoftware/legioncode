@@ -1,4 +1,4 @@
-declare module "@t3tools/mobile-device-stream" {
+declare module "@legioncode/mobile-device-stream" {
   const script: string;
   export default script;
 }

@@ -1,10 +1,10 @@
 import { useAtomValue } from "@effect/atom-react";
-import { secondTick } from "@t3tools/client-runtime/clock";
+import { secondTick } from "@legioncode/client-runtime/clock";
 import {
   vcsActionLabelText,
   type VcsActionState,
   type VcsActionTarget,
-} from "@t3tools/client-runtime/state/vcs";
+} from "@legioncode/client-runtime/state/vcs";
 import { Atom } from "effect/reactivity";
 import * as Haptics from "expo-haptics";
 import { msg, useMessages } from "gt-react-native";

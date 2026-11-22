@@ -1,5 +1,5 @@
-import { imageMimeType } from "@t3tools/shared/image";
-import type { EnvironmentId } from "@t3tools/contracts";
+import { imageMimeType } from "@legioncode/shared/image";
+import type { EnvironmentId } from "@legioncode/contracts";
 import type { FilePreviewItem } from "../components/ui/FilePreviewModal.types";
 import { isFileBackedComposerAttachment, type DraftComposerAttachment } from "./composerImages";
 

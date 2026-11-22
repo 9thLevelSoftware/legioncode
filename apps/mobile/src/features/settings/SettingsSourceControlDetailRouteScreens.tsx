@@ -1,12 +1,12 @@
 import { useAtomValue } from "@effect/atom-react";
 import type { StaticScreenProps } from "@react-navigation/native";
-import { issueTrackerSummary } from "@t3tools/client-runtime/state/issue-trackers";
-import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
+import { issueTrackerSummary } from "@legioncode/client-runtime/state/issue-trackers";
+import { sourceControlClients } from "@legioncode/client-runtime/source-control-clients";
 import {
   AuthSettingsWriteScope,
   type EnvironmentId,
   type SourceControlProviderKind,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Option from "effect/Option";
 import { T, useGT, useMessages } from "gt-react-native";
 import type { ReactNode } from "react";

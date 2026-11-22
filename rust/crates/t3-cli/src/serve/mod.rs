@@ -297,7 +297,7 @@ async fn wait_for_shutdown(fence: &CancellationToken) {
             tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).ok();
         tokio::select! {
             _ = tokio::signal::ctrl_c() => {}
-            _ = async {
+            () = async {
                 if let Some(ref mut term) = sigterm {
                     term.recv().await;
                 } else {

@@ -1,4 +1,4 @@
-//! Linux-specific AppArmor userns, shared-library, and Fontconfig setup for `t3 browser setup`.
+//! Linux-specific `AppArmor` userns, shared-library, and Fontconfig setup for `t3 browser setup`.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;

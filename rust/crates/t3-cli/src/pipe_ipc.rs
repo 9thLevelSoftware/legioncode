@@ -191,5 +191,5 @@ pub(crate) fn validate_unix_socket_dir(dir: &Path, expected_uid: Option<u32>) ->
     if meta.file_type().is_symlink() || !meta.is_dir() {
         return false;
     }
-    meta.uid() == uid && (meta.mode() & 0o077) == 0
+    meta.uid() == uid && meta.mode().trailing_zeros() >= 6
 }

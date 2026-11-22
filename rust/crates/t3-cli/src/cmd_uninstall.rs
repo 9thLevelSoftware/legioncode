@@ -153,13 +153,14 @@ fn owns_launcher(launcher: &Path, versions_dir: &Path) -> bool {
     }
     #[cfg(not(windows))]
     {
-        let link_owned = fs::read_link(launcher)
-            .ok()
-            .map(|t| launcher.parent().unwrap_or(Path::new(".")).join(t))
-            .is_some_and(|t| is_version_executable(versions_dir, &t));
-        let real_owned = fs::canonicalize(launcher)
-            .ok()
-            .is_some_and(|t| is_version_executable(versions_dir, &t));
+        let link_owned = fs::read_link(launcher).is_ok_and(|t| {
+            is_version_executable(
+                versions_dir,
+                &launcher.parent().unwrap_or(Path::new(".")).join(t),
+            )
+        });
+        let real_owned =
+            fs::canonicalize(launcher).is_ok_and(|t| is_version_executable(versions_dir, &t));
         let script_owned = fs::read_to_string(launcher)
             .ok()
             .and_then(|raw| extract_posix_launcher_target(&raw))

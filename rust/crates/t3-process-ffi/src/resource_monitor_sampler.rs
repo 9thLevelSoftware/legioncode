@@ -7,9 +7,11 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use crate::resource_monitor_events::ProcessTableEntryV3;
 use crate::resource_monitor_history::MAX_PROCESS_NAME_BYTES;
+use crate::resource_monitor_history::truncate_utf8;
+#[cfg(any(windows, target_os = "linux"))]
+use crate::resource_monitor_history::unix_time_ms;
 #[cfg(not(windows))]
 use crate::resource_monitor_history::{MAX_PROCESS_COMMAND_BYTES, MAX_PROCESS_STATUS_BYTES};
-use crate::resource_monitor_history::{truncate_utf8, unix_time_ms};
 
 #[cfg(windows)]
 pub(crate) struct Win32ProcessMetrics {

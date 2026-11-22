@@ -1,15 +1,15 @@
-//! Core Orchestration V2 DDL tables, indexes, and FTS5 trigram message search definitions.
+//! Core retained DDL tables, schema bootstrap, and FTS5 trigram message search definitions.
 
 use rusqlite::Connection;
 
-use super::auth_peer_schema;
+use super::{auth_peer_schema, schema_migrations, schema_v2_indexes, schema_v2_tables};
 
 const ATTACHMENT_ONLY_BOOTSTRAP_PROMPT: &str = "[User attached one or more files without additional text. Respond using the conversation context and the attached files.]";
 
 // SQLite ltrim needs every character JavaScript's `\s` matches (`messageSearchIndex.ts:7-8`).
 const BOOTSTRAP_PREFIX_WHITESPACE: &str = "\t\n\u{000b}\u{000c}\r \u{00a0}\u{1680}\u{2000}\u{2001}\u{2002}\u{2003}\u{2004}\u{2005}\u{2006}\u{2007}\u{2008}\u{2009}\u{200a}\u{2028}\u{2029}\u{202f}\u{205f}\u{3000}\u{feff}";
 
-const CORE_V2_TABLES_SQL: &str = "
+const CORE_RETAINED_TABLES_SQL: &str = "
 CREATE TABLE IF NOT EXISTS effect_sql_migrations (
   migration_id integer PRIMARY KEY NOT NULL,
   created_at datetime NOT NULL DEFAULT current_timestamp,
@@ -31,12 +31,9 @@ CREATE TABLE IF NOT EXISTS projection_projects (
   project_icon_json TEXT,
   pinned_at TEXT,
   archived_at TEXT,
-  has_custom_title INTEGER NOT NULL DEFAULT 0
+  has_custom_title INTEGER NOT NULL DEFAULT 0,
+  tracked_folders_json TEXT NOT NULL DEFAULT '[]'
 );
-CREATE INDEX IF NOT EXISTS idx_projection_projects_updated_at
-  ON projection_projects(updated_at);
-CREATE INDEX IF NOT EXISTS idx_projection_projects_workspace_root_deleted_at
-  ON projection_projects(workspace_root, deleted_at);
 
 CREATE TABLE IF NOT EXISTS projection_threads (
   thread_id TEXT PRIMARY KEY,
@@ -71,14 +68,6 @@ CREATE TABLE IF NOT EXISTS projection_threads (
   title_state_json TEXT,
   auto_settle_disabled_at TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_projection_threads_project_archived_at
-  ON projection_threads(project_id, archived_at);
-CREATE INDEX IF NOT EXISTS idx_projection_threads_project_deleted_created
-  ON projection_threads(project_id, deleted_at, created_at);
-CREATE INDEX IF NOT EXISTS idx_projection_threads_shell_active
-  ON projection_threads(deleted_at, archived_at, project_id, created_at, thread_id);
-CREATE INDEX IF NOT EXISTS idx_projection_threads_shell_archived
-  ON projection_threads(deleted_at, archived_at, project_id, thread_id);
 
 CREATE TABLE IF NOT EXISTS orchestration_events (
   sequence INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -96,26 +85,6 @@ CREATE TABLE IF NOT EXISTS orchestration_events (
   metadata_json TEXT NOT NULL,
   application_event_version INTEGER NOT NULL DEFAULT 1
 );
-CREATE UNIQUE INDEX IF NOT EXISTS idx_orch_events_stream_version
-  ON orchestration_events(aggregate_kind, stream_id, stream_version);
-CREATE INDEX IF NOT EXISTS idx_orch_events_stream_sequence
-  ON orchestration_events(aggregate_kind, stream_id, sequence);
-CREATE INDEX IF NOT EXISTS idx_orch_events_command_id
-  ON orchestration_events(command_id);
-CREATE INDEX IF NOT EXISTS idx_orchestration_events_application_sequence
-  ON orchestration_events(application_event_version, sequence);
-CREATE INDEX IF NOT EXISTS idx_orchestration_events_application_high_water
-  ON orchestration_events(sequence)
-  WHERE aggregate_kind = 'project'
-    OR (application_event_version = 2 AND aggregate_kind = 'thread');
-CREATE INDEX IF NOT EXISTS idx_orchestration_events_agent_stream_sequence
-  ON orchestration_events(stream_id, sequence)
-  WHERE application_event_version = 2 AND aggregate_kind = 'thread';
-CREATE INDEX IF NOT EXISTS orchestration_events_v2_created_threads_idx
-  ON orchestration_events(stream_id)
-  WHERE application_event_version = 2
-    AND aggregate_kind = 'thread'
-    AND event_type = 'thread.created';
 
 CREATE TABLE IF NOT EXISTS orchestration_command_receipts (
   command_id TEXT PRIMARY KEY,
@@ -127,107 +96,87 @@ CREATE TABLE IF NOT EXISTS orchestration_command_receipts (
   error TEXT,
   command_type TEXT NOT NULL DEFAULT 'legacy'
 );
-CREATE INDEX IF NOT EXISTS idx_orch_command_receipts_aggregate
-  ON orchestration_command_receipts(aggregate_kind, aggregate_id);
-CREATE INDEX IF NOT EXISTS idx_orch_command_receipts_sequence
-  ON orchestration_command_receipts(result_sequence);
 
-CREATE TABLE IF NOT EXISTS orchestration_v2_projection_threads (
+CREATE TABLE IF NOT EXISTS provider_session_runtime (
   thread_id TEXT PRIMARY KEY,
-  project_id TEXT NOT NULL,
-  title TEXT NOT NULL,
-  default_provider TEXT NOT NULL,
-  runtime_mode TEXT NOT NULL,
-  interaction_mode TEXT NOT NULL,
-  active_provider_thread_id TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  archived_at TEXT,
-  deleted_at TEXT,
-  payload_json TEXT NOT NULL,
-  provider_instance_id TEXT
-);
-CREATE INDEX IF NOT EXISTS orchestration_v2_projection_threads_project_updated_idx
-  ON orchestration_v2_projection_threads(project_id, updated_at);
-CREATE INDEX IF NOT EXISTS orchestration_v2_projection_threads_worktree_path_idx
-  ON orchestration_v2_projection_threads(
-    CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.worktreePath') END
-  );
-CREATE INDEX IF NOT EXISTS orchestration_v2_projection_threads_root_thread_idx
-  ON orchestration_v2_projection_threads(
-    CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.lineage.rootThreadId') END
-  );
-
-CREATE TABLE IF NOT EXISTS orchestration_v2_projection_runs (
-  run_id TEXT PRIMARY KEY,
-  thread_id TEXT NOT NULL,
-  ordinal INTEGER NOT NULL,
-  provider TEXT NOT NULL,
-  provider_thread_id TEXT,
+  provider_name TEXT NOT NULL,
+  adapter_key TEXT NOT NULL,
+  runtime_mode TEXT NOT NULL DEFAULT 'full-access',
   status TEXT NOT NULL,
-  requested_at TEXT NOT NULL,
-  completed_at TEXT,
-  payload_json TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  resume_cursor_json TEXT,
+  runtime_payload_json TEXT,
   provider_instance_id TEXT
 );
-CREATE UNIQUE INDEX IF NOT EXISTS orchestration_v2_projection_runs_thread_ordinal_idx
-  ON orchestration_v2_projection_runs(thread_id, ordinal);
-CREATE INDEX IF NOT EXISTS orchestration_v2_projection_runs_provider_thread_idx
-  ON orchestration_v2_projection_runs(provider_thread_id);
-CREATE INDEX IF NOT EXISTS orchestration_v2_projection_runs_thread_status_idx
-  ON orchestration_v2_projection_runs(thread_id, status);
-CREATE INDEX IF NOT EXISTS orchestration_v2_projection_runs_recovery_idx
-  ON orchestration_v2_projection_runs(status, thread_id)
-  WHERE status IN ('queued', 'preparing', 'starting', 'running', 'waiting');
-CREATE INDEX IF NOT EXISTS orchestration_v2_projection_runs_run_status_idx
-  ON orchestration_v2_projection_runs(run_id, status);
-CREATE INDEX IF NOT EXISTS orchestration_v2_projection_runs_hidden_items_idx
-  ON orchestration_v2_projection_runs(thread_id, status, run_id)
-  WHERE status IN ('rolled_back', 'queued', 'cancelled');
 
-CREATE TABLE IF NOT EXISTS orchestration_v2_effect_outbox (
-  effect_id TEXT PRIMARY KEY,
-  command_id TEXT NOT NULL,
-  thread_id TEXT NOT NULL,
-  effect_type TEXT NOT NULL,
-  payload_json TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (
-    status IN ('pending', 'running', 'succeeded', 'failed', 'cancelled')
-  ),
-  attempt_count INTEGER NOT NULL DEFAULT 0,
-  available_at TEXT NOT NULL,
-  lease_owner TEXT,
-  lease_expires_at TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
-  completed_at TEXT,
-  last_error TEXT
-);
-CREATE INDEX IF NOT EXISTS orchestration_v2_effect_outbox_claim_idx
-  ON orchestration_v2_effect_outbox(status, available_at, lease_expires_at, created_at);
-CREATE INDEX IF NOT EXISTS orchestration_v2_effect_outbox_command_idx
-  ON orchestration_v2_effect_outbox(command_id, effect_id);
-CREATE INDEX IF NOT EXISTS orchestration_v2_effect_outbox_thread_status_idx
-  ON orchestration_v2_effect_outbox(thread_id, status, effect_type);
-
-CREATE TABLE IF NOT EXISTS orchestration_v2_projection_messages (
+CREATE TABLE IF NOT EXISTS projection_thread_messages (
   message_id TEXT PRIMARY KEY,
   thread_id TEXT NOT NULL,
-  run_id TEXT,
-  node_id TEXT,
+  turn_id TEXT,
   role TEXT NOT NULL,
-  streaming INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  is_streaming INTEGER NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  payload_json TEXT NOT NULL,
-  search_text TEXT
+  attachments_json TEXT,
+  context_json TEXT
 );
-CREATE INDEX IF NOT EXISTS orchestration_v2_projection_messages_thread_created_idx
-  ON orchestration_v2_projection_messages(thread_id, created_at, message_id);
-CREATE INDEX IF NOT EXISTS orchestration_v2_projection_messages_run_idx
-  ON orchestration_v2_projection_messages(run_id);
-CREATE INDEX IF NOT EXISTS orchestration_v2_projection_messages_node_idx
-  ON orchestration_v2_projection_messages(node_id);
+
+CREATE TABLE IF NOT EXISTS projection_thread_sessions (
+  thread_id TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  provider_name TEXT,
+  provider_session_id TEXT,
+  provider_thread_id TEXT,
+  active_turn_id TEXT,
+  last_error TEXT,
+  updated_at TEXT NOT NULL,
+  runtime_mode TEXT NOT NULL DEFAULT 'full-access',
+  provider_instance_id TEXT
+);
+
+CREATE TABLE IF NOT EXISTS projection_thread_pull_requests (
+  thread_id TEXT NOT NULL,
+  host TEXT NOT NULL,
+  repository TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  url TEXT NOT NULL,
+  source TEXT NOT NULL,
+  linked_at TEXT NOT NULL,
+  snapshot_json TEXT,
+  stack_json TEXT,
+  PRIMARY KEY (thread_id, host, repository, number)
+);
+
+CREATE TABLE IF NOT EXISTS pull_request_files_viewed (
+  provider TEXT NOT NULL,
+  host TEXT NOT NULL,
+  repository TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  viewer TEXT NOT NULL,
+  path TEXT NOT NULL,
+  revision TEXT,
+  viewed_at TEXT NOT NULL,
+  PRIMARY KEY (provider, host, repository, number, viewer, path)
+) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS pull_request_review_guides (
+  host TEXT NOT NULL,
+  repository TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  guide_json TEXT NOT NULL,
+  PRIMARY KEY (host, repository, number)
+) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS mcp_app_model_context (
+  thread_id TEXT NOT NULL,
+  item_id TEXT NOT NULL,
+  server TEXT NOT NULL,
+  tool TEXT NOT NULL,
+  text TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (thread_id, item_id)
+);
 
 CREATE TABLE IF NOT EXISTS orchestration_v2_projection_metadata (
   projection_name TEXT PRIMARY KEY,
@@ -244,8 +193,6 @@ CREATE TABLE IF NOT EXISTS orchestration_v2_legacy_imports (
   imported_message_count INTEGER NOT NULL DEFAULT 0,
   last_error TEXT
 );
-CREATE INDEX IF NOT EXISTS orchestration_v2_legacy_imports_pending_transcript_idx
-  ON orchestration_v2_legacy_imports(transcript_imported_at, shell_imported_at, thread_id);
 ";
 
 const CREATE_FTS_SEARCH_TABLE_SQL: &str = "
@@ -258,8 +205,12 @@ CREATE VIRTUAL TABLE IF NOT EXISTS orchestration_v2_message_search USING fts5(
 ";
 
 pub(crate) fn apply_core_v2_ddl(conn: &Connection) -> rusqlite::Result<()> {
-    conn.execute_batch(CORE_V2_TABLES_SQL)?;
+    conn.execute_batch(CORE_RETAINED_TABLES_SQL)?;
+    schema_v2_tables::create_v2_tables(conn)?;
     auth_peer_schema::apply_auth_and_peer_ddl(conn)?;
+    let column_report = schema_migrations::apply_column_migrations(conn)?;
+    schema_v2_indexes::apply_indexes_and_count_triggers(conn)?;
+
     match conn.execute_batch(CREATE_FTS_SEARCH_TABLE_SQL) {
         Ok(()) => {}
         // Match 069_ThreadMessageSearch.ts: ignore only SQLITE_ERROR (errcode === 1) if FTS5 options are unsupported.
@@ -267,6 +218,14 @@ pub(crate) fn apply_core_v2_ddl(conn: &Connection) -> rusqlite::Result<()> {
             return Ok(());
         }
         Err(err) => return Err(err),
+    }
+
+    if column_report.added_message_search_text {
+        conn.execute_batch(
+            "DROP TRIGGER IF EXISTS orchestration_v2_message_search_insert;
+             DROP TRIGGER IF EXISTS orchestration_v2_message_search_update;
+             DROP TRIGGER IF EXISTS orchestration_v2_message_search_delete;",
+        )?;
     }
 
     let has_search_text = messages_has_search_text_column(conn)?;

@@ -37,20 +37,30 @@
 #![forbid(unsafe_code)]
 
 pub mod apple_speech_ipc;
+pub mod bridge_types;
 pub mod browser_webview;
 mod browser_webview_controls;
 pub mod bundle;
 mod bundle_templates;
 pub mod control_server;
 mod control_server_protocol;
+pub mod http_codec;
+pub mod http_loopback;
 pub mod ipc;
+mod ipc_bridge;
+mod ipc_bridge_extra;
+mod ipc_bridge_preview;
 mod ipc_handlers;
 mod ipc_types;
 mod ipc_update_types;
+pub mod native_dialogs;
+mod os_pickers;
+pub mod preload_bridge;
 pub mod self_check;
 mod self_check_checks;
 pub mod sidecar;
 mod sidecar_discovery;
+pub mod sidecar_process;
 pub mod window_host;
 pub mod window_host_protocol;
 mod window_host_smoke;

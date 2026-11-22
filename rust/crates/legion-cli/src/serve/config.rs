@@ -124,8 +124,12 @@ pub(crate) fn resolve_static_dir_env() -> Option<PathBuf> {
         .map(|v| expand_home(v.trim()))
 }
 
-/// Auto-discovers the first built web bundle directory containing `index.html` among
-/// `<current_exe_dir>/client`, `<current_exe_dir>/../web-app`, and `<cwd>/client`.
+/// Auto-discovers the first built web bundle directory containing `index.html` among:
+/// 1. `<current_exe_dir>/client`
+/// 2. `<current_exe_dir>/../web-app`
+/// 3. `<cwd>/apps/web/dist`
+/// 4. `<cwd>/client`
+/// 5. `<repo_root>/apps/web/dist` or `<repo_root>/apps/server/dist/client` when running from `rust/target/{debug,release}`.
 pub fn resolve_default_static_dir(cwd: &Path) -> Option<PathBuf> {
     let exe_dir = env::current_exe()
         .ok()
@@ -133,9 +137,29 @@ pub fn resolve_default_static_dir(cwd: &Path) -> Option<PathBuf> {
     resolve_default_static_dir_from(exe_dir.as_deref(), cwd)
 }
 
+fn resolve_repo_root_from_rust_target(exe_dir: &Path) -> Option<&Path> {
+    let mut current = Some(exe_dir);
+    let mut saw_profile = false;
+    while let Some(dir) = current {
+        let name = dir.file_name().and_then(|n| n.to_str());
+        if name == Some("target") {
+            let rust_dir = dir.parent()?;
+            if saw_profile && rust_dir.file_name().and_then(|n| n.to_str()) == Some("rust") {
+                return rust_dir.parent();
+            }
+            return None;
+        }
+        if matches!(name, Some("debug" | "release")) {
+            saw_profile = true;
+        }
+        current = dir.parent();
+    }
+    None
+}
+
 /// Testable helper backing [`resolve_default_static_dir`] with an explicit executable directory.
 pub fn resolve_default_static_dir_from(exe_dir: Option<&Path>, cwd: &Path) -> Option<PathBuf> {
-    let mut candidates = Vec::with_capacity(3);
+    let mut candidates = Vec::with_capacity(6);
     if let Some(dir) = exe_dir {
         candidates.push(dir.join("client"));
         let sibling_web_app = dir.parent().map_or_else(
@@ -144,7 +168,18 @@ pub fn resolve_default_static_dir_from(exe_dir: Option<&Path>, cwd: &Path) -> Op
         );
         candidates.push(sibling_web_app);
     }
+    candidates.push(cwd.join("apps").join("web").join("dist"));
     candidates.push(cwd.join("client"));
+    if let Some(repo_root) = exe_dir.and_then(resolve_repo_root_from_rust_target) {
+        candidates.push(repo_root.join("apps").join("web").join("dist"));
+        candidates.push(
+            repo_root
+                .join("apps")
+                .join("server")
+                .join("dist")
+                .join("client"),
+        );
+    }
     candidates
         .into_iter()
         .find(|dir| dir.join("index.html").is_file())
@@ -214,5 +249,94 @@ const fn current_platform_arch() -> PlatformArch {
         PlatformArch::X64
     } else {
         PlatformArch::Other
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::Path;
+
+    use super::resolve_default_static_dir_from;
+
+    fn write_index(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        fs::create_dir_all(dir)?;
+        fs::write(dir.join("index.html"), "<!doctype html><html></html>")?;
+        Ok(())
+    }
+
+    #[test]
+    fn resolve_default_static_dir_prefers_priority_order_and_target_repo_walkup()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let temp = tempfile::tempdir()?;
+        let repo = temp.path().join("repo");
+        let target_debug = repo.join("rust").join("target").join("debug");
+        let target_release = repo
+            .join("rust")
+            .join("target")
+            .join("x86_64")
+            .join("release");
+        fs::create_dir_all(&target_debug)?;
+        fs::create_dir_all(&target_release)?;
+
+        let outside_cwd = temp.path().join("outside");
+        fs::create_dir_all(&outside_cwd)?;
+
+        // (5b) repo apps/server/dist/client fallback from rust/target/{debug,release}
+        let repo_server_client = repo.join("apps").join("server").join("dist").join("client");
+        write_index(&repo_server_client)?;
+        assert_eq!(
+            resolve_default_static_dir_from(Some(&target_debug), &outside_cwd),
+            Some(repo_server_client)
+        );
+
+        // (5a) repo apps/web/dist beats apps/server/dist/client
+        let repo_web_dist = repo.join("apps").join("web").join("dist");
+        write_index(&repo_web_dist)?;
+        assert_eq!(
+            resolve_default_static_dir_from(Some(&target_release), &outside_cwd),
+            Some(repo_web_dist)
+        );
+
+        // Non-target exe_dir does not walk up to repo root
+        let non_target_bin = repo.join("bundle").join("bin");
+        fs::create_dir_all(&non_target_bin)?;
+        assert_eq!(
+            resolve_default_static_dir_from(Some(&non_target_bin), &outside_cwd),
+            None
+        );
+
+        // (4) <cwd>/client beats (5)
+        let cwd_client = outside_cwd.join("client");
+        write_index(&cwd_client)?;
+        assert_eq!(
+            resolve_default_static_dir_from(Some(&target_debug), &outside_cwd),
+            Some(cwd_client)
+        );
+
+        // (3) <cwd>/apps/web/dist beats (4)
+        let cwd_web_dist = outside_cwd.join("apps").join("web").join("dist");
+        write_index(&cwd_web_dist)?;
+        assert_eq!(
+            resolve_default_static_dir_from(Some(&target_debug), &outside_cwd),
+            Some(cwd_web_dist)
+        );
+
+        // (2) <exe_dir>/../web-app beats (3)
+        let exe_webapp = repo.join("rust").join("target").join("web-app");
+        write_index(&exe_webapp)?;
+        assert_eq!(
+            resolve_default_static_dir_from(Some(&target_debug), &outside_cwd),
+            Some(exe_webapp)
+        );
+
+        // (1) <exe_dir>/client beats (2)
+        let exe_client = target_debug.join("client");
+        write_index(&exe_client)?;
+        assert_eq!(
+            resolve_default_static_dir_from(Some(&target_debug), &outside_cwd),
+            Some(exe_client)
+        );
+        Ok(())
     }
 }

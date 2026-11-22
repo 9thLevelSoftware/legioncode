@@ -28,5 +28,4 @@ legion-edge = { path = "../legion-edge" }
 legion-shared = { path = "../legion-shared", default-features = false }
 legion-surfaces = { path = "../legion-surfaces" }
 legion-terminal-vt = { path = "../legion-terminal-vt" }
-legion-web-ui = { path = "../legion-web-ui" }
 wasm-bindgen = { workspace = true }

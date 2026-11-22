@@ -7,6 +7,11 @@ pub(crate) mod auth_peer_schema;
 mod migration_head;
 mod migrations_v105;
 pub(crate) mod schema;
+mod schema_feature_tables;
+mod schema_migrations;
+mod schema_v2_indexes;
+mod schema_v2_tables;
+mod schema_v2_triggers;
 
 use std::fs;
 use std::path::{Path, PathBuf};

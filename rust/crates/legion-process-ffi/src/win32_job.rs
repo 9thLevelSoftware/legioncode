@@ -190,6 +190,21 @@ mod imp {
             Ok(())
         }
 
+        /// Assigns an owned Win32 process handle to this Win32 Job Object.
+        pub(crate) fn assign_handle(
+            &self,
+            process_handle: &OwnedHandle,
+        ) -> Result<(), Win32JobError> {
+            // SAFETY: `self.raw` is live and `process_handle` is a live Win32 process handle.
+            if unsafe {
+                AssignProcessToJobObject(self.raw.as_ptr(), process_handle.as_raw_handle())
+            } == 0
+            {
+                return last_err(Win32JobError::AssignProcessFailed);
+            }
+            Ok(())
+        }
+
         /// Opens `pid` with quota+terminate rights and assigns it to this Win32 Job Object.
         pub fn assign_pid(&self, pid: u32) -> Result<(), Win32JobError> {
             // SAFETY: `OpenProcess` accepts integer flags and returns NULL on failure.

@@ -96,23 +96,40 @@ fn hex_val(b: u8) -> Option<u8> {
 
 #[derive(Deserialize)]
 struct ManifestEntry {
-    file: Option<String>,
+    file: String,
+    #[serde(default)]
+    css: Option<Vec<String>>,
+    #[serde(default)]
+    assets: Option<Vec<String>>,
 }
 
 pub(crate) fn load_manifest_assets(static_root: &Path) -> HashSet<String> {
-    let manifest_path = static_root.join(".vite").join("manifest.json");
-    let Ok(bytes) = std::fs::read(manifest_path) else {
-        return HashSet::new();
-    };
-    let Ok(map) =
-        serde_json::from_slice::<std::collections::HashMap<String, ManifestEntry>>(&bytes)
-    else {
-        return HashSet::new();
-    };
-    map.into_values()
-        .filter_map(|entry| entry.file)
-        .map(|f| f.trim_start_matches('/').to_owned())
-        .collect()
+    let mut assets = HashSet::new();
+    for manifest_path in [
+        static_root.join(".vite").join("manifest.json"),
+        static_root.join("manifest.json"),
+    ] {
+        let Ok(bytes) = std::fs::read(&manifest_path) else {
+            continue;
+        };
+        let Ok(map) =
+            serde_json::from_slice::<std::collections::HashMap<String, ManifestEntry>>(&bytes)
+        else {
+            continue;
+        };
+        for entry in map.into_values() {
+            for rel in std::iter::once(entry.file)
+                .chain(entry.css.unwrap_or_default())
+                .chain(entry.assets.unwrap_or_default())
+            {
+                let trimmed = rel.trim_start_matches('/');
+                if !trimmed.is_empty() {
+                    assets.insert(trimmed.to_owned());
+                }
+            }
+        }
+    }
+    assets
 }
 
 pub(crate) fn build_weak_etag(size: u64, mtime: SystemTime) -> String {
@@ -222,6 +239,13 @@ pub(crate) fn parse_byte_range(header: Option<&str>, size: u64) -> ParsedByteRan
     }
 }
 
+const WORKSPACE_PREVIEW_EXTENSIONS: &[&str] = &[
+    "htm", "html", "pdf", "avif", "bmp", "gif", "ico", "jpeg", "jpg", "png", "svg", "webp", "ttf",
+    "otf", "woff", "woff2", "zip", "jar", "tar", "gz", "tgz", "sqlite", "sqlite3", "db", "docx",
+    "xlsx", "pptx", "odt", "ods", "odp", "rtf", "epub", "ipynb", "mp3", "wav", "ogg", "m4a", "aac",
+    "flac", "opus", "weba", "mp4", "webm", "m4v", "ogv", "mov",
+];
+
 /// Returns `true` when `path` has an extension supported by workspace file/browser previews (`#39491`).
 ///
 /// Mirrors `@legioncode/shared/filePreview`'s `isWorkspacePreviewEntryPath`: excludes unsupported XML/XHTML
@@ -232,55 +256,7 @@ pub fn is_workspace_preview_entry_path(path: &Path) -> bool {
         return false;
     };
     let lower = ext.to_ascii_lowercase();
-    matches!(
-        lower.as_str(),
-        "htm"
-            | "html"
-            | "pdf"
-            | "avif"
-            | "bmp"
-            | "gif"
-            | "ico"
-            | "jpeg"
-            | "jpg"
-            | "png"
-            | "svg"
-            | "webp"
-            | "ttf"
-            | "otf"
-            | "woff"
-            | "woff2"
-            | "zip"
-            | "jar"
-            | "tar"
-            | "gz"
-            | "tgz"
-            | "sqlite"
-            | "sqlite3"
-            | "db"
-            | "docx"
-            | "xlsx"
-            | "pptx"
-            | "odt"
-            | "ods"
-            | "odp"
-            | "rtf"
-            | "epub"
-            | "ipynb"
-            | "mp3"
-            | "wav"
-            | "ogg"
-            | "m4a"
-            | "aac"
-            | "flac"
-            | "opus"
-            | "weba"
-            | "mp4"
-            | "webm"
-            | "m4v"
-            | "ogv"
-            | "mov"
-    )
+    WORKSPACE_PREVIEW_EXTENSIONS.contains(&lower.as_str())
 }
 
 /// Resolves a workspace asset (following symlinks) ONLY when its canonical target exists as a
@@ -305,4 +281,113 @@ pub fn resolve_previewable_workspace_asset(
             .is_ok_and(|canonical_root| canonical_target.starts_with(&canonical_root))
     });
     within_allowed.then_some(canonical_target)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use reqwest::StatusCode;
+    use serde_json::{Value, json};
+    use tokio::net::TcpListener;
+
+    use super::{HTML_CSP, load_manifest_assets};
+    use crate::static_assets::static_assets_router;
+
+    #[test]
+    fn load_manifest_assets_collects_file_css_and_assets_from_both_paths()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir_a = tempfile::tempdir()?;
+        fs::create_dir_all(dir_a.path().join(".vite"))?;
+        fs::write(
+            dir_a.path().join(".vite").join("manifest.json"),
+            r#"{"src/main.ts":{"file":"/assets/main-1111aaaa.js","css":["assets/main-2222bbbb.css"],"assets":["assets/font-3333cccc.woff2"]}}"#,
+        )?;
+        let assets_a = load_manifest_assets(dir_a.path());
+        assert!(assets_a.contains("assets/main-1111aaaa.js"));
+        assert!(assets_a.contains("assets/main-2222bbbb.css"));
+        assert!(assets_a.contains("assets/font-3333cccc.woff2"));
+
+        let dir_b = tempfile::tempdir()?;
+        fs::write(
+            dir_b.path().join("manifest.json"),
+            r#"{"index.html":{"file":"assets/root-4444dddd.js","css":["/assets/root-5555eeee.css"]}}"#,
+        )?;
+        let assets_b = load_manifest_assets(dir_b.path());
+        assert!(assets_b.contains("assets/root-4444dddd.js"));
+        assert!(assets_b.contains("assets/root-5555eeee.css"));
+        Ok(())
+    }
+
+    fn hdr<'a>(resp: &'a reqwest::Response, name: &str) -> Option<&'a str> {
+        resp.headers().get(name).and_then(|v| v.to_str().ok())
+    }
+
+    #[tokio::test]
+    async fn static_assets_blocks_reserved_api_ws_oauth_well_known_fallbacks_and_sets_csp()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dist = tempfile::tempdir()?;
+        let root = dist.path();
+        fs::create_dir_all(root.join(".vite"))?;
+        fs::create_dir_all(root.join(".well-known"))?;
+        fs::create_dir_all(root.join("assets"))?;
+        fs::create_dir_all(root.join("preview"))?;
+        fs::write(root.join("index.html"), "<!doctype html><html>SPA</html>")?;
+        fs::write(root.join("preview").join("index.html"), "<html>Sub</html>")?;
+        fs::write(root.join("assets").join("app-12345678.css"), "body{}")?;
+        fs::write(root.join(".well-known").join("assetlinks.json"), "[]")?;
+        fs::write(
+            root.join(".vite").join("manifest.json"),
+            r#"{"index.html":{"file":"assets/app-12345678.js","css":["assets/app-12345678.css"]}}"#,
+        )?;
+
+        let listener = TcpListener::bind("127.0.0.1:0").await?;
+        let base_url = format!("http://{}", listener.local_addr()?);
+        let router = static_assets_router(Some(root.to_path_buf()));
+        let _srv = tokio::spawn(async move {
+            let _ = axum::serve(listener, router).await;
+        });
+
+        let client = reqwest::Client::new();
+        for missing in [
+            "/api/unknown",
+            "/ws",
+            "/ws/unknown",
+            "/oauth/token",
+            "/.well-known/unknown",
+        ] {
+            let resp = client.get(format!("{base_url}{missing}")).send().await?;
+            assert_eq!(resp.status(), StatusCode::NOT_FOUND, "path {missing}");
+            assert_eq!(resp.json::<Value>().await?, json!({ "error": "Not Found" }));
+        }
+
+        let wk = client
+            .get(format!("{base_url}/.well-known/assetlinks.json"))
+            .send()
+            .await?;
+        assert_eq!(wk.status(), StatusCode::OK);
+
+        let css = client
+            .get(format!("{base_url}/assets/app-12345678.css"))
+            .send()
+            .await?;
+        assert_eq!(
+            hdr(&css, "cache-control"),
+            Some("public, max-age=31536000, immutable")
+        );
+
+        let spa = client.get(format!("{base_url}/threads/123")).send().await?;
+        assert_eq!(spa.status(), StatusCode::OK);
+        assert_eq!(hdr(&spa, "x-frame-options"), Some("DENY"));
+        assert_eq!(
+            hdr(&spa, "content-security-policy"),
+            Some("frame-ancestors 'none'")
+        );
+
+        let preview = client.get(format!("{base_url}/preview")).send().await?;
+        assert_eq!(preview.status(), StatusCode::OK);
+        assert_eq!(hdr(&preview, "content-security-policy"), Some(HTML_CSP));
+        assert!(hdr(&preview, "x-frame-options").is_none());
+        Ok(())
+    }
 }

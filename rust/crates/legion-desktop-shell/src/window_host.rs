@@ -1,6 +1,7 @@
 //! Real `tao` + `wry` `WebView2` / native window host with `legioncode://app` custom-protocol
 //! security routing, `WindowBounds` display clamping, and `window.ipc.postMessage` bridge.
 
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use legion_surfaces::desktop::{
@@ -13,45 +14,99 @@ use tao::platform::run_return::EventLoopExtRunReturn;
 use tao::window::{Window, WindowBuilder};
 use wry::{PageLoadEvent, WebContext, WebView, WebViewBuilder};
 
-use crate::ipc::{DesktopIpcRequest, DesktopIpcRouter};
-use crate::sidecar::{SidecarConfig, SidecarController};
+use crate::ipc::DesktopIpcRouter;
+use crate::native_dialogs::client_platform;
+use crate::preload_bridge::{build_bridge_init_config, render_desktop_bridge_init_script};
+use crate::sidecar::{SidecarConfig, SidecarController, SidecarMode};
 use crate::window_host_protocol::{
     CustomProtocolMetrics, build_smoke_html, desktop_scheme_name, resolve_custom_protocol_request,
 };
 use crate::window_host_smoke::{
-    RuntimeTracker, SmokeTempDir, finalize_report, spawn_control_server_thread,
-    spawn_smoke_watchdog,
+    RuntimeTracker, SmokeTempDir, finalize_report, handle_webview_ipc, resolve_desktop_session,
+    spawn_control_server_thread, spawn_smoke_watchdog,
 };
 pub use crate::window_host_types::{
-    DesktopExitReason, DesktopHostError, DesktopLaunchConfig, DesktopRunReport, DesktopUserEvent,
-    WebviewSmokeChecks,
+    BaseDirOrigin, DesktopExitReason, DesktopHostError, DesktopLaunchConfig, DesktopRunReport,
+    DesktopSidecarPolicy, DesktopUserEvent, WebviewSmokeChecks,
 };
+
+struct WebviewRuntimeSpec<'a> {
+    config: &'a DesktopLaunchConfig,
+    initial_url: &'a str,
+    init_script: Option<&'a str>,
+    router: &'a Arc<Mutex<DesktopIpcRouter>>,
+    tracker: &'a Arc<Mutex<RuntimeTracker>>,
+    proxy: &'a EventLoopProxy<DesktopUserEvent>,
+}
 
 /// Launches the real `tao` + `wry` desktop window (interactive or `--smoke-webview`).
 pub fn launch_desktop_window(
     config: &DesktopLaunchConfig,
 ) -> Result<DesktopRunReport, DesktopHostError> {
+    let session = resolve_desktop_session(config)?;
+    let init_script = if config.headless_smoke {
+        None
+    } else {
+        let bridge_cfg = build_bridge_init_config(
+            session.is_development,
+            &config.app_version,
+            session.http_base_url.clone(),
+            session.ws_base_url.clone(),
+            session.bootstrap_token.clone(),
+        );
+        Some(
+            render_desktop_bridge_init_script(&bridge_cfg)
+                .map_err(DesktopHostError::WebViewCreate)?,
+        )
+    };
+
     let mut event_loop = build_event_loop(config);
     let proxy = event_loop.create_proxy();
     let clamped_bounds = clamp_loop_monitors(&event_loop, config);
     let window = create_desktop_window(&event_loop, config, clamped_bounds)?;
 
-    let data_dir_guard = SmokeTempDir::new(config.web_data_dir.as_deref(), config.headless_smoke)?;
+    let fallback_web_dir: Option<PathBuf> = (!config.headless_smoke
+        && config.web_data_dir.is_none())
+    .then(|| config.base_dir.join("userdata").join("webview-data"));
+    let data_dir_guard = SmokeTempDir::new(
+        config
+            .web_data_dir
+            .as_deref()
+            .or(fallback_web_dir.as_deref()),
+        config.headless_smoke,
+    )?;
     let mut web_context = WebContext::new(Some(data_dir_guard.path.clone()));
     let tracker = Arc::new(Mutex::new(RuntimeTracker::default()));
-    let router = Arc::new(Mutex::new(DesktopIpcRouter::new(SidecarController::new(
-        SidecarConfig {
+    let router = Arc::new(Mutex::new(
+        DesktopIpcRouter::new(SidecarController::new(SidecarConfig {
             base_dir: config.base_dir.clone(),
+            mode: SidecarMode::from_is_development(session.is_development),
+            base_dir_is_explicit: config.base_dir_origin.is_explicit(),
             app_version: config.app_version.clone(),
             ..SidecarConfig::default()
-        },
-    ))));
+        }))
+        .with_local_bootstrap(
+            session.http_base_url.clone(),
+            session.ws_base_url.clone(),
+            session.bootstrap_token.clone(),
+        ),
+    ));
 
     let control_thread = config
         .enable_control_server
         .then(|| spawn_control_server_thread(&config.base_dir, proxy.clone()));
-    let webview =
-        build_desktop_webview(config, &window, &mut web_context, &router, &tracker, &proxy)?;
+    let webview = build_desktop_webview(
+        &WebviewRuntimeSpec {
+            config,
+            initial_url: &session.initial_url,
+            init_script: init_script.as_deref(),
+            router: &router,
+            tracker: &tracker,
+            proxy: &proxy,
+        },
+        &window,
+        &mut web_context,
+    )?;
     let watchdog = config
         .headless_smoke
         .then(|| spawn_smoke_watchdog(config.smoke_timeout_ms, proxy));
@@ -71,6 +126,7 @@ pub fn launch_desktop_window(
         let _ = handle.join();
     }
     drop(web_context);
+    drop(session.managed_sidecar);
 
     let snapshot = tracker
         .lock()
@@ -158,23 +214,20 @@ fn create_desktop_window(
 }
 
 fn build_desktop_webview(
-    config: &DesktopLaunchConfig,
+    spec: &WebviewRuntimeSpec<'_>,
     window: &Window,
     web_context: &mut WebContext,
-    router: &Arc<Mutex<DesktopIpcRouter>>,
-    tracker: &Arc<Mutex<RuntimeTracker>>,
-    proxy: &EventLoopProxy<DesktopUserEvent>,
 ) -> Result<WebView, DesktopHostError> {
-    let smoke_html = config.headless_smoke.then(build_smoke_html);
-    let proto_static_dir = config.static_dir.clone();
-    let proto_clerk_host = config.clerk_frontend_api_hostname.clone();
-    let proto_tracker = tracker.clone();
-    let ipc_router = router.clone();
-    let ipc_proxy = proxy.clone();
-    let ipc_tracker = tracker.clone();
-    let load_tracker = tracker.clone();
+    let smoke_html = spec.config.headless_smoke.then(build_smoke_html);
+    let proto_static_dir = spec.config.static_dir.clone();
+    let proto_clerk_host = spec.config.clerk_frontend_api_hostname.clone();
+    let proto_tracker = spec.tracker.clone();
+    let ipc_router = spec.router.clone();
+    let ipc_proxy = spec.proxy.clone();
+    let ipc_tracker = spec.tracker.clone();
+    let load_tracker = spec.tracker.clone();
 
-    let web_builder = WebViewBuilder::new_with_web_context(web_context)
+    let mut web_builder = WebViewBuilder::new_with_web_context(web_context)
         .with_custom_protocol(desktop_scheme_name().to_owned(), move |_id, request| {
             let mut local_metrics = CustomProtocolMetrics::default();
             let resp = resolve_custom_protocol_request(
@@ -201,7 +254,10 @@ fn build_desktop_webview(
                 guard.webview_loaded = true;
             }
         })
-        .with_url(&config.initial_url);
+        .with_url(spec.initial_url);
+    if let Some(script) = spec.init_script {
+        web_builder = web_builder.with_initialization_script(script);
+    }
 
     #[cfg(target_os = "linux")]
     {
@@ -244,6 +300,31 @@ fn handle_loop_event(
                 let _ = webview.evaluate_script(&script);
             }
         }
+        Event::UserEvent(DesktopUserEvent::RevealWindow) => {
+            window.set_minimized(false);
+            window.set_visible(true);
+            window.set_focus();
+        }
+        Event::WindowEvent {
+            event: WindowEvent::Resized(_),
+            ..
+        } => {
+            let is_fullscreen = window.fullscreen().is_some();
+            let changed = tracker.lock().is_ok_and(|mut guard| {
+                if guard.last_fullscreen == is_fullscreen {
+                    false
+                } else {
+                    guard.last_fullscreen = is_fullscreen;
+                    true
+                }
+            });
+            if changed {
+                let script = format!(
+                    "window.__legionEmitDesktopEvent && window.__legionEmitDesktopEvent(\"windowFullscreenState\", {is_fullscreen});"
+                );
+                let _ = webview.evaluate_script(&script);
+            }
+        }
         Event::UserEvent(DesktopUserEvent::ActivateWorkspace {
             request_id,
             workspace_root,
@@ -263,6 +344,18 @@ fn handle_loop_event(
                 );
                 let _ = webview.evaluate_script(&script);
             }
+            if let Ok(activation) = serde_json::to_string(&serde_json::json!({
+                "version": 1,
+                "requestId": request_id,
+                "type": "open-workspace",
+                "workspaceRoot": workspace_root,
+                "platform": client_platform(),
+            })) {
+                let script = format!(
+                    "window.__legionEmitDesktopEvent && window.__legionEmitDesktopEvent(\"appActivationRequest\", {activation});"
+                );
+                let _ = webview.evaluate_script(&script);
+            }
         }
         Event::UserEvent(DesktopUserEvent::SmokeTimeout) => {
             if let Ok(mut guard) = tracker.lock() {
@@ -271,49 +364,5 @@ fn handle_loop_event(
             *control_flow = ControlFlow::Exit;
         }
         _ => {}
-    }
-}
-
-fn handle_webview_ipc(
-    body: &str,
-    router: &Arc<Mutex<DesktopIpcRouter>>,
-    tracker: &Arc<Mutex<RuntimeTracker>>,
-    proxy: &EventLoopProxy<DesktopUserEvent>,
-) {
-    let Ok(req) = serde_json::from_str::<DesktopIpcRequest>(body) else {
-        return;
-    };
-    if req.method == "desktop.__smokeComplete" {
-        if let Ok(mut guard) = tracker.lock() {
-            guard.smoke_signal.js_smoke_ok =
-                req.params.get("ok").and_then(serde_json::Value::as_bool) == Some(true);
-            guard.smoke_signal.js_traversal_rejected = req
-                .params
-                .get("traversalRejected")
-                .and_then(serde_json::Value::as_bool)
-                == Some(true);
-            guard.js_fetch_traversal_status = req
-                .params
-                .get("fetchTraversalStatus")
-                .and_then(serde_json::Value::as_u64)
-                .and_then(|n| u16::try_from(n).ok())
-                .unwrap_or(0);
-            guard.smoke_signal.smoke_completed = true;
-        }
-        let _ = proxy.send_event(DesktopUserEvent::SmokeComplete);
-        return;
-    }
-
-    let reply_json = {
-        let Ok(mut guard) = router.lock() else {
-            return;
-        };
-        serde_json::to_string(&guard.dispatch(req)).ok()
-    };
-    if let Some(json) = reply_json {
-        if let Ok(mut guard) = tracker.lock() {
-            guard.ipc_round_trips += 1;
-        }
-        let _ = proxy.send_event(DesktopUserEvent::IpcReply(json));
     }
 }

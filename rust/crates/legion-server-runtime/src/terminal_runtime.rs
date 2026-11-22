@@ -1,4 +1,4 @@
-//! Live terminal session manager wiring `TerminalSessionKeys` (`BUG-08`), `VtParser`, `AnsiPalette256` (`BUG-25`), and `"LCVT"` snapshots.
+//! Live terminal session manager wiring `TerminalSessionKeys` (`BUG-08`), `VtParser`, `AnsiPalette256` (`BUG-25`), `"LCVT"` snapshots, interactive OS PTYs, and broadcast streams.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex as StdMutex};
@@ -6,22 +6,26 @@ use std::sync::{Arc, Mutex as StdMutex};
 use legion_protocol::provider_env::{
     TerminalResumeStatus, TerminalSessionKey, TerminalSessionKeys,
 };
-use legion_terminal_vt::{Rgba, TerminalGrid, VtParser, encode_lcvt};
-use tokio::sync::Notify;
+use legion_terminal_vt::{Rgba, encode_lcvt};
+use tokio::sync::{Notify, broadcast};
 
 use crate::error::ServerRuntimeError;
 use crate::terminal_session::{
-    AttachedProcess, EvictedSessionMeta, TerminalOpenRequest, TerminalOpenResult,
-    TerminalSessionEntry, TerminalSnapshotResult, prepare_write_bytes,
+    DEFAULT_STREAM_CHANNEL_CAPACITY, EvictedSessionMeta, TerminalMetadataStreamEvent,
+    TerminalOpenRequest, TerminalOpenResult, TerminalOutputSubscription, TerminalSessionEntry,
+    TerminalSessionStateSnapshot, TerminalSessionSummary, TerminalSnapshotResult, active_entry,
+    active_entry_mut, build_opened_entry, collect_summaries, prepare_write_bytes,
+    validate_resume_eligibility,
 };
 
 struct RuntimeState {
     keys: TerminalSessionKeys,
     active: HashMap<TerminalSessionKey, TerminalSessionEntry>,
     evicted_meta: HashMap<TerminalSessionKey, EvictedSessionMeta>,
+    metadata_tx: broadcast::Sender<TerminalMetadataStreamEvent>,
 }
 
-/// Thread-safe live terminal runtime managing VT grids, palettes, snapshots, and child processes.
+/// Thread-safe live terminal runtime managing VT grids, palettes, snapshots, and child PTY/pipe processes.
 #[derive(Clone)]
 pub struct TerminalRuntime {
     state: Arc<StdMutex<RuntimeState>>,
@@ -36,11 +40,13 @@ impl Default for TerminalRuntime {
 impl TerminalRuntime {
     /// Create a [`TerminalRuntime`] retaining up to `max_inactive_retained` inactive sessions before LRU eviction (`BUG-08`).
     pub fn with_capacity(max_inactive_retained: usize) -> Self {
+        let (metadata_tx, _) = broadcast::channel(DEFAULT_STREAM_CHANNEL_CAPACITY);
         Self {
             state: Arc::new(StdMutex::new(RuntimeState {
                 keys: TerminalSessionKeys::with_capacity(max_inactive_retained),
                 active: HashMap::new(),
                 evicted_meta: HashMap::new(),
+                metadata_tx,
             })),
         }
     }
@@ -51,25 +57,8 @@ impl TerminalRuntime {
         req: &TerminalOpenRequest,
     ) -> Result<TerminalOpenResult, ServerRuntimeError> {
         let key = TerminalSessionKey::new(&req.thread_id, &req.terminal_id);
-        let mut guard = self
-            .state
-            .lock()
-            .map_err(|_| ServerRuntimeError::Terminal("terminal mutex poisoned".to_owned()))?;
-
-        if req.resume {
-            if guard.keys.is_closed(&key) {
-                return Err(ServerRuntimeError::Conflict(format!(
-                    "terminal `{}` was explicitly closed and cannot be resumed",
-                    key.to_wire_key()
-                )));
-            }
-            if !guard.keys.can_resume(&key) {
-                return Err(ServerRuntimeError::NotFound(format!(
-                    "terminal `{}` has no resumable session state",
-                    key.to_wire_key()
-                )));
-            }
-        }
+        let mut guard = lock_state(&self.state)?;
+        validate_resume_eligibility(&guard.keys, &key, req.resume)?;
 
         let was_evicted = guard.keys.is_evicted(&key);
         if req.resume
@@ -97,53 +86,15 @@ impl TerminalRuntime {
             let _ = guard.evicted_meta.remove(&key);
             None
         };
-        let cols = meta.as_ref().map_or(req.cols, |m| m.cols);
-        let rows = meta.as_ref().map_or(req.rows, |m| m.rows);
-        let cwd = req
-            .cwd
-            .clone()
-            .or_else(|| meta.as_ref().and_then(|m| m.cwd.clone()));
-        let palette_overrides = meta.map_or_else(Vec::new, |m| m.palette_overrides);
-
-        let mut grid_val = TerminalGrid::try_new(cols, rows)?;
-        if !palette_overrides.is_empty() {
-            grid_val
-                .palette_mut()
-                .apply_theme_overrides(&palette_overrides);
-        }
-        let grid = Arc::new(StdMutex::new(grid_val));
-        let parser = Arc::new(StdMutex::new(VtParser::new()));
-        let output_notify = Arc::new(Notify::new());
-
-        let process = match &req.command {
-            Some(cmd) => Some(AttachedProcess::spawn(
-                cmd,
-                &req.args,
-                cwd.as_ref(),
-                &req.env_overrides,
-                &grid,
-                &parser,
-                &output_notify,
-            )?),
-            None => None,
-        };
+        let metadata_tx = guard.metadata_tx.clone();
+        let (cols, rows, entry) = build_opened_entry(req, meta, metadata_tx)?;
 
         if let Some(mut old) = guard.active.remove(&key)
             && let Some(mut proc_handle) = old.process.take()
         {
             proc_handle.terminate();
         }
-        guard.active.insert(
-            key.clone(),
-            TerminalSessionEntry {
-                grid,
-                parser,
-                cwd,
-                palette_overrides,
-                process,
-                output_notify,
-            },
-        );
+        guard.active.insert(key.clone(), entry);
         guard.keys.open(key.clone());
         let status = guard.keys.status(&key);
 
@@ -164,15 +115,15 @@ impl TerminalRuntime {
         terminal_id: &str,
     ) -> Result<Vec<TerminalSessionKey>, ServerRuntimeError> {
         let key = TerminalSessionKey::new(thread_id, terminal_id);
-        let mut guard = self
-            .state
-            .lock()
-            .map_err(|_| ServerRuntimeError::Terminal("terminal mutex poisoned".to_owned()))?;
+        let mut guard = lock_state(&self.state)?;
         let evicted = guard.keys.mark_inactive(key);
         for ev_key in &evicted {
             if let Some(mut entry) = guard.active.remove(ev_key) {
                 if let Some(mut proc_handle) = entry.process.take() {
                     proc_handle.terminate();
+                }
+                if let Ok(mut s) = entry.stream.lock() {
+                    s.mark_closed();
                 }
                 let (cols, rows) = entry.grid.lock().map_or((80, 24), |g| (g.cols(), g.rows()));
                 guard.evicted_meta.insert(
@@ -181,6 +132,7 @@ impl TerminalRuntime {
                         cols,
                         rows,
                         cwd: entry.cwd,
+                        worktree_path: entry.worktree_path,
                         palette_overrides: entry.palette_overrides,
                     },
                 );
@@ -198,25 +150,29 @@ impl TerminalRuntime {
         as_paste: bool,
     ) -> Result<(), ServerRuntimeError> {
         let key = TerminalSessionKey::new(thread_id, terminal_id);
-        let mut guard = self
-            .state
-            .lock()
-            .map_err(|_| ServerRuntimeError::Terminal("terminal mutex poisoned".to_owned()))?;
-        let entry = guard.active.get_mut(&key).ok_or_else(|| {
-            ServerRuntimeError::NotFound(format!("terminal `{}` is not active", key.to_wire_key()))
-        })?;
+        let mut guard = lock_state(&self.state)?;
+        let entry = active_entry_mut(&mut guard.active, &key)?;
         let bracketed = entry.grid.lock().is_ok_and(|g| g.bracketed_paste_enabled());
         let bytes = prepare_write_bytes(data, as_paste, bracketed);
         if let Some(proc_handle) = entry.process.as_mut() {
             proc_handle.write_bytes(&bytes)?;
-        } else if let (Ok(mut g), Ok(mut p)) = (entry.grid.lock(), entry.parser.lock()) {
-            p.feed(&bytes, &mut g);
+        } else {
+            let title = if let (Ok(mut g), Ok(mut p)) = (entry.grid.lock(), entry.parser.lock()) {
+                p.feed(&bytes, &mut g);
+                let t = g.title();
+                (!t.is_empty()).then(|| t.to_owned())
+            } else {
+                None
+            };
+            if let Ok(mut s) = entry.stream.lock() {
+                s.push_raw_output(&bytes, title.as_deref());
+            }
             entry.output_notify.notify_waiters();
         }
         Ok(())
     }
 
-    /// Resize the session's `TerminalGrid`.
+    /// Resize the session's `TerminalGrid` and any attached OS PTY (`PtyProcess::resize`).
     pub fn terminal_resize(
         &self,
         thread_id: &str,
@@ -230,19 +186,110 @@ impl TerminalRuntime {
             ));
         }
         let key = TerminalSessionKey::new(thread_id, terminal_id);
-        let guard = self
-            .state
-            .lock()
-            .map_err(|_| ServerRuntimeError::Terminal("terminal mutex poisoned".to_owned()))?;
-        let entry = guard.active.get(&key).ok_or_else(|| {
-            ServerRuntimeError::NotFound(format!("terminal `{}` is not active", key.to_wire_key()))
-        })?;
+        let guard = lock_state(&self.state)?;
+        let entry = active_entry(&guard.active, &key)?;
+        if let Some(proc_handle) = entry.process.as_ref() {
+            proc_handle.resize(cols, rows)?;
+        }
         let mut g = entry
             .grid
             .lock()
             .map_err(|_| ServerRuntimeError::Terminal("grid mutex poisoned".to_owned()))?;
         g.resize(cols, rows);
+        drop(g);
+        if let Ok(mut s) = entry.stream.lock() {
+            s.mark_resize(cols, rows);
+        }
         Ok(())
+    }
+
+    /// Clear the active session's viewport, scrollback buffer, and broadcast history replay cache.
+    pub fn terminal_clear(
+        &self,
+        thread_id: &str,
+        terminal_id: &str,
+    ) -> Result<(), ServerRuntimeError> {
+        let key = TerminalSessionKey::new(thread_id, terminal_id);
+        let guard = lock_state(&self.state)?;
+        let entry = active_entry(&guard.active, &key)?;
+        if let (Ok(mut g), Ok(mut p)) = (entry.grid.lock(), entry.parser.lock()) {
+            p.feed(b"\x1b[2J\x1b[3J\x1b[H", &mut g);
+        }
+        if let Ok(mut s) = entry.stream.lock() {
+            s.mark_cleared();
+        }
+        entry.output_notify.notify_waiters();
+        Ok(())
+    }
+
+    /// Subscribe atomically to an active session's output/lifecycle broadcast stream + initial history snapshot.
+    pub fn subscribe_output(
+        &self,
+        thread_id: &str,
+        terminal_id: &str,
+    ) -> Result<TerminalOutputSubscription, ServerRuntimeError> {
+        self.subscribe_output_with_limit(thread_id, terminal_id, None)
+    }
+
+    /// Subscribe atomically with an optional `max_history_bytes` replay cap (matching `TerminalAttachInput.maxHistoryBytes`).
+    pub fn subscribe_output_with_limit(
+        &self,
+        thread_id: &str,
+        terminal_id: &str,
+        max_history_bytes: Option<usize>,
+    ) -> Result<TerminalOutputSubscription, ServerRuntimeError> {
+        let key = TerminalSessionKey::new(thread_id, terminal_id);
+        let guard = lock_state(&self.state)?;
+        let entry = active_entry(&guard.active, &key)?;
+        let stream = entry
+            .stream
+            .lock()
+            .map_err(|_| ServerRuntimeError::Terminal("stream mutex poisoned".to_owned()))?;
+        Ok(stream.subscribe(max_history_bytes))
+    }
+
+    /// Fetch the wire-compatible session state snapshot including sanitized scrollback history.
+    pub fn session_snapshot(
+        &self,
+        thread_id: &str,
+        terminal_id: &str,
+        max_history_bytes: Option<usize>,
+    ) -> Result<TerminalSessionStateSnapshot, ServerRuntimeError> {
+        let key = TerminalSessionKey::new(thread_id, terminal_id);
+        let guard = lock_state(&self.state)?;
+        let entry = active_entry(&guard.active, &key)?;
+        let stream = entry
+            .stream
+            .lock()
+            .map_err(|_| ServerRuntimeError::Terminal("stream mutex poisoned".to_owned()))?;
+        Ok(stream.snapshot(max_history_bytes))
+    }
+
+    /// List lightweight metadata summaries for active sessions (optionally filtered to one `thread_id`).
+    pub fn list_summaries(&self, thread_id: Option<&str>) -> Vec<TerminalSessionSummary> {
+        let Ok(guard) = self.state.lock() else {
+            return Vec::new();
+        };
+        collect_summaries(&guard.active, thread_id)
+    }
+
+    /// Atomically captures the current fleet metadata snapshot and subscribes to future upserts/removals.
+    pub fn subscribe_metadata(
+        &self,
+    ) -> Result<
+        (
+            TerminalMetadataStreamEvent,
+            broadcast::Receiver<TerminalMetadataStreamEvent>,
+        ),
+        ServerRuntimeError,
+    > {
+        let guard = lock_state(&self.state)?;
+        let receiver = guard.metadata_tx.subscribe();
+        let terminals = collect_summaries(&guard.active, None);
+        Ok((
+            TerminalMetadataStreamEvent::Snapshot { terminals },
+            receiver,
+        ))
     }
 
     /// Apply 256-color palette overrides (`BUG-25`) to an active terminal's `AnsiPalette256`.
@@ -253,13 +300,8 @@ impl TerminalRuntime {
         overrides: &[(u8, Rgba)],
     ) -> Result<(), ServerRuntimeError> {
         let key = TerminalSessionKey::new(thread_id, terminal_id);
-        let mut guard = self
-            .state
-            .lock()
-            .map_err(|_| ServerRuntimeError::Terminal("terminal mutex poisoned".to_owned()))?;
-        let entry = guard.active.get_mut(&key).ok_or_else(|| {
-            ServerRuntimeError::NotFound(format!("terminal `{}` is not active", key.to_wire_key()))
-        })?;
+        let mut guard = lock_state(&self.state)?;
+        let entry = active_entry_mut(&mut guard.active, &key)?;
         entry.palette_overrides.extend_from_slice(overrides);
         let mut g = entry
             .grid
@@ -276,13 +318,8 @@ impl TerminalRuntime {
         terminal_id: &str,
     ) -> Result<TerminalSnapshotResult, ServerRuntimeError> {
         let key = TerminalSessionKey::new(thread_id, terminal_id);
-        let guard = self
-            .state
-            .lock()
-            .map_err(|_| ServerRuntimeError::Terminal("terminal mutex poisoned".to_owned()))?;
-        let entry = guard.active.get(&key).ok_or_else(|| {
-            ServerRuntimeError::NotFound(format!("terminal `{}` is not active", key.to_wire_key()))
-        })?;
+        let guard = lock_state(&self.state)?;
+        let entry = active_entry(&guard.active, &key)?;
         let g = entry
             .grid
             .lock()
@@ -306,14 +343,14 @@ impl TerminalRuntime {
         terminal_id: &str,
     ) -> Result<(), ServerRuntimeError> {
         let key = TerminalSessionKey::new(thread_id, terminal_id);
-        let mut guard = self
-            .state
-            .lock()
-            .map_err(|_| ServerRuntimeError::Terminal("terminal mutex poisoned".to_owned()))?;
-        if let Some(mut entry) = guard.active.remove(&key)
-            && let Some(mut proc_handle) = entry.process.take()
-        {
-            proc_handle.terminate();
+        let mut guard = lock_state(&self.state)?;
+        if let Some(mut entry) = guard.active.remove(&key) {
+            if let Some(mut proc_handle) = entry.process.take() {
+                proc_handle.terminate();
+            }
+            if let Ok(mut s) = entry.stream.lock() {
+                s.mark_closed();
+            }
         }
         let _ = guard.evicted_meta.remove(&key);
         guard.keys.close(key);
@@ -341,4 +378,12 @@ impl TerminalRuntime {
             .ok()
             .and_then(|g| g.active.get(&key).map(|e| Arc::clone(&e.output_notify)))
     }
+}
+
+fn lock_state(
+    state: &StdMutex<RuntimeState>,
+) -> Result<std::sync::MutexGuard<'_, RuntimeState>, ServerRuntimeError> {
+    state
+        .lock()
+        .map_err(|_| ServerRuntimeError::Terminal("terminal mutex poisoned".to_owned()))
 }

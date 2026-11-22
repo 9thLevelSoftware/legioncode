@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use std::env;
 use std::path::{Path, PathBuf};
 
-use legion_persistence::paths::ServerDerivedPaths;
+use legion_persistence::paths::{ServerDerivedPaths, resolve_base_dir};
 use legion_persistence::service_preflight::{SERVICE_LAUNCHER_PROTOCOL, ServicePreflightResult};
 use legion_process_ffi::env::SanitizedChildEnv;
 use legion_process_ffi::pipes::ParentPipeSet;
@@ -46,10 +46,14 @@ pub enum SidecarError {
 pub enum RuntimeDiscoverySource {
     /// Caller-supplied `explicit_binary_path`.
     Explicit,
+    /// Executable named by `LEGIONCODE_RUST_BIN`.
+    RustBinEnv,
     /// Bundled Tauri `externalBin` path under `binaries/`.
     TauriExternalBin,
-    /// Sibling binary beside the running desktop host executable.
+    /// Sibling binary beside or under `../bin` relative to the desktop host executable.
     SiblingBinary,
+    /// Sibling Cargo/dist workspace build target.
+    WorkspaceTarget,
     /// Executable named by `LEGIONCODE_CLI_PATH`.
     CliPathEnv,
     /// Discovered via the process `PATH`.
@@ -133,10 +137,11 @@ pub struct SidecarConfig {
 
 impl Default for SidecarConfig {
     fn default() -> Self {
+        let (base_dir, base_dir_is_explicit) = resolve_base_dir(None);
         Self {
-            base_dir: default_legioncode_home(),
+            base_dir,
             mode: SidecarMode::Production,
-            base_dir_is_explicit: false,
+            base_dir_is_explicit,
             app_version: env!("CARGO_PKG_VERSION").to_owned(),
             launcher_protocol: SERVICE_LAUNCHER_PROTOCOL,
             host: "127.0.0.1".to_owned(),
@@ -191,9 +196,30 @@ pub(crate) fn probe_runtime_candidates(
     path_env: Option<&str>,
     current_exe: Option<&Path>,
 ) -> SidecarRuntimeDiscovery {
+    probe_runtime_candidates_with_rust_bin(
+        explicit_binary_path,
+        None,
+        cli_path_env,
+        path_env,
+        current_exe,
+        false,
+    )
+}
+
+pub(crate) fn probe_runtime_candidates_with_rust_bin(
+    explicit_binary_path: Option<&Path>,
+    rust_bin_env: Option<&str>,
+    cli_path_env: Option<&str>,
+    path_env: Option<&str>,
+    current_exe: Option<&Path>,
+    include_workspace_targets: bool,
+) -> SidecarRuntimeDiscovery {
     let mut candidates = Vec::new();
     if let Some(explicit) = explicit_binary_path {
         candidates.push((RuntimeDiscoverySource::Explicit, explicit.to_path_buf()));
+    }
+    if let Some(rust_bin) = rust_bin_env.map(str::trim).filter(|s| !s.is_empty()) {
+        candidates.push((RuntimeDiscoverySource::RustBinEnv, PathBuf::from(rust_bin)));
     }
     if let Some(exe_dir) = current_exe.and_then(Path::parent) {
         for name in sidecar_binary_names() {
@@ -206,6 +232,15 @@ pub(crate) fn probe_runtime_candidates(
                 exe_dir.join("resources").join("binaries").join(&name),
             ));
             candidates.push((RuntimeDiscoverySource::SiblingBinary, exe_dir.join(&name)));
+            if let Some(parent_dir) = exe_dir.parent() {
+                candidates.push((
+                    RuntimeDiscoverySource::SiblingBinary,
+                    parent_dir.join("bin").join(&name),
+                ));
+            }
+        }
+        if include_workspace_targets {
+            push_workspace_candidates(exe_dir, &mut candidates);
         }
     }
     if let Some(cli_path) = cli_path_env.map(str::trim).filter(|s| !s.is_empty()) {
@@ -244,11 +279,29 @@ pub(crate) fn probe_runtime_candidates(
     }
 }
 
-fn default_legioncode_home() -> PathBuf {
-    let home = env::var_os("USERPROFILE")
-        .or_else(|| env::var_os("HOME"))
-        .map_or_else(|| PathBuf::from("."), PathBuf::from);
-    home.join(legion_contracts::brand::ACTIVE_BRAND.home_dir_name)
+fn push_workspace_candidates(
+    exe_dir: &Path,
+    candidates: &mut Vec<(RuntimeDiscoverySource, PathBuf)>,
+) {
+    let binary_name = default_sidecar_filename();
+    for ancestor in exe_dir.ancestors().take(5) {
+        if ancestor.join("Cargo.toml").is_file() {
+            for rel in ["dist/bin", "target/release", "target/debug"] {
+                candidates.push((
+                    RuntimeDiscoverySource::WorkspaceTarget,
+                    ancestor.join(rel).join(binary_name),
+                ));
+            }
+        }
+        if ancestor.join("rust").join("Cargo.toml").is_file() {
+            for rel in ["rust/dist/bin", "rust/target/release", "rust/target/debug"] {
+                candidates.push((
+                    RuntimeDiscoverySource::WorkspaceTarget,
+                    ancestor.join(rel).join(binary_name),
+                ));
+            }
+        }
+    }
 }
 
 fn default_sidecar_filename() -> &'static str {

@@ -52,7 +52,6 @@ pub use crate::bridge_wave5::{
     active_brand_json, allows_preview_tunnel_json, highlight_hdl_json, link_batch_plan_json,
     normalize_nfd_filename, resolve_linked_thread_open_json, strip_osc4_queries,
 };
-pub use crate::bridge_web_ui::{WebAppBridge, emit_web_app_bundle_json};
 pub use crate::bridge_worker::EdgeWorkerBridge;
 
 const MAX_SAFE_JS_INTEGER: u64 = (1_u64 << 53) - 1;

@@ -11,6 +11,13 @@ pub mod env;
 pub mod ffi_boundary;
 pub mod keep_awake;
 pub mod pipes;
+pub mod pty;
+#[cfg(unix)]
+mod pty_unix;
+#[cfg(windows)]
+mod pty_win32;
+#[cfg(windows)]
+mod pty_win32_ffi;
 pub mod resource_monitor;
 mod resource_monitor_codec;
 mod resource_monitor_events;

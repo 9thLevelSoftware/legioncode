@@ -1,6 +1,8 @@
 use legion_contracts::orchestration::{
-    INTERNAL_COMMAND_TYPES, OrchestrationCommand, PatchValue, StoredDomainEvent, StreamItem,
-    is_internal_command_type, is_known_domain_event_type, is_known_turn_item_type,
+    INTERNAL_COMMAND_TYPES, OrchestrationCommand, PatchValue, ProjectWireCommand,
+    StoredDomainEvent, StreamItem, WireClientCommand, decode_wire_client_command,
+    decode_wire_orchestration_command, is_internal_command_type, is_known_domain_event_type,
+    is_known_turn_item_type,
 };
 use proptest::prelude::*;
 use serde_json::{Value, json};
@@ -194,4 +196,101 @@ proptest! {
         });
         prop_assert!(serde_json::from_value::<StreamItem>(bad_turn_item).is_err());
     }
+}
+
+#[test]
+fn wire_command_decoders_handle_v1_aliases_projects_and_reject_internal() {
+    let start_v1 = decode_wire_orchestration_command(json!({
+        "type": "thread.turn.start",
+        "commandId": "cmd-start-1",
+        "threadId": "t-1",
+        "message": { "messageId": "msg-v1", "text": "hello world", "attachments": [] }
+    }))
+    .expect("v1 turn start");
+    assert_eq!(start_v1.command_type(), "message.dispatch");
+
+    let interrupt_with_turn = decode_wire_orchestration_command(json!({
+        "type": "thread.turn.interrupt",
+        "commandId": "cmd-int-1",
+        "threadId": "t-1",
+        "turnId": "run-1"
+    }))
+    .expect("v1 turn interrupt with turnId");
+    assert_eq!(interrupt_with_turn.command_type(), "run.interrupt");
+
+    let interrupt_stop = decode_wire_orchestration_command(json!({
+        "type": "thread.turn.interrupt",
+        "commandId": "cmd-int-2",
+        "threadId": "t-1"
+    }))
+    .expect("v1 turn interrupt without turnId");
+    assert_eq!(interrupt_stop.command_type(), "thread.stop");
+
+    let approval = decode_wire_orchestration_command(json!({
+        "type": "thread.approval.respond",
+        "commandId": "cmd-app-1",
+        "threadId": "t-1",
+        "requestId": "req-1",
+        "decision": "accept"
+    }))
+    .expect("v1 approval respond");
+    assert_eq!(approval.command_type(), "runtime-request.respond");
+
+    let user_input = decode_wire_orchestration_command(json!({
+        "type": "thread.user-input.respond",
+        "commandId": "cmd-ui-1",
+        "threadId": "t-1",
+        "requestId": "req-2",
+        "answers": { "q1": "yes" }
+    }))
+    .expect("v1 user input respond");
+    assert_eq!(user_input.command_type(), "runtime-request.respond");
+
+    let revert = decode_wire_orchestration_command(json!({
+        "type": "thread.checkpoint.revert",
+        "commandId": "cmd-rev-1",
+        "threadId": "t-1",
+        "turnCount": 2
+    }))
+    .expect("v1 checkpoint revert");
+    assert_eq!(revert.command_type(), "checkpoint.rollback");
+
+    let project_create = decode_wire_client_command(json!({
+        "type": "project.create",
+        "commandId": "cmd-pc-1",
+        "title": "Workspace",
+        "workspaceRoot": "/repo",
+        "defaultModelSelection": { "provider": "claude", "model": "claude-haiku-4-5" }
+    }))
+    .expect("project.create");
+    match project_create {
+        WireClientCommand::Project(proj) => match *proj {
+            ProjectWireCommand::Create(create) => {
+                assert_eq!(create.title, "Workspace");
+                assert!(matches!(create.default_model_selection, PatchValue::Set(_)));
+            }
+            other => panic!("expected ProjectWireCommand::Create, got {other:?}"),
+        },
+        other @ WireClientCommand::Orchestration(_) => {
+            panic!("expected WireClientCommand::Project, got {other:?}")
+        }
+    }
+
+    let project_update = decode_wire_client_command(json!({
+        "type": "project.update",
+        "projectId": "p-1",
+        "autoPull": true
+    }))
+    .expect("project.update alias");
+    assert!(matches!(
+        project_update,
+        WireClientCommand::Project(ref p) if matches!(**p, ProjectWireCommand::Update(_))
+    ));
+
+    let rejected = decode_wire_client_command(json!({
+        "type": "thread.guest-share.open",
+        "commandId": "cmd-bad",
+        "threadId": "t-1"
+    }));
+    assert!(rejected.is_err());
 }

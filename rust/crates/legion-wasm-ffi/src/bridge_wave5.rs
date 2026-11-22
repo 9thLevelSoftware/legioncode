@@ -12,8 +12,9 @@ use legion_contracts::peer_links::PeerLinkName;
 use legion_contracts::policy::{ManagedPolicySummary, allows_preview_tunnel};
 use legion_shared::text_norm::file_display_name;
 use legion_terminal_vt::sanitize_terminal_history;
-use legion_web_ui::hdl_highlight::{resolve_hdl_language, tokenize_hdl};
 use serde::{Deserialize, Serialize};
+
+use crate::hdl_highlight::{resolve_hdl_language, tokenize_hdl};
 
 /// Normalizes macOS NFD filenames and extracts clean NFC display names (`legion_shared::text_norm`).
 #[must_use]
@@ -148,7 +149,7 @@ pub fn link_batch_plan_json(input_json: &str) -> Result<String, String> {
     .map_err(|err| err.to_string())
 }
 
-/// Tokenizes Verilog, `SystemVerilog`, or VHDL snippets (`legion_web_ui::hdl_highlight`).
+/// Tokenizes Verilog, `SystemVerilog`, or VHDL snippets (`crate::hdl_highlight`).
 pub fn highlight_hdl_json(lang_or_path: &str, source: &str) -> Result<String, String> {
     let Some(lang) = resolve_hdl_language(lang_or_path) else {
         return serde_json::to_string(&serde_json::json!({ "language": null, "tokens": [] }))

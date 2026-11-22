@@ -4,17 +4,21 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, mpsc};
+use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
 
+use legion_contracts::brand::ACTIVE_BRAND;
 use legion_surfaces::desktop::WindowBounds;
 use tao::event_loop::EventLoopProxy;
 
 use crate::control_server::{ActivationHandler, DesktopControlResponse, DesktopControlServer};
+use crate::ipc::{DesktopIpcRequest, DesktopIpcRouter};
+use crate::sidecar::ManagedDesktopSidecar;
+use crate::sidecar_process::start_managed_desktop_sidecar;
 use crate::window_host_protocol::CustomProtocolMetrics;
 use crate::window_host_types::{
-    DesktopExitReason, DesktopHostError, DesktopLaunchConfig, DesktopRunReport, DesktopUserEvent,
-    WebviewSmokeChecks,
+    DesktopExitReason, DesktopHostError, DesktopLaunchConfig, DesktopRunReport,
+    DesktopSidecarPolicy, DesktopUserEvent, WebviewSmokeChecks,
 };
 
 static WEB_TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -35,6 +39,7 @@ pub(crate) struct RuntimeTracker {
     pub ipc_round_trips: usize,
     pub js_fetch_traversal_status: u16,
     pub activated_workspaces: Vec<String>,
+    pub last_fullscreen: bool,
 }
 
 pub(crate) struct SmokeTempDir {
@@ -200,5 +205,123 @@ pub(crate) fn finalize_report(
         },
         activated_workspaces: snapshot.activated_workspaces.clone(),
         failure_reason,
+    }
+}
+
+pub(crate) struct ResolvedSession {
+    pub initial_url: String,
+    pub http_base_url: Option<String>,
+    pub ws_base_url: Option<String>,
+    pub bootstrap_token: Option<String>,
+    pub is_development: bool,
+    pub managed_sidecar: Option<ManagedDesktopSidecar>,
+}
+
+pub(crate) fn resolve_desktop_session(
+    config: &DesktopLaunchConfig,
+) -> Result<ResolvedSession, DesktopHostError> {
+    if config.headless_smoke {
+        return Ok(ResolvedSession {
+            initial_url: config.initial_url.clone(),
+            http_base_url: None,
+            ws_base_url: None,
+            bootstrap_token: None,
+            is_development: false,
+            managed_sidecar: None,
+        });
+    }
+    let env_dev_url = ACTIVE_BRAND.read_env("DESKTOP_DEV_URL");
+    if let Some(dev_url) = config.dev_url.as_ref().or(env_dev_url.as_ref()) {
+        let trimmed = dev_url.trim().trim_end_matches('/');
+        let ws_url = ACTIVE_BRAND.read_env("DESKTOP_WS_URL").unwrap_or_else(|| {
+            if let Some(rest) = trimmed.strip_prefix("https://") {
+                format!("wss://{rest}/ws")
+            } else if let Some(rest) = trimmed.strip_prefix("http://") {
+                format!("ws://{rest}/ws")
+            } else {
+                format!("{trimmed}/ws")
+            }
+        });
+        return Ok(ResolvedSession {
+            initial_url: dev_url.trim().to_owned(),
+            http_base_url: Some(trimmed.to_owned()),
+            ws_base_url: Some(ws_url),
+            bootstrap_token: ACTIVE_BRAND.read_env("DEV_AUTH_TOKEN"),
+            is_development: true,
+            managed_sidecar: None,
+        });
+    }
+    if config.sidecar_policy == DesktopSidecarPolicy::ManagedLocal {
+        let sidecar = start_managed_desktop_sidecar(
+            &config.base_dir,
+            config.base_dir_origin.is_explicit(),
+            &config.app_version,
+            config.static_dir.as_deref(),
+        )
+        .map_err(DesktopHostError::SidecarStartup)?;
+        return Ok(ResolvedSession {
+            initial_url: format!("{}/", sidecar.http_base_url),
+            http_base_url: Some(sidecar.http_base_url.clone()),
+            ws_base_url: Some(sidecar.ws_base_url.clone()),
+            bootstrap_token: Some(sidecar.bootstrap_token.clone()),
+            is_development: false,
+            managed_sidecar: Some(sidecar),
+        });
+    }
+    Ok(ResolvedSession {
+        initial_url: config.initial_url.clone(),
+        http_base_url: None,
+        ws_base_url: None,
+        bootstrap_token: None,
+        is_development: false,
+        managed_sidecar: None,
+    })
+}
+
+pub(crate) fn handle_webview_ipc(
+    body: &str,
+    router: &Arc<Mutex<DesktopIpcRouter>>,
+    tracker: &Arc<Mutex<RuntimeTracker>>,
+    proxy: &EventLoopProxy<DesktopUserEvent>,
+) {
+    let Ok(req) = serde_json::from_str::<DesktopIpcRequest>(body) else {
+        return;
+    };
+    if req.method == "desktop.__smokeComplete" {
+        if let Ok(mut guard) = tracker.lock() {
+            guard.smoke_signal.js_smoke_ok =
+                req.params.get("ok").and_then(serde_json::Value::as_bool) == Some(true);
+            guard.smoke_signal.js_traversal_rejected = req
+                .params
+                .get("traversalRejected")
+                .and_then(serde_json::Value::as_bool)
+                == Some(true);
+            guard.js_fetch_traversal_status = req
+                .params
+                .get("fetchTraversalStatus")
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|n| u16::try_from(n).ok())
+                .unwrap_or(0);
+            guard.smoke_signal.smoke_completed = true;
+        }
+        let _ = proxy.send_event(DesktopUserEvent::SmokeComplete);
+        return;
+    }
+
+    let trigger_reveal = req.method == "desktop.bridge.revealWindow";
+    let reply_json = {
+        let Ok(mut guard) = router.lock() else {
+            return;
+        };
+        serde_json::to_string(&guard.dispatch(req)).ok()
+    };
+    if trigger_reveal {
+        let _ = proxy.send_event(DesktopUserEvent::RevealWindow);
+    }
+    if let Some(json) = reply_json {
+        if let Ok(mut guard) = tracker.lock() {
+            guard.ipc_round_trips += 1;
+        }
+        let _ = proxy.send_event(DesktopUserEvent::IpcReply(json));
     }
 }

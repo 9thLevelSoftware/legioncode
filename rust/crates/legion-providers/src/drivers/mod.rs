@@ -11,6 +11,7 @@ pub mod built_ins;
 pub mod built_ins_acp;
 pub mod built_ins_extra;
 pub mod claude;
+mod cli_probe_path;
 pub mod codex;
 mod codex_probe;
 pub mod cursor_worker;
@@ -61,12 +62,13 @@ pub use antigravity::{
 };
 pub use built_ins::{
     BUILTIN_DRIVER_SPECS, CLAUDE_HOST_SESSION_VARIABLES, ClaudeExecutableError, CursorSidecarSpec,
-    FX_ACP_CANCEL_BEHAVIOR, FxLaunchSpec, KIRO_AUTOPILOT_CONFIG_ID, KIRO_EFFORT_CONFIG_ID,
-    KiroLaunchSpec, MUSE_PROTOCOL_VERSION, PiLaunchError, RegistryExecError, build_claude_env,
-    codex_app_server_args, codex_text_gen_args, codex_thread_start_envelope,
-    codex_turn_start_envelope, cursor_isolated_sidecar_spec, fill_compaction_recents,
-    fx_launch_spec, fx_session_mode_for_policy, fx_tool_call_was_cancelled, kiro_autopilot_value,
-    kiro_launch_spec, muse_launch_spec, muse_verbatim_path, normalize_registry_command_path,
+    DISCOVERY_CLI_DRIVERS, FX_ACP_CANCEL_BEHAVIOR, FxLaunchSpec, KIRO_AUTOPILOT_CONFIG_ID,
+    KIRO_EFFORT_CONFIG_ID, KiroLaunchSpec, MUSE_PROTOCOL_VERSION, PiLaunchError, RegistryExecError,
+    build_claude_env, builtin_cli_probe_spec, codex_app_server_args, codex_text_gen_args,
+    codex_thread_start_envelope, codex_turn_start_envelope, cursor_isolated_sidecar_spec,
+    fill_compaction_recents, find_builtin_driver_spec, fx_launch_spec, fx_session_mode_for_policy,
+    fx_tool_call_was_cancelled, kiro_autopilot_value, kiro_launch_spec, muse_launch_spec,
+    muse_verbatim_path, normalize_driver_slug, normalize_registry_command_path,
     opencode_basic_auth_header, opencode_server_env, pi_launch_args, pi_probe_spec,
     resolve_claude_executable, validate_registry_executable,
 };
@@ -78,6 +80,10 @@ pub use claude::{
     claude_launch_arg_plugin_directories, is_claude_images_unsupported_error,
     phase_for_held_steer_result, resolve_claude_inline_plugin_directories,
     summarize_claude_tool_request, truncate_without_trailing_high_surrogate,
+};
+pub use cli_probe_path::{
+    classify_cli_probe_output, extract_cli_version, find_executable_on_path,
+    resolve_cli_probe_command, summarize_antigravity_probe,
 };
 pub use codex::{
     CODEX_INVALID_ENCRYPTED_CONTENT_CODE, CODEX_INVALID_ENCRYPTED_HISTORY_MESSAGE,

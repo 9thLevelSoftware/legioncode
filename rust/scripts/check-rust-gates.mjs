@@ -37,8 +37,8 @@ const crates = fs
   .map((entry) => entry.name)
   .sort();
 
-if (crates.length < 20) {
-  throw new Error(`Expected at least 20 crates under rust/crates, found ${crates.length}`);
+if (crates.length < 19) {
+  throw new Error(`Expected at least 19 crates under rust/crates, found ${crates.length}`);
 }
 
 const errors = [];

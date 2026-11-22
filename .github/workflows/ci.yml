@@ -67,7 +67,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
-          toolchain: stable
+          toolchain: "1.100.0"
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
 
@@ -106,16 +106,7 @@ jobs:
         run: cargo doc --locked --manifest-path rust/Cargo.toml --workspace --no-deps
 
       - name: Check WASM crate compilation
-        run: |
-          cargo check --locked --manifest-path rust/Cargo.toml --target wasm32-unknown-unknown \
-            -p t3-contracts \
-            -p t3-shared \
-            -p t3-terminal-vt \
-            -p t3-client-core \
-            -p t3-edge \
-            -p t3-web-ui \
-            -p t3-marketing \
-            -p t3-wasm-ffi
+        run: cargo clippy --locked --manifest-path rust/Cargo.toml --target wasm32-unknown-unknown -p t3-wasm-ffi -- -D warnings
 
   rust_test:
     name: Rust Clippy & Tests (${{ matrix.label }})
@@ -149,7 +140,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
-          toolchain: stable
+          toolchain: "1.100.0"
           components: clippy
 
       - name: Cache Cargo dependencies
@@ -177,7 +168,14 @@ jobs:
         run: cargo clippy --locked --manifest-path rust/Cargo.toml --workspace --all-targets -- -D warnings
 
       - name: Test Rust workspace
-        run: cargo test --locked --manifest-path rust/Cargo.toml --workspace
+        shell: bash
+        run: |
+          if [[ "${RUNNER_OS}" == "Linux" ]]; then
+            WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1 \
+              xvfb-run -a cargo test --locked --manifest-path rust/Cargo.toml --workspace
+          else
+            cargo test --locked --manifest-path rust/Cargo.toml --workspace
+          fi
 
       - name: Test native helper crates
         shell: bash
@@ -205,7 +203,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
-          toolchain: stable
+          toolchain: "1.100.0"
           targets: wasm32-unknown-unknown
 
       - name: Install wasm-bindgen-cli

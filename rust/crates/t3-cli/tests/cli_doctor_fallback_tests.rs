@@ -124,9 +124,16 @@ fn unit_forced_original_and_passthrough_log_and_delegate_to_node() -> TestResult
     let base_str = base_dir.to_string_lossy().into_owned();
 
     // 1. RUST_ANYTHING_UNIT_STATUS=original delegates `status --json` to Node and records unit "STATUS".
+    let fake_status = temp.path().join("fake-status.cjs");
+    fs::write(
+        &fake_status,
+        "process.stdout.write(JSON.stringify({service:{supported:true,installed:false}}));\n",
+    )?;
+    let fake_status_str = fake_status.to_string_lossy().into_owned();
     let env_forced = isolated_env(
         temp.path(),
         &[
+            ("T3_BIN_TS", &fake_status_str),
             ("RUST_ANYTHING_UNIT_STATUS", "Original"),
             ("RUST_ANYTHING_FALLBACK_LOG", &log_str),
         ],

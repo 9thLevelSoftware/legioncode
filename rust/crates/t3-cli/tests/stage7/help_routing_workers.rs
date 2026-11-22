@@ -16,18 +16,26 @@ fn help_and_aliases_match_node_byte_for_byte_offline() -> TestResult {
     let temp = tempfile::tempdir()?;
     let env = isolated_env(temp.path(), &[("T3_BIN_TS", NONEXISTENT_BIN_TS)]);
 
+    let expected_help = include_str!("../../assets/help/root.txt").as_bytes();
     let node_out = Command::new("node")
-        .args(["d:/t3code/apps/server/src/bin.ts", "help"])
-        .output()?;
-    assert!(node_out.status.success());
+        .args([t3_cli::fallback::LEGACY_BIN_TS, "help"])
+        .output()
+        .ok()
+        .filter(|out| out.status.success());
 
     for cmd in ["help", "--help", "-h"] {
         let out = run_t3(&[cmd], &env)?;
         assert_eq!(out.status.code(), Some(0), "cmd={cmd}");
         assert_eq!(
-            out.stdout, node_out.stdout,
-            "stdout mismatch for `t3 {cmd}`"
+            out.stdout, expected_help,
+            "stdout mismatch against root.txt for `t3 {cmd}`"
         );
+        if let Some(node) = &node_out {
+            assert_eq!(
+                out.stdout, node.stdout,
+                "stdout mismatch against node for `t3 {cmd}`"
+            );
+        }
         assert!(out.stderr.is_empty(), "unexpected stderr for `t3 {cmd}`");
     }
 

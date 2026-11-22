@@ -78,10 +78,7 @@ pub(crate) fn run_linux_browser_setup(explicit_base_dir: Option<&str>) -> i32 {
         String::new()
     };
     let browser = installed_browser(&base_dir_path);
-    let missing = browser
-        .as_deref()
-        .map(missing_libraries)
-        .unwrap_or_default();
+    let missing = browser.as_deref().map_or_default(missing_libraries);
     let needs_fonts = !font_available();
 
     if !needs_profile && missing.is_empty() && !needs_fonts {

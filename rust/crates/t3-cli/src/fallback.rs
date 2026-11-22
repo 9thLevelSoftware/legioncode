@@ -11,7 +11,10 @@ use t3_contracts::brand::ACTIVE_BRAND;
 use t3_persistence::paths::ServerDerivedPaths;
 
 /// Absolute path to the legacy TypeScript CLI entrypoint invoked on fallback.
-pub const LEGACY_BIN_TS: &str = "d:/t3code/apps/server/src/bin.ts";
+pub const LEGACY_BIN_TS: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../../apps/server/src/bin.ts"
+);
 
 const FALLBACK_LOG_ENV: &str = "RUST_ANYTHING_FALLBACK_LOG";
 const UNIT_FORCE_PREFIX: &str = "RUST_ANYTHING_UNIT_";

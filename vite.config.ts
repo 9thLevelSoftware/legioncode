@@ -181,6 +181,7 @@ export default defineConfig({
   fmt: {
     ignorePatterns: [
       ".repos/**",
+      ".legion-cli/**",
       "rust/**",
       "infra/task-cache/vendor/**",
       // Macroscope requires one glob per line; Markdown formatting corrupts it.
@@ -218,6 +219,7 @@ export default defineConfig({
     ignorePatterns: [
       ".repos",
       ".repos/**",
+      ".legion-cli/**",
       "rust/**",
       "infra/task-cache/vendor/**",
       "dist",

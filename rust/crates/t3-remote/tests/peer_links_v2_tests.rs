@@ -38,7 +38,7 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 #[test]
 fn peer_links_batch_failure_classification_url_redaction_and_transitive_labels() -> TestResult {
     let err = validate_peer_origin("ftp://user:secret@host.test/path?tok=1").err();
-    let msg = err.map(|e| e.message).unwrap_or_default();
+    let msg = err.map_or_default(|e| e.message);
     assert!(!msg.contains("secret"));
     assert!(!msg.contains("tok=1"));
     assert_eq!(msg, "That address is not an http or https address.");

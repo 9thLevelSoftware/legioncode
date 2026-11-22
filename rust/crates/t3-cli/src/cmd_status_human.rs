@@ -21,9 +21,8 @@ pub(crate) fn format_human_status(raw_base_dir: Option<&str>, status: &StatusOut
         );
     }
 
-    let base_dir_args = raw_base_dir
-        .map(|dir| vec!["--base-dir".to_owned(), dir.to_owned()])
-        .unwrap_or_default();
+    let base_dir_args =
+        raw_base_dir.map_or_default(|dir| vec!["--base-dir".to_owned(), dir.to_owned()]);
 
     let service_value = if !status.service.supported {
         "unavailable".to_owned()

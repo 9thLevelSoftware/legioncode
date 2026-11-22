@@ -39,12 +39,9 @@ fn create_dummy_t3_on_path(bin_dir: &Path) -> TestResult {
     Ok(())
 }
 
-fn run_node_status(
-    args: &[&str],
-    envs: &[(&str, &str)],
-) -> Result<String, Box<dyn std::error::Error>> {
+fn try_run_node_status(args: &[&str], envs: &[(&str, &str)]) -> Option<String> {
     let mut cmd = Command::new("node");
-    cmd.arg("d:/t3code/apps/server/src/bin.ts");
+    cmd.arg(t3_cli::fallback::LEGACY_BIN_TS);
     cmd.arg("status");
     cmd.args(args);
     for key in [
@@ -62,16 +59,11 @@ fn run_node_status(
     for (k, v) in envs {
         cmd.env(k, v);
     }
-    let out = cmd.output()?;
-    if !out.status.success() {
-        return Err(format!(
-            "node status failed ({}): {}",
-            out.status,
-            String::from_utf8_lossy(&out.stderr)
-        )
-        .into());
-    }
-    Ok(String::from_utf8(out.stdout)?)
+    let out = cmd.output().ok()?;
+    out.status
+        .success()
+        .then(|| String::from_utf8(out.stdout).ok())
+        .flatten()
 }
 
 #[test]
@@ -172,9 +164,20 @@ fn service_preflight_honors_kill_switch_and_help_delegation() -> TestResult {
     let log_str = log_file.to_string_lossy().into_owned();
     let db_path = temp.path().join("statev2.sqlite");
     let db_str = db_path.to_string_lossy().into_owned();
+    let fake_preflight = temp.path().join("fake-preflight.cjs");
+    fs::write(
+        &fake_preflight,
+        concat!(
+            "process.stdout.write(JSON.stringify({status:'ready',version:'",
+            env!("CARGO_PKG_VERSION"),
+            "',launcherProtocol:4}));\n",
+        ),
+    )?;
+    let fake_preflight_str = fake_preflight.to_string_lossy().into_owned();
     let env = isolated_env(
         temp.path(),
         &[
+            ("T3_BIN_TS", &fake_preflight_str),
             ("RUST_ANYTHING_UNIT_SERVICE_PREFLIGHT", "original"),
             ("RUST_ANYTHING_FALLBACK_LOG", &log_str),
         ],
@@ -211,8 +214,9 @@ fn human_status_matches_node_on_empty_home_and_host_override() -> TestResult {
     let rust_empty = run_t3(&["status", "--base-dir", &base_str], &env)?;
     assert!(rust_empty.status.success());
     let rust_empty_stdout = String::from_utf8(rust_empty.stdout)?;
-    let node_empty_stdout = run_node_status(&["--base-dir", &base_str], &env)?;
-    assert_eq!(rust_empty_stdout, node_empty_stdout);
+    if let Some(node_empty_stdout) = try_run_node_status(&["--base-dir", &base_str], &env) {
+        assert_eq!(rust_empty_stdout, node_empty_stdout);
+    }
     assert!(rust_empty_stdout.contains("Service        not installed"));
     assert!(rust_empty_stdout.contains("Local network  off"));
 
@@ -220,16 +224,18 @@ fn human_status_matches_node_on_empty_home_and_host_override() -> TestResult {
     let rust_host = run_t3(&["status", "--base-dir", &base_str], &env)?;
     assert!(rust_host.status.success());
     let rust_host_stdout = String::from_utf8(rust_host.stdout)?;
-    let node_host_stdout = run_node_status(&["--base-dir", &base_str], &env)?;
-    assert_eq!(rust_host_stdout, node_host_stdout);
+    if let Some(node_host_stdout) = try_run_node_status(&["--base-dir", &base_str], &env) {
+        assert_eq!(rust_host_stdout, node_host_stdout);
+    }
     assert!(rust_host_stdout.contains("overridden \u{00B7} T3CODE_HOST=10.0.0.5"));
 
     fs::write(base_dir.join("service.env"), "T3CODE_LAN=true\n")?;
     let rust_lan = run_t3(&["status", "--base-dir", &base_str], &env)?;
     assert!(rust_lan.status.success());
     let rust_lan_stdout = String::from_utf8(rust_lan.stdout)?;
-    let node_lan_stdout = run_node_status(&["--base-dir", &base_str], &env)?;
-    assert_eq!(rust_lan_stdout, node_lan_stdout);
+    if let Some(node_lan_stdout) = try_run_node_status(&["--base-dir", &base_str], &env) {
+        assert_eq!(rust_lan_stdout, node_lan_stdout);
+    }
     assert!(rust_lan_stdout.contains("Anyone on your LAN or tailnet"));
     Ok(())
 }

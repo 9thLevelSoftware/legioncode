@@ -215,8 +215,7 @@ impl AcpToolCallState {
         let content_preview = payload
             .content
             .as_deref()
-            .map(render_content_preview)
-            .unwrap_or_default();
+            .map_or_default(render_content_preview);
         let last_emitted_chars = utf8_len_to_utf16(&content_preview);
         Self {
             tool_call_id: payload.tool_call_id,

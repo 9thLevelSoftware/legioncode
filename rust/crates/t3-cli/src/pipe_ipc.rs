@@ -1,7 +1,9 @@
 //! Shared synchronous Named Pipe / Unix Domain Socket single-line JSON exchange.
 
 use std::io::{ErrorKind, Read, Write};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+#[cfg(windows)]
+use std::time::Instant;
 
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt as _;

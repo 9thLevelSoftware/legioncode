@@ -27,7 +27,6 @@ base64 = "0.22"
 clap = { version = "4", features = ["derive"] }
 futures-util = "0.3"
 hex = "0.4"
-hmac = "0.12"
 http = "1"
 indexmap = { version = "2", features = ["serde"] }
 js-sys = "0.3.105"

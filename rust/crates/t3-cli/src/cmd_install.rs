@@ -136,7 +136,6 @@ pub(crate) fn is_version_executable(versions_dir: &Path, candidate: &Path) -> bo
     name.eq_ignore_ascii_case("t3") || name.eq_ignore_ascii_case("t3.exe")
 }
 
-#[cfg(windows)]
 pub(crate) fn extract_windows_shim_target(contents: &str) -> Option<&str> {
     let line = contents
         .lines()

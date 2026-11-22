@@ -259,8 +259,6 @@ fn run_up_service_step(
 }
 
 fn resolve_base_cmd(subcommand: &str, raw_base_dir: Option<&str>) -> String {
-    let args = raw_base_dir
-        .map(|d| vec!["--base-dir".to_owned(), d.to_owned()])
-        .unwrap_or_default();
+    let args = raw_base_dir.map_or_default(|d| vec!["--base-dir".to_owned(), d.to_owned()]);
     resolve_host_cli_command(subcommand, &args)
 }

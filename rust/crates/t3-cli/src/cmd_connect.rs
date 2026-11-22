@@ -62,8 +62,7 @@ pub fn run(args: &[String]) -> i32 {
                 let link_args = f
                     .base_dir
                     .as_deref()
-                    .map(|d| vec!["--base-dir".to_owned(), d.to_owned()])
-                    .unwrap_or_default();
+                    .map_or_default(|d| vec!["--base-dir".to_owned(), d.to_owned()]);
                 let link_cmd = resolve_host_cli_command("connect link", &link_args);
                 exec_status(f.base_dir.as_deref(), f.has(FlagMask::JSON), &link_cmd)
             }

@@ -66,11 +66,10 @@ fn read_code_workspace_folders(root: &Path, file_name: &str) -> Option<Vec<(Path
             continue;
         };
         let resolved = lexical_clean(&root.join(p));
-        let explicit = entry.name.as_deref().map(bounded_name).unwrap_or_default();
+        let explicit = entry.name.as_deref().map_or_default(bounded_name);
         let fallback = resolved
             .file_name()
-            .map(|n| bounded_name(&n.to_string_lossy()))
-            .unwrap_or_default();
+            .map_or_default(|n| bounded_name(&n.to_string_lossy()));
         out.push((
             resolved,
             if explicit.is_empty() {
@@ -118,8 +117,7 @@ pub fn scan_workspace_folders(
     let raw_candidates = collect_scan_candidates(&root, &names, listed.as_deref());
     let submodules: HashSet<String> = fs::read_to_string(root.join(".gitmodules"))
         .ok()
-        .map(|s| parse_gitmodules_paths(&s).into_iter().collect())
-        .unwrap_or_default();
+        .map_or_default(|s| parse_gitmodules_paths(&s).into_iter().collect());
     let real_root = real_path_or_self(&root);
     let mut seen_real = HashSet::new();
     let mut folders = Vec::new();
@@ -133,8 +131,7 @@ pub fn scan_workspace_folders(
         let relative_path = cand_path
             .strip_prefix(&root)
             .ok()
-            .map(|r| r.to_string_lossy().replace('\\', "/"))
-            .unwrap_or_default();
+            .map_or_default(|r| r.to_string_lossy().replace('\\', "/"));
         if submodules.contains(&relative_path) || !cand_path.exists() {
             continue;
         }
@@ -226,13 +223,12 @@ pub fn discover_project_folders(workspace_root: &Path) -> Vec<ProjectTrackedFold
     let ignored: Vec<PathBuf> = fs::read_to_string(root.join(T3_PROJECT_FILE_NAME))
         .ok()
         .and_then(|raw| serde_json::from_str::<RawT3Project>(&strip_lenient_jsonc(&raw)).ok())
-        .map(|proj| {
+        .map_or_default(|proj| {
             proj.ignore_repositories
                 .into_iter()
                 .map(|entry| lexical_clean(&root.join(entry)))
                 .collect()
-        })
-        .unwrap_or_default();
+        });
 
     scan.folders
         .into_iter()

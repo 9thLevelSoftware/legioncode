@@ -211,10 +211,12 @@ impl JobProcessSupervisor {
             command.creation_flags(CREATE_NO_WINDOW);
         }
 
-        let (mut child, parent_pipes) = pipes
+        let (child, parent_pipes) = pipes
             .spawn_command(&mut command)
             .map_err(SupervisorError::SpawnFailed)?;
 
+        #[cfg(windows)]
+        let mut child = child;
         #[cfg(windows)]
         if let Err(err) = self.job.assign_child(&child) {
             let _ = child.kill();

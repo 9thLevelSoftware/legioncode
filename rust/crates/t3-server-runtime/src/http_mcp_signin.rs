@@ -169,8 +169,7 @@ impl McpSignInRegistry {
         if let Some(oauth_err) = validated.error {
             let desc = validated
                 .error_description
-                .map(|d| format!(": {d}"))
-                .unwrap_or_default();
+                .map_or_default(|d| format!(": {d}"));
             return Err(ProviderMcpSignInError {
                 server: server.to_owned(),
                 detail: format!("OAuth authorization failed ({oauth_err}){desc}"),

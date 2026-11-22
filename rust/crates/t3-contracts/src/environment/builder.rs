@@ -218,5 +218,9 @@ fn base_server_capabilities() -> EnvironmentCapabilities {
         shell_older_settled: Some(true),
         linked_thread_refreshes: Some(true),
         issue_linked_threads: Some(true),
+        preview_tunnel_setting: Some(true),
+        multi_repo_projects: Some(true),
+        linked_thread_read: Some(true),
+        transitive_peer_linking: Some(true),
     }
 }

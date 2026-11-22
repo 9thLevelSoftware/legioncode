@@ -75,6 +75,9 @@ pub const V2_MIGRATION_MANIFEST: &[(i64, &str)] = &[
     (100, "TurnStartReadIndexes"),
     (101, "DelegatedTaskReadIndexes"),
     (102, "ThreadItemCounts"),
+    (103, "IssueTrackerAdditionalScopes"),
+    (104, "ProjectionProjectsTrackedFolders"),
+    (105, "TaskFolders"),
 ];
 
 /// Result emitted by [`run_service_preflight`], serializing to exact wire JSON with `"status"` first.

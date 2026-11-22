@@ -12,6 +12,8 @@ quick-xml = { workspace = true }
 rusqlite.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+t3-contracts = { path = "../t3-contracts" }
+t3-shared = { path = "../t3-shared", default-features = false }
 thiserror.workspace = true
 tokio.workspace = true
 uuid.workspace = true

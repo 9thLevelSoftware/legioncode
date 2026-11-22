@@ -269,7 +269,7 @@ pub(crate) fn verify_service_manifests(
         systemd_roundtrip,
         launchd_roundtrip,
         windows_task_utf16le_bom: bom_ok,
-        aur_nightly_desktop_id: nightly.desktop_entry_id.to_owned(),
+        aur_nightly_desktop_id: nightly.desktop_entry_id.clone(),
         bundle_file_count: manifest.files.len(),
     })
 }

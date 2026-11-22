@@ -182,26 +182,30 @@ pub(crate) fn render_aur_pkgbuild(
     channel: DesktopUpdateChannel,
     aur: &AurLauncherBundle,
 ) -> String {
+    let brand = t3_contracts::brand::ACTIVE_BRAND;
+    let slug = brand.url_scheme;
+    let bin = brand.cli_bin_name;
+    let nightly_slug = format!("{slug}-nightly");
     let pkgver = version.replace('-', "_");
     let (pkgdesc, provides_name, conflicts_line, legacy_symlink) = match channel {
         DesktopUpdateChannel::Latest => (
-            "Desktop control surface for local coding agents",
-            "t3code",
-            "conflicts=('t3code')",
-            "t3-code-desktop",
+            "Desktop control surface for local coding agents".to_owned(),
+            slug.to_owned(),
+            format!("conflicts=('{slug}')"),
+            format!("{bin}-code-desktop"),
         ),
         DesktopUpdateChannel::Nightly => (
-            "Nightly desktop control surface for local coding agents",
-            "t3code-nightly",
-            "conflicts=('t3code-nightly' 't3code')",
-            "t3-code-nightly-desktop",
+            "Nightly desktop control surface for local coding agents".to_owned(),
+            nightly_slug.clone(),
+            format!("conflicts=('{nightly_slug}' '{slug}')"),
+            format!("{bin}-code-nightly-desktop"),
         ),
     };
     let bin_basename = aur
         .launcher_path
         .rsplit('/')
         .next()
-        .unwrap_or(provides_name);
+        .unwrap_or(&provides_name);
 
     [
         format!("pkgname={}", aur.package_name),
@@ -209,12 +213,12 @@ pub(crate) fn render_aur_pkgbuild(
         "pkgrel=1".to_owned(),
         format!("pkgdesc='{pkgdesc}'"),
         "arch=('x86_64' 'aarch64')".to_owned(),
-        "url='https://github.com/pingdotgg/t3code'".to_owned(),
+        format!("url='https://github.com/pingdotgg/{slug}'"),
         "license=('MIT')".to_owned(),
         "depends=('glibc' 'gcc-libs' 'gtk3' 'webkit2gtk-4.1' 'hicolor-icon-theme' 'xdg-utils')"
             .to_owned(),
         format!("provides=(\"{provides_name}=$pkgver\")"),
-        conflicts_line.to_owned(),
+        conflicts_line,
         "options=('!debug' '!strip')".to_owned(),
         String::new(),
         "package() {".to_owned(),
@@ -238,6 +242,13 @@ pub(crate) fn render_aur_pkgbuild(
     .join("\n")
 }
 
+const fn brand_rel_path(t3_path: &'static str, legion_path: &'static str) -> &'static str {
+    match t3_contracts::brand::ACTIVE_BRAND.url_scheme.as_bytes() {
+        b"legioncode" => legion_path,
+        _ => t3_path,
+    }
+}
+
 pub(crate) fn ordered_bundle_files(
     a: &crate::bundle::DesktopBundleArtifacts,
 ) -> Vec<(&'static str, &'static str, Vec<u8>)> {
@@ -253,7 +264,7 @@ pub(crate) fn ordered_bundle_files(
             a.capabilities_default_json.as_bytes().to_vec(),
         ),
         (
-            "linux/t3code.desktop",
+            brand_rel_path("linux/t3code.desktop", "linux/legioncode.desktop"),
             "utf-8",
             a.linux_desktop_entry.as_bytes().to_vec(),
         ),
@@ -263,22 +274,25 @@ pub(crate) fn ordered_bundle_files(
             a.linux_pkgbuild.as_bytes().to_vec(),
         ),
         (
-            "linux/t3code-launcher.sh",
+            brand_rel_path("linux/t3code-launcher.sh", "linux/legioncode-launcher.sh"),
             "utf-8",
             a.linux_launcher_script.as_bytes().to_vec(),
         ),
         (
-            "services/t3code.service",
+            brand_rel_path("services/t3code.service", "services/legioncode.service"),
             "utf-8",
             a.systemd_unit.as_bytes().to_vec(),
         ),
         (
-            "services/com.t3tools.t3code.service.plist",
+            brand_rel_path(
+                "services/com.t3tools.t3code.service.plist",
+                "services/dev.legioncode.service.plist",
+            ),
             "utf-8",
             a.launchd_plist.as_bytes().to_vec(),
         ),
         (
-            "services/t3code-task.xml",
+            brand_rel_path("services/t3code-task.xml", "services/legioncode-task.xml"),
             "utf-16le-bom",
             a.windows_task_utf16le_bom.clone(),
         ),

@@ -236,10 +236,10 @@ fn launcher_startup_plan_covers_active_trial_rollback_and_preflight_block()
     assert_eq!(trial_plan.version, "1.1.0");
     assert!(decode_service_launcher_context(&trial_plan.context_json).is_some());
 
-    // Simulate future migration (> 102) blocking launch via service_preflight.
+    // Simulate future migration (> 105) blocking launch via service_preflight.
     let store = SqliteStore::open(&trial_db)?;
     store.connection().execute(
-        "INSERT INTO effect_sql_migrations (migration_id, name) VALUES (103, 'Future')",
+        "INSERT INTO effect_sql_migrations (migration_id, name) VALUES (106, 'Future')",
         [],
     )?;
     store.close()?;

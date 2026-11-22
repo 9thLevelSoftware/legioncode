@@ -4,7 +4,6 @@
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 
 /// Wire protocol version for desktop app activation (`desktopAppActivation.ts:5`).
 pub const DESKTOP_APP_ACTIVATION_PROTOCOL_VERSION: u32 = 1;
@@ -47,55 +46,34 @@ pub struct DesktopAppControlAddress {
     pub directory: Option<String>,
 }
 
-/// Derives the deterministic control address matching `@t3tools/shared/desktopAppControl.ts`.
+/// Derives the deterministic control address matching `@t3tools/shared/desktopAppControl.ts`
+/// routed through `t3_contracts::brand::ACTIVE_BRAND`.
 pub fn resolve_desktop_app_control_address(
     state_dir: &str,
     platform: DesktopControlPlatform,
     temp_dir: &str,
     user_id: Option<u32>,
 ) -> DesktopAppControlAddress {
-    let digest = Sha256::digest(state_dir.as_bytes());
-    let state_hash = hex::encode(&digest[..12]);
-
-    if matches!(platform, DesktopControlPlatform::Win32) {
-        return DesktopAppControlAddress {
-            address: format!(r"\\.\pipe\t3code-app-{state_hash}"),
-            directory: None,
-        };
-    }
-
-    let user_key = user_id.map_or_else(|| state_hash[..12].to_owned(), |uid| uid.to_string());
-    let folder = format!("t3code-{user_key}");
-    let socket_name = format!("{state_hash}.sock");
-    let max_path_bytes = match platform {
-        DesktopControlPlatform::Linux => 107_usize,
-        DesktopControlPlatform::Darwin | DesktopControlPlatform::Win32 => 103_usize,
+    let shared_platform = match platform {
+        DesktopControlPlatform::Win32 => {
+            t3_shared::desktop_app_control::DesktopControlPlatform::Win32
+        }
+        DesktopControlPlatform::Linux => {
+            t3_shared::desktop_app_control::DesktopControlPlatform::Linux
+        }
+        DesktopControlPlatform::Darwin => {
+            t3_shared::desktop_app_control::DesktopControlPlatform::Darwin
+        }
     };
-
-    let mut directory = join_posix_path(temp_dir, &folder);
-    if join_posix_path(&directory, &socket_name).len() > max_path_bytes {
-        directory = join_posix_path("/tmp", &folder);
-    }
-
+    let resolved = t3_shared::desktop_app_control::resolve_desktop_app_control_address(
+        state_dir,
+        shared_platform,
+        temp_dir,
+        user_id,
+    );
     DesktopAppControlAddress {
-        address: join_posix_path(&directory, &socket_name),
-        directory: Some(directory),
-    }
-}
-
-fn join_posix_path(base: &str, segment: &str) -> String {
-    let trimmed_base = if base == "/" {
-        "/"
-    } else {
-        base.trim_end_matches('/')
-    };
-    let clean_seg = segment.trim_start_matches('/');
-    if trimmed_base.is_empty() {
-        clean_seg.to_owned()
-    } else if trimmed_base == "/" {
-        format!("/{clean_seg}")
-    } else {
-        format!("{trimmed_base}/{clean_seg}")
+        address: resolved.address,
+        directory: resolved.directory,
     }
 }
 

@@ -15,11 +15,11 @@ use thiserror::Error;
 use crate::env::SanitizedChildEnv;
 use crate::pipes::{ParentPipeSet, PipeSetConfig, ScopedPipeSet};
 #[cfg(windows)]
+use crate::spawn_flags::CREATE_NO_WINDOW;
+use crate::spawn_flags::{ChildProcessRole, SpawnWindowPolicy, TargetOs, policy_for};
+#[cfg(windows)]
 use crate::win32_job::JobHandle;
 use crate::win32_job::Win32JobError;
-
-#[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// Errors produced while configuring, spawning, or terminating supervised processes.
 #[derive(Debug, Error)]
@@ -61,14 +61,29 @@ pub struct SpawnSpec {
 impl SpawnSpec {
     /// Creates a new [`SpawnSpec`] using a sanitized snapshot of the current host environment.
     pub fn new(program: impl Into<OsString>) -> Self {
+        Self::for_role(program, ChildProcessRole::Worker)
+    }
+
+    /// Creates a new [`SpawnSpec`] applying host window/console suppression rules for `role`.
+    pub fn for_role(program: impl Into<OsString>, role: ChildProcessRole) -> Self {
+        let policy = policy_for(role, TargetOs::host());
         Self {
             program: program.into(),
             args: Vec::new(),
             cwd: None,
             env: SanitizedChildEnv::from_os_env(),
             stdio: PipeSetConfig::piped(),
-            windows_no_window: true,
+            windows_no_window: policy.creation_flags == crate::spawn_flags::CREATE_NO_WINDOW
+                || policy.windows_hide
+                || role.is_background(),
         }
+    }
+
+    /// Applies a precomputed [`SpawnWindowPolicy`] to `windows_no_window`.
+    #[must_use]
+    pub fn with_window_policy(mut self, policy: SpawnWindowPolicy) -> Self {
+        self.windows_no_window = policy.creation_flags != 0 || policy.windows_hide;
+        self
     }
 
     /// Appends one literal argument to the child command line.

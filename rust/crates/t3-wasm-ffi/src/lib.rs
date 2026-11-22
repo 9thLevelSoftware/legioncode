@@ -18,6 +18,7 @@ mod bridge_hook_actor_fetch;
 mod bridge_shared;
 mod bridge_surfaces;
 mod bridge_terminal;
+mod bridge_wave5;
 mod bridge_web_ui;
 mod bridge_worker;
 mod bridge_worker_bindings;
@@ -107,6 +108,30 @@ pub fn decode_t3vt_summary_json(bytes: &[u8]) -> Result<String, JsValue> {
     bridge::decode_t3vt_summary_json(bytes).map_err(|err| JsValue::from_str(&err))
 }
 
+/// Normalizes macOS NFD filenames and returns clean NFC display names.
+#[wasm_bindgen]
+pub fn normalize_nfd_filename(raw: &str) -> String {
+    bridge::normalize_nfd_filename(raw)
+}
+
+/// Strips standalone `OSC 4` palette queries and dynamic color queries from terminal history.
+#[wasm_bindgen]
+pub fn strip_osc4_queries(raw: &str) -> String {
+    bridge::strip_osc4_queries(raw)
+}
+
+/// Evaluates loopback preview tunnel policy and settings allowances (`{"allowed": bool}`).
+#[wasm_bindgen]
+pub fn allows_preview_tunnel_json(input_json: &str) -> Result<String, JsValue> {
+    bridge::allows_preview_tunnel_json(input_json).map_err(|err| JsValue::from_str(&err))
+}
+
+/// Serializes the active brand configuration (`ACTIVE_BRAND`) as `JSON`.
+#[wasm_bindgen]
+pub fn active_brand_json() -> Result<String, JsValue> {
+    bridge::active_brand_json().map_err(|err| JsValue::from_str(&err))
+}
+
 /// Stateful client-runtime state machine exported to JavaScript/WASM callers.
 #[wasm_bindgen]
 pub struct WasmClientCore {
@@ -170,6 +195,18 @@ impl WasmClientCore {
         self.inner
             .probe_step_json(json)
             .map_err(|err| JsValue::from_str(&err))
+    }
+
+    /// Resolves linked-thread opening strategy (`direct` vs. `relay`).
+    #[wasm_bindgen]
+    pub fn linked_thread_open_json(&self, input_json: &str) -> Result<String, JsValue> {
+        bridge::resolve_linked_thread_open_json(input_json).map_err(|err| JsValue::from_str(&err))
+    }
+
+    /// Plans bounded-concurrency P2P batch linking candidates and next batch.
+    #[wasm_bindgen]
+    pub fn link_batch_plan_json(&self, input_json: &str) -> Result<String, JsValue> {
+        bridge::link_batch_plan_json(input_json).map_err(|err| JsValue::from_str(&err))
     }
 }
 

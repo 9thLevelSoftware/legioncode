@@ -47,6 +47,27 @@ pub use queries::{
     issue_pairing_token_with_conn, verify_bearer_session, verify_bearer_session_with_conn,
 };
 pub use store::ensure_pairing_schema;
+pub(crate) use store::revoke_unspent_links;
+
+/// Revokes unspent pairing links bound to `proof_key_thumbprint`, other Connect devices, and
+/// optionally unbound pairing/approval codes (`AuthPairingLinks.revokeUnspentByProofKey`, #39495).
+pub fn revoke_unspent_pairing_links(
+    conn: &rusqlite::Connection,
+    proof_key_thumbprint: Option<&str>,
+    keep_proof_key_thumbprint: Option<&str>,
+    include_unbound: bool,
+    revoked_at_iso: &str,
+) -> Result<Vec<String>, PairingTokenError> {
+    ensure_pairing_schema(conn)?;
+    revoke_unspent_links(
+        conn,
+        proof_key_thumbprint,
+        keep_proof_key_thumbprint,
+        include_unbound,
+        revoked_at_iso,
+    )
+    .map_err(|source| store::sqlite_err("revoke_unspent_pairing_links", source))
+}
 
 /// Default one-time pairing credential lifetime (`5` minutes, `PairingGrantStore.ts:326`).
 pub const DEFAULT_PAIRING_TOKEN_TTL_MS: i64 = 5 * 60 * 1_000;

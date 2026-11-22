@@ -37,6 +37,7 @@ pub fn create_thread_cmd(
         thread_id: ThreadId::new(thread)?,
         project_id: ProjectId::new(project)?,
         title: title.to_owned(),
+        generate_title: None,
         model_selection: ModelSelection {
             instance_id: ProviderInstanceId::new("codex")?,
             model: "gpt-5".to_owned(),
@@ -71,6 +72,7 @@ pub fn send_message_cmd(
             linked_sender: None,
             idle_compaction: None,
             fresh_context: None,
+            output_schema: None,
             command_id: CommandId::new(cmd)?,
             thread_id: ThreadId::new(thread)?,
             message_id: MessageId::new(msg)?,
@@ -174,6 +176,7 @@ pub fn make_subagent_thread_event(
         title_renamed: None,
         rollback_request_id: None,
         rollback_failure: None,
+        rollback_unrestored: None,
         deleted_at: None,
     };
     Ok(DomainEvent {

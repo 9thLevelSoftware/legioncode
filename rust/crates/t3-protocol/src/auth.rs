@@ -61,7 +61,8 @@ mod secret_cache;
 pub use lease_registry::SessionLeaseRegistry;
 pub use lease_types::{
     ActiveSessionSummary, ConnectionInvalidationReason, ConnectionState, NewSessionLease,
-    RenewDpopSessionInput, SessionLease, SessionRenewalError, SessionVerificationError,
+    PEER_LINK_RENEWAL_STEP_MS, PEER_LINK_SESSION_TTL_MS, PeerLeaseTouch, RenewDpopSessionInput,
+    SessionLease, SessionRenewalError, SessionVerificationError,
 };
 pub use precedence::{
     CredentialPrecedence, CredentialSelectionError, CredentialSource, DpopBindingError,

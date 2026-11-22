@@ -4,6 +4,7 @@
 //! `apps/server/src/environment/ServerEnvironment.ts` (`ensure_environment_id`).
 
 mod attachments;
+mod home;
 
 use std::fs;
 use std::io::ErrorKind;
@@ -14,10 +15,12 @@ use attachments::{
     TempFileGuard, recovery_path_for, restrict_state_dir_permissions, write_and_sync,
 };
 use serde::{Deserialize, Serialize};
+use t3_contracts::brand::BrandConfig;
 use thiserror::Error;
 use uuid::Uuid;
 
 pub use attachments::sweep_stale_pending_attachments;
+pub use home::{expand_home_dir, os_user_home_dir, resolve_base_dir, resolve_base_dir_for_brand};
 
 /// Errors returned while deriving, creating, or initializing server paths and identity files.
 #[derive(Debug, Error)]
@@ -152,6 +155,27 @@ impl ServerDerivedPaths {
             logs_dir,
             provider_logs_dir,
         }
+    }
+
+    /// Resolves `base_dir` via `brand` env vars or home dotdir and derives server paths.
+    #[must_use]
+    pub fn resolve_for_brand(
+        brand: &BrandConfig,
+        cli_base_dir: Option<&Path>,
+        home_dir: Option<&Path>,
+        dev_url_present: bool,
+        env_lookup: impl FnMut(&str) -> Option<String>,
+    ) -> Self {
+        let (base_dir, explicit) =
+            resolve_base_dir_for_brand(brand, cli_base_dir, home_dir, env_lookup);
+        Self::derive(base_dir, dev_url_present, explicit)
+    }
+
+    /// Derives paths from CLI `--base-dir`, active-brand environment variables, or home dotdir.
+    #[must_use]
+    pub fn derive_from_env(cli_base_dir: Option<&Path>, dev_url_present: bool) -> Self {
+        let (base_dir, explicit) = resolve_base_dir(cli_base_dir);
+        Self::derive(base_dir, dev_url_present, explicit)
     }
 }
 

@@ -66,6 +66,12 @@ pub struct CheckpointScope {
     pub advances_app_run_count: bool,
     /// Working directory.
     pub cwd: String,
+    /// Optional repository display label on repository scopes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// Tracked repository path associated with this scope, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository_path: Option<String>,
     /// Creation timestamp.
     pub created_at: String,
 }

@@ -16,6 +16,7 @@ pub const WINDOWS_POLICY_VALUES: &[&str] = &[
     "WebhookTasks",
     "Telemetry",
     "BrowserCookieImport",
+    "PreviewTunnel",
     "ProviderInstances",
     "UpdatesMode",
     "UpdatesFeedUrl",
@@ -157,6 +158,13 @@ fn core_policies() -> Vec<PolicyDef<'static>> {
             title: "Allow importing browser cookies",
             help: "Disabled stops users from importing cookies from another browser into T3 Code's browser.",
             toggle: Some("BrowserCookieImport"),
+            elements: None,
+        },
+        PolicyDef {
+            id: "PreviewTunnel",
+            title: "Allow the preview tunnel",
+            help: "Disabled stops other devices from opening this machine's local servers through T3 Code: no in-app browser tabs loaded on the device, no Open on this device, no port forwarding. Browser tabs still stream from this machine.",
+            toggle: Some("PreviewTunnel"),
             elements: None,
         },
         PolicyDef {

@@ -177,7 +177,9 @@ pub(crate) fn write_launcher_file(link: &Path, executable: &Path) -> std::io::Re
 }
 
 fn resolve_install_bin_dir() -> PathBuf {
-    non_empty_env("T3CODE_INSTALL_BIN_DIR")
+    t3_contracts::brand::ACTIVE_BRAND
+        .read_env("INSTALL_BIN_DIR")
+        .or_else(|| non_empty_env("T3CODE_INSTALL_BIN_DIR"))
         .map_or_else(|| user_home_dir().join(".local").join("bin"), PathBuf::from)
         .pipe_resolve()
 }

@@ -69,6 +69,14 @@ pub struct PeerLinksService {
     secrets: FileSecretStore,
 }
 
+#[derive(Debug, Clone)]
+pub struct LinkUnlessLinkedOutcome {
+    /// Active peer link record.
+    pub link: PeerLink,
+    /// `true` when an existing unexpired link was kept without rewriting/re-pairing.
+    pub already_linked: bool,
+}
+
 impl PeerLinksService {
     /// Creates a [`PeerLinksService`] backed by `secrets`.
     #[must_use]
@@ -142,6 +150,29 @@ impl PeerLinksService {
             .into_iter()
             .find(|r| r.environment_id == environment_id);
         found.map(record_to_link).transpose()
+    }
+
+    /// Returns an existing unexpired link unchanged (`already_linked = true`) or inserts a new
+    /// link (`already_linked = false`), keeping batch pairing codes unused for live peers (`#39426`).
+    pub fn link_unless_linked(
+        &self,
+        conn: &Connection,
+        now_iso: &str,
+        input: InsertPeerLinkInput,
+    ) -> Result<LinkUnlessLinkedOutcome, PeerLinkError> {
+        if let Some(existing) = self.get(conn, input.environment_id.as_str())?
+            && existing.expires_at.as_str() > now_iso
+        {
+            return Ok(LinkUnlessLinkedOutcome {
+                link: existing,
+                already_linked: true,
+            });
+        }
+        let link = self.insert(conn, input)?;
+        Ok(LinkUnlessLinkedOutcome {
+            link,
+            already_linked: false,
+        })
     }
 
     /// Validates URLs, stores the bearer secret in [`FileSecretStore`], and upserts the DB row.

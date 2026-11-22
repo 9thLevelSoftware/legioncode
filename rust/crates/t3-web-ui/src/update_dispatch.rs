@@ -160,7 +160,9 @@ pub(crate) fn dispatch_composer_diff(
 ) -> Result<Vec<WebHostEffect>, WebUiError> {
     let effects = match action {
         WebAppAction::UpdateComposerDraft { text } => {
-            state.composer.draft = text;
+            if !state.composer.dictating {
+                state.composer.draft = text;
+            }
             Vec::new()
         }
         WebAppAction::PasteIntoComposer {
@@ -293,7 +295,7 @@ pub(crate) fn dispatch_terminal_palette(
             }
             palette_focus_effects(state, index)
         }
-        _ => Vec::new(),
+        other => crate::update_dispatch_features::dispatch_wave5_action(state, other)?,
     };
     Ok((effects, None))
 }

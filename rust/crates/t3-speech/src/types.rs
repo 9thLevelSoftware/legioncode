@@ -32,6 +32,9 @@ pub struct TranscriptionOptions {
     /// Project/personal custom vocabulary entries preserved across wire serialization.
     #[serde(default)]
     pub speech_custom_words: Vec<SpeechCustomWord>,
+    /// Recognition-only terms (e.g. project name or cue) that steer ASR without rewriting text.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub speech_hints: Vec<String>,
     /// Whether universal/language filler words should be trimmed from final transcripts.
     #[serde(default = "default_true")]
     pub speech_remove_filler_words: bool,
@@ -49,6 +52,7 @@ impl Default for TranscriptionOptions {
             speech_language: default_language(),
             speech_translate_to_english: false,
             speech_custom_words: Vec::new(),
+            speech_hints: Vec::new(),
             speech_remove_filler_words: true,
             speech_correction_word: None,
             speech_silence_filtering: true,

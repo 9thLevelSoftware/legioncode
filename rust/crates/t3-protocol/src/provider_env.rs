@@ -60,6 +60,7 @@
 mod env;
 mod maintenance;
 mod maintenance_js;
+mod maintenance_npm;
 mod maintenance_types;
 mod ndjson;
 mod terminal_keys;
@@ -71,6 +72,14 @@ pub use maintenance::{
     make_targeted_update_action, resolve_latest_update_action, resolve_provider_maintenance,
 };
 pub use maintenance_js::supports_exact_pin;
+pub use maintenance_npm::{
+    ChannelUpdatePromptOutcome, HOMEBREW_LATEST_CASK_SWITCH_COMMAND,
+    HOMEBREW_STABLE_CASK_UPDATE_COMMAND, NpmBatchQueryPlan, SemverVersion,
+    channel_latest_version_below, compare_semver, evaluate_channel_update_prompt, filter_npm_env,
+    is_ignored_npm_env_var, npm_prefix_single_flight_key, parse_npm_ls_versions,
+    parse_npm_outdated_latest_versions, parse_semver, plan_npm_prefix_batch_query,
+    provider_update_channel_lags,
+};
 pub use maintenance_types::{
     MaintenanceCapabilities, MaintenanceInstaller, MaintenanceProbe, MaintenanceResolutionInput,
     MaintenanceShimMode, MaintenanceTier, ProviderMaintenanceDefinition, UpdateCommandSpec,

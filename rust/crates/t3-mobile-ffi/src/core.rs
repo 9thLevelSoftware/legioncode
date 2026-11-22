@@ -161,3 +161,12 @@ pub fn sdk_sources_json() -> Result<String, MobileFfiError> {
 pub fn packaging_bundle_json() -> Result<String, MobileFfiError> {
     crate::mobile_packaging::packaging_bundle_json()
 }
+
+pub use crate::core_review::{
+    filter_review_files_json, linked_lines_json, secret_card_json, tunnel_guard_json,
+};
+pub use crate::core_review_types::{
+    FilterReviewFilesRequest, FilterReviewFilesResponse, LinkedLinesRequest, LinkedLinesResponse,
+    SecretCardAction, SecretCardRequest, SecretCardResponse, SecretFieldViewState,
+    TunnelBindCheckInput, TunnelGuardRequest, TunnelGuardResponse, TunnelHeadersInput,
+};

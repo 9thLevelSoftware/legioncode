@@ -51,11 +51,11 @@ fn policy_fingerprints_match_legacy_golden_digests() {
     );
     assert_eq!(
         policy_fingerprint_12hex(&sample_policy()).expect("cli sample digest"),
-        "f716b00ffc01"
+        "13ab1a3e32bc"
     );
     assert_eq!(
         policy_fingerprint_12hex(&SAMPLE_POLICY).expect("static sample digest"),
-        "f716b00ffc01"
+        "13ab1a3e32bc"
     );
 }
 
@@ -97,7 +97,7 @@ fn cli_policy_descriptions_match_ts_output() {
     let text =
         describe_policy("/etc/t3/policy.json", Some(&SAMPLE_POLICY)).expect("describe sample");
     assert!(
-        text.contains("Managed by Example Corp (/etc/t3/policy.json, fingerprint f716b00ffc01).")
+        text.contains("Managed by Example Corp (/etc/t3/policy.json, fingerprint 13ab1a3e32bc).")
     );
     assert!(text.contains("No managed settings."));
     assert!(text.contains("\"maxRuntimeMode\": \"auto-accept-edits\""));
@@ -110,13 +110,13 @@ fn cli_policy_descriptions_match_ts_output() {
         managed_policy: Some(Some(LoadedPolicySummary {
             source: "/etc/t3/policy.json".to_owned(),
             organization: "Example Corp".to_owned(),
-            fingerprint: "f716b00ffc01".to_owned(),
+            fingerprint: "13ab1a3e32bc".to_owned(),
         })),
     };
     let installed = LoadedPolicySummary {
         source: "/etc/t3/policy.json".to_owned(),
         organization: "Example Corp".to_owned(),
-        fingerprint: "f716b00ffc01".to_owned(),
+        fingerprint: "13ab1a3e32bc".to_owned(),
     };
     assert_eq!(
         describe_running_server(Some(&running), Some(&installed)),
@@ -131,7 +131,9 @@ fn windows_templates_and_macos_profile_generate_expected_artifacts() {
     assert!(win_admx.contains(r"SOFTWARE\Policies\T3Tools\T3Code"));
     assert!(win_admx.contains("MaxRuntimeMode"));
     assert!(win_admx.contains("AllowedDrivers"));
+    assert!(win_admx.contains("PreviewTunnel"));
     assert!(win_strings.contains("T3 Code"));
+    assert!(win_strings.contains("PreviewTunnel"));
     for &(_, label) in t3_contracts::policy::KNOWN_DRIVER_LABELS {
         assert!(win_strings.contains(label), "missing ADML label `{label}`");
     }
@@ -141,6 +143,7 @@ fn windows_templates_and_macos_profile_generate_expected_artifacts() {
     assert!(profile.contains("<string>com.t3tools.t3code</string>"));
     assert!(profile.contains("<string>Example Corp</string>"));
     assert!(profile.contains("<key>telemetry</key>"));
+    assert!(profile.contains("<key>previewTunnel</key>"));
     assert!(profile.contains("<false />"));
 
     let mut null_settings = IndexMap::new();

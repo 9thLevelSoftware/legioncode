@@ -119,6 +119,13 @@ pub(crate) fn apply_update_action(
             }
             machine.on_download_complete(VerifiedArtifact::new(version, sha512, size_bytes));
         }
+        UpdateStepAction::NoOffer {
+            checked_at,
+            has_release_floor,
+            managed_policy,
+        } => {
+            machine.on_no_offer(checked_at, has_release_floor, managed_policy.as_ref());
+        }
         UpdateStepAction::InstallFailure { message } => machine.on_install_failure(&message),
     }
     Ok(())
@@ -132,10 +139,11 @@ pub(crate) fn resolve_branding(is_development: bool, app_version: &str) -> Deskt
     } else {
         "Beta"
     };
+    let product_name = t3_contracts::brand::ACTIVE_BRAND.product_name;
     DesktopAppBranding {
-        base_name: "T3 Code".to_owned(),
+        base_name: product_name.to_owned(),
         stage_label: stage.to_owned(),
-        display_name: format!("T3 Code ({stage})"),
+        display_name: format!("{product_name} ({stage})"),
     }
 }
 

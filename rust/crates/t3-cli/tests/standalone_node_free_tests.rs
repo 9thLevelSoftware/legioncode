@@ -240,6 +240,7 @@ async fn verify_replay_turn_checkpoint_terminal_and_thread(
         thread_id: thread_id.clone(),
         project_id: ProjectId::new(project_id)?,
         title: "Replay E2E".to_owned(),
+        generate_title: None,
         model_selection: ModelSelection {
             instance_id: ProviderInstanceId::new("replay-dev")?,
             model: "replay".to_owned(),
@@ -260,6 +261,7 @@ async fn verify_replay_turn_checkpoint_terminal_and_thread(
             title_seed: None,
             scheduled_task_id: None,
             sender_thread_id: None,
+            output_schema: None,
             workspace_strategy: None,
         }),
     });

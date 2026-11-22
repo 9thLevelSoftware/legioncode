@@ -150,6 +150,12 @@ pub enum DeciderError {
     /// Deterministic ID derivation failed contract validation.
     #[error("invalid identifier derived from command `{0}`")]
     InvalidId(String),
+    /// Request validation failed before mutating state (for example empty message with `generate_title`).
+    #[error("invalid request: {0}")]
+    InvalidRequest(String),
+    /// Run output schema check or submission failed validation.
+    #[error("run output rejected: {0}")]
+    RunOutputRejected(String),
 }
 
 pub(crate) fn derived_event_id(

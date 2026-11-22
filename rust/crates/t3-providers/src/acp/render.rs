@@ -6,7 +6,7 @@ use t3_shared::utf16::{utf8_len_to_utf16, utf16_slice_safe};
 
 use super::presentation::{
     AcpToolCallState, McpToolIdentity, TOOL_CALL_CONTENT_MAX_CHARS, ToolCallKind, ToolCallStatus,
-    extract_mcp_tool_identity,
+    build_mcp_identity, extract_mcp_tool_identity,
 };
 
 /// Semantic UI presentation bucket aligned with `t3_contracts::orchestration::KNOWN_TURN_ITEM_TYPES`.
@@ -91,7 +91,8 @@ pub struct ToolCallPresentation {
 /// ```
 #[must_use]
 pub fn map_tool_call_presentation(state: &AcpToolCallState) -> ToolCallPresentation {
-    let mcp = extract_mcp_tool_identity(&state.title);
+    let mcp_target = extract_mcp_tool_call_identity(&state.title, state.raw_input.as_ref(), None);
+    let mcp = mcp_target.as_ref().map(|target| target.identity.clone());
     let category = if mcp.is_some() {
         ToolActivityCategory::McpTool
     } else {
@@ -173,4 +174,110 @@ fn extract_item_text(item: &Value) -> String {
         return path.to_owned();
     }
     String::new()
+}
+
+/// Extracted MCP tool identity plus structured arguments when supplied (`7f928416b2`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct McpToolCallTarget {
+    /// Target `(server, tool)` identity.
+    pub identity: McpToolIdentity,
+    /// Structured MCP tool arguments when recovered from `rawInput`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<Value>,
+}
+
+/// Extracts MCP identity from metadata (`_meta.is_mcp_tool_call`), Antigravity's
+/// `call_mcp_tool` `rawInput.{ServerName, ToolName, Arguments}` (`7f928416b2`),
+/// Kiro's `_meta.kiro.serverName` + `rawInput.tool_id`, or common title conventions.
+#[must_use]
+pub fn extract_mcp_tool_call_identity(
+    title: &str,
+    raw_input: Option<&Value>,
+    meta: Option<&Value>,
+) -> Option<McpToolCallTarget> {
+    if let Some(meta_obj) = meta.and_then(Value::as_object) {
+        let is_mcp = meta_obj.get("is_mcp_tool_call").and_then(Value::as_bool) == Some(true);
+        if is_mcp
+            && let (Some(server), Some(tool)) = (
+                meta_obj.get("mcp_server_name").and_then(Value::as_str),
+                meta_obj.get("mcp_tool_name").and_then(Value::as_str),
+            )
+            && let Some(identity) = build_mcp_identity(server, tool)
+        {
+            return Some(McpToolCallTarget {
+                identity,
+                input: None,
+            });
+        }
+    }
+
+    if let Some(input_obj) = raw_input.and_then(Value::as_object) {
+        if let (Some(server), Some(tool)) = (
+            input_obj.get("ServerName").and_then(Value::as_str),
+            input_obj.get("ToolName").and_then(Value::as_str),
+        ) && let Some(identity) = build_mcp_identity(server, tool)
+        {
+            let args = input_obj
+                .get("Arguments")
+                .filter(|v| v.is_object())
+                .cloned();
+            return Some(McpToolCallTarget {
+                identity,
+                input: args,
+            });
+        }
+
+        if let Some(kiro_server) = meta
+            .and_then(Value::as_object)
+            .and_then(|m| m.get("kiro"))
+            .and_then(Value::as_object)
+            .and_then(|k| k.get("serverName"))
+            .and_then(Value::as_str)
+            && let Some(tool_id) = input_obj.get("tool_id").and_then(Value::as_str)
+            && let Some((_, kiro_tool)) = tool_id.split_once("::")
+            && let Some(identity) = build_mcp_identity(kiro_server, kiro_tool)
+        {
+            let args = input_obj
+                .get("arguments")
+                .filter(|v| v.is_object())
+                .cloned();
+            return Some(McpToolCallTarget {
+                identity,
+                input: args,
+            });
+        }
+    }
+
+    extract_mcp_tool_identity(title).map(|identity| McpToolCallTarget {
+        identity,
+        input: None,
+    })
+}
+
+const GENERIC_COMMAND_TITLES: &[&str] = &["Ran command", "Run command", "Command"];
+
+/// Returns the human-readable status label for a commandless `command_execution` item,
+/// preventing generic provider titles such as `"Ran command"` from rendering `"Running Ran"` (`9294a9801e`).
+#[must_use]
+pub fn commandless_command_label(
+    item_type: &str,
+    command: Option<&str>,
+    provider_title: Option<&str>,
+    status: &ToolCallStatus,
+) -> Option<&'static str> {
+    if item_type != "command_execution" || command.is_some_and(|c| !c.trim().is_empty()) {
+        return None;
+    }
+    let normalized = provider_title.map(str::trim).filter(|t| !t.is_empty());
+    let is_generic = normalized.is_none_or(|t| GENERIC_COMMAND_TITLES.contains(&t));
+    if !is_generic {
+        return None;
+    }
+    Some(match status {
+        ToolCallStatus::Pending | ToolCallStatus::InProgress => "Running command",
+        ToolCallStatus::Failed => "Failed command",
+        ToolCallStatus::Unknown(raw) if raw.eq_ignore_ascii_case("declined") => "Declined command",
+        ToolCallStatus::Unknown(raw) if raw.eq_ignore_ascii_case("stopped") => "Stopped command",
+        ToolCallStatus::Completed | ToolCallStatus::Unknown(_) => "Ran command",
+    })
 }

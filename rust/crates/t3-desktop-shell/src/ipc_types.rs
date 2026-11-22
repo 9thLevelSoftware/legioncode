@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use t3_contracts::policy::ManagedPolicyDocument;
-use t3_edge::desktop_updates::{DesktopUpdateChannel, UpdateStatus};
+use t3_edge::desktop_updates::{DesktopUpdateChannel, TrackMismatch, UpdateStatus};
 use t3_persistence::paths::ServerDerivedPaths;
 use t3_persistence::service_preflight::ServicePreflightResult;
 use t3_surfaces::desktop::{DesktopRouteDecision, DisplayRect, InitialWindowBounds, WindowBounds};
@@ -29,6 +29,18 @@ pub enum DesktopIpcMethod {
     /// `desktop.renderServiceUnits`
     #[serde(rename = "desktop.renderServiceUnits")]
     RenderServiceUnits,
+    /// `desktop.appleSpeech.available` (`#34027`)
+    #[serde(rename = "desktop.appleSpeech.available")]
+    AppleSpeechAvailable,
+    /// `desktop.appleSpeech.supportedLocales` (`#34027`)
+    #[serde(rename = "desktop.appleSpeech.supportedLocales")]
+    AppleSpeechSupportedLocales,
+    /// `desktop.appleSpeech.prepare` (`#34027`)
+    #[serde(rename = "desktop.appleSpeech.prepare")]
+    AppleSpeechPrepare,
+    /// `desktop.appleSpeech.transcribe` (`#34027`)
+    #[serde(rename = "desktop.appleSpeech.transcribe")]
+    AppleSpeechTranscribe,
 }
 
 impl DesktopIpcMethod {
@@ -41,6 +53,10 @@ impl DesktopIpcMethod {
             "desktop.updateStep" => Some(Self::UpdateStep),
             "desktop.preflightDb" => Some(Self::PreflightDb),
             "desktop.renderServiceUnits" => Some(Self::RenderServiceUnits),
+            "desktop.appleSpeech.available" => Some(Self::AppleSpeechAvailable),
+            "desktop.appleSpeech.supportedLocales" => Some(Self::AppleSpeechSupportedLocales),
+            "desktop.appleSpeech.prepare" => Some(Self::AppleSpeechPrepare),
+            "desktop.appleSpeech.transcribe" => Some(Self::AppleSpeechTranscribe),
             _ => None,
         }
     }
@@ -54,6 +70,10 @@ impl DesktopIpcMethod {
             Self::UpdateStep => "desktop.updateStep",
             Self::PreflightDb => "desktop.preflightDb",
             Self::RenderServiceUnits => "desktop.renderServiceUnits",
+            Self::AppleSpeechAvailable => "desktop.appleSpeech.available",
+            Self::AppleSpeechSupportedLocales => "desktop.appleSpeech.supportedLocales",
+            Self::AppleSpeechPrepare => "desktop.appleSpeech.prepare",
+            Self::AppleSpeechTranscribe => "desktop.appleSpeech.transcribe",
         }
     }
 }
@@ -169,6 +189,9 @@ pub struct BootstrapResult {
     pub update_status: UpdateStatus,
     /// Active desktop update channel.
     pub update_channel: DesktopUpdateChannel,
+    /// Active cross-track mismatch surfaced by updater checks (`#38506`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub track_mismatch: Option<TrackMismatch>,
     /// Discovered sidecar binary path if found on disk.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sidecar_binary: Option<String>,

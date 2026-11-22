@@ -223,3 +223,12 @@ pub fn parse_grok_models_cli_output(stdout: &str) -> Vec<CatalogModelEntry> {
     }
     seen
 }
+
+/// Returns `true` when Grok's background interval poll should recheck CLI status.
+///
+/// Starting the Grok CLI spawns several subprocesses; healthy (`Ready`) instances are
+/// rechecked only on explicit refresh or settings changes (`0a1773aec9`).
+#[must_use]
+pub const fn grok_should_refresh_on_interval(status: super::ProviderProbeStatus) -> bool {
+    !matches!(status, super::ProviderProbeStatus::Ready)
+}

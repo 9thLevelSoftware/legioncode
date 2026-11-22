@@ -4,6 +4,7 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::Deserialize;
+use t3_contracts::brand::ACTIVE_BRAND;
 use t3_contracts::ids::{EnvironmentId, ThreadId};
 use t3_contracts::orchestration::McpClientAccess;
 use t3_persistence::ownership::format_epoch_millis_utc;
@@ -75,7 +76,7 @@ pub struct LivePeerMcpOptions {
 impl Default for LivePeerMcpOptions {
     fn default() -> Self {
         Self {
-            client_name: "t3code-peer".to_owned(),
+            client_name: format!("{}-peer", ACTIVE_BRAND.url_scheme),
             client_version: "1".to_owned(),
             mode_limit: None,
             sender_thread: None,

@@ -138,7 +138,7 @@ pub fn extract_mcp_tool_identity(raw_name: &str) -> Option<McpToolIdentity> {
     None
 }
 
-fn build_mcp_identity(server: &str, tool: &str) -> Option<McpToolIdentity> {
+pub(super) fn build_mcp_identity(server: &str, tool: &str) -> Option<McpToolIdentity> {
     let server = server.trim();
     let tool = tool.trim();
     if server.is_empty()

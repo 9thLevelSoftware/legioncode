@@ -36,6 +36,9 @@
 
 #![forbid(unsafe_code)]
 
+pub mod apple_speech_ipc;
+pub mod browser_webview;
+mod browser_webview_controls;
 pub mod bundle;
 mod bundle_templates;
 pub mod control_server;
@@ -52,6 +55,7 @@ pub mod window_host;
 pub mod window_host_protocol;
 mod window_host_smoke;
 mod window_host_types;
+pub mod wsl_env;
 
 /// Returns the crate version string for `t3-desktop-shell`.
 ///

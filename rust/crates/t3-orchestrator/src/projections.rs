@@ -2,6 +2,7 @@
 
 pub mod prune;
 pub mod shell;
+pub mod shell_focus;
 pub mod shell_types;
 
 use thiserror::Error;

@@ -2,10 +2,14 @@
 
 use t3_contracts::ids::{CommandId, RunId};
 use t3_contracts::orchestration::{
-    AppThread, ConversationMessage, DispatchMode, DomainEvent, DomainEventPayload,
-    MessageDispatchCommand, ModelSelection, Run, RunStatus,
+    AppThread, DispatchMode, DomainEvent, DomainEventPayload, MessageDispatchCommand, Run,
+    RunOutputSchema, RunStatus,
 };
 
+use crate::decider::output_ops::validate_output_request_for_message;
+use crate::decider::queue_ops::{
+    build_dispatched_run, build_user_message, effective_dispatch_mode, next_queue_position,
+};
 use crate::decider::thread_ops::{is_run_active, make_thread_event, require_live_thread};
 use crate::decider::types::{CommandDecision, DeciderError, derived_effect_id, derived_event_id};
 use crate::outbox::{OutboxEffectRequest, PendingOutboxEffect};
@@ -20,6 +24,8 @@ pub(crate) fn decide_message_dispatch(
     if thread.archived_at.is_some() {
         return Err(DeciderError::ThreadArchived(cmd.thread_id.clone()));
     }
+    let inherited_output_schema = resolve_dispatch_output_schema(state, cmd);
+    validate_output_request_for_message(&cmd.text, &cmd.attachments, cmd.output_schema.as_ref())?;
 
     let active_runs: Vec<&Run> = state.runs.iter().filter(|r| is_run_active(r)).collect();
     let max_ordinal = state.runs.iter().map(|r| r.ordinal).max().unwrap_or(0);
@@ -27,17 +33,18 @@ pub(crate) fn decide_message_dispatch(
     let mut outbox = Vec::new();
 
     clear_settled_and_snoozed(&mut thread, cmd, now_iso, &mut events)?;
-    let msg_run_id = apply_dispatch_mode(
-        &thread,
-        cmd,
-        &active_runs,
-        max_ordinal,
+    let mode = effective_dispatch_mode(state, cmd);
+    let mut acc = DispatchAcc {
         now_iso,
-        &mut events,
-        &mut outbox,
-    )?;
+        events: &mut events,
+        outbox: &mut outbox,
+        output_schema: inherited_output_schema,
+        queue_pos: next_queue_position(&state.runs),
+    };
+    let (msg_run_id, will_queue) =
+        apply_dispatch_mode(&thread, cmd, &mode, &active_runs, max_ordinal, &mut acc)?;
 
-    let msg = build_user_message(cmd, msg_run_id, now_iso);
+    let msg = build_user_message(cmd, msg_run_id, will_queue, now_iso);
     let ev_idx = events.len();
     events.push(DomainEvent {
         id: derived_event_id(&cmd.command_id, ev_idx)?,
@@ -60,6 +67,25 @@ pub(crate) fn decide_message_dispatch(
         rollback_intent: None,
         resulting_thread: Some(thread),
     })
+}
+
+fn resolve_dispatch_output_schema(
+    state: &DeciderThreadState,
+    cmd: &MessageDispatchCommand,
+) -> Option<RunOutputSchema> {
+    if let Some(schema) = &cmd.output_schema {
+        return Some(schema.clone());
+    }
+    let continued = cmd
+        .restart_continuation_of_run_id
+        .as_ref()
+        .or(cmd.usage_limit_continuation_of_run_id.as_ref())
+        .or(cmd.manual_continuation_of_run_id.as_ref())?;
+    state
+        .runs
+        .iter()
+        .find(|r| r.id == *continued)
+        .and_then(|r| r.output_schema.clone())
 }
 
 fn clear_settled_and_snoozed(
@@ -108,23 +134,30 @@ fn clear_settled_and_snoozed(
     Ok(())
 }
 
+struct DispatchAcc<'a> {
+    now_iso: &'a str,
+    events: &'a mut Vec<DomainEvent>,
+    outbox: &'a mut Vec<PendingOutboxEffect>,
+    output_schema: Option<RunOutputSchema>,
+    queue_pos: u64,
+}
+
 fn apply_dispatch_mode(
     thread: &AppThread,
     cmd: &MessageDispatchCommand,
+    mode: &DispatchMode,
     active_runs: &[&Run],
     max_ordinal: u64,
-    now_iso: &str,
-    events: &mut Vec<DomainEvent>,
-    outbox: &mut Vec<PendingOutboxEffect>,
-) -> Result<Option<RunId>, DeciderError> {
-    match &cmd.dispatch_mode {
+    acc: &mut DispatchAcc<'_>,
+) -> Result<(Option<RunId>, bool), DeciderError> {
+    match mode {
         DispatchMode::SteerActive { target_run_id } => {
             if !active_runs.iter().any(|r| r.id == *target_run_id) {
                 return Err(DeciderError::InvalidRunState(format!(
                     "target run `{target_run_id}` is not active for steer"
                 )));
             }
-            outbox.push(PendingOutboxEffect {
+            acc.outbox.push(PendingOutboxEffect {
                 id: derived_effect_id(&cmd.command_id, 0),
                 command_id: cmd.command_id.clone(),
                 thread_id: cmd.thread_id.clone(),
@@ -135,29 +168,19 @@ fn apply_dispatch_mode(
                 },
                 available_at: None,
             });
-            Ok(Some(target_run_id.clone()))
+            Ok((Some(target_run_id.clone()), false))
         }
         DispatchMode::RestartActive { target_run_id } => {
-            let mut acc = DispatchAcc {
-                now_iso,
-                events,
-                outbox,
-            };
-            dispatch_restart_active(
-                thread,
-                cmd,
-                active_runs,
-                target_run_id,
-                max_ordinal,
-                &mut acc,
-            )
+            let run_id =
+                dispatch_restart_active(thread, cmd, active_runs, target_run_id, max_ordinal, acc)?;
+            Ok((run_id, false))
         }
         DispatchMode::QueueAfterActive
         | DispatchMode::DeferStart { .. }
         | DispatchMode::StartImmediately => {
             let queued = !active_runs.is_empty()
                 || matches!(
-                    cmd.dispatch_mode,
+                    mode,
                     DispatchMode::QueueAfterActive | DispatchMode::DeferStart { .. }
                 );
             let status = if queued {
@@ -166,17 +189,28 @@ fn apply_dispatch_mode(
                 RunStatus::Running
             };
             let new_run_id = derived_run_id(&cmd.command_id)?;
-            let run = build_run(&new_run_id, thread, max_ordinal + 1, status, now_iso, cmd);
-            let idx = events.len();
-            events.push(make_run_event(
+            let mut run = build_dispatched_run(
+                &new_run_id,
+                thread,
+                max_ordinal + 1,
+                status,
+                acc.now_iso,
+                cmd,
+                acc.output_schema.clone(),
+            );
+            if queued {
+                run.queue_position = Some(Some(acc.queue_pos));
+            }
+            let idx = acc.events.len();
+            acc.events.push(make_run_event(
                 &cmd.command_id,
                 idx,
-                now_iso,
+                acc.now_iso,
                 "run.created",
                 run,
             )?);
             if status == RunStatus::Running {
-                outbox.push(PendingOutboxEffect {
+                acc.outbox.push(PendingOutboxEffect {
                     id: derived_effect_id(&cmd.command_id, 0),
                     command_id: cmd.command_id.clone(),
                     thread_id: cmd.thread_id.clone(),
@@ -186,15 +220,9 @@ fn apply_dispatch_mode(
                     available_at: None,
                 });
             }
-            Ok(Some(new_run_id))
+            Ok((Some(new_run_id), queued))
         }
     }
-}
-
-struct DispatchAcc<'a> {
-    now_iso: &'a str,
-    events: &'a mut Vec<DomainEvent>,
-    outbox: &'a mut Vec<PendingOutboxEffect>,
 }
 
 fn dispatch_restart_active(
@@ -223,13 +251,14 @@ fn dispatch_restart_active(
     )?);
 
     let new_run_id = derived_run_id(&cmd.command_id)?;
-    let run = build_run(
+    let run = build_dispatched_run(
         &new_run_id,
         thread,
         max_ordinal + 1,
         RunStatus::Running,
         acc.now_iso,
         cmd,
+        acc.output_schema.clone(),
     );
     let idx2 = acc.events.len();
     acc.events.push(make_run_event(
@@ -251,36 +280,6 @@ fn dispatch_restart_active(
         available_at: None,
     });
     Ok(Some(new_run_id))
-}
-
-fn build_user_message(
-    cmd: &MessageDispatchCommand,
-    run_id: Option<RunId>,
-    now_iso: &str,
-) -> ConversationMessage {
-    ConversationMessage {
-        notification: cmd.notification.clone(),
-        created_by: cmd.created_by,
-        creation_source: cmd.creation_source,
-        scheduled_task_id: cmd.scheduled_task_id.clone(),
-        follows_thread_selection: None,
-        sender_thread_id: cmd.sender_thread_id.clone(),
-        linked_sender: cmd.linked_sender.clone(),
-        idle_compaction: cmd.idle_compaction.clone(),
-        workflow_script: None,
-        id: cmd.message_id.clone(),
-        thread_id: cmd.thread_id.clone(),
-        run_id,
-        node_id: None,
-        role: "user".to_owned(),
-        text: cmd.text.clone(),
-        context: cmd.context.clone(),
-        attachments: cmd.attachments.clone(),
-        streaming: false,
-        created_at: now_iso.to_owned(),
-        updated_at: now_iso.to_owned(),
-        delegated_completion: cmd.delegated_completion.clone(),
-    }
 }
 
 fn derived_run_id(command_id: &CommandId) -> Result<RunId, DeciderError> {
@@ -309,52 +308,4 @@ pub(crate) fn make_run_event(
             run: Box::new(run),
         },
     })
-}
-
-fn build_run(
-    run_id: &RunId,
-    thread: &AppThread,
-    ordinal: u64,
-    status: RunStatus,
-    now_iso: &str,
-    cmd: &MessageDispatchCommand,
-) -> Run {
-    let selection: ModelSelection = cmd
-        .model_selection
-        .clone()
-        .unwrap_or_else(|| thread.model_selection.clone());
-    Run {
-        id: run_id.clone(),
-        thread_id: thread.id.clone(),
-        ordinal,
-        provider_instance_id: selection.instance_id.clone(),
-        model_selection: selection,
-        provider_thread_id: thread.active_provider_thread_id.clone(),
-        user_message_id: cmd.message_id.clone(),
-        root_node_id: None,
-        active_attempt_id: None,
-        status,
-        queue_position: None,
-        queue_held: None,
-        steer_when_ready_run_id: None,
-        requested_at: now_iso.to_owned(),
-        started_at: if status == RunStatus::Running {
-            Some(now_iso.to_owned())
-        } else {
-            None
-        },
-        completed_at: None,
-        checkpoint_id: None,
-        context_handoff_id: None,
-        restart_continuation_of_run_id: cmd.restart_continuation_of_run_id.clone(),
-        manual_continuation_of_run_id: cmd.manual_continuation_of_run_id.clone(),
-        usage_limit_continuation_of_run_id: cmd.usage_limit_continuation_of_run_id.clone(),
-        delegated_task_id: None,
-        work_started_at: None,
-        restart_cancelled_background_work: None,
-        source_plan_ref: None,
-        delegated_completion: None,
-        workspace_preparation: None,
-        fresh_context: cmd.fresh_context,
-    }
 }

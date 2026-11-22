@@ -7,24 +7,33 @@
 
 #[path = "secrets_ref.rs"]
 mod ref_cache;
+#[path = "secrets_validation.rs"]
+mod validation;
 
-use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use thiserror::Error;
-use uuid::Uuid;
 
 pub use ref_cache::{
     CachedSecretResolver, MAX_SECRET_PROVIDER_ID_LENGTH, MAX_SECRET_REF_LENGTH, SecretRef,
     SecretRefError, SecretReference,
+};
+pub use validation::{
+    branded_secret_name, branded_secret_name_for_brand, resolve_secret_home_for_brand,
+    resolve_secret_home_from_env, validate_secret_name,
+};
+use validation::{
+    random_bytes, resolve_confined_secret_path, temp_path_for, write_temp_secret_file,
 };
 
 /// Errors produced by [`FileSecretStore`].
 #[derive(Debug, Error)]
 pub enum SecretStoreError {
     /// Secret key name is empty or contains path traversal characters.
-    #[error("invalid secret name '{name}': must be non-empty without path separators or '..'")]
+    #[error(
+        "invalid secret name '{name}': must be non-empty without path separators, ':', NUL, or '..'"
+    )]
     InvalidName {
         /// Rejected secret name.
         name: String,
@@ -152,10 +161,9 @@ impl FileSecretStore {
         &self.secrets_dir
     }
 
-    /// Resolves `<secrets_dir>/<name>.bin` after validating `name`.
+    /// Resolves `<secrets_dir>/<name>.bin` after validating `name` and directory confinement.
     pub fn secret_path(&self, name: &str) -> Result<PathBuf, SecretStoreError> {
-        validate_secret_name(name)?;
-        Ok(self.secrets_dir.join(format!("{name}.bin")))
+        resolve_confined_secret_path(&self.secrets_dir, name)
     }
 
     /// Reads raw secret bytes for `name`, returning `Ok(None)` when absent.
@@ -295,57 +303,4 @@ impl FileSecretStore {
             }),
         }
     }
-}
-
-fn validate_secret_name(name: &str) -> Result<(), SecretStoreError> {
-    if name.is_empty()
-        || name == "."
-        || name == ".."
-        || name.contains('/')
-        || name.contains('\\')
-        || name.contains('\0')
-        || name.contains("..")
-    {
-        return Err(SecretStoreError::InvalidName {
-            name: name.to_owned(),
-        });
-    }
-    Ok(())
-}
-
-fn temp_path_for(secret_path: &Path) -> PathBuf {
-    let mut os = secret_path.as_os_str().to_os_string();
-    os.push(format!(".{}.tmp", Uuid::new_v4()));
-    PathBuf::from(os)
-}
-
-fn write_temp_secret_file(temp_path: &Path, value: &[u8]) -> Result<(), std::io::Error> {
-    let mut options = OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    let mut file = options.open(temp_path)?;
-    file.write_all(value)?;
-    file.sync_all()?;
-    drop(file);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(temp_path, fs::Permissions::from_mode(0o600))?;
-    }
-    Ok(())
-}
-
-fn random_bytes(len: usize) -> Vec<u8> {
-    let mut out = Vec::with_capacity(len);
-    while out.len() < len {
-        let block = *Uuid::new_v4().as_bytes();
-        let remaining = len - out.len();
-        let take = remaining.min(block.len());
-        out.extend_from_slice(&block[..take]);
-    }
-    out
 }

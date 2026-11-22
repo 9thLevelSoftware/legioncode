@@ -292,5 +292,10 @@ pub fn build_smoke_html() -> &'static str {
 }
 
 pub(crate) const fn desktop_scheme_name() -> &'static str {
-    DESKTOP_PRODUCTION_SCHEME
+    let active = t3_contracts::brand::ACTIVE_BRAND.url_scheme;
+    if active.is_empty() {
+        DESKTOP_PRODUCTION_SCHEME
+    } else {
+        active
+    }
 }

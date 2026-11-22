@@ -1,0 +1,4 @@
+# Link the MSVC C runtime statically so standalone Windows binaries
+# (`t3.exe`, `t3-desktop.exe`) start without the Visual C++ Redistributable.
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-C", "target-feature=+crt-static"]

@@ -18,10 +18,10 @@ pub use super::built_ins_acp::{
     kiro_autopilot_value, kiro_launch_spec,
 };
 pub use super::built_ins_extra::{
-    MINIMUM_OPENCODE_VERSION, MINIMUM_PI_VERSION, MUSE_PROTOCOL_VERSION, PiLaunchError,
-    RegistryExecError, fill_compaction_recents, muse_launch_spec, muse_verbatim_path,
-    normalize_registry_command_path, opencode_basic_auth_header, opencode_server_env,
-    pi_launch_args, pi_probe_spec, validate_registry_executable,
+    MUSE_PROTOCOL_VERSION, PiLaunchError, RegistryExecError, fill_compaction_recents,
+    muse_launch_spec, muse_verbatim_path, normalize_registry_command_path,
+    opencode_basic_auth_header, opencode_server_env, pi_launch_args, pi_probe_spec,
+    validate_registry_executable,
 };
 use super::{ProviderDriverSpec, build_child_env};
 

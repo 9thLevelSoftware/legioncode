@@ -12,7 +12,7 @@
 //! };
 //!
 //! let sample = sample_policy();
-//! assert_eq!(policy_fingerprint_12hex(&sample)?, "f716b00ffc01");
+//! assert_eq!(policy_fingerprint_12hex(&sample)?, "13ab1a3e32bc");
 //!
 //! let minimal: ManagedPolicyDocument = serde_json::from_str(
 //!     r#"{"schemaVersion":1,"organization":"Minimal Org"}"#,
@@ -23,7 +23,9 @@
 
 mod describe;
 mod macos_template;
+mod manageable_settings;
 mod serde_helpers;
+mod summary;
 mod windows_data;
 mod windows_templates;
 
@@ -46,6 +48,11 @@ pub use describe::{
     LoadedPolicySummary, RunningServerState, describe_policy, describe_running_server,
 };
 pub use macos_template::{PolicyTemplateError, macos_profile};
+pub use manageable_settings::{describe_manageable_settings, list_manageable_settings};
+pub use summary::{
+    ManagedPolicySummary, ManagedPolicySummaryLimits, ManagedProviderSummaryLimits,
+    ManagedUpdatesSummaryPolicy, allows_preview_tunnel,
+};
 pub use windows_data::{
     KNOWN_DRIVER_LABELS, WINDOWS_POLICY_GROUPS, WINDOWS_POLICY_KEY, WINDOWS_POLICY_LISTS,
     WINDOWS_POLICY_VALUES,
@@ -222,6 +229,9 @@ pub struct ManagedPolicyLimits {
     /// `Some(false)` blocks browser cookie import.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub browser_cookie_import: Option<bool>,
+    /// `Some(false)` disables preview tunnels so remote clients cannot reach loopback ports.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview_tunnel: Option<bool>,
     /// Provider allowlist and pinned instance settings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub providers: Option<ManagedProviderLimits>,
@@ -272,6 +282,7 @@ pub fn sample_policy() -> ManagedPolicyDocument {
             max_runtime_mode: Some(RuntimeMode::AutoAcceptEdits),
             clients: Some(vec![ManagedPolicyClient::Desktop]),
             telemetry: Some(false),
+            preview_tunnel: Some(false),
             ..ManagedPolicyLimits::default()
         }),
     }

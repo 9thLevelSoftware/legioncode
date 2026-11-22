@@ -9,9 +9,10 @@ ARGUMENTS
   message string    Message for the agent, or - to read it from stdin.
 
 FLAGS
-  --base-dir string    Explicit T3 Code data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME).
-  --wait               Wait for the agent to finish and print its reply. Exits 1 if the run fails and 2 if it waits for an answer.
-  --json               Print JSON instead of text.
+  --base-dir string         Explicit T3 Code data directory; runtime state is stored under userdata (equivalent to T3CODE_HOME).
+  --output-schema string    File holding a JSON Schema. The agent must return data matching it; --wait --json prints it as `output`.
+  --wait                    Wait for the agent to finish and print its reply. Exits 1 if the run fails and 2 if it waits for an answer.
+  --json                    Print JSON instead of text.
 
 GLOBAL FLAGS
   --help, -h                                                          Show help information

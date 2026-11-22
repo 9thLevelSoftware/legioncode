@@ -1,30 +1,19 @@
 //! Shared [`RuntimeHttpState`] and composable Axum routers for `t3 serve`.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex as StdMutex};
 
 use axum::Router;
-use axum::routing::{delete, get, post};
 use rusqlite::Connection;
+use t3_contracts::policy::ManagedPolicySummary;
 use t3_orchestrator::Orchestrator;
 use t3_remote::secrets::FileSecretStore;
 
 use crate::error::ServerRuntimeError;
-use crate::http_auth::{handle_oauth_token, handle_pair};
-use crate::http_auth_admin::{
-    handle_approve_connect_device, handle_create_pairing, handle_issue_session,
-    handle_list_connect_devices, handle_list_pairing, handle_list_sessions,
-    handle_revoke_connect_device, handle_revoke_pairing, handle_revoke_session,
-};
-use crate::http_integrations::{
-    handle_link_peer, handle_list_peers, handle_preview_action, handle_provider_probe,
-    handle_unlink_peer,
-};
-use crate::http_integrations_scm::{
-    handle_get_scm_diff, handle_get_scm_pr, handle_post_scm_diff, handle_post_scm_pr,
-};
-use crate::http_projects::{handle_get_projects, handle_mutate_project};
-use crate::http_traces::handle_otlp_traces;
+use crate::http_api_routes::build_runtime_api_router;
+use crate::http_mcp_signin::McpSignInRegistry;
+use crate::http_projects_read::ProjectSettingsOverride;
 use crate::preview_browser::PreviewBrowserRuntime;
 use crate::provider_probe::ProviderProbeService;
 use crate::static_assets::static_assets_router;
@@ -46,6 +35,14 @@ pub struct RuntimeHttpState {
     pub secrets_dir: PathBuf,
     /// Built frontend dist directory served via [`static_assets_router`].
     pub static_dir: Option<PathBuf>,
+    /// Allowed canonical workspace root prefixes for `/api/assets/workspace` symlink checks (`#39491`).
+    pub allowed_workspace_roots: Vec<PathBuf>,
+    /// Server-side `enablePreviewTunnel` setting gated with [`RuntimeHttpState::managed_policy`] (`#39415`).
+    pub enable_preview_tunnel: bool,
+    /// Optional managed enterprise policy summary governing preview tunnel permissions (`#39415`).
+    pub managed_policy: Option<ManagedPolicySummary>,
+    /// Whether peer links / transitive pairing and thread relays are enabled on this environment.
+    pub linked_environments_enabled: bool,
     /// Optional live orchestrator reference.
     pub orchestrator: Option<Arc<Orchestrator>>,
     /// Optional live terminal runtime reference.
@@ -54,6 +51,11 @@ pub struct RuntimeHttpState {
     pub probe_service: Arc<ProviderProbeService>,
     /// Headless browser CDP host runtime for `/api/preview/action`.
     pub preview_browser: Arc<PreviewBrowserRuntime>,
+    /// Registered MCP server OAuth sign-in flows (`#39921`).
+    pub mcp_sign_in: Arc<McpSignInRegistry>,
+    /// Per-project saved Settings overrides (`#39676`, `#35925`).
+    pub project_settings_overrides: Arc<StdMutex<BTreeMap<String, ProjectSettingsOverride>>>,
+    access_logs: Arc<StdMutex<Vec<String>>>,
     trace_write_lock: Arc<StdMutex<()>>,
 }
 
@@ -70,10 +72,17 @@ impl RuntimeHttpState {
             logs_dir: logs,
             secrets_dir: secrets,
             static_dir: None,
+            allowed_workspace_roots: Vec::new(),
+            enable_preview_tunnel: true,
+            managed_policy: None,
+            linked_environments_enabled: true,
             orchestrator: None,
             terminal_runtime: None,
             probe_service: Arc::new(ProviderProbeService::default()),
             preview_browser: Arc::new(PreviewBrowserRuntime::new()),
+            mcp_sign_in: Arc::new(McpSignInRegistry::new()),
+            project_settings_overrides: Arc::new(StdMutex::new(BTreeMap::new())),
+            access_logs: Arc::new(StdMutex::new(Vec::new())),
             trace_write_lock: Arc::new(StdMutex::new(())),
         }
     }
@@ -171,52 +180,65 @@ impl RuntimeHttpState {
     pub(crate) fn trace_write_lock(&self) -> Arc<StdMutex<()>> {
         Arc::clone(&self.trace_write_lock)
     }
+
+    /// Configure preview tunnel setting and optional managed policy override (`#39415`).
+    #[must_use]
+    pub fn with_preview_tunnel_policy(
+        mut self,
+        enable_preview_tunnel: bool,
+        managed_policy: Option<ManagedPolicySummary>,
+    ) -> Self {
+        self.enable_preview_tunnel = enable_preview_tunnel;
+        self.managed_policy = managed_policy;
+        self
+    }
+
+    /// Configure allowed workspace roots for `/api/assets/workspace` validation (`#39491`).
+    #[must_use]
+    pub fn with_allowed_workspace_roots(mut self, roots: Vec<PathBuf>) -> Self {
+        self.allowed_workspace_roots = roots;
+        self
+    }
+
+    /// Enable or disable peer thread relay & transitive pairing (`#39406`, `#40036`).
+    #[must_use]
+    pub const fn with_linked_environments_enabled(mut self, enabled: bool) -> Self {
+        self.linked_environments_enabled = enabled;
+        self
+    }
+
+    /// Register saved Settings overrides (`defaultProjectScripts`, `defaultModelSelection`, `trackedFolders`)
+    /// for a project (`#39676`, `#35925`).
+    pub fn set_project_settings_override(
+        &self,
+        project_id: impl Into<String>,
+        cfg: ProjectSettingsOverride,
+    ) {
+        if let Ok(mut guard) = self.project_settings_overrides.lock() {
+            guard.insert(project_id.into(), cfg);
+        }
+    }
+
+    pub(crate) fn record_access_log(&self, line: String) {
+        if let Ok(mut guard) = self.access_logs.lock() {
+            guard.push(line);
+        }
+    }
+
+    /// Returns recorded redacted HTTP access log lines (`#40133`).
+    pub fn access_logs(&self) -> Vec<String> {
+        self.access_logs
+            .lock()
+            .map(|g| g.clone())
+            .unwrap_or_default()
+    }
 }
 
 /// Build the API routes (`/api/auth/*`, `/oauth/token`, `/api/projects*`, `/api/scm/*`,
-/// `/api/peers*`, `/api/providers/probe`, `/api/preview/action`, `/api/observability/v1/traces`).
+/// `/api/peers*`, `/api/links/*`, `/api/workspace/*`, `/api/mcp/sign-in/*`, `/api/preview/*`,
+/// `/api/providers/probe`, `/api/assets/workspace`, `/api/observability/v1/traces`).
 pub fn runtime_api_router(state: Arc<RuntimeHttpState>) -> Router {
-    Router::new()
-        .route("/api/auth/pair", post(handle_pair))
-        .route("/oauth/token", post(handle_oauth_token))
-        .route(
-            "/api/auth/pairing",
-            get(handle_list_pairing).post(handle_create_pairing),
-        )
-        .route("/api/auth/pairing/{id}", delete(handle_revoke_pairing))
-        .route(
-            "/api/auth/sessions",
-            get(handle_list_sessions).post(handle_issue_session),
-        )
-        .route("/api/auth/sessions/{id}", delete(handle_revoke_session))
-        .route(
-            "/api/auth/connect-devices",
-            get(handle_list_connect_devices),
-        )
-        .route(
-            "/api/auth/connect-devices/approve",
-            post(handle_approve_connect_device),
-        )
-        .route(
-            "/api/auth/connect-devices/revoke",
-            post(handle_revoke_connect_device),
-        )
-        .route("/api/projects", get(handle_get_projects))
-        .route("/api/projects/mutate", post(handle_mutate_project))
-        .route(
-            "/api/scm/pr",
-            get(handle_get_scm_pr).post(handle_post_scm_pr),
-        )
-        .route(
-            "/api/scm/diff",
-            get(handle_get_scm_diff).post(handle_post_scm_diff),
-        )
-        .route("/api/peers", get(handle_list_peers).post(handle_link_peer))
-        .route("/api/peers/{id}", delete(handle_unlink_peer))
-        .route("/api/providers/probe", post(handle_provider_probe))
-        .route("/api/preview/action", post(handle_preview_action))
-        .route("/api/observability/v1/traces", post(handle_otlp_traces))
-        .with_state(state)
+    build_runtime_api_router(state)
 }
 
 /// Build a full server router combining [`runtime_api_router`] and [`static_assets_router`].

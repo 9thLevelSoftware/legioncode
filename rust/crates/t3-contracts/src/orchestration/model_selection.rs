@@ -107,6 +107,14 @@ impl<'de> Deserialize<'de> for ModelSelection {
     }
 }
 
+/// Repository selector entry inside `WorkspaceStrategy::Worktree.repositories`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceStrategyRepository {
+    /// Tracked repository path.
+    pub path: String,
+}
+
 /// Workspace launch strategy when starting a thread (`orchestrationV2.ts:744-760`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -137,6 +145,9 @@ pub enum WorkspaceStrategy {
         /// Whether to branch from origin instead of local HEAD.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         start_from_origin: Option<bool>,
+        /// Selected tracked Git repositories to isolate inside a multi-repo task folder.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        repositories: Option<Vec<WorkspaceStrategyRepository>>,
     },
 }
 

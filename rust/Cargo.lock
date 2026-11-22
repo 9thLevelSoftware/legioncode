@@ -3088,7 +3088,7 @@ dependencies = [
 
 [[package]]
 name = "t3-cli"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "anyhow",
  "axum",
@@ -3124,7 +3124,7 @@ dependencies = [
 
 [[package]]
 name = "t3-client-core"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "proptest",
  "serde",
@@ -3137,7 +3137,7 @@ dependencies = [
 
 [[package]]
 name = "t3-contracts"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "hex",
  "indexmap",
@@ -3150,7 +3150,7 @@ dependencies = [
 
 [[package]]
 name = "t3-desktop-shell"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "hex",
  "http",
@@ -3162,6 +3162,7 @@ dependencies = [
  "t3-persistence",
  "t3-process-ffi",
  "t3-shared",
+ "t3-speech",
  "t3-surfaces",
  "tao",
  "thiserror 2.0.21",
@@ -3171,7 +3172,7 @@ dependencies = [
 
 [[package]]
 name = "t3-edge"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "base64 0.22.1",
  "hex",
@@ -3187,7 +3188,7 @@ dependencies = [
 
 [[package]]
 name = "t3-mobile-ffi"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "serde",
  "serde_json",
@@ -3202,7 +3203,7 @@ dependencies = [
 
 [[package]]
 name = "t3-orchestrator"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "proptest",
  "rusqlite",
@@ -3218,12 +3219,14 @@ dependencies = [
 
 [[package]]
 name = "t3-persistence"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "quick-xml",
  "rusqlite",
  "serde",
  "serde_json",
+ "t3-contracts",
+ "t3-shared",
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
@@ -3233,7 +3236,7 @@ dependencies = [
 
 [[package]]
 name = "t3-process-ffi"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "serde",
  "serde_json",
@@ -3242,7 +3245,7 @@ dependencies = [
 
 [[package]]
 name = "t3-protocol"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "proptest",
  "serde",
@@ -3257,7 +3260,7 @@ dependencies = [
 
 [[package]]
 name = "t3-providers"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "hex",
  "indexmap",
@@ -3277,7 +3280,7 @@ dependencies = [
 
 [[package]]
 name = "t3-remote"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "futures-util",
  "hex",
@@ -3301,7 +3304,7 @@ dependencies = [
 
 [[package]]
 name = "t3-scm"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "hex",
  "http",
@@ -3323,7 +3326,7 @@ dependencies = [
 
 [[package]]
 name = "t3-server-runtime"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -3356,7 +3359,7 @@ dependencies = [
 
 [[package]]
 name = "t3-shared"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "base64 0.22.1",
  "p256",
@@ -3365,6 +3368,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "t3-contracts",
  "thiserror 2.0.21",
  "tokio",
  "uuid",
@@ -3372,16 +3376,17 @@ dependencies = [
 
 [[package]]
 name = "t3-speech"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "serde",
  "serde_json",
+ "t3-contracts",
  "thiserror 2.0.21",
 ]
 
 [[package]]
 name = "t3-surfaces"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "hex",
  "serde",
@@ -3395,7 +3400,7 @@ dependencies = [
 
 [[package]]
 name = "t3-terminal-vt"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "proptest",
  "serde",
@@ -3404,7 +3409,7 @@ dependencies = [
 
 [[package]]
 name = "t3-wasm-ffi"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "js-sys",
  "serde",
@@ -3421,7 +3426,7 @@ dependencies = [
 
 [[package]]
 name = "t3-web-ui"
-version = "0.1.10"
+version = "0.1.11"
 dependencies = [
  "indexmap",
  "proptest",

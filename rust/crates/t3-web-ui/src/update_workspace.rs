@@ -132,6 +132,7 @@ pub(crate) fn handle_create_thread(
         thread_id: tid,
         project_id: pid,
         title: title.trim().to_owned(),
+        generate_title: None,
         model_selection: ModelSelection {
             instance_id,
             model: model_name.clone(),
@@ -204,6 +205,7 @@ pub(crate) fn handle_send_message(
         linked_sender: None,
         idle_compaction: None,
         fresh_context: None,
+        output_schema: None,
         command_id: cmd_id,
         thread_id: tid,
         message_id: mid,

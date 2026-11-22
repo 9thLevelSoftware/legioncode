@@ -71,6 +71,7 @@ fn build_replay_thread_cmd(
         link_origin: None,
         delegated_from: None,
         imported_native_thread: None,
+        generate_title: None,
         initial_message: Some(InitialThreadMessage {
             message_id: MessageId::new("msg-user-1")?,
             text: "Show showcase reply and capture workspace state".to_owned(),
@@ -80,6 +81,7 @@ fn build_replay_thread_cmd(
             scheduled_task_id: None,
             sender_thread_id: None,
             workspace_strategy: None,
+            output_schema: None,
         }),
     }))
 }

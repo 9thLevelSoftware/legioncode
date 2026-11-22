@@ -19,6 +19,11 @@ use t3_surfaces::desktop::{
     build_desktop_csp,
 };
 
+use crate::apple_speech_ipc::{
+    AppleSpeechHelper, AppleSpeechIpcService, UnavailableAppleSpeechHelper,
+    handle_apple_speech_available, handle_apple_speech_prepare,
+    handle_apple_speech_supported_locales, handle_apple_speech_transcribe,
+};
 use crate::ipc_handlers::{
     apply_update_action, decode_optional_params, decode_params, encode_result,
     handle_clamp_window_bounds, handle_resolve_scheme, infer_channel_from_version, ipc_error,
@@ -40,6 +45,7 @@ use crate::sidecar::{SidecarConfig, SidecarController, SidecarMode};
 pub struct DesktopIpcRouter {
     sidecar: SidecarController,
     update_machine: DesktopUpdateMachine,
+    apple_speech: AppleSpeechIpcService,
 }
 
 impl Default for DesktopIpcRouter {
@@ -56,6 +62,7 @@ impl DesktopIpcRouter {
         Self {
             sidecar,
             update_machine: DesktopUpdateMachine::new(channel, version),
+            apple_speech: AppleSpeechIpcService::default(),
         }
     }
 
@@ -64,6 +71,18 @@ impl DesktopIpcRouter {
     pub fn with_update_machine(mut self, update_machine: DesktopUpdateMachine) -> Self {
         self.update_machine = update_machine;
         self
+    }
+
+    /// Configures Apple Speech capabilities for `desktop.appleSpeech.*` IPC calls (`#34027`).
+    #[must_use]
+    pub fn with_apple_speech(mut self, apple_speech: AppleSpeechIpcService) -> Self {
+        self.apple_speech = apple_speech;
+        self
+    }
+
+    /// Borrow mutable [`AppleSpeechIpcService`] state.
+    pub fn apple_speech_mut(&mut self) -> &mut AppleSpeechIpcService {
+        &mut self.apple_speech
     }
 
     /// Returns the configured [`SidecarController`].
@@ -76,8 +95,18 @@ impl DesktopIpcRouter {
         &self.update_machine
     }
 
-    /// Dispatches a decoded [`DesktopIpcRequest`] and returns a [`DesktopIpcResponse`].
+    /// Dispatches a decoded [`DesktopIpcRequest`] using default helper availability.
     pub fn dispatch(&mut self, request: DesktopIpcRequest) -> DesktopIpcResponse {
+        let mut unavailable = UnavailableAppleSpeechHelper;
+        self.dispatch_with_apple_speech(request, &mut unavailable)
+    }
+
+    /// Dispatches a decoded [`DesktopIpcRequest`] with a supplied [`AppleSpeechHelper`] backend (`#34027`).
+    pub fn dispatch_with_apple_speech<H: AppleSpeechHelper>(
+        &mut self,
+        request: DesktopIpcRequest,
+        speech_helper: &mut H,
+    ) -> DesktopIpcResponse {
         let id = request.id;
         let outcome = match DesktopIpcMethod::parse(&request.method) {
             Some(DesktopIpcMethod::Bootstrap) => self.handle_bootstrap(request.params),
@@ -86,6 +115,20 @@ impl DesktopIpcRouter {
             Some(DesktopIpcMethod::UpdateStep) => self.handle_update_step(request.params),
             Some(DesktopIpcMethod::PreflightDb) => self.handle_preflight_db(request.params),
             Some(DesktopIpcMethod::RenderServiceUnits) => self.handle_render_units(request.params),
+            Some(DesktopIpcMethod::AppleSpeechAvailable) => {
+                handle_apple_speech_available(&self.apple_speech)
+            }
+            Some(DesktopIpcMethod::AppleSpeechSupportedLocales) => {
+                handle_apple_speech_supported_locales(&self.apple_speech)
+            }
+            Some(DesktopIpcMethod::AppleSpeechPrepare) => {
+                handle_apple_speech_prepare(&mut self.apple_speech, &request.params, speech_helper)
+            }
+            Some(DesktopIpcMethod::AppleSpeechTranscribe) => handle_apple_speech_transcribe(
+                &mut self.apple_speech,
+                request.params,
+                speech_helper,
+            ),
             None => Err(ipc_error(
                 "UnknownMethod",
                 format!("unsupported desktop IPC method `{}`", request.method),
@@ -139,15 +182,23 @@ impl DesktopIpcRouter {
         let paths = ServerDerivedPaths::derive(&base_dir, is_development, base_dir_is_explicit);
         let preflight = run_service_preflight(&paths.db_path, launcher_protocol, &app_version);
 
+        let brand = t3_contracts::brand::ACTIVE_BRAND;
+        let dev_scheme = format!("{}-dev", brand.url_scheme);
         let scheme = if is_development {
-            DESKTOP_DEVELOPMENT_SCHEME
-        } else {
+            if brand.url_scheme == "t3code" {
+                DESKTOP_DEVELOPMENT_SCHEME
+            } else {
+                dev_scheme.as_str()
+            }
+        } else if brand.url_scheme == "t3code" {
             DESKTOP_PRODUCTION_SCHEME
+        } else {
+            brand.url_scheme
         };
         let identifier = if is_development {
-            "com.t3tools.t3code.dev"
+            format!("{}.dev", brand.macos_policy_domain)
         } else {
-            "com.t3tools.t3code"
+            brand.macos_policy_domain.to_owned()
         };
         let content_security_policy =
             build_desktop_csp(scheme, req.clerk_frontend_api_hostname.as_deref());
@@ -189,7 +240,7 @@ impl DesktopIpcRouter {
 
         encode_result(BootstrapResult {
             surface_protocol_version: SURFACE_PROTOCOL_VERSION,
-            identifier: identifier.to_owned(),
+            identifier,
             scheme: scheme.to_owned(),
             desktop_url: format!("{scheme}://{DESKTOP_HOST}/"),
             content_security_policy,
@@ -201,6 +252,7 @@ impl DesktopIpcRouter {
             updates_enabled,
             update_status: machine.status(),
             update_channel: machine.channel(),
+            track_mismatch: machine.track_mismatch(),
             sidecar_binary: discovery
                 .found
                 .then(|| discovery.binary_path.to_string_lossy().into_owned()),
@@ -226,6 +278,7 @@ impl DesktopIpcRouter {
             installable_artifact: machine.installable_artifact().cloned(),
             last_error: machine.last_error().map(str::to_owned),
             error_context: machine.error_context(),
+            track_mismatch: machine.track_mismatch(),
             state: machine,
         })
     }

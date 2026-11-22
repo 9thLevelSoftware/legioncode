@@ -119,11 +119,9 @@ impl ServeError {
 }
 
 pub(crate) fn resolve_static_dir_env() -> Option<PathBuf> {
-    env::var("T3CODE_STATIC_DIR")
-        .ok()
-        .map(|v| v.trim().to_owned())
-        .filter(|v| !v.is_empty())
-        .map(|v| expand_home(&v))
+    t3_contracts::brand::ACTIVE_BRAND
+        .read_env("STATIC_DIR")
+        .map(|v| expand_home(v.trim()))
 }
 
 /// Auto-discovers the first built web bundle directory containing `index.html` among

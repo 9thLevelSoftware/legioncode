@@ -6,12 +6,66 @@ use std::sync::Arc;
 
 use axum::Json;
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde_json::{Map, Value, json};
+use t3_protocol::url_redaction::redact_http_request_target;
 
 use crate::error::ServerRuntimeError;
 use crate::http_api::RuntimeHttpState;
+
+/// Formats a single HTTP access log line with signed paths and sensitive query tokens redacted (`#40133`).
+pub fn format_redacted_access_log(
+    method: &Method,
+    request_target: &str,
+    status: StatusCode,
+) -> String {
+    let safe_target = redact_http_request_target(request_target);
+    format!("{} {} -> {}", method.as_str(), safe_target, status.as_u16())
+}
+
+/// Axum middleware recording redacted HTTP access log entries onto [`RuntimeHttpState::access_logs`] (`#40133`).
+pub(crate) async fn redacted_access_log_middleware(
+    State(state): State<Arc<RuntimeHttpState>>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let method = req.method().clone();
+    let target = req
+        .uri()
+        .path_and_query()
+        .map_or_else(|| req.uri().path().to_owned(), ToString::to_string);
+    let resp = next.run(req).await;
+    let line = format_redacted_access_log(&method, &target, resp.status());
+    state.record_access_log(line);
+    resp
+}
+
+fn redact_span_or_url_text(raw: &str) -> String {
+    if let Some((verb, rest)) = raw.split_once(' ')
+        && matches!(
+            verb,
+            "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS"
+        )
+        && (rest.starts_with('/') || rest.starts_with("http://") || rest.starts_with("https://"))
+    {
+        return format!("{verb} {}", redact_http_request_target(rest));
+    }
+    redact_http_request_target(raw)
+}
+
+fn redact_trace_value(value: Value) -> Value {
+    match value {
+        Value::String(s) => Value::String(redact_span_or_url_text(&s)),
+        Value::Array(items) => Value::Array(items.into_iter().map(redact_trace_value).collect()),
+        Value::Object(map) => Value::Object(
+            map.into_iter()
+                .map(|(k, v)| (k, redact_trace_value(v)))
+                .collect(),
+        ),
+        other => other,
+    }
+}
 
 /// `POST /api/observability/v1/traces` — normalize OTLP JSON spans into `<logs_dir>/traces.ndjson`.
 pub(crate) async fn handle_otlp_traces(
@@ -84,13 +138,19 @@ fn normalize_span(span: &Value, resource_attrs: &Map<String, Value>) -> Option<V
     let elapsed_ns = end_ns.saturating_sub(start_ns);
     let duration_ms = nanos_to_duration_ms(elapsed_ns);
 
-    let mut attrs = resource_attrs.clone();
+    let mut attrs = Map::new();
+    for (k, v) in resource_attrs {
+        attrs.insert(k.clone(), redact_trace_value(v.clone()));
+    }
     if let Some(span_attrs) = span.get("attributes") {
-        attrs.extend(flatten_attributes(span_attrs));
+        for (k, v) in flatten_attributes(span_attrs) {
+            attrs.insert(k, redact_trace_value(v));
+        }
     }
 
+    let safe_name = redact_span_or_url_text(name);
     let mut out = Map::new();
-    out.insert("name".to_owned(), Value::String(name.to_owned()));
+    out.insert("name".to_owned(), Value::String(safe_name));
     out.insert(
         "startTimeUnixNano".to_owned(),
         Value::String(start_ns.to_string()),

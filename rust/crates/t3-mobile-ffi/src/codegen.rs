@@ -6,7 +6,7 @@ use crate::codegen_kotlin::KOTLIN_WRAPPER_TEMPLATE;
 use crate::codegen_templates::{C_HEADER_TEMPLATE, SWIFT_WRAPPER_TEMPLATE};
 
 /// Ordered list of every C-ABI symbol exported by `t3-mobile-ffi`.
-pub const EXPORTED_SYMBOLS: [&str; 13] = [
+pub const EXPORTED_SYMBOLS: [&str; 17] = [
     "t3_mobile_ffi_abi_version",
     "t3_mobile_ffi_decorate_diff_json",
     "t3_mobile_ffi_filter_clipboard_json",
@@ -17,6 +17,10 @@ pub const EXPORTED_SYMBOLS: [&str; 13] = [
     "t3_mobile_ffi_vt_decode_snapshot_json",
     "t3_mobile_ffi_host_swap_chunks_json",
     "t3_mobile_ffi_theme_plan_json",
+    "t3_mobile_ffi_filter_review_files_json",
+    "t3_mobile_ffi_linked_lines_json",
+    "t3_mobile_ffi_tunnel_guard_json",
+    "t3_mobile_ffi_secret_card_json",
     "t3_mobile_ffi_sdk_sources_json",
     "t3_mobile_ffi_free_string",
     "t3_mobile_ffi_free_bytes",

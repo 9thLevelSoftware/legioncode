@@ -6,5 +6,6 @@ mod surfaces_tests {
     mod mobile_composer;
     mod mobile_diff;
     mod mobile_i18n;
+    mod mobile_review;
     mod mobile_tunnel;
 }

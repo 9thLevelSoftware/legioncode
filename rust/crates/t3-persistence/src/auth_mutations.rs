@@ -280,3 +280,100 @@ pub fn revoke_session_at(
     tx.commit()?;
     Ok(revoked)
 }
+
+/// Counts returned by [`revoke_other_sessions`] and [`revoke_other_connect_devices_at`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RevokeOtherSessionsOutcome {
+    /// Active sessions marked revoked (`session_id != keep_session_id`).
+    pub revoked_sessions: usize,
+    /// Unspent pairing links/codes revoked (including unbound pairing & approval codes).
+    pub revoked_pairing_links: usize,
+    /// T3 Connect trusted devices removed from `auth_connect_devices`.
+    pub removed_connect_devices: usize,
+}
+
+/// Revokes every active session except `keep_session_id`, removes other trusted Connect devices,
+/// and revokes all unspent pairing tokens/codes (`ebf7b9a4c5`).
+pub fn revoke_other_sessions(
+    conn: &Connection,
+    keep_session_id: &str,
+) -> Result<RevokeOtherSessionsOutcome, AuthRecordsError> {
+    revoke_other_sessions_at(conn, keep_session_id, current_epoch_ms())
+}
+
+/// Deterministic timestamp variant of [`revoke_other_sessions`].
+pub fn revoke_other_sessions_at(
+    conn: &Connection,
+    keep_session_id: &str,
+    now_ms: i64,
+) -> Result<RevokeOtherSessionsOutcome, AuthRecordsError> {
+    ensure_schema(conn)?;
+    let now_iso = format_epoch_millis_utc(now_ms);
+    let tx = TxGuard::begin(conn)?;
+
+    let keep_thumbprint = match conn.query_row(
+        "SELECT proof_key_thumbprint
+         FROM auth_sessions
+         WHERE session_id = ?1
+           AND proof_key_thumbprint IS NOT NULL",
+        [keep_session_id],
+        |row| row.get::<_, String>(0),
+    ) {
+        Ok(value) => Some(value),
+        Err(rusqlite::Error::QueryReturnedNoRows) => None,
+        Err(source) => return Err(sqlite_err("revoke_other_sessions:keep_thumbprint", source)),
+    };
+
+    let (revoked_pairing_links, removed_connect_devices) =
+        store::revoke_other_connect_devices_tx(conn, keep_thumbprint.as_deref(), &now_iso)?;
+
+    let revoked_sessions = conn
+        .execute(
+            "UPDATE auth_sessions
+             SET revoked_at = ?1
+             WHERE session_id != ?2
+               AND revoked_at IS NULL",
+            params![now_iso, keep_session_id],
+        )
+        .map_err(|source| sqlite_err("revoke_other_sessions:sessions", source))?;
+
+    tx.commit()?;
+    Ok(RevokeOtherSessionsOutcome {
+        revoked_sessions,
+        revoked_pairing_links,
+        removed_connect_devices,
+    })
+}
+
+/// Revokes all trusted Connect devices except `keep_proof_key_thumbprint`, their sessions,
+/// and all unspent pairing links/codes (`PairingGrantStore.revokeConnectDevicesExcept`, #39495).
+pub fn revoke_other_connect_devices_at(
+    conn: &Connection,
+    keep_proof_key_thumbprint: Option<&str>,
+    now_ms: i64,
+) -> Result<RevokeOtherSessionsOutcome, AuthRecordsError> {
+    ensure_schema(conn)?;
+    let now_iso = format_epoch_millis_utc(now_ms);
+    let tx = TxGuard::begin(conn)?;
+
+    let (revoked_pairing_links, removed_connect_devices) =
+        store::revoke_other_connect_devices_tx(conn, keep_proof_key_thumbprint, &now_iso)?;
+
+    let revoked_sessions = conn
+        .execute(
+            "UPDATE auth_sessions
+             SET revoked_at = ?1
+             WHERE proof_key_thumbprint IS NOT NULL
+               AND proof_key_thumbprint IS NOT ?2
+               AND revoked_at IS NULL",
+            params![now_iso, keep_proof_key_thumbprint],
+        )
+        .map_err(|source| sqlite_err("revoke_other_connect_devices:sessions", source))?;
+
+    tx.commit()?;
+    Ok(RevokeOtherSessionsOutcome {
+        revoked_sessions,
+        revoked_pairing_links,
+        removed_connect_devices,
+    })
+}

@@ -15,6 +15,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use reqwest::Client;
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue};
 use serde_json::{Value, json};
+use t3_contracts::brand::{ACTIVE_BRAND, BrandConfig};
 use thiserror::Error;
 use tokio::sync::Mutex;
 
@@ -30,11 +31,26 @@ pub const MCP_PROTOCOL_VERSION: &str = "2025-06-18";
 const HEADER_MCP_SESSION_ID: &str = "mcp-session-id";
 const HEADER_MCP_PROTOCOL_VERSION: &str = "mcp-protocol-version";
 
+/// Returns candidate MCP bridge endpoint environment variable names for [`ACTIVE_BRAND`].
+#[must_use]
+pub fn mcp_bridge_url_env_candidates() -> Vec<String> {
+    ACTIVE_BRAND.env_var_candidates("ACP_MCP_URL")
+}
+
+/// Resolves the MCP bridge endpoint URL from environment lookup using `brand`.
+#[must_use]
+pub fn resolve_mcp_bridge_url_for_brand<F>(brand: &BrandConfig, lookup: F) -> Option<String>
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    brand.read_env_from("ACP_MCP_URL", lookup)
+}
+
 /// Errors returned by [`McpHttpClient`], [`call_mcp_tool`], and [`run_mcp_stdio_bridge`].
 #[derive(Debug, Error)]
 pub enum McpBridgeError {
     /// Target `/mcp` endpoint returned a non-2xx HTTP status code.
-    #[error("T3 Code MCP endpoint responded with HTTP {status}.")]
+    #[error("{} MCP endpoint responded with HTTP {status}.", ACTIVE_BRAND.product_name)]
     HttpStatus {
         /// Returned HTTP status code.
         status: u16,
@@ -46,7 +62,7 @@ pub enum McpBridgeError {
         detail: String,
     },
     /// JSON-RPC request returned a JSON-RPC `error` object or omitted its matching response.
-    #[error("T3 Code MCP {method} failed{detail}")]
+    #[error("{} MCP {method} failed{detail}", ACTIVE_BRAND.product_name)]
     JsonRpc {
         /// JSON-RPC method invoked (e.g. `"initialize"`, `"tools/call"`).
         method: String,
@@ -170,7 +186,7 @@ impl McpHttpClient {
     /// Sends a typed JSON-RPC request, auto-replying to server `ping`s (`AcpMcpStdioBridge.ts:125-146`).
     pub async fn request(&self, method: &str, params: Value) -> Result<Value, McpBridgeError> {
         let seq = self.next_id.fetch_add(1, Ordering::Relaxed);
-        let id = format!("t3-cli-{seq}");
+        let id = format!("{}-cli-{seq}", ACTIVE_BRAND.cli_bin_name);
         let body = json!({
             "jsonrpc": "2.0",
             "id": id,

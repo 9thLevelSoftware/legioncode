@@ -38,7 +38,7 @@ fn missing_db_and_supported_protocols_are_ready_with_exact_wire_json() -> Result
     assert!(is_supported_launcher_protocol(4));
     assert!(!is_supported_launcher_protocol(2));
     assert!(!is_supported_launcher_protocol(5));
-    assert_eq!(V2_MIGRATION_MANIFEST.len(), 48);
+    assert_eq!(V2_MIGRATION_MANIFEST.len(), 51);
 
     let dir = tempfile::tempdir()?;
     let db_path = dir.path().join("missing.sqlite");
@@ -119,7 +119,7 @@ fn newer_migrations_block_with_exact_versioned_message() -> Result<(), Box<dyn E
     assert_eq!(
         blocked.reason(),
         Some(
-            "This database has migrations that t3@0.9.0 does not know: 103_FutureOne, 104_FutureTwo. A newer build wrote them, and running t3@0.9.0 on this database is not safe. Stay on the newer release, or wait for a release that includes these migrations."
+            "This database has migrations that t3@0.9.0 does not know: 106_FutureOne, 107_FutureTwo. A newer build wrote them, and running t3@0.9.0 on this database is not safe. Stay on the newer release, or wait for a release that includes these migrations."
         ),
     );
     Ok(())

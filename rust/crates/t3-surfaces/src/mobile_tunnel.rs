@@ -13,6 +13,8 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+use t3_contracts::brand::tunnel_header_candidates;
+use t3_contracts::policy::{ManagedPolicySummary, allows_preview_tunnel};
 use thiserror::Error;
 
 pub use crate::mobile_tunnel_proxy::{HttpHeaderHostSwap, HttpProxyPhase};
@@ -20,6 +22,94 @@ pub use crate::mobile_tunnel_theme::{
     TerminalThemeFileStore, ThemeFileEntry, ThemeFileWritePlan, render_ghostty_theme_config,
     sanitize_pane_id,
 };
+
+/// Distinct loopback preview tunnel navigation states (`PreviewTunnel.ts` / `#39415`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TunnelNavigationState {
+    /// Settings and managed policy allow preview tunnels.
+    Allowed,
+    /// Server settings or managed policy turned preview tunnels off.
+    TunnelDisabled,
+    /// Preview tunnel is allowed, but nothing is listening on the requested loopback port.
+    PortRefused,
+    /// Upstream environment or reverse proxy returned a gateway error (`502`/`503`/`504`).
+    Unreachable,
+}
+
+/// Evaluates whether loopback preview tunnel navigation is permitted by settings and policy.
+#[must_use]
+pub fn evaluate_tunnel_navigation(
+    enable_preview_tunnel: bool,
+    managed_policy: Option<&ManagedPolicySummary>,
+) -> TunnelNavigationState {
+    if allows_preview_tunnel(enable_preview_tunnel, managed_policy) {
+        TunnelNavigationState::Allowed
+    } else {
+        TunnelNavigationState::TunnelDisabled
+    }
+}
+
+/// Distinguishes disabled preview tunnels from refused loopback ports or proxy errors in HTTP
+/// refusal responses using [`t3_contracts::brand::tunnel_header_candidates`].
+#[must_use]
+pub fn classify_tunnel_http_refusal<'a>(
+    status: u16,
+    headers: impl IntoIterator<Item = (&'a str, &'a str)>,
+) -> Option<TunnelNavigationState> {
+    let disabled_names = tunnel_header_candidates("tunnel-disabled");
+    let refused_names = tunnel_header_candidates("tunnel-port-refused");
+    let mut port_refused = false;
+    for (name, value) in headers {
+        let header_name = name.trim();
+        let truthy = header_is_truthy(value);
+        if !truthy {
+            continue;
+        }
+        if disabled_names
+            .iter()
+            .any(|candidate| header_name.eq_ignore_ascii_case(candidate))
+        {
+            return Some(TunnelNavigationState::TunnelDisabled);
+        }
+        if refused_names
+            .iter()
+            .any(|candidate| header_name.eq_ignore_ascii_case(candidate))
+        {
+            port_refused = true;
+        }
+    }
+    if port_refused {
+        return Some(TunnelNavigationState::PortRefused);
+    }
+    if matches!(status, 502..=504) {
+        return Some(TunnelNavigationState::Unreachable);
+    }
+    None
+}
+
+fn header_is_truthy(value: &str) -> bool {
+    let trimmed = value.trim();
+    !trimmed.is_empty() && !trimmed.eq_ignore_ascii_case("false") && trimmed != "0"
+}
+
+/// Parameters for binding a loopback preview tunnel endpoint via
+/// [`ScopedWebViewTunnelRegistry::bind_if_allowed`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TunnelBindSpec<'a> {
+    /// Owning preview `WebView` identifier.
+    pub webview_id: &'a str,
+    /// Target environment identifier.
+    pub environment_id: &'a str,
+    /// Local loopback proxy host (typically `"127.0.0.1"`).
+    pub proxy_host: &'a str,
+    /// Local loopback SOCKS listener port.
+    pub proxy_port: u16,
+    /// Stand-in loopback domain (`"t3lo.test"` or `"localhost"`).
+    pub stand_in_host: &'a str,
+    /// Optional upstream WebSocket tunnel URL.
+    pub tunnel_base_url: Option<&'a str>,
+}
 
 /// Active proxy/tunnel binding isolated to one `webview_id` (`BUG-26`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -59,6 +149,9 @@ pub enum TunnelRegistryError {
     /// Target `webview_id` is not registered.
     #[error("webview '{0}' is not bound in tunnel registry")]
     WebViewNotFound(String),
+    /// Preview tunnel is disabled by settings or managed policy.
+    #[error("preview tunnel is disabled by settings or managed policy")]
+    TunnelDisabled,
 }
 
 /// Per-`webview_id` tunnel endpoint/proxy binding registry isolating concurrent preview
@@ -105,6 +198,27 @@ impl ScopedWebViewTunnelRegistry {
         };
         self.bindings.insert(wv.to_owned(), binding.clone());
         Ok(binding)
+    }
+
+    /// Binds a tunnel proxy endpoint only when `enable_preview_tunnel` and `managed_policy`
+    /// allow preview tunnels (`dcf158c591` #39415).
+    pub fn bind_if_allowed(
+        &mut self,
+        spec: &TunnelBindSpec<'_>,
+        enable_preview_tunnel: bool,
+        managed_policy: Option<&ManagedPolicySummary>,
+    ) -> Result<TunnelEndpointBinding, TunnelRegistryError> {
+        if !allows_preview_tunnel(enable_preview_tunnel, managed_policy) {
+            return Err(TunnelRegistryError::TunnelDisabled);
+        }
+        self.bind(
+            spec.webview_id,
+            spec.environment_id,
+            spec.proxy_host,
+            spec.proxy_port,
+            spec.stand_in_host,
+            spec.tunnel_base_url,
+        )
     }
 
     /// Updates the upstream `tunnel_base_url` solely for `webview_id`.

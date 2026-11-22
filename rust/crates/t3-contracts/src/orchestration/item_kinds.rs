@@ -8,6 +8,7 @@ use crate::ids::{
     ProviderDriverKind, ProviderInstanceId, ProviderThreadId, RunId, RuntimeRequestId,
     ScheduledTaskId, ThreadId,
 };
+use crate::mcp_sign_in::OrchestrationMcpSignInNotice;
 
 use super::command_payloads_extra::ProviderApprovalDecision;
 use super::common::{CreationSource, McpClientAccess, OrchestrationActor};
@@ -15,6 +16,44 @@ use super::items::{CheckpointFileSummary, CheckpointFileTotals, PlanStep};
 use super::model_selection::{
     ModelSelection, OrchestrationNotification, ProviderFailure, ProviderRetry,
 };
+
+const fn default_true() -> bool {
+    true
+}
+
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde skip_serializing_if requires a &T predicate"
+)]
+fn is_true(value: &bool) -> bool {
+    *value
+}
+
+/// One field in a multi-value `secret_request` card (`OrchestrationV2SecretRequestField`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SecretRequestField {
+    /// Key name used in submitted `values` and returned `files`.
+    pub name: String,
+    /// Field display label.
+    pub label: String,
+    /// Optional placeholder string.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub placeholder: Option<String>,
+    /// Whether input is masked (`false` shows plain text such as an email; absent/`true` masks).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret: Option<bool>,
+    /// Whether the UI allows toggling visibility (defaults to `true`).
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub revealable: bool,
+}
+
+impl SecretRequestField {
+    /// Returns whether this field represents a masked secret input (`secret != Some(false)`).
+    pub fn is_secret(&self) -> bool {
+        self.secret != Some(false)
+    }
+}
 
 /// All 25 known `TurnItem` variants (`orchestrationV2.ts:1750-1979`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -178,10 +217,13 @@ pub enum TurnItemKind {
     /// Completed interrupt notice (`run_interrupt_result`).
     RunInterruptResult { message: String },
     /// Informational/warning/error system notice (`system_notice`).
+    #[serde(rename_all = "camelCase")]
     SystemNotice {
         message: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         level: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mcp_sign_in: Option<OrchestrationMcpSignInNotice>,
     },
     /// Provider or runtime error (`error`).
     Error {
@@ -243,6 +285,10 @@ pub enum TurnItemKind {
         placeholder: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         delivery: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fields: Option<Vec<SecretRequestField>>,
+        #[serde(default = "default_true", skip_serializing_if = "is_true")]
+        revealable: bool,
         secret_status: String,
     },
     /// Peer environment link request card (`link_request`).

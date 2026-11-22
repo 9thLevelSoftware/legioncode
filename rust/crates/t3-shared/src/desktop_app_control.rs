@@ -5,6 +5,7 @@ use std::fmt::Write as _;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
+use t3_contracts::brand::{ACTIVE_BRAND, BrandConfig};
 
 const UNIX_SUN_PATH_LIMIT_LINUX: usize = 107;
 const UNIX_SUN_PATH_LIMIT_DARWIN: usize = 103;
@@ -90,10 +91,27 @@ pub fn resolve_desktop_app_control_address(
     temp_dir: &str,
     user_id: Option<u32>,
 ) -> DesktopAppControlAddress {
+    resolve_desktop_app_control_address_for_brand(
+        &ACTIVE_BRAND,
+        state_dir,
+        platform,
+        temp_dir,
+        user_id,
+    )
+}
+
+/// Resolves the desktop single-instance IPC pipe or socket address for an explicit [`BrandConfig`].
+pub fn resolve_desktop_app_control_address_for_brand(
+    brand: &BrandConfig,
+    state_dir: &str,
+    platform: DesktopControlPlatform,
+    temp_dir: &str,
+    user_id: Option<u32>,
+) -> DesktopAppControlAddress {
     let state_hash = desktop_control_state_hash(state_dir);
     if platform == DesktopControlPlatform::Win32 {
         return DesktopAppControlAddress {
-            address: format!(r"\\.\pipe\t3code-app-{state_hash}"),
+            address: format!("{}{state_hash}", brand.desktop_pipe_prefix()),
             directory: None,
         };
     }
@@ -102,7 +120,7 @@ pub fn resolve_desktop_app_control_address(
         Some(uid) => uid.to_string(),
         None => state_hash[..12].to_owned(),
     };
-    let folder = format!("t3code-{user_key}");
+    let folder = format!("{}-{user_key}", brand.ipc_pipe_prefix);
     let socket_name = format!("{state_hash}.sock");
     let max_path_bytes = match platform {
         DesktopControlPlatform::Linux | DesktopControlPlatform::Win32 => UNIX_SUN_PATH_LIMIT_LINUX,

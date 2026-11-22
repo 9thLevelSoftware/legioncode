@@ -1,7 +1,14 @@
-//! `OSC` (Operating System Command) dispatch onto [`crate::grid::TerminalGrid`].
+//! `OSC` (Operating System Command) dispatch onto [`crate::grid::TerminalGrid`] and
+//! replayable terminal history `OSC` query filtering (`982bbcdfe1` #40149).
 
 use crate::grid::TerminalGrid;
 use crate::palette::parse_color;
+
+pub use crate::history_sanitizer::{
+    SanitizedHistoryChunk, TerminalHistorySanitizer, is_osc_palette_query,
+    sanitize_terminal_history, sanitize_terminal_history_chunk, should_strip_csi_sequence,
+    should_strip_dcs_sequence, should_strip_osc_sequence,
+};
 
 pub(crate) fn dispatch_osc(grid: &mut TerminalGrid, raw: &[u8]) {
     let text = String::from_utf8_lossy(raw);

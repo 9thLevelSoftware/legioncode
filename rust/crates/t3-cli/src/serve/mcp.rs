@@ -10,6 +10,7 @@ use axum::http::header::AUTHORIZATION;
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde_json::{Value, json};
+use t3_contracts::brand::ACTIVE_BRAND;
 use t3_persistence::pairing_tokens::verify_bearer_session_with_conn;
 use t3_protocol::mcp::{McpGateOutcome, McpHttpRequest, evaluate_mcp_http_request};
 use uuid::Uuid;
@@ -101,7 +102,7 @@ async fn handle_mcp_post(state: &Arc<AppState>, req: Request) -> Response {
                         "protocolVersion": "2025-06-18",
                         "capabilities": { "tools": {} },
                         "serverInfo": {
-                            "name": "T3 Code",
+                            "name": ACTIVE_BRAND.product_name,
                             "version": env!("CARGO_PKG_VERSION")
                         }
                     }

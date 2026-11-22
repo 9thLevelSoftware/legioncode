@@ -6,6 +6,7 @@ use t3_contracts::orchestration::{
     PatchValue, Run, RunStatus, ThreadCreateCommand, ThreadLineage,
 };
 
+use crate::decider::output_ops::validate_output_request_for_message;
 use crate::decider::thread_ops::make_thread_event;
 use crate::decider::types::{CommandDecision, DeciderError, derived_effect_id, derived_event_id};
 use crate::outbox::{OutboxEffectRequest, PendingOutboxEffect};
@@ -18,6 +19,25 @@ pub(crate) fn decide_thread_create(
 ) -> Result<CommandDecision, DeciderError> {
     if state.thread.is_some() {
         return Err(DeciderError::ThreadAlreadyExists(cmd.thread_id.clone()));
+    }
+    if cmd.generate_title == Some(true) {
+        let has_content = cmd
+            .initial_message
+            .as_ref()
+            .is_some_and(|m| !m.text.trim().is_empty() || !m.attachments.is_empty());
+        if !has_content {
+            return Err(DeciderError::InvalidRequest(
+                "Title generation requires a message or attachments. No thread was created."
+                    .to_owned(),
+            ));
+        }
+    }
+    if let Some(init) = &cmd.initial_message {
+        validate_output_request_for_message(
+            &init.text,
+            &init.attachments,
+            init.output_schema.as_ref(),
+        )?;
     }
     let thread = build_new_thread(cmd, now_iso);
     let mut events = vec![make_thread_event(
@@ -102,11 +122,19 @@ fn build_new_thread(cmd: &ThreadCreateCommand, now_iso: &str) -> AppThread {
         tags: None,
         last_visited_at: None,
         opens: PatchValue::default(),
-        title_regeneration: None,
+        title_regeneration: if cmd.generate_title == Some(true) {
+            Some(Some(serde_json::json!({
+                "status": "pending",
+                "generateTitle": true,
+            })))
+        } else {
+            None
+        },
         last_title_regeneration: None,
         title_renamed: None,
         rollback_request_id: None,
         rollback_failure: None,
+        rollback_unrestored: None,
         deleted_at: None,
     }
 }
@@ -121,9 +149,64 @@ fn append_initial_message(
 ) -> Result<(), DeciderError> {
     let run_id = RunId::new(format!("{}-run", cmd.command_id.as_str()))
         .map_err(|err| DeciderError::InvalidId(err.to_string()))?;
-    let run = Run {
-        id: run_id.clone(),
+    let run = build_initial_run(&run_id, thread, init, now_iso);
+    let msg = build_initial_message(cmd, thread, init, &run_id, now_iso);
+    events.push(DomainEvent {
+        id: derived_event_id(&cmd.command_id, 1)?,
         thread_id: cmd.thread_id.clone(),
+        run_id: Some(run_id.clone()),
+        node_id: None,
+        driver: None,
+        provider_instance_id: Some(thread.provider_instance_id.clone()),
+        raw_event_id: None,
+        occurred_at: now_iso.to_owned(),
+        payload: DomainEventPayload::RunUpdated {
+            event_type: "run.created".to_owned(),
+            run: Box::new(run),
+        },
+    });
+    events.push(DomainEvent {
+        id: derived_event_id(&cmd.command_id, 2)?,
+        thread_id: cmd.thread_id.clone(),
+        run_id: Some(run_id.clone()),
+        node_id: None,
+        driver: None,
+        provider_instance_id: Some(thread.provider_instance_id.clone()),
+        raw_event_id: None,
+        occurred_at: now_iso.to_owned(),
+        payload: DomainEventPayload::MessageUpdated(Box::new(msg)),
+    });
+    outbox_effects.push(PendingOutboxEffect {
+        id: derived_effect_id(&cmd.command_id, 0),
+        command_id: cmd.command_id.clone(),
+        thread_id: cmd.thread_id.clone(),
+        request: OutboxEffectRequest::ProviderTurnStart { run_id },
+        available_at: None,
+    });
+    if cmd.generate_title == Some(true) {
+        outbox_effects.push(PendingOutboxEffect {
+            id: derived_effect_id(&cmd.command_id, 1),
+            command_id: cmd.command_id.clone(),
+            thread_id: cmd.thread_id.clone(),
+            request: OutboxEffectRequest::ThreadTitleGenerate {
+                kind: "initial".to_owned(),
+                message_id: Some(init.message_id.clone()),
+            },
+            available_at: None,
+        });
+    }
+    Ok(())
+}
+
+fn build_initial_run(
+    run_id: &RunId,
+    thread: &AppThread,
+    init: &InitialThreadMessage,
+    now_iso: &str,
+) -> Run {
+    Run {
+        id: run_id.clone(),
+        thread_id: thread.id.clone(),
         ordinal: 1,
         provider_instance_id: thread.provider_instance_id.clone(),
         model_selection: thread.model_selection.clone(),
@@ -150,22 +233,19 @@ fn append_initial_message(
         delegated_completion: None,
         workspace_preparation: init.workspace_strategy.clone(),
         fresh_context: None,
-    };
-    events.push(DomainEvent {
-        id: derived_event_id(&cmd.command_id, 1)?,
-        thread_id: cmd.thread_id.clone(),
-        run_id: Some(run_id.clone()),
-        node_id: None,
-        driver: None,
-        provider_instance_id: Some(thread.provider_instance_id.clone()),
-        raw_event_id: None,
-        occurred_at: now_iso.to_owned(),
-        payload: DomainEventPayload::RunUpdated {
-            event_type: "run.created".to_owned(),
-            run: Box::new(run),
-        },
-    });
-    let msg = ConversationMessage {
+        output_schema: init.output_schema.clone(),
+        output: None,
+    }
+}
+
+fn build_initial_message(
+    cmd: &ThreadCreateCommand,
+    _thread: &AppThread,
+    init: &InitialThreadMessage,
+    run_id: &RunId,
+    now_iso: &str,
+) -> ConversationMessage {
+    ConversationMessage {
         notification: None,
         created_by: cmd.created_by,
         creation_source: cmd.creation_source,
@@ -187,24 +267,5 @@ fn append_initial_message(
         created_at: now_iso.to_owned(),
         updated_at: now_iso.to_owned(),
         delegated_completion: None,
-    };
-    events.push(DomainEvent {
-        id: derived_event_id(&cmd.command_id, 2)?,
-        thread_id: cmd.thread_id.clone(),
-        run_id: Some(run_id.clone()),
-        node_id: None,
-        driver: None,
-        provider_instance_id: Some(thread.provider_instance_id.clone()),
-        raw_event_id: None,
-        occurred_at: now_iso.to_owned(),
-        payload: DomainEventPayload::MessageUpdated(Box::new(msg)),
-    });
-    outbox_effects.push(PendingOutboxEffect {
-        id: derived_effect_id(&cmd.command_id, 0),
-        command_id: cmd.command_id.clone(),
-        thread_id: cmd.thread_id.clone(),
-        request: OutboxEffectRequest::ProviderTurnStart { run_id },
-        available_at: None,
-    });
-    Ok(())
+    }
 }

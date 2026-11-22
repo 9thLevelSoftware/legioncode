@@ -3,6 +3,7 @@
 use t3_remote::thread_client::ThreadSendMode;
 
 use crate::cli_global::fail_with_command_help;
+use crate::cmd_thread::start::{ThreadStartOpts, parse_start};
 use crate::fallback::take_flag_value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,6 +21,7 @@ pub(crate) enum ThreadAction {
         all: bool,
         json: bool,
     },
+    Start(ThreadStartOpts),
     Read {
         base_dir: Option<String>,
         thread_id: String,
@@ -33,6 +35,7 @@ pub(crate) enum ThreadAction {
         thread_id: String,
         message: String,
         mode: ThreadSendMode,
+        output_schema: Option<String>,
         wait: bool,
         json: bool,
     },
@@ -48,6 +51,7 @@ pub(crate) enum ThreadAction {
 impl ThreadAction {
     pub(crate) fn base_dir(&self) -> Option<&str> {
         match self {
+            Self::Start(opts) => opts.base_dir.as_deref(),
             Self::List { base_dir, .. }
             | Self::Read { base_dir, .. }
             | Self::Send { base_dir, .. }
@@ -67,6 +71,7 @@ pub(crate) fn parse_thread_cli(rest: &[String]) -> Result<ParsedThreadCli, i32> 
 
     match subcmd {
         "list" => parse_list(tail),
+        "start" => parse_start(tail),
         "read" | "show" => parse_read(tail, subcmd),
         "send" => parse_send(tail),
         "wait" => crate::cmd_thread::parse_wait(tail),
@@ -259,6 +264,7 @@ fn parse_send(tail: &[String]) -> Result<ParsedThreadCli, i32> {
     let path = &["thread", "send"];
     let mut common = ThreadCommonOpts::default();
     let mut mode = ThreadSendMode::Queue;
+    let mut output_schema = None;
     let mut wait = false;
     let mut json = false;
     let mut pos = Vec::new();
@@ -271,6 +277,8 @@ fn parse_send(tail: &[String]) -> Result<ParsedThreadCli, i32> {
         } else if arg == "--wait" {
             wait = true;
         } else if take_common_opt(path, tail, &mut idx, &mut common)? {
+        } else if let Some(val) = take_thr_opt(path, tail, &mut idx, "output-schema")? {
+            output_schema = Some(val);
         } else if let Some(val) = take_thr_opt(path, tail, &mut idx, "mode")? {
             mode = match val.trim() {
                 "auto" => ThreadSendMode::Auto,
@@ -314,6 +322,7 @@ fn parse_send(tail: &[String]) -> Result<ParsedThreadCli, i32> {
             thread_id,
             message,
             mode,
+            output_schema,
             wait,
             json,
         },

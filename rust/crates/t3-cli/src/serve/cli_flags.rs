@@ -210,8 +210,16 @@ fn build_parsed_config(kind: ServerEntryKind, acc: FlagAcc) -> Result<ParsedServ
     let port = acc
         .port
         .or_else(|| resolve_env_u16("T3CODE_PORT"))
+        .or_else(|| {
+            t3_contracts::brand::ACTIVE_BRAND
+                .read_env("PORT")
+                .and_then(|v| v.trim().parse::<u16>().ok())
+        })
         .unwrap_or(DEFAULT_PORT);
-    let host = acc.host.or_else(|| resolve_env_nonempty("T3CODE_HOST"));
+    let host = acc
+        .host
+        .or_else(|| resolve_env_nonempty("T3CODE_HOST"))
+        .or_else(|| t3_contracts::brand::ACTIVE_BRAND.read_env("HOST"));
     let lan = acc
         .lan
         .or_else(|| resolve_env_bool("T3CODE_LAN"))

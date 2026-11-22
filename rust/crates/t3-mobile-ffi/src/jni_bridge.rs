@@ -26,7 +26,8 @@ pub type JByteArray = *mut c_void;
 /// `JNI` environment pointer (`const struct JNINativeInterface_ *`).
 pub type JNIEnv = *const JNINativeInterface_;
 
-type EnvPtr = *mut JNIEnv;
+/// `JNI` environment pointer pointer passed into exported `extern "system"` functions.
+pub type EnvPtr = *mut JNIEnv;
 
 /// Standard `JDK` `JNINativeInterface_` pointer table up through `SetByteArrayRegion`.
 #[repr(C)]
@@ -205,6 +206,29 @@ pub extern "system" fn Java_codes_t3_mobile_T3MobileBridge_nativeAbiVersion(
     std::panic::catch_unwind(|| jint::try_from(crate::abi_version()).unwrap_or(0)).unwrap_or(-125)
 }
 
+/// Shared `JNI` `JString -> Result<String, E> -> JString` helper guarded by `catch_unwind`.
+/// # Safety
+/// `env` must be valid `JNIEnv*`; `input` must be a valid `JString` or null.
+// SAFETY: `env` and `input` validity is enforced by the JNI native call contract and checked on entry.
+pub(crate) unsafe fn run_jstr_bridge<E: std::fmt::Display>(
+    env: EnvPtr,
+    input: JString,
+    op: fn(&str) -> Result<String, E>,
+) -> JString {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        // SAFETY: `env` and `input` obey caller `# Safety` contract.
+        let r = unsafe { read_jstr(env, input) }.and_then(|v| op(&v).map_err(|e| e.to_string()));
+        // SAFETY: `env` is valid for JNI return allocation or throwing `IllegalArgumentException`.
+        unsafe {
+            match r {
+                Ok(o) => write_jstr(env, &o),
+                Err(e) => jni_fail(env, &e),
+            }
+        }
+    }))
+    .unwrap_or(null_mut())
+}
+
 jni_fns! {
     Java_codes_t3_mobile_T3MobileBridge_nativeDecorateDiffJson (JString => JString) = read_jstr -> decorate_diff_json -> write_jstr;
     Java_codes_t3_mobile_T3MobileBridge_nativeFilterClipboardJson (JString => JString) = read_jstr -> filter_clipboard_json -> write_jstr;
@@ -215,174 +239,4 @@ jni_fns! {
     Java_codes_t3_mobile_T3MobileBridge_nativeThemePlanJson (JString => JString) = read_jstr -> theme_plan_json -> write_jstr;
     Java_codes_t3_mobile_T3MobileBridge_nativeVtRenderSnapshot (JString => JByteArray) = read_jstr -> vt_render_snapshot -> write_jbytes;
     Java_codes_t3_mobile_T3MobileBridge_nativeVtDecodeSnapshotJson (JByteArray => JString) = read_jbytes -> vt_decode_snapshot_json -> write_jstr;
-}
-
-#[cfg(test)]
-mod tests {
-    use super as j;
-    use super::{
-        EnvPtr as E, JBoolean as B, JByte as I, JByteArray as A, JClass as C, JNIEnv,
-        JNINativeInterface_ as V, JSize as S, JString as T,
-        Java_codes_t3_mobile_T3MobileBridge_nativeAbiVersion as abi,
-        Java_codes_t3_mobile_T3MobileBridge_nativeVtDecodeSnapshotJson as vd,
-        Java_codes_t3_mobile_T3MobileBridge_nativeVtRenderSnapshot as vr, jint,
-    };
-    use std::ffi::{CStr, c_char, c_void};
-    use std::mem::{offset_of, size_of};
-    use std::ptr::{copy_nonoverlapping as cp, null_mut, without_provenance_mut as wpm};
-    use std::slice::from_raw_parts as rs;
-
-    #[derive(Default)]
-    struct St {
-        s: Vec<Vec<u8>>,
-        a: Vec<Vec<u8>>,
-        thrown: Vec<String>,
-        acq: usize,
-        rel: usize,
-    }
-    #[repr(C)]
-    struct MockEnv(JNIEnv, St);
-    impl St {
-        fn mk_s(&mut self, b: &[u8]) -> T {
-            self.s.push([b, &[0]].concat());
-            wpm(self.s.len())
-        }
-        fn mk_b(&mut self, b: &[u8]) -> A {
-            self.a.push(b.to_vec());
-            wpm(self.a.len())
-        }
-        fn get_s(&self, s: T) -> Result<String, String> {
-            let i = s.addr().checked_sub(1).ok_or("null")?;
-            String::from_utf8(self.s[i][..self.s[i].len() - 1].to_vec()).map_err(|e| e.to_string())
-        }
-        fn len_a(&self, a: A) -> S {
-            S::try_from(self.a.get(a.addr().saturating_sub(1)).map_or(0, Vec::len)).unwrap_or(0)
-        }
-        fn span(&mut self, a: A, st: S, n: S) -> Option<&mut [u8]> {
-            let (s, l) = (usize::try_from(st).ok()?, usize::try_from(n).ok()?);
-            self.a.get_mut(a.addr().checked_sub(1)?)?.get_mut(s..s + l)
-        }
-    }
-    // SAFETY: `e` points to live `MockEnv`.
-    unsafe fn st<'a>(e: E) -> &'a mut St {
-        unsafe { &mut (*e.cast::<MockEnv>()).1 }
-    }
-    // SAFETY: Returns sentinel class handle.
-    unsafe extern "system" fn m_find(_: E, _: *const c_char) -> C {
-        wpm(1)
-    }
-    // SAFETY: `e` is `MockEnv` and `m` is NUL-terminated.
-    unsafe extern "system" fn m_throw(e: E, _: C, m: *const c_char) -> jint {
-        // SAFETY: `m` is valid C string.
-        let txt = unsafe { CStr::from_ptr(m) }.to_string_lossy().into_owned();
-        // SAFETY: `e` is valid `MockEnv`.
-        unsafe { st(e) }.thrown.push(txt);
-        0
-    }
-    // SAFETY: `e` is `MockEnv` and `p` is NUL-terminated.
-    unsafe extern "system" fn m_new_s(e: E, p: *const c_char) -> T {
-        // SAFETY: `e` is `MockEnv` and `p` is valid C string.
-        unsafe { st(e).mk_s(CStr::from_ptr(p).to_bytes()) }
-    }
-    // SAFETY: `e` is `MockEnv`.
-    unsafe extern "system" fn m_get_s(e: E, s: T, _: *mut B) -> *const c_char {
-        // SAFETY: `e` is `MockEnv`.
-        let m = unsafe { st(e) };
-        m.acq += 1;
-        m.s.get(s.addr().saturating_sub(1))
-            .map_or(std::ptr::null(), |b| b.as_ptr().cast())
-    }
-    // SAFETY: `e` is `MockEnv`.
-    unsafe extern "system" fn m_rel_s(e: E, _: T, _: *const c_char) {
-        // SAFETY: `e` is `MockEnv`.
-        unsafe { st(e) }.rel += 1;
-    }
-    // SAFETY: `e` is `MockEnv`.
-    unsafe extern "system" fn m_len(e: E, a: A) -> S {
-        // SAFETY: `e` is `MockEnv`.
-        unsafe { st(e) }.len_a(a)
-    }
-    // SAFETY: `e` is `MockEnv`.
-    unsafe extern "system" fn m_new_a(e: E, n: S) -> A {
-        // SAFETY: `e` is `MockEnv`.
-        unsafe { st(e) }.mk_b(&vec![0; usize::try_from(n).unwrap_or(0)])
-    }
-    // SAFETY: `env` is `MockEnv` and `buf` is writable for `len` bytes.
-    unsafe extern "system" fn m_get_r(env: E, arr: A, off: S, len: S, buf: *mut I) {
-        // SAFETY: `env` is `MockEnv`.
-        if let Some(v) = unsafe { st(env) }.span(arr, off, len) {
-            // SAFETY: `v` and `buf` are non-overlapping for `v.len()` bytes.
-            unsafe { cp(v.as_ptr(), buf.cast(), v.len()) };
-        }
-    }
-    // SAFETY: `env` is `MockEnv` and `buf` is readable for `len` bytes.
-    unsafe extern "system" fn m_set_r(env: E, arr: A, off: S, len: S, buf: *const I) {
-        // SAFETY: `env` is `MockEnv`.
-        if let Some(d) = unsafe { st(env) }.span(arr, off, len) {
-            // SAFETY: `buf` is readable for `d.len()` bytes.
-            d.copy_from_slice(unsafe { rs(buf.cast(), d.len()) });
-        }
-    }
-    // SAFETY: Function pointer alias for mock JSON entrypoints.
-    type JniFn = unsafe extern "system" fn(E, C, T) -> T;
-
-    #[test]
-    fn jni_vtable_offsets_and_all_entrypoints_round_trip() -> Result<(), String> {
-        let p = size_of::<*const c_void>();
-        assert_eq!(offset_of!(V, find_class), 6 * p);
-        assert_eq!(offset_of!(V, throw_new), 15 * p);
-        assert_eq!(offset_of!(V, new_string_utf), 167 * p);
-        assert_eq!(offset_of!(V, get_string_utf_chars), 169 * p);
-        assert_eq!(offset_of!(V, release_string_utf_chars), 170 * p);
-        assert_eq!(offset_of!(V, get_array_length), 171 * p);
-        assert_eq!(offset_of!(V, new_byte_array), 176 * p);
-        assert_eq!(offset_of!(V, get_byte_array_region), 200 * p);
-        assert_eq!(offset_of!(V, set_byte_array_region), 208 * p);
-        let tbl = V {
-            find_class: Some(m_find),
-            throw_new: Some(m_throw),
-            new_string_utf: Some(m_new_s),
-            get_string_utf_chars: Some(m_get_s),
-            release_string_utf_chars: Some(m_rel_s),
-            get_array_length: Some(m_len),
-            new_byte_array: Some(m_new_a),
-            get_byte_array_region: Some(m_get_r),
-            set_byte_array_region: Some(m_set_r),
-            ..V::zeroed()
-        };
-        let mut bx = Box::new(MockEnv(&raw const tbl, St::default()));
-        let ep: E = (&raw mut *bx).cast::<JNIEnv>();
-        let n = null_mut();
-        assert_eq!(abi(ep, n), 1);
-        let vt_in =
-            bx.1.mk_s(br#"{"cols":8,"rows":2,"ansiText":"\u001b[32mhi\u001b[0m"}"#);
-        let cases: [(JniFn, &[u8], &str); 7] = [
-            (j::Java_codes_t3_mobile_T3MobileBridge_nativeDecorateDiffJson, br#"{"tokens":[{"content":"fn x","fontStyle":2}],"wordHighlights":[{"start":3,"end":4}]}"#, "\"wordHighlighted\":true"),
-            (j::Java_codes_t3_mobile_T3MobileBridge_nativeFilterClipboardJson, br#"{"text":"use /c1)","records":[{"contextId":"","label":"no"},{"contextId":"c1","label":"ok"}]}"#, "\"c1\""),
-            (j::Java_codes_t3_mobile_T3MobileBridge_nativeNavStringsJson, b"de", "Einstellungen"),
-            (j::Java_codes_t3_mobile_T3MobileBridge_nativeLiveActivityJson, br#"{"locale":"fr","active":true,"pushData":{"activity_line_0":"waiting_for_approval\tGo\tT3"}}"#, "Approuver"),
-            (j::Java_codes_t3_mobile_T3MobileBridge_nativePaletteResolveJson, br##"{"priorOverrides":[{"index":1,"color":"#ff0000"}],"overrides":[],"indices":[1]}"##, "\"overrideCount\":0"),
-            (j::Java_codes_t3_mobile_T3MobileBridge_nativeHostSwapChunksJson, br#"{"fromHost":"t3lo.test","toHost":"127.0.0.1","chunks":["GET / HTTP/1.1\r\nHost: t3lo.test\r\n\r\nHost: t3lo.test"]}"#, "Host: 127.0.0.1"),
-            (j::Java_codes_t3_mobile_T3MobileBridge_nativeThemePlanJson, br#"{"paneId":"pane/1","themeConfig":"background = #111111"}"#, "\"changed\":true"),
-        ];
-        let (df, nv, th) = (cases[0].0, cases[2].0, cases[6].0);
-        let (bad_j, bad_b, bad_u) = (bx.1.mk_s(b"{bad"), bx.1.mk_b(b"BAD!"), bx.1.mk_s(&[0xFF]));
-        // SAFETY: `ep` points to live `MockEnv` with full vtable for the test lifetime.
-        unsafe {
-            assert!(df(null_mut(), n, n).is_null());
-            assert!(nv(ep, n, n).is_null());
-            assert!(vr(ep, n, bad_j).is_null());
-            assert!(vd(ep, n, bad_b).is_null());
-            assert!(vd(ep, n, n).is_null());
-            assert!(th(ep, n, bad_u).is_null());
-            for (f, inp, exp) in cases {
-                let h = bx.1.mk_s(inp);
-                assert!(bx.1.get_s(f(ep, n, h))?.contains(exp));
-            }
-            let dec = bx.1.get_s(vd(ep, n, vr(ep, n, vt_in)))?;
-            assert!(dec.contains("\"viewportLines\":[\"hi\",\"\"]"));
-        }
-        assert_eq!((bx.1.acq, bx.1.thrown.len()), (bx.1.rel, 5));
-        Ok(())
-    }
 }

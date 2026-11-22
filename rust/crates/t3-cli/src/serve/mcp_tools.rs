@@ -1,6 +1,8 @@
 //! Built-in `/mcp` tool definitions and dispatchers for `t3_project_list`
 //! and `t3_thread_{list,read,send,wait}` so `t3 thread` and ACP bridges work standalone.
 
+#[path = "mcp_launch_output.rs"]
+mod launch_output;
 #[path = "mcp_queries.rs"]
 mod queries;
 
@@ -8,40 +10,50 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use serde_json::{Value, json};
+use t3_contracts::brand::{ACTIVE_BRAND, canonical_mcp_tool_suffix};
 use t3_contracts::ids::{CommandId, MessageId, ThreadId};
 use t3_contracts::orchestration::{
     CreationSource, DispatchMode, MessageDispatchCommand, OrchestrationActor, OrchestrationCommand,
 };
+use t3_orchestrator::decider::output_ops::validate_output_request_for_message;
 use uuid::Uuid;
 
 use super::AppState;
-use queries::{project_list, run_status_for, thread_list, thread_read};
+use launch_output::{parse_output_schema_arg, submit_output, thread_launch};
+use queries::{project_list, read_run_output_for, run_status_for, thread_list, thread_read};
 
 /// Metadata returned for `tools/list` on `/mcp`.
 pub(super) fn list_tools_json() -> Value {
+    let prefix = ACTIVE_BRAND.mcp_tool_prefix;
+    let name = |suffix: &str| format!("{prefix}{suffix}");
     json!({
         "tools": [
-            { "name": "t3_project_list", "description": "List active T3 Code projects.", "inputSchema": { "type": "object" } },
-            { "name": "t3_thread_list", "description": "List threads in a project.", "inputSchema": { "type": "object" } },
-            { "name": "t3_thread_read", "description": "Read a thread and its messages.", "inputSchema": { "type": "object" } },
-            { "name": "t3_thread_send", "description": "Send a message to a thread.", "inputSchema": { "type": "object" } },
-            { "name": "t3_thread_wait", "description": "Wait for a thread run to settle.", "inputSchema": { "type": "object" } }
+            { "name": name("project_list"), "description": format!("List active {} projects.", ACTIVE_BRAND.product_name), "inputSchema": { "type": "object" } },
+            { "name": name("thread_list"), "description": "List threads in a project.", "inputSchema": { "type": "object" } },
+            { "name": name("thread_read"), "description": "Read a thread and its messages.", "inputSchema": { "type": "object" } },
+            { "name": name("thread_launch"), "description": "Create a new top-level thread.", "inputSchema": { "type": "object" } },
+            { "name": name("thread_send"), "description": "Send a message to a thread.", "inputSchema": { "type": "object" } },
+            { "name": name("submit_output"), "description": "Submit a schema-checked JSON result for the active run.", "inputSchema": { "type": "object" } },
+            { "name": name("thread_wait"), "description": "Wait for a thread run to settle.", "inputSchema": { "type": "object" } }
         ]
     })
 }
 
-/// Executes one `/mcp` `tools/call` returning an MCP `CallToolResult` JSON object.
+/// Executes one `/mcp` `tools/call` supporting both `t3_*` and `legion_*` tool aliases.
 pub(super) async fn call_tool(state: &Arc<AppState>, name: &str, args: &Value) -> Value {
-    let outcome = match name {
-        "t3_project_list" => with_db(state, |conn| project_list(conn, args)),
-        "t3_thread_list" => with_db(state, |conn| thread_list(conn, args)),
-        "t3_thread_read" => match required_str(args, "threadId") {
+    let canonical = canonical_mcp_tool_suffix(name);
+    let outcome = match canonical {
+        "project_list" => with_db(state, |conn| project_list(conn, args)),
+        "thread_list" => with_db(state, |conn| thread_list(conn, args)),
+        "thread_read" => match required_str(args, "threadId") {
             Ok(tid) => with_db(state, |conn| thread_read(conn, tid, args)),
             Err(err) => Err(err),
         },
-        "t3_thread_send" => thread_send(state, args).await,
-        "t3_thread_wait" => thread_wait(state, args).await,
-        other => Err(format!("Unknown MCP tool `{other}`.")),
+        "thread_launch" => thread_launch(state, args).await,
+        "thread_send" => thread_send(state, args).await,
+        "submit_output" => submit_output(state, args).await,
+        "thread_wait" => thread_wait(state, args).await,
+        _ => Err(format!("Unknown MCP tool `{name}`.")),
     };
 
     match outcome {
@@ -90,6 +102,15 @@ async fn thread_send(state: &Arc<AppState>, args: &Value) -> Result<Value, Strin
         .filter(|m| matches!(*m, "steer" | "restart"))
         .map(str::to_owned);
 
+    let output_schema = parse_output_schema_arg(args)?;
+    validate_output_request_for_message(&message, &[], output_schema.as_ref())
+        .map_err(|e| e.to_string())?;
+    let dispatch_mode = if output_schema.is_some() {
+        DispatchMode::QueueAfterActive
+    } else {
+        DispatchMode::StartImmediately
+    };
+
     let cmd = OrchestrationCommand::MessageDispatch(MessageDispatchCommand {
         notification: None,
         guest_message_id: None,
@@ -100,6 +121,7 @@ async fn thread_send(state: &Arc<AppState>, args: &Value) -> Result<Value, Strin
         linked_sender: None,
         idle_compaction: None,
         fresh_context: None,
+        output_schema,
         command_id,
         thread_id: thread_id.clone(),
         message_id: message_id.clone(),
@@ -117,7 +139,7 @@ async fn thread_send(state: &Arc<AppState>, args: &Value) -> Result<Value, Strin
         usage_limit_recovery_request_id: None,
         delivery_intent,
         delegated_completion: None,
-        dispatch_mode: DispatchMode::StartImmediately,
+        dispatch_mode,
     });
     state
         .orchestrator
@@ -161,22 +183,30 @@ async fn thread_wait(state: &Arc<AppState>, args: &Value) -> Result<Value, Strin
     let mut rx = state.orchestrator.subscribe();
 
     loop {
-        let (run_id, status) = {
+        let (run_id, status, output) = {
             let conn = state
                 .orchestrator
                 .sink()
                 .db()
                 .lock()
                 .map_err(|_| "database mutex poisoned".to_owned())?;
-            run_status_for(&conn, &thread_id, target_run_id.as_deref())?
+            let (rid, st) = run_status_for(&conn, &thread_id, target_run_id.as_deref())?;
+            let out = read_run_output_for(&conn, &thread_id, rid.as_deref());
+            (rid, st, out)
         };
         if is_terminal_run_status(&status) || run_id.is_none() {
-            return Ok(json!({
+            let mut resp = json!({
                 "threadId": thread_id,
                 "runId": run_id,
                 "status": status,
                 "timedOut": false,
-            }));
+            });
+            if let Some(val) = output
+                && let Some(obj) = resp.as_object_mut()
+            {
+                obj.insert("output".to_owned(), val);
+            }
+            return Ok(resp);
         }
         let now = tokio::time::Instant::now();
         if now >= deadline

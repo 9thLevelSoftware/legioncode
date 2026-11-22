@@ -9,6 +9,7 @@ pub mod permissions;
 pub mod presentation;
 pub mod protocol;
 pub mod render;
+pub mod session_sync;
 pub mod updates;
 
 pub use codec::{
@@ -33,5 +34,13 @@ pub use protocol::{
     NewSessionRequest, NewSessionResponse, PromptContentBlock, PromptRequest, PromptResponse,
     StopReason,
 };
-pub use render::{ToolActivityCategory, ToolCallPresentation, map_tool_call_presentation};
+pub use render::{
+    McpToolCallTarget, ToolActivityCategory, ToolCallPresentation, commandless_command_label,
+    extract_mcp_tool_call_identity, map_tool_call_presentation,
+};
+pub use session_sync::{
+    ACP_LOADED_COMMANDS_WAIT_MS, ACP_MCP_CALL_LAUNCHER_CMD, AcpCompactionGate,
+    AcpUsageUpdateEmission, acp_session_update_applies_live_background_mutations,
+    evaluate_acp_compaction_gate, format_acp_usage_update_emission, resolve_acp_mcp_call_arguments,
+};
 pub use updates::{AvailableCommand, SessionUpdateKind, SessionUpdateNotification};

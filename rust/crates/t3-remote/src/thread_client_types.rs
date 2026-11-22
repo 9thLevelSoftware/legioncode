@@ -146,6 +146,9 @@ pub struct ThreadDetail {
     pub branch: Option<String>,
     /// Active git worktree path if any.
     pub worktree_path: Option<String>,
+    /// Latest run identifier on this thread, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_run_id: Option<String>,
     /// Pending approval/question count blocking completion.
     pub pending_request_count: u64,
     /// Total timeline items.
@@ -203,7 +206,7 @@ pub struct ThreadReadResult {
 }
 
 /// Request arguments for `t3_thread_send` (`orchestratorMcp.ts:553-565`).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ThreadSendRequest {
     /// Target thread ID.
@@ -213,6 +216,45 @@ pub struct ThreadSendRequest {
     /// Optional delivery strategy.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mode: Option<ThreadSendMode>,
+    /// Optional JSON Schema requiring a typed run output.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_schema: Option<serde_json::Map<String, serde_json::Value>>,
+}
+
+/// Request arguments for `t3_thread_launch` (`orchestratorMcp.ts` / `thread.ts`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThreadLaunchRequest {
+    /// Owning project ID.
+    pub project_id: String,
+    /// Initial thread title.
+    pub title: String,
+    /// Whether the server should generate the title from the initial prompt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generate_title: Option<bool>,
+    /// Optional initial message text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    /// Optional provider/model selection override.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_selection: Option<serde_json::Value>,
+    /// Optional JSON Schema requiring a typed run output.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_schema: Option<serde_json::Map<String, serde_json::Value>>,
+    /// Optional worktree launch strategy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_strategy: Option<serde_json::Value>,
+}
+
+/// Result returned by `t3_thread_launch`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThreadLaunchResult {
+    /// Newly created thread ID.
+    pub thread_id: String,
+    /// Created initial run ID, if a message was sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<String>,
 }
 
 /// Result returned by `t3_thread_send` (`orchestratorMcp.ts:568-576`).
@@ -246,10 +288,23 @@ pub struct ThreadWaitRequest {
     /// Also await delegated/background tasks settling.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub until_delegated_work_settled: Option<bool>,
+    /// Also await typed output submission when the run owes a schema output.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub until_output: Option<bool>,
+}
+
+/// Later run that produced the thread's final reply when waiting on delegated work.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThreadWaitResultRun {
+    /// Run identifier.
+    pub run_id: String,
+    /// Terminal run status.
+    pub status: String,
 }
 
 /// Result returned by `t3_thread_wait` (`orchestratorMcp.ts:593-601`).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ThreadWaitResult {
     /// Target thread ID.
@@ -260,4 +315,10 @@ pub struct ThreadWaitResult {
     pub status: String,
     /// True when the wait slice timed out before terminal completion.
     pub timed_out: bool,
+    /// Result-bearing run when delegated/wake work settled on a subsequent run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_run: Option<ThreadWaitResultRun>,
+    /// Typed JSON output submitted against the run's `outputSchema`, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<serde_json::Value>,
 }

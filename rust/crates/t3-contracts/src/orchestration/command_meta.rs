@@ -21,6 +21,7 @@ pub const INTERNAL_COMMAND_TYPES: &[&str] = &[
     "thread.background-work.settle",
     "secret_request.record",
     "link_request.record",
+    "run.output.submit",
 ];
 
 /// Returns `true` when `command_type` belongs to server-only `OrchestrationV2InternalCommand`.

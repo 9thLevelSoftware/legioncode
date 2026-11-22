@@ -17,6 +17,7 @@ use super::common::{
 use super::model_selection::{
     LimitRecoveryUpdate, ModelSelection, OrchestrationNotification, WorkspaceStrategy,
 };
+use super::run_output::RunOutputSchema;
 
 /// Provider interaction mode (`providerPolicy.ts:45`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -74,6 +75,9 @@ pub struct InitialThreadMessage {
     /// Local sending thread ID.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sender_thread_id: Option<ThreadId>,
+    /// Optional JSON Schema requiring a typed structured output for the run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_schema: Option<RunOutputSchema>,
     /// Optional workspace preparation strategy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workspace_strategy: Option<WorkspaceStrategy>,
@@ -95,6 +99,9 @@ pub struct ThreadCreateCommand {
     pub project_id: ProjectId,
     /// Initial thread title.
     pub title: String,
+    /// Whether to generate an LLM title asynchronously after the initial turn.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generate_title: Option<bool>,
     /// Initial model selection.
     pub model_selection: ModelSelection,
     /// Initial runtime permission mode.
@@ -227,6 +234,9 @@ pub struct MessageDispatchCommand {
     /// Start a fresh provider session without prior thread history.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fresh_context: Option<bool>,
+    /// Optional JSON Schema requiring a typed structured output from this turn.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_schema: Option<RunOutputSchema>,
     /// Idempotency command ID.
     pub command_id: CommandId,
     /// Target thread ID.

@@ -174,8 +174,21 @@ pub struct AppThread {
     /// Last rollback failure summary.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rollback_failure: Option<Option<Value>>,
+    /// Repositories left untouched during the latest file rewind because no snapshot existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rollback_unrestored: Option<Option<RollbackUnrestored>>,
     /// Soft-deletion timestamp, or `null`.
     pub deleted_at: Option<String>,
+}
+
+/// Repositories a completed file rewind left unchanged (`OrchestrationV2AppThread.rollbackUnrestored`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RollbackUnrestored {
+    /// Rollback command ID that produced this notice.
+    pub request_id: CommandId,
+    /// Repository display names whose files could not be restored.
+    pub repositories: Vec<String>,
 }
 
 /// Lightweight visit update payload (`orchestrationV2.ts:554-557`).

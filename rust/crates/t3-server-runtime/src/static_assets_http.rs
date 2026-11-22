@@ -221,3 +221,88 @@ pub(crate) fn parse_byte_range(header: Option<&str>, size: u64) -> ParsedByteRan
         last: end.min(size - 1),
     }
 }
+
+/// Returns `true` when `path` has an extension supported by workspace file/browser previews (`#39491`).
+///
+/// Mirrors `@t3tools/shared/filePreview`'s `isWorkspacePreviewEntryPath`: excludes unsupported XML/XHTML
+/// variants such as `.xhtml` while allowing browser previews (`.htm`, `.html`, `.pdf`), images, fonts,
+/// media, office documents, archives, and sqlite files.
+pub fn is_workspace_preview_entry_path(path: &Path) -> bool {
+    let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
+        return false;
+    };
+    let lower = ext.to_ascii_lowercase();
+    matches!(
+        lower.as_str(),
+        "htm"
+            | "html"
+            | "pdf"
+            | "avif"
+            | "bmp"
+            | "gif"
+            | "ico"
+            | "jpeg"
+            | "jpg"
+            | "png"
+            | "svg"
+            | "webp"
+            | "ttf"
+            | "otf"
+            | "woff"
+            | "woff2"
+            | "zip"
+            | "jar"
+            | "tar"
+            | "gz"
+            | "tgz"
+            | "sqlite"
+            | "sqlite3"
+            | "db"
+            | "docx"
+            | "xlsx"
+            | "pptx"
+            | "odt"
+            | "ods"
+            | "odp"
+            | "rtf"
+            | "epub"
+            | "ipynb"
+            | "mp3"
+            | "wav"
+            | "ogg"
+            | "m4a"
+            | "aac"
+            | "flac"
+            | "opus"
+            | "weba"
+            | "mp4"
+            | "webm"
+            | "m4v"
+            | "ogv"
+            | "mov"
+    )
+}
+
+/// Resolves a workspace asset (following symlinks) ONLY when its canonical target exists as a
+/// regular file inside at least one canonical entry in `allowed_roots` AND satisfies
+/// [`is_workspace_preview_entry_path`] (`#39491`).
+pub fn resolve_previewable_workspace_asset(
+    candidate: &Path,
+    allowed_roots: &[std::path::PathBuf],
+) -> Option<std::path::PathBuf> {
+    if !is_workspace_preview_entry_path(candidate) {
+        return None;
+    }
+    let canonical_target = std::fs::canonicalize(candidate).ok()?;
+    if !canonical_target.is_file() {
+        return None;
+    }
+    if !is_workspace_preview_entry_path(&canonical_target) {
+        return None;
+    }
+    let within_allowed = allowed_roots.iter().any(|root| {
+        std::fs::canonicalize(root)
+            .is_ok_and(|canonical_root| canonical_target.starts_with(&canonical_root))
+    });
+    within_allowed.then_some(canonical_target)
+}

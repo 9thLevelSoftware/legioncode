@@ -11,8 +11,11 @@ use serde::Deserialize;
 use sha2::{Digest as _, Sha256};
 use t3_persistence::service_launcher::{is_exact_service_version, runtime_entry_paths};
 
-use crate::cmd_install::write_launcher_file;
+#[path = "cmd_update_shim.rs"]
+mod shim;
+
 use crate::invocation::non_empty_env;
+pub(crate) use shim::repoint_recorded_launchers_for_versions;
 
 const RELEASE_REPO: &str = "pingdotgg/t3code";
 const DEFAULT_RELEASE_DOWNLOAD_BASE: &str = "https://github.com/pingdotgg/t3code/releases/download";
@@ -140,6 +143,9 @@ pub(crate) fn install_target_version(
 ) -> Result<PathBuf, String> {
     let (entry_path, sentinel_path) = runtime_entry_paths(base_dir, target_version);
     if t3_persistence::service_launcher::runtime_exists(base_dir, target_version) {
+        if let Some(versions_dir) = entry_path.parent().and_then(|p| p.parent()) {
+            repoint_recorded_launchers_for_versions(versions_dir, &entry_path);
+        }
         return Ok(entry_path);
     }
 
@@ -223,7 +229,7 @@ pub(crate) fn install_target_version(
     validate_extracted_binary(&entry_path, target_version)?;
     fs::write(&sentinel_path, format!("{target_version}\n"))
         .map_err(|err| format!("Could not write runtime sentinel: {err}"))?;
-    repoint_recorded_launchers(base_dir, &entry_path);
+    repoint_recorded_launchers_for_versions(version_dir.parent().unwrap_or(base_dir), &entry_path);
 
     Ok(entry_path)
 }
@@ -317,17 +323,4 @@ fn validate_extracted_binary(entry_path: &Path, expected_version: &str) -> Resul
         ));
     }
     Ok(())
-}
-
-fn repoint_recorded_launchers(base_dir: &Path, new_entry: &Path) {
-    let launchers_file = base_dir.join("runtime").join("launchers");
-    let Ok(contents) = fs::read_to_string(launchers_file) else {
-        return;
-    };
-    for line in contents.lines().map(str::trim).filter(|l| !l.is_empty()) {
-        let launcher = Path::new(line);
-        if launcher.exists() {
-            let _ = write_launcher_file(launcher, new_entry);
-        }
-    }
 }

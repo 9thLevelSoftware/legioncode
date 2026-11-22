@@ -47,8 +47,8 @@ mod search_eval;
 mod search_match;
 mod search_query;
 mod search_typo;
+mod text_norm_tables;
 mod unicode_so_table;
-mod url_authority;
 mod utf16_fold_table;
 
 #[cfg(feature = "concurrency")]
@@ -57,6 +57,9 @@ pub mod desktop_app_control;
 #[cfg(feature = "dpop")]
 pub mod dpop;
 pub mod frame_parts;
+pub mod oauth_callback;
 pub mod qr_code;
 pub mod search;
+pub mod text_norm;
+pub mod url_authority;
 pub mod utf16;

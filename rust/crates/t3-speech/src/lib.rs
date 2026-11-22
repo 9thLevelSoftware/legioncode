@@ -104,6 +104,8 @@
 mod acoustic_weights;
 mod asr_types;
 mod base64;
+mod custom_words_dict;
+mod custom_words_match;
 mod vad_frame;
 mod vad_session;
 mod voice_ws_types;
@@ -113,8 +115,11 @@ mod worker_stdio;
 
 pub mod acoustic_features;
 pub mod acoustic_model;
+pub mod apple_speech;
 pub mod asr;
+pub mod custom_words;
 pub mod native_discovery;
+pub mod pcm_prebuffer;
 pub mod types;
 pub mod vad;
 pub mod voice_ws;

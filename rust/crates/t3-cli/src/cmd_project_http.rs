@@ -1,10 +1,10 @@
 //! HTTP helpers and bearer resolution for live/remote `t3 project` commands.
 
-use std::env;
 use std::path::Path;
 
 use reqwest::header::AUTHORIZATION;
 use serde_json::Value;
+use t3_contracts::brand::ACTIVE_BRAND;
 use t3_persistence::paths::ServerDerivedPaths;
 use t3_server_runtime::{HttpProject, HttpProjectSnapshot};
 
@@ -19,18 +19,19 @@ pub(super) async fn resolve_bearer_token(
     if let Some(tok) = explicit_token.map(str::trim).filter(|s| !s.is_empty()) {
         return Ok(tok.to_owned());
     }
-    for key in ["T3CODE_TOKEN", "T3CODE_BEARER_TOKEN"] {
-        if let Ok(val) = env::var(key) {
-            let trimmed = val.trim();
-            if !trimmed.is_empty() {
-                return Ok(trimmed.to_owned());
-            }
-        }
+    if let Some(val) = ACTIVE_BRAND
+        .read_env("TOKEN")
+        .or_else(|| ACTIVE_BRAND.read_env("BEARER_TOKEN"))
+    {
+        return Ok(val.trim().to_owned());
     }
     if let Some(local_paths) = paths {
         return exchange_local_bearer(&local_paths.db_path, origin, "t3 project cli").await;
     }
-    Err("--remote-url requires --token <bearer> (or T3CODE_TOKEN).".to_owned())
+    Err(format!(
+        "--remote-url requires --token <bearer> (or {}TOKEN).",
+        ACTIVE_BRAND.primary_env_prefix
+    ))
 }
 
 pub(super) fn find_active_project<'a>(

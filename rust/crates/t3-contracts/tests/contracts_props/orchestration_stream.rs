@@ -39,7 +39,7 @@ fn client_commands_accept_valid_variants_and_reject_server_internal_commands() {
         panic!("expected ThreadMetadataUpdate");
     }
 
-    assert_eq!(INTERNAL_COMMAND_TYPES.len(), 15);
+    assert_eq!(INTERNAL_COMMAND_TYPES.len(), 16);
     assert!(is_internal_command_type("thread.guest-share.open"));
     for internal_type in INTERNAL_COMMAND_TYPES {
         let raw = json!({

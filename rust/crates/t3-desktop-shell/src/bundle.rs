@@ -87,27 +87,35 @@ pub struct DesktopBundleConfig {
 
 impl Default for DesktopBundleConfig {
     fn default() -> Self {
-        let base_dir = "/home/t3/.t3".to_owned();
+        let brand = t3_contracts::brand::ACTIVE_BRAND;
+        let cli = brand.cli_bin_name;
+        let base_dir = format!("/home/{cli}/{}", brand.home_dir_name);
         let log_path = format!("{base_dir}/userdata/logs/{BOOT_SERVICE_LOG_FILE}");
-        let systemd_unit_path = format!("/home/t3/.config/systemd/user/{BOOT_SERVICE_UNIT_FILE}");
+        let systemd_unit_path =
+            format!("/home/{cli}/.config/systemd/user/{BOOT_SERVICE_UNIT_FILE}");
+        let scheme = if brand.url_scheme == "t3code" {
+            DESKTOP_PRODUCTION_SCHEME
+        } else {
+            brand.url_scheme
+        };
         Self {
-            product_name: "T3 Code".to_owned(),
+            product_name: brand.product_name.to_owned(),
             version: env!("CARGO_PKG_VERSION").to_owned(),
-            identifier: "com.t3tools.t3code".to_owned(),
-            scheme: DESKTOP_PRODUCTION_SCHEME.to_owned(),
+            identifier: brand.macos_policy_domain.to_owned(),
+            scheme: scheme.to_owned(),
             channel: DesktopUpdateChannel::Latest,
             clerk_frontend_api_hostname: None,
             frontend_dist: "../dist".to_owned(),
             dev_url: "http://localhost:5173".to_owned(),
-            external_bin: vec!["binaries/t3".to_owned()],
+            external_bin: vec![format!("binaries/{cli}")],
             base_dir,
             log_path,
             systemd_unit_path,
-            service_program: vec!["/usr/bin/t3".to_owned(), "__service-launcher".to_owned()],
-            launchd_home_dir: "/Users/t3".to_owned(),
+            service_program: vec![format!("/usr/bin/{cli}"), "__service-launcher".to_owned()],
+            launchd_home_dir: format!("/Users/{cli}"),
             launchd_env_path: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin".to_owned(),
-            windows_user_id: "DESKTOP\\t3".to_owned(),
-            windows_home_dir: "C:\\Users\\t3".to_owned(),
+            windows_user_id: format!("DESKTOP\\{cli}"),
+            windows_home_dir: format!("C:\\Users\\{cli}"),
             windows_conhost_path: "C:\\Windows\\System32\\conhost.exe".to_owned(),
         }
     }
@@ -260,8 +268,8 @@ impl DesktopBundleManifest {
             content_security_policy: csp,
             external_bin: config.external_bin.clone(),
             channel: config.channel,
-            aur_package_name: aur.package_name.to_owned(),
-            aur_desktop_entry_id: aur.desktop_entry_id.to_owned(),
+            aur_package_name: aur.package_name.clone(),
+            aur_desktop_entry_id: aur.desktop_entry_id.clone(),
             files,
         };
 

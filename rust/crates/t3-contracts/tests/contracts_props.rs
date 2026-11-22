@@ -1,6 +1,8 @@
 //! Integration and property-based tests for `t3-contracts` (`ids`, `environment`,
 //! `policy`, `id_table`, `pull_requests`, `orchestration`, `permissions`) and BUG-17..20.
 
+#[path = "contracts_props/brand.rs"]
+mod brand;
 #[path = "contracts_props/id_table_pr.rs"]
 mod id_table_pr;
 #[path = "contracts_props/ids_env.rs"]

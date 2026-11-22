@@ -4,4 +4,5 @@ mod mobile_ffi_tests {
     mod bridge_tests;
     mod codegen_tests;
     mod packaging_tests;
+    mod review_ffi_tests;
 }

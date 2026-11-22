@@ -10,3 +10,5 @@ mod mcp;
 mod provider_env;
 #[path = "protocol_tests/rpc_codec.rs"]
 mod rpc_codec;
+#[path = "protocol_tests/wave2_deliverables.rs"]
+mod wave2_deliverables;

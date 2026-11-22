@@ -3,8 +3,8 @@
 use serde::{Deserialize, Serialize};
 use t3_contracts::policy::ManagedUpdatesPolicy;
 use t3_edge::desktop_updates::{
-    DesktopUpdateChannel, DesktopUpdateMachine, PendingUpdate, UpdateErrorContext, UpdateStatus,
-    VerifiedArtifact,
+    DesktopUpdateChannel, DesktopUpdateMachine, PendingUpdate, TrackMismatch, UpdateErrorContext,
+    UpdateStatus, VerifiedArtifact,
 };
 use t3_persistence::service_preflight::ServicePreflightResult;
 
@@ -101,6 +101,18 @@ pub enum UpdateStepAction {
         #[serde(default)]
         payload_utf8: Option<String>,
     },
+    /// Record an empty update-check response (`NoOffer`) that surfaces cross-track mismatch (`#38506`).
+    #[serde(rename_all = "camelCase")]
+    NoOffer {
+        /// ISO-8601 check timestamp.
+        checked_at: String,
+        /// Whether the feed returned an older release floor preventing mismatch error.
+        #[serde(default)]
+        has_release_floor: bool,
+        /// Optional managed updates policy suppressing disallowed tracks.
+        #[serde(default)]
+        managed_policy: Option<ManagedUpdatesPolicy>,
+    },
     /// Record an installer launch failure while retaining `retained_download`.
     #[serde(rename_all = "camelCase")]
     InstallFailure {
@@ -134,6 +146,9 @@ pub struct UpdateStepResult {
     /// Latest error operation context, if any.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_context: Option<UpdateErrorContext>,
+    /// Cross-track mismatch discovered when checking a mismatched release track (`#38506`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub track_mismatch: Option<TrackMismatch>,
     /// Full state machine snapshot for stateless roundtripping.
     pub state: DesktopUpdateMachine,
 }

@@ -53,7 +53,7 @@ use t3_contracts::policy::{ManagedUpdatesMode, ManagedUpdatesPolicy};
 use t3_shared::search::normalize_whitespace;
 
 pub use crate::desktop_updates_aur::{
-    AurLauncherBundle, DesktopUpdateChannel, render_aur_launcher,
+    AurLauncherBundle, DesktopUpdateChannel, render_aur_launcher, render_aur_launcher_for_brand,
 };
 pub use crate::desktop_updates_resume::{
     DOWNLOAD_STALL_RETRIES, DigestError, DownloadFailureKind, DownloadResumePlanner,
@@ -61,7 +61,8 @@ pub use crate::desktop_updates_resume::{
     Sha512Verifier, compute_sha512_base64, compute_sha512_hex, verify_sha512,
 };
 pub use crate::desktop_updates_types::{
-    DesktopUpdateError, PendingUpdate, UpdateErrorContext, UpdateStatus, VerifiedArtifact,
+    DesktopUpdateError, PendingUpdate, TrackMismatch, UpdateErrorContext, UpdateStatus,
+    VerifiedArtifact, desktop_update_channel_of, track_mismatch_message,
 };
 
 /// Desktop auto-update state machine keeping `retained_download` separate from `pending_check`
@@ -81,6 +82,8 @@ pub struct DesktopUpdateMachine {
     checked_at: Option<String>,
     last_error: Option<String>,
     error_context: Option<UpdateErrorContext>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    track_mismatch: Option<TrackMismatch>,
 }
 
 impl DesktopUpdateMachine {
@@ -95,6 +98,7 @@ impl DesktopUpdateMachine {
             checked_at: None,
             last_error: None,
             error_context: None,
+            track_mismatch: None,
         }
     }
 
@@ -133,8 +137,15 @@ impl DesktopUpdateMachine {
         self.error_context
     }
 
+    /// Track mismatch attached when the last check failed solely due to a build vs saved
+    /// channel mismatch (`#38506`).
+    pub fn track_mismatch(&self) -> Option<TrackMismatch> {
+        self.track_mismatch
+    }
+
     /// Applies a [`ManagedUpdatesPolicy`], returning `true` when updates remain enabled.
     pub fn apply_managed_policy(&mut self, policy: Option<&ManagedUpdatesPolicy>) -> bool {
+        self.track_mismatch = None;
         let blocked = policy.is_some_and(|p| {
             p.mode == ManagedUpdatesMode::Off
                 || (self.channel == DesktopUpdateChannel::Nightly && p.allow_nightly == Some(false))
@@ -162,6 +173,7 @@ impl DesktopUpdateMachine {
         self.checked_at = Some(checked_at.into());
         self.last_error = None;
         self.error_context = None;
+        self.track_mismatch = None;
     }
 
     /// Records a newly offered update (`V2`) in `pending_check` without clearing `retained_download` (`V1`).
@@ -176,6 +188,7 @@ impl DesktopUpdateMachine {
         self.checked_at = Some(pending.checked_at.clone());
         self.last_error = None;
         self.error_context = None;
+        self.track_mismatch = None;
         if matches_retained {
             self.pending_check = None;
             self.status = UpdateStatus::Downloaded;
@@ -194,6 +207,7 @@ impl DesktopUpdateMachine {
         self.checked_at = Some(checked_at.into());
         self.last_error = None;
         self.error_context = None;
+        self.track_mismatch = None;
         self.status = if self.retained_download.is_some() {
             UpdateStatus::Downloaded
         } else {
@@ -201,8 +215,61 @@ impl DesktopUpdateMachine {
         };
     }
 
+    /// Records that an update check offered nothing usable; surfaces a track mismatch when a build
+    /// on one track checks a feed for another unblocked saved track without a release floor (`#38506`).
+    pub fn on_no_offer(
+        &mut self,
+        checked_at: impl Into<String>,
+        has_release_floor: bool,
+        policy: Option<&ManagedUpdatesPolicy>,
+    ) {
+        if self.status == UpdateStatus::Disabled {
+            return;
+        }
+        let build_channel = desktop_update_channel_of(&self.current_version);
+        if has_release_floor || build_channel == self.channel {
+            self.on_no_update(checked_at);
+            return;
+        }
+        let blocked_reason = policy.and_then(|p| {
+            if p.mode == ManagedUpdatesMode::Off {
+                Some("Automatic updates are disabled by policy.".to_owned())
+            } else if build_channel == DesktopUpdateChannel::Nightly
+                && p.allow_nightly == Some(false)
+            {
+                Some(
+                    "Nightly updates are turned off on this machine. Switch to the stable channel to keep getting updates."
+                        .to_owned(),
+                )
+            } else {
+                None
+            }
+        });
+        if let Some(reason) = blocked_reason {
+            self.on_check_failure_with_track_mismatch(&reason, checked_at, None);
+            return;
+        }
+        let message = track_mismatch_message(build_channel, self.channel);
+        self.on_check_failure_with_track_mismatch(
+            &message,
+            checked_at,
+            Some(TrackMismatch { build_channel }),
+        );
+    }
+
     /// Handles a failed update check; restores `retained_download` (`V1`) instead of stranding it (`BUG-28`).
     pub fn on_check_failure(&mut self, message: &str, checked_at: impl Into<String>) {
+        self.on_check_failure_with_track_mismatch(message, checked_at, None);
+    }
+
+    /// Handles a failed update check, optionally recording a [`TrackMismatch`] when no installer
+    /// is retained on disk (`#38506`).
+    pub fn on_check_failure_with_track_mismatch(
+        &mut self,
+        message: &str,
+        checked_at: impl Into<String>,
+        track_mismatch: Option<TrackMismatch>,
+    ) {
         if self.status == UpdateStatus::Disabled {
             return;
         }
@@ -212,10 +279,12 @@ impl DesktopUpdateMachine {
             self.status = UpdateStatus::Downloaded;
             self.last_error = None;
             self.error_context = None;
+            self.track_mismatch = None;
         } else {
             self.status = UpdateStatus::Error;
             self.last_error = Some(normalize_whitespace(message).into_owned());
             self.error_context = Some(UpdateErrorContext::Check);
+            self.track_mismatch = track_mismatch;
         }
     }
 
@@ -231,6 +300,7 @@ impl DesktopUpdateMachine {
         self.status = UpdateStatus::Downloading;
         self.last_error = None;
         self.error_context = None;
+        self.track_mismatch = None;
         Ok(())
     }
 
@@ -254,6 +324,7 @@ impl DesktopUpdateMachine {
         }
         self.last_error = Some(normalize_whitespace(message).into_owned());
         self.error_context = Some(UpdateErrorContext::Download);
+        self.track_mismatch = None;
         if self.retained_download.is_some() {
             self.pending_check = None;
             self.status = UpdateStatus::Downloaded;
@@ -272,6 +343,7 @@ impl DesktopUpdateMachine {
         self.status = UpdateStatus::Downloaded;
         self.last_error = None;
         self.error_context = None;
+        self.track_mismatch = None;
     }
 
     /// Records an installer launch failure while retaining the verified download for retry.
@@ -283,6 +355,7 @@ impl DesktopUpdateMachine {
         }
         self.last_error = Some(normalize_whitespace(message).into_owned());
         self.error_context = Some(UpdateErrorContext::Install);
+        self.track_mismatch = None;
     }
 
     /// Returns the verified installer ready for installation (`V1` fallback or newly downloaded `V2`).

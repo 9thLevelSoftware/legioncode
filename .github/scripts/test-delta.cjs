@@ -4,9 +4,12 @@
 const MARKER = "<!-- test-delta -->";
 const NET_CASES_TO_REPORT = 20;
 const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
+const RUST_FILE = /\.rs$/;
 // `<` admits type arguments, as in `it.each<Row>(...)`, which may span lines.
 const TEST_CASE = /^\s*(?:it|test)(?:\.\w+)*\s*[(<]/;
+const RUST_TEST_CASE = /^\s*#\[(?:[\w:]+::)?test(?:\([^)]*\))?\]/;
 const isBrowserTest = (path) => path.includes(".browser.test.");
+const isTrackedFile = (path) => TEST_FILE.test(path) || RUST_FILE.test(path);
 
 function kindOf(path) {
   if (isBrowserTest(path)) return "browser";
@@ -16,7 +19,7 @@ function kindOf(path) {
 
 /** @param {string} diff output of `git diff -U0 base...head` */
 function countTestDelta(diff) {
-  const kinds = { browser: 0, server: 0, unit: 0 };
+  const kinds = { rust: 0, browser: 0, server: 0, unit: 0 };
   const newBrowserFiles = [];
   let path = null;
   // A browser test file is new when it is added, or renamed from a file that was not one.
@@ -35,21 +38,28 @@ function countTestDelta(diff) {
     if (line.startsWith("rename from ") && file) file.isNew = !isBrowserTest(line.slice(12));
     if (line.startsWith("--- ")) {
       const source = line.slice(4).replace(/^a\//, "");
-      path = TEST_FILE.test(source) ? source : null;
+      path = isTrackedFile(source) ? source : null;
       continue;
     }
     if (line.startsWith("+++ ")) {
       const target = line.slice(4).replace(/^b\//, "");
       // A deleted file's target is /dev/null; keep its old path to count the removed cases.
-      if (target !== "/dev/null") path = TEST_FILE.test(target) ? target : null;
+      if (target !== "/dev/null") path = isTrackedFile(target) ? target : null;
       continue;
     }
     if (line.startsWith("new file mode") || !path) continue;
     const sign = line[0] === "+" ? 1 : line[0] === "-" ? -1 : 0;
-    if (sign !== 0 && TEST_CASE.test(line.slice(1))) kinds[kindOf(path)] += sign;
+    const testCasePattern = RUST_FILE.test(path) ? RUST_TEST_CASE : TEST_CASE;
+    if (sign !== 0 && testCasePattern.test(line.slice(1))) {
+      kinds[RUST_FILE.test(path) ? "rust" : kindOf(path)] += sign;
+    }
   }
   flush();
-  return { kinds, net: kinds.browser + kinds.server + kinds.unit, newBrowserFiles };
+  return {
+    kinds,
+    net: kinds.rust + kinds.browser + kinds.server + kinds.unit,
+    newBrowserFiles,
+  };
 }
 
 /** Returns the comment body, or null when the change does not grow the suite enough to mention. */
@@ -59,7 +69,7 @@ function render(delta) {
   const lines = [
     MARKER,
     `This PR changes the test suite by **${signed(delta.net)} test cases** ` +
-      `(browser ${signed(delta.kinds.browser)}, unit ${signed(delta.kinds.unit)}, server ${signed(delta.kinds.server)}).`,
+      `(rust ${signed(delta.kinds.rust ?? 0)}, browser ${signed(delta.kinds.browser)}, unit ${signed(delta.kinds.unit)}, server ${signed(delta.kinds.server)}).`,
   ];
   if (delta.newBrowserFiles.length > 0) {
     lines.push(
@@ -70,7 +80,7 @@ function render(delta) {
   }
   lines.push(
     "",
-    "Keep tests that would fail for a real reason, and test logic below the UI where it can be. See [Testing](https://github.com/pingdotgg/t3code/blob/main/docs/internals/testing.md).",
+    "Keep tests that would fail for a real reason, and test logic below the UI where it can be. See [Testing](https://github.com/9thLevelSoftware/legioncode/blob/main/docs/internals/testing.md).",
   );
   return lines.join("\n");
 }

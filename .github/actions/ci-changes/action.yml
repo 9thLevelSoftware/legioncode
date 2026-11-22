@@ -21,6 +21,8 @@ outputs:
     value: ${{ steps.detect.outputs.release_smoke }}
   mobile_native:
     value: ${{ steps.detect.outputs.mobile_native }}
+  js_checks:
+    value: ${{ steps.detect.outputs.js_checks }}
 runs:
   using: composite
   steps:

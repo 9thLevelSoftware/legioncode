@@ -37,21 +37,34 @@ diff --git a/apps/web/src/Panel.tsx b/apps/web/src/Panel.tsx
 +++ b/apps/web/src/Panel.tsx
 @@ -1 +1 @@
 +it("is not a test file", () => {});
-`;
+diff --git a/rust/crates/t3-cli/tests/cli_tests.rs b/rust/crates/t3-cli/tests/cli_tests.rs
+--- a/rust/crates/t3-cli/tests/cli_tests.rs
++++ b/rust/crates/t3-cli/tests/cli_tests.rs
+@@ -1,1 +1,2 @@
++#[test]
++  #[tokio::test]
+ `;
 
 test("counts cases by kind, including deleted files, and finds new or renamed browser files", () => {
   assert.deepEqual(countTestDelta(diff), {
-    kinds: { browser: 2, server: -1, unit: -1 },
-    net: 0,
+    kinds: { rust: 2, browser: 2, server: -1, unit: -1 },
+    net: 2,
     newBrowserFiles: ["apps/web/src/Panel.browser.test.tsx", "apps/web/src/Menu.browser.test.tsx"],
   });
 });
 
 test("reports only growth worth a reviewer's attention", () => {
-  const quiet = { kinds: { browser: 0, server: 3, unit: 5 }, net: 8, newBrowserFiles: [] };
+  const quiet = { kinds: { rust: 0, browser: 0, server: 3, unit: 5 }, net: 8, newBrowserFiles: [] };
   assert.equal(render(quiet), null);
-  const growth = { kinds: { browser: 4, server: 10, unit: 12 }, net: 26, newBrowserFiles: [] };
-  assert.match(render(growth), /\*\*\+26 test cases\*\* \(browser \+4, unit \+12, server \+10\)/);
+  const growth = {
+    kinds: { rust: 3, browser: 4, server: 10, unit: 12 },
+    net: 29,
+    newBrowserFiles: [],
+  };
+  assert.match(
+    render(growth),
+    /\*\*\+29 test cases\*\* \(rust \+3, browser \+4, unit \+12, server \+10\)/,
+  );
   assert.match(
     render(countTestDelta(diff)),
     /New browser test files: `apps\/web\/src\/Panel\.browser\.test\.tsx`/,

@@ -246,21 +246,15 @@ function assertMissing(path: string, message: string): void {
 const tempRoot = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-release-smoke-"));
 
 try {
-  const gitBashDir = "C:\\Program Files\\Git\\bin";
-  // oxlint-disable-next-line t3code/no-global-process-runtime -- Release smoke is a standalone Node script without Effect HostProcess.
-  const isWindows = process.platform === "win32";
-  const relayTestEnv =
-    isWindows && NodeFS.existsSync(NodePath.join(gitBashDir, "bash.exe"))
-      ? {
-          ...process.env,
-          PATH: `${gitBashDir};${process.env.PATH ?? process.env.Path ?? ""}`,
-        }
-      : process.env;
-
   NodeChildProcess.execFileSync(
     process.execPath,
-    ["--test", NodePath.resolve(repoRoot, ".github/scripts/relay-state-output.test.cjs")],
-    { stdio: "inherit", env: relayTestEnv },
+    [
+      "--test",
+      NodePath.resolve(repoRoot, ".github/scripts/check-nightly-release.test.cjs"),
+      NodePath.resolve(repoRoot, ".github/scripts/test-delta.test.cjs"),
+      NodePath.resolve(repoRoot, ".github/scripts/ci-workflows.test.cjs"),
+    ],
+    { stdio: "inherit" },
   );
 
   copyWorkspaceManifestFixture(tempRoot);

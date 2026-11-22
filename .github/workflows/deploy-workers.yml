@@ -32,7 +32,7 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
-            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+            !/apps/mobile/modules/legion-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - name: Setup Rust

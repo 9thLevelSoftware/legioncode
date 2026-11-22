@@ -37,9 +37,9 @@ diff --git a/apps/web/src/Panel.tsx b/apps/web/src/Panel.tsx
 +++ b/apps/web/src/Panel.tsx
 @@ -1 +1 @@
 +it("is not a test file", () => {});
-diff --git a/rust/crates/t3-cli/tests/cli_tests.rs b/rust/crates/t3-cli/tests/cli_tests.rs
---- a/rust/crates/t3-cli/tests/cli_tests.rs
-+++ b/rust/crates/t3-cli/tests/cli_tests.rs
+diff --git a/rust/crates/legion-cli/tests/cli_tests.rs b/rust/crates/legion-cli/tests/cli_tests.rs
+--- a/rust/crates/legion-cli/tests/cli_tests.rs
++++ b/rust/crates/legion-cli/tests/cli_tests.rs
 @@ -1,1 +1,2 @@
 +#[test]
 +  #[tokio::test]

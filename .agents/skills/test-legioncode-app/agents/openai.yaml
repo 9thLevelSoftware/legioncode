@@ -1,0 +1,4 @@
+interface:
+  display_name: "LegionCode App Testing"
+  short_description: "Test web and desktop in LegionCode's Browser panel"
+  default_prompt: "Use $test-legioncode-app to verify the affected web or desktop flow through LegionCode's Browser panel."

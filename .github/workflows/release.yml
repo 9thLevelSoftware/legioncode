@@ -117,13 +117,13 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
-            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+            !/apps/mobile/modules/legion-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - name: Setup dependencies
         uses: ./.github/actions/setup-ci-deps
         with:
-          install-args: --filter=@t3tools/scripts...
+          install-args: --filter=@legioncode/scripts...
 
       - id: release_meta
         name: Resolve release version
@@ -178,7 +178,7 @@ jobs:
             echo "release_channel=stable" >> "$GITHUB_OUTPUT"
             echo "version=$version" >> "$GITHUB_OUTPUT"
             echo "tag=v$version" >> "$GITHUB_OUTPUT"
-            echo "name=T3 Code v$version" >> "$GITHUB_OUTPUT"
+            echo "name=LegionCode v$version" >> "$GITHUB_OUTPUT"
             echo "cli_dist_tag=latest" >> "$GITHUB_OUTPUT"
             if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
               echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
@@ -209,7 +209,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: npm-launcher
-          path: npm-packages/t3.tgz
+          path: npm-packages/legioncode.tgz
           if-no-files-found: error
 
   quality:
@@ -226,7 +226,7 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
-            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+            !/apps/mobile/modules/legion-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - name: Setup Rust
@@ -290,7 +290,7 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
-            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+            !/apps/mobile/modules/legion-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - name: Setup Rust
@@ -326,7 +326,7 @@ jobs:
       - name: Setup script dependencies
         uses: ./.github/actions/setup-ci-deps
         with:
-          install-args: --filter=@t3tools/scripts...
+          install-args: --filter=@legioncode/scripts...
 
       - name: Stamp release version and build portable surface bundles
         shell: bash
@@ -340,10 +340,10 @@ jobs:
           node rust/scripts/build-dist.mjs --surfaces wasm,web-app,cloudflare-workers,mobile-sdk
           node rust/scripts/smoke-wasm-surfaces.mjs
           mkdir -p release-surface-assets
-          tar -czf "release-surface-assets/t3-web-app-${RELEASE_VERSION}.tar.gz" -C rust/dist web-app
-          tar -czf "release-surface-assets/t3-wasm-sdk-${RELEASE_VERSION}.tar.gz" -C rust/dist wasm-web wasm-nodejs
-          tar -czf "release-surface-assets/t3-cloudflare-workers-${RELEASE_VERSION}.tar.gz" -C rust/dist cloudflare-workers
-          tar -czf "release-surface-assets/t3-mobile-sdk-${RELEASE_VERSION}.tar.gz" -C rust/dist mobile
+          tar -czf "release-surface-assets/legioncode-web-app-${RELEASE_VERSION}.tar.gz" -C rust/dist web-app
+          tar -czf "release-surface-assets/legioncode-wasm-sdk-${RELEASE_VERSION}.tar.gz" -C rust/dist wasm-web wasm-nodejs
+          tar -czf "release-surface-assets/legioncode-cloudflare-workers-${RELEASE_VERSION}.tar.gz" -C rust/dist cloudflare-workers
+          tar -czf "release-surface-assets/legioncode-mobile-sdk-${RELEASE_VERSION}.tar.gz" -C rust/dist mobile
 
       - name: Upload portable surface bundles
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -425,7 +425,7 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
-            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+            !/apps/mobile/modules/legion-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - name: Download web-app dist bundle
@@ -464,7 +464,7 @@ jobs:
       - name: Setup script dependencies
         uses: ./.github/actions/setup-ci-deps
         with:
-          install-args: --filter=@t3tools/scripts...
+          install-args: --filter=@legioncode/scripts...
 
       - name: Build Rust binaries and FFI libraries
         shell: bash
@@ -476,14 +476,14 @@ jobs:
           cargo fetch --locked --manifest-path native/resource-monitor/Cargo.toml
           node scripts/update-release-package-versions.ts "$RELEASE_VERSION"
           cargo update --workspace --offline --manifest-path rust/Cargo.toml
-          cargo build --locked --release --manifest-path rust/Cargo.toml --target "${{ matrix.rust_target }}" -p t3-cli -p t3-desktop-shell -p t3-mobile-ffi
+          cargo build --locked --release --manifest-path rust/Cargo.toml --target "${{ matrix.rust_target }}" -p legion-cli -p legion-desktop-shell -p legion-mobile-ffi
           cargo build --locked --release --manifest-path native/resource-monitor/Cargo.toml --target "${{ matrix.rust_target }}"
 
       - name: Package and smoke CLI archive
         shell: bash
         env:
           RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
-          T3CODE_CLI_MAC_SIGN_IDENTITY: ${{ vars.T3CODE_CLI_MAC_SIGN_IDENTITY }}
+          LEGIONCODE_CLI_MAC_SIGN_IDENTITY: ${{ vars.LEGIONCODE_CLI_MAC_SIGN_IDENTITY }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
@@ -493,10 +493,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p apps/server/dist-exe apps/server/dist/resource-monitor release-target-assets
-          cp "rust/target/${{ matrix.rust_target }}/release/t3${{ matrix.ext }}" \
-            "apps/server/dist-exe/t3-${{ matrix.exe_key }}${{ matrix.ext }}"
-          cp "native/resource-monitor/target/${{ matrix.rust_target }}/release/t3-resource-monitor${{ matrix.ext }}" \
-            "apps/server/dist/resource-monitor/t3-resource-monitor${{ matrix.ext }}"
+          cp "rust/target/${{ matrix.rust_target }}/release/legioncode${{ matrix.ext }}" \
+            "apps/server/dist-exe/legioncode-${{ matrix.exe_key }}${{ matrix.ext }}"
+          cp "native/resource-monitor/target/${{ matrix.rust_target }}/release/legioncode-resource-monitor${{ matrix.ext }}" \
+            "apps/server/dist/resource-monitor/legioncode-resource-monitor${{ matrix.ext }}"
           node scripts/build-cli-archive.ts \
             --platform "${{ matrix.platform }}" \
             --arch "${{ matrix.arch }}" \
@@ -504,7 +504,7 @@ jobs:
             --output-dir release-target-assets
           if [[ "${{ matrix.platform_key }}" != "darwin-x64" ]]; then
             node scripts/smoke-cli-archive.ts \
-              --archive "release-target-assets/t3-${RELEASE_VERSION}-${{ matrix.platform_key }}.${{ matrix.archive_ext }}" \
+              --archive "release-target-assets/legioncode-${RELEASE_VERSION}-${{ matrix.platform_key }}.${{ matrix.archive_ext }}" \
               --expect-version "$RELEASE_VERSION"
           fi
 
@@ -514,8 +514,8 @@ jobs:
           RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
         run: |
           set -euo pipefail
-          desktop_stem="t3-desktop-${RELEASE_VERSION}-${{ matrix.platform_key }}"
-          mobile_stem="t3-mobile-ffi-${RELEASE_VERSION}-${{ matrix.platform_key }}"
+          desktop_stem="legioncode-desktop-${RELEASE_VERSION}-${{ matrix.platform_key }}"
+          mobile_stem="legioncode-mobile-ffi-${RELEASE_VERSION}-${{ matrix.platform_key }}"
           desktop_dir="desktop-stage/${desktop_stem}"
           mobile_dir="mobile-ffi-stage/${mobile_stem}"
           target_release_dir="rust/target/${{ matrix.rust_target }}/release"
@@ -523,22 +523,22 @@ jobs:
           rm -rf "$desktop_dir" "$mobile_dir"
           mkdir -p "$desktop_dir" "$mobile_dir" release-target-assets
 
-          cp "${target_release_dir}/t3-desktop${{ matrix.ext }}" "${desktop_dir}/t3-desktop${{ matrix.ext }}"
+          cp "${target_release_dir}/legioncode-desktop${{ matrix.ext }}" "${desktop_dir}/legioncode-desktop${{ matrix.ext }}"
           if [[ "${{ matrix.platform_key }}" == "darwin-x64" ]]; then
-            cargo build --locked --release --manifest-path rust/Cargo.toml -p t3-desktop-shell
-            rust/target/release/t3-desktop --emit-bundle "$desktop_dir"
-            cp "${target_release_dir}/t3-desktop" "${desktop_dir}/t3-desktop"
+            cargo build --locked --release --manifest-path rust/Cargo.toml -p legion-desktop-shell
+            rust/target/release/legioncode-desktop --emit-bundle "$desktop_dir"
+            cp "${target_release_dir}/legioncode-desktop" "${desktop_dir}/legioncode-desktop"
           else
-            "${desktop_dir}/t3-desktop${{ matrix.ext }}" --emit-bundle "$desktop_dir"
+            "${desktop_dir}/legioncode-desktop${{ matrix.ext }}" --emit-bundle "$desktop_dir"
           fi
 
           for lib in \
-            libt3_mobile_ffi.so \
-            libt3_mobile_ffi.dylib \
-            libt3_mobile_ffi.a \
-            t3_mobile_ffi.dll \
-            t3_mobile_ffi.dll.lib \
-            t3_mobile_ffi.lib; do
+            liblegion_mobile_ffi.so \
+            liblegion_mobile_ffi.dylib \
+            liblegion_mobile_ffi.a \
+            legion_mobile_ffi.dll \
+            legion_mobile_ffi.dll.lib \
+            legion_mobile_ffi.lib; do
             if [[ -f "${target_release_dir}/${lib}" ]]; then
               cp "${target_release_dir}/${lib}" "${mobile_dir}/${lib}"
             fi
@@ -579,14 +579,14 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
-            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+            !/apps/mobile/modules/legion-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - name: Setup script dependencies for AI release notes
         if: needs.preflight.outputs.release_channel != 'preview' && env.OPENAI_API_KEY != ''
         uses: ./.github/actions/setup-ci-deps
         with:
-          install-args: --filter=@t3tools/scripts...
+          install-args: --filter=@legioncode/scripts...
 
       - name: Download release artifacts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -629,7 +629,7 @@ jobs:
             '> [!CAUTION]' \
             '> **Preview build — not for general use.**' \
             '>' \
-            "> Preview builds are cut by maintainers from unreleased branches to exercise the release pipeline. If you want T3 Code, install the [latest release](${LATEST_URL}) or a nightly instead." \
+            "> Preview builds are cut by maintainers from unreleased branches to exercise the release pipeline. If you want LegionCode, install the [latest release](${LATEST_URL}) or a nightly instead." \
             '' \
             "Built from \`${BUILD_REF}\`." > release-notes.md
 
@@ -780,9 +780,9 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
         run: |
-          built="$(tar -xzOf npm-packages/t3.tgz package/package.json | jq -r .version)"
+          built="$(tar -xzOf npm-packages/legioncode.tgz package/package.json | jq -r .version)"
           if [[ "$built" != "$RELEASE_VERSION" ]]; then
-            echo "::error::npm-launcher holds t3@$built, expected t3@$RELEASE_VERSION." >&2
+            echo "::error::npm-launcher holds legioncode@$built, expected legioncode@$RELEASE_VERSION." >&2
             exit 1
           fi
 
@@ -790,8 +790,8 @@ jobs:
         env:
           DIST_TAG: ${{ needs.preflight.outputs.cli_dist_tag }}
         run: |
-          if ! npm publish --access public --tag "$DIST_TAG" --provenance ./npm-packages/t3.tgz; then
-            echo "::error::npm publish failed. Make sure package t3 has a trusted publisher registered for .github/workflows/release.yml." >&2
+          if ! npm publish --access public --tag "$DIST_TAG" --provenance ./npm-packages/legioncode.tgz; then
+            echo "::error::npm publish failed. Make sure package legioncode has a trusted publisher registered for .github/workflows/release.yml." >&2
             exit 1
           fi
 
@@ -830,7 +830,7 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
-            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+            !/apps/mobile/modules/legion-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - id: app_bot
@@ -851,7 +851,7 @@ jobs:
       - name: Setup dependencies
         uses: ./.github/actions/setup-ci-deps
         with:
-          install-args: --filter=@t3tools/scripts... --filter=@t3tools/oxlint-plugin-t3code...
+          install-args: --filter=@legioncode/scripts... --filter=@legioncode/oxlint-plugin-legioncode...
 
       - id: update_versions
         name: Update version strings

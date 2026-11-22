@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // @effect-diagnostics nodeBuiltinImport:off
 /**
- * Replays small fake threads on a Claude or Codex model to check T3's MCP tool use. A trimmed
+ * Replays small fake threads on a Claude or Codex model to check LegionCode's MCP tool use. A trimmed
  * harness capture supplies the prompt and native tools; a cheap model plays the shell. See
  * README.md for how to run it and add cases.
  */
@@ -21,7 +21,7 @@ import {
   PreviewAutomationError,
   PreviewAutomationUnavailableError,
   ProviderInstanceId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Config from "effect/Config";
@@ -40,16 +40,16 @@ import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { taskPrompt } from "../../apps/server/src/mcp/delegatedTaskModes.ts";
 import * as McpInvocationContext from "../../apps/server/src/mcp/McpInvocationContext.ts";
 import { advertisedJsonSchema } from "../../apps/server/src/mcp/advertisedJsonSchema.ts";
-import * as Contracts from "@t3tools/contracts";
+import * as Contracts from "@legioncode/contracts";
 import {
   EnvironmentId,
   ORCHESTRATOR_MCP_RUNNING_TASK_NEXT,
   PullRequestState,
   ThreadId,
-} from "@t3tools/contracts";
-import { projectComposerContextForProvider } from "@t3tools/shared/composerContextReferences";
-import { THEME_GUIDE } from "@t3tools/shared/themeCss";
-import { formatThreadLink } from "@t3tools/shared/threadLinks";
+} from "@legioncode/contracts";
+import { projectComposerContextForProvider } from "@legioncode/shared/composerContextReferences";
+import { THEME_GUIDE } from "@legioncode/shared/themeCss";
+import { formatThreadLink } from "@legioncode/shared/threadLinks";
 import { buildCodexAdditionalContext } from "../../apps/server/src/provider/CodexDeveloperInstructions.ts";
 import { makeSideChatContext } from "../../apps/server/src/orchestration-v2/ContextHandoffService.ts";
 import { withInlineContext } from "../../apps/server/src/orchestration-v2/ContextHandoffDelivery.ts";
@@ -119,7 +119,7 @@ type PricedModel = keyof typeof PRICES;
 const PROXY_SHELL_MODELS = ["gpt-6-luna", "gpt-6.1-terra"] as const;
 type ShellModel = PricedModel | (typeof PROXY_SHELL_MODELS)[number];
 const isPricedModel = (model: ShellModel): model is PricedModel => model in PRICES;
-const T3_PREFIX = "mcp__t3-code__";
+const LEGION_PREFIX = "mcp__legion-code__";
 const RUNTIME_MARKER = "<runtime_info>";
 const TOOL_LOADED = "Tool loaded.";
 
@@ -160,11 +160,11 @@ export type SampleRun = {
   stopReason: string;
   /** The agent's final answer: its last response's text, if it ended its turn. */
   readonly finalText?: string;
-  /** PRs linked to the thread when the sample ends, by the agent or by T3. */
+  /** PRs linked to the thread when the sample ends, by the agent or by LegionCode. */
   readonly linked?: ReadonlyArray<string>;
   /** The thread's working directory, which chat resolves relative file pills against. */
   readonly cwd?: string;
-  /** The `agent-device` commands T3's device_open returned, prior turns included. */
+  /** The `agent-device` commands LegionCode's device_open returned, prior turns included. */
   readonly launchers?: ReadonlyArray<string>;
 };
 
@@ -174,8 +174,8 @@ const PriorToolCall = Schema.Struct({
   tool: Schema.String,
   input: Schema.Unknown,
   /**
-   * For a device tool or t3_background_wait, `"default"` runs the call on the world's devices or
-   * background tasks for T3's result.
+   * For a device tool or legion_background_wait, `"default"` runs the call on the world's devices or
+   * background tasks for LegionCode's result.
    */
   result: Schema.Unknown,
   /** Repository-relative file whose current contents supply this tool result. */
@@ -214,7 +214,7 @@ const McpToolUseExpect = Schema.Struct({
   minCalls: Schema.optional(Schema.Record(Schema.String, Schema.Number)),
   maxCalls: Schema.optional(Schema.Record(Schema.String, Schema.Number)),
   /**
-   * One `args`-style value per new top-level thread the agent asks for, by `t3_thread_launch` or a
+   * One `args`-style value per new top-level thread the agent asks for, by `legion_thread_launch` or a
    * `create_threads` entry. Each matches a different thread's request; no other thread is asked for.
    */
   newThreads: Schema.optional(Schema.Array(Schema.Unknown)),
@@ -264,7 +264,7 @@ const McpToolUseWorld = Schema.StructWithRest(
         Schema.StructWithRest(Schema.Struct({ sha: Schema.String, subject: Schema.String }), Rest),
       ),
     ),
-    /** Simulators and emulators. With them, T3's device tools answer from this world. */
+    /** Simulators and emulators. With them, LegionCode's device tools answer from this world. */
     devices: Schema.optional(Schema.Array(DeviceSummary)),
     /** Labels of the SSH device hosts in `devices`, by id. The local host always exists. */
     deviceHosts: Schema.optional(Schema.Record(Schema.String, Schema.String)),
@@ -278,25 +278,25 @@ const McpToolUseWorld = Schema.StructWithRest(
     /**
      * Hosts whose hub fails to list devices, by id, with the error, such as F1's
      * `{"_tag": "DeviceOperationError", "operation": "list", "reason": "request_failed", "cause": null}`.
-     * T3 marks each one failed on every call and lists none of its devices.
+     * LegionCode marks each one failed on every call and lists none of its devices.
      */
     deviceDiscoveryFailures: Schema.optional(Schema.Record(Schema.String, DeviceOperationError)),
-    /** false: agent device access is off. T3 denies every device call and drops its device text. */
+    /** false: agent device access is off. LegionCode denies every device call and drops its device text. */
     deviceAgentAccess: Schema.optional(Schema.Boolean),
-    /** false: agent browser access is off. T3 denies every preview call and drops its browser text. */
+    /** false: agent browser access is off. LegionCode denies every preview call and drops its browser text. */
     browserAgentAccess: Schema.optional(Schema.Boolean),
-    /** Every capture reaches T3 with adb screencap's warning ahead of the PNG: T3 reports 0×0. */
+    /** Every capture reaches LegionCode with adb screencap's warning ahead of the PNG: LegionCode reports 0×0. */
     deviceInvalidCapture: Schema.optional(Schema.Boolean),
     /** Devices another thread's agent-device session holds, by device id: that thread's id. */
     deviceOwners: Schema.optional(Schema.Record(Schema.String, Schema.String)),
     /**
      * Task IDs of the background commands and Monitors still running on the agent's Claude
-     * session. With them, T3's own t3_background_wait handler answers from this world.
+     * session. With them, LegionCode's own legion_background_wait handler answers from this world.
      */
     backgroundTasks: Schema.optional(Schema.Array(Schema.String)),
     /** The world's `prs`, bottom first, form one native stack with this number. */
     stack: Schema.optional(Schema.Number),
-    /** PRs already linked to the thread, with the state T3 last saw. */
+    /** PRs already linked to the thread, with the state LegionCode last saw. */
     linkedPullRequests: Schema.optional(
       Schema.Array(
         Schema.Struct({ number: Schema.Number, state: PullRequestState, title: Schema.String }),
@@ -319,11 +319,11 @@ export const McpToolUseCase = Schema.Struct({
     role: Schema.Literals(["top", "delegated-child", "native-subagent"]),
     /** Runs only on this harness, for cases whose right answer depends on it. */
     harness: Schema.optional(Schema.Literals(["claude", "codex"])),
-    /** The Linked environments beta is on, so T3 lists its link tools. */
+    /** The Linked environments beta is on, so LegionCode lists its link tools. */
     linkedEnvironments: Schema.optional(Schema.Boolean),
-    /** false: the project is on no forge T3 reads, so T3 hides its forge tools. */
+    /** false: the project is on no forge LegionCode reads, so LegionCode hides its forge tools. */
     forge: Schema.optional(Schema.Boolean),
-    /** delegate_task `role` for a delegated child. T3 builds the child's first message from it. */
+    /** delegate_task `role` for a delegated child. LegionCode builds the child's first message from it. */
     delegateRole: Schema.optional(OrchestratorMcpTaskRole),
     context: Schema.optional(Schema.String),
     priorTurns: Schema.optional(
@@ -337,8 +337,8 @@ export const McpToolUseCase = Schema.Struct({
     ),
     world: Schema.optional(McpToolUseWorld),
     /**
-     * Canned tool results by bare name, T3 or native. `"default"` uses the runner's result. For a
-     * device tool, a T3 `DeviceError` (`{"_tag": ..., "cause": null}`) fails it inside T3; for a
+     * Canned tool results by bare name, LegionCode or native. `"default"` uses the runner's result. For a
+     * device tool, a LegionCode `DeviceError` (`{"_tag": ..., "cause": null}`) fails it inside LegionCode; for a
      * preview tool, a `PreviewAutomationError` fails it with that error's message. A
      * `{"$sequence": [...]}` mock answers its nth call with the nth result, then repeats the last.
      */
@@ -347,14 +347,14 @@ export const McpToolUseCase = Schema.Struct({
     shellMocks: Schema.optional(
       Schema.Array(Schema.Struct({ match: Schema.String, output: Schema.String })),
     ),
-    /** The thread is a side chat's first turn: T3 puts the parent's digest ahead of `prompt`. */
+    /** The thread is a side chat's first turn: LegionCode puts the parent's digest ahead of `prompt`. */
     sideChat: Schema.optional(
       Schema.Struct({ parentThreadId: Schema.String, digest: Schema.Array(Schema.String) }),
     ),
   }),
   /** Empty to resume a top-level thread without side-chat context after its last tool result. */
   prompt: Schema.String,
-  /** Records for the context chips `prompt` links, projected as T3 sends them. */
+  /** Records for the context chips `prompt` links, projected as LegionCode sends them. */
   promptContext: Schema.optional(Schema.Struct({ records: Schema.Array(ComposerContextRecord) })),
   expect: McpToolUseExpect,
   /** Model calls this case may need. Overrides `--max-steps`. */
@@ -426,11 +426,12 @@ const toolResult = (id: string, content: unknown): Block => ({
 });
 const texts = (content: typeof Content.Type) =>
   typeof content === "string" ? [content] : content.flatMap((block) => block.text ?? []);
-const isT3Name = (name: string) => name.startsWith(T3_PREFIX) || name.startsWith("mcp__t3_code__");
+const isLegionName = (name: string) =>
+  name.startsWith(LEGION_PREFIX) || name.startsWith("mcp__legion_code__");
 const hasTool = (tools: ReadonlyArray<ApiTool>, name: string) =>
   tools.some((tool) => tool.name === name);
 
-/** Grading name: T3 tools lose their MCP prefix, native tools keep the part after the last `_`. */
+/** Grading name: LegionCode tools lose their MCP prefix, native tools keep the part after the last `_`. */
 const CODEX_NAMES: Readonly<Record<string, string>> = {
   exec_command: "Bash",
   shell_command: "Bash",
@@ -444,12 +445,12 @@ const CODEX_NAMES: Readonly<Record<string, string>> = {
 };
 export const normalizeToolName = (name: string) => {
   const bare = name.slice(name.lastIndexOf(".") + 1);
-  return isT3Name(bare)
-    ? bare.slice(T3_PREFIX.length)
+  return isLegionName(bare)
+    ? bare.slice(LEGION_PREFIX.length)
     : (CODEX_NAMES[bare] ?? bare.slice(bare.lastIndexOf("_") + 1));
 };
 export const normalizeToolInput = (name: string, input: unknown) => {
-  const decode = t3InputDecoders.get(normalizeToolName(name));
+  const decode = legionInputDecoders.get(normalizeToolName(name));
   if (decode !== undefined) return Option.getOrElse(decode(input), () => input);
   return normalizeToolName(name) === "Bash" && isRecord(input)
     ? { ...input, command: input.command ?? input.cmd }
@@ -460,7 +461,7 @@ export const normalizeToolInput = (name: string, input: unknown) => {
 
 // McpHttpServer advertises each tool's JSON schema, and Claude Code passes the MCP name,
 // description, and schema through unchanged.
-const t3SourceTools: ReadonlyArray<Tool.Any> = [
+const legionSourceTools: ReadonlyArray<Tool.Any> = [
   OrchestratorToolkit,
   ThreadToolkit,
   AttachmentToolkit,
@@ -477,20 +478,20 @@ const t3SourceTools: ReadonlyArray<Tool.Any> = [
   MessageToolkit,
 ].flatMap((toolkit): ReadonlyArray<Tool.Any> => Object.values(toolkit.tools));
 // McpHttpServer decodes arguments with each tool's JSON codec, which drops undeclared keys.
-const t3InputDecoders = new Map(
-  t3SourceTools.map((tool) => [
+const legionInputDecoders = new Map(
+  legionSourceTools.map((tool) => [
     tool.name,
     Schema.decodeUnknownOption(
       Schema.toCodecJson(tool.parametersSchema as Schema.Codec<unknown, unknown>),
     ),
   ]),
 );
-const t3Tools: ReadonlyArray<ApiTool> = t3SourceTools.map((tool) => ({
-  name: `${T3_PREFIX}${tool.name}`,
+const legionTools: ReadonlyArray<ApiTool> = legionSourceTools.map((tool) => ({
+  name: `${LEGION_PREFIX}${tool.name}`,
   description: Tool.getDescription(tool) ?? "",
   input_schema: advertisedJsonSchema(tool),
 }));
-// T3 gates these on the `preview` capability, which agent browser access decides.
+// LegionCode gates these on the `preview` capability, which agent browser access decides.
 const PREVIEW_TOOLS = new Set(
   [PreviewToolkit, PreviewControlsToolkit].flatMap((toolkit) =>
     Object.values(toolkit.tools).map((tool: Tool.Any) => tool.name),
@@ -500,44 +501,44 @@ const decodePreviewError = Schema.decodeUnknownOption(PreviewAutomationError);
 const previewFailure = (mock: unknown) => Option.getOrUndefined(decodePreviewError(mock));
 const enabledWhen = (predicate: () => boolean) =>
   new Set(
-    t3SourceTools
+    legionSourceTools
       .filter(
         (tool) => Context.getOrUndefined(tool.annotations, McpSchema.EnabledWhen) === predicate,
       )
-      .map((tool) => `${T3_PREFIX}${tool.name}`),
+      .map((tool) => `${LEGION_PREFIX}${tool.name}`),
   );
 // Claude Code loads a tool whose `_meta` sets anthropic/alwaysLoad up front instead of deferring it.
 const alwaysLoaded = new Set(
-  t3SourceTools
+  legionSourceTools
     .filter((tool) => {
       const meta = Context.getOrUndefined(tool.annotations, Tool.Meta);
       return meta !== undefined && meta["anthropic/alwaysLoad"] === true;
     })
-    .map((tool) => `${T3_PREFIX}${tool.name}`),
+    .map((tool) => `${LEGION_PREFIX}${tool.name}`),
 );
 // Refs whose request_secret takes `value` save a secret the user already pasted, with no card.
-export const savesPastedSecrets = t3Tools.some(
+export const savesPastedSecrets = legionTools.some(
   (tool) =>
-    tool.name === `${T3_PREFIX}request_secret` &&
+    tool.name === `${LEGION_PREFIX}request_secret` &&
     isRecord(tool.input_schema) &&
     isRecord(tool.input_schema.properties) &&
     "value" in tool.input_schema.properties,
 );
-/** A request_secret call that hands T3 a pasted secret, on a ref that takes one. */
+/** A request_secret call that hands LegionCode a pasted secret, on a ref that takes one. */
 const pastedSecret = (name: string, input: Readonly<Record<string, unknown>>) =>
   savesPastedSecrets && name === "request_secret" && typeof input.value === "string";
-// T3 does not offer these to a delegated child, so its harness never lists them.
+// LegionCode does not offer these to a delegated child, so its harness never lists them.
 const hiddenFromSubagents = enabledWhen(McpInvocationContext.hiddenFromSubagents);
-// The Linked environments beta starts off, and T3 lists its tools only while it is on.
+// The Linked environments beta starts off, and LegionCode lists its tools only while it is on.
 const hiddenWhileLinksOff = enabledWhen(McpInvocationContext.hiddenWhileLinksOff);
-// T3 lists PR and CI tools only to a thread whose project is on a forge it reads.
+// LegionCode lists PR and CI tools only to a thread whose project is on a forge it reads.
 const hiddenWithoutForge = enabledWhen(McpInvocationContext.hiddenWithoutForge);
-const visibleT3Tools = (options: {
+const visibleLegionTools = (options: {
   readonly subagent?: boolean;
   readonly links?: boolean;
   readonly forge?: boolean;
 }) =>
-  t3Tools.filter(
+  legionTools.filter(
     (tool) =>
       (options.links === true || !hiddenWhileLinksOff.has(tool.name)) &&
       (options.forge !== false || !hiddenWithoutForge.has(tool.name)) &&
@@ -545,7 +546,7 @@ const visibleT3Tools = (options: {
   );
 
 /**
- * T3's Claude Code options for an eval thread: its system prompt append and its hooks. `device` and
+ * LegionCode's Claude Code options for an eval thread: its system prompt append and its hooks. `device` and
  * `browser` say whether the thread holds the `device` and `preview` capabilities, as agent device
  * and browser access decide.
  */
@@ -559,27 +560,27 @@ const claudeQueryOptions = (model: Model, device = true, browser = true) => {
     nativeThreadId: "mcp-tool-use-eval",
     resume: false,
     cwd: null,
-    mcpServers: { "t3-code": { type: "http", url: "http://127.0.0.1/mcp" } },
+    mcpServers: { "legion-code": { type: "http", url: "http://127.0.0.1/mcp" } },
     deviceToolsAvailable: device,
     browserToolsAvailable: browser,
   };
   return makeClaudeQueryOptions(input);
 };
 
-/** Text T3 appends to Claude Code's system prompt. Delegated children get the same text. */
-export const t3SystemAppend = (model: Model, device = true, browser = true) => {
+/** Text LegionCode appends to Claude Code's system prompt. Delegated children get the same text. */
+export const legionSystemAppend = (model: Model, device = true, browser = true) => {
   const { systemPrompt } = claudeQueryOptions(model, device, browser);
   if (isRecord(systemPrompt) && systemPrompt.type === "preset" && systemPrompt.append) {
     return systemPrompt.append;
   }
-  throw new Error("makeClaudeQueryOptions no longer appends T3 text to a preset prompt.");
+  throw new Error("makeClaudeQueryOptions no longer appends LegionCode text to a preset prompt.");
 };
 
 /**
- * The context T3's SubagentStart hooks give a native subagent, which gets none of the append.
- * Empty when T3 registers no such hook.
+ * The context LegionCode's SubagentStart hooks give a native subagent, which gets none of the append.
+ * Empty when LegionCode registers no such hook.
  */
-export const t3SubagentContext = async (model: Model, device = true, browser = true) => {
+export const legionSubagentContext = async (model: Model, device = true, browser = true) => {
   const hooks = (claudeQueryOptions(model, device, browser).hooks?.SubagentStart ?? []).flatMap(
     (m) => m.hooks,
   );
@@ -605,18 +606,18 @@ export const t3SubagentContext = async (model: Model, device = true, browser = t
 };
 
 /**
- * Size of the context T3 adds: the system text every Claude thread gets, and the tool
+ * Size of the context LegionCode adds: the system text every Claude thread gets, and the tool
  * descriptions and schemas (loaded on demand here, sent up front by harnesses without
  * deferred tools). Tokens are estimated at 4 characters each.
  */
-const t3ContextReport = (model: Model) => {
+const legionContextReport = (model: Model) => {
   const size = (chars: number) => `${chars} chars (~${Math.round(chars / 4)} tokens)`;
-  const descriptions = t3Tools.reduce((sum, tool) => sum + valueText(tool.description).length, 0);
-  const schemas = JSON.stringify(t3Tools).length;
+  const descriptions = legionTools.reduce((sum, tool) => sum + valueText(tool.description).length, 0);
+  const schemas = JSON.stringify(legionTools).length;
   return [
-    `- T3 context: system text ${size((isCodex(model) ? JSON.stringify(buildCodexAdditionalContext({ model }, { browser: true, device: true })) : t3SystemAppend(model)).length)}`,
+    `- LegionCode context: system text ${size((isCodex(model) ? JSON.stringify(buildCodexAdditionalContext({ model }, { browser: true, device: true })) : legionSystemAppend(model)).length)}`,
     `tool descriptions ${size(descriptions)}`,
-    `full tool schemas ${size(schemas)} across ${t3Tools.length} tools.`,
+    `full tool schemas ${size(schemas)} across ${legionTools.length} tools.`,
   ].join(", ");
 };
 
@@ -652,15 +653,15 @@ export const buildBase = (
     readonly subagent?: boolean;
     readonly links?: boolean;
     readonly forge?: boolean;
-    /** A native subagent starts from its task: T3 appends nothing to its system prompt. */
+    /** A native subagent starts from its task: LegionCode appends nothing to its system prompt. */
     readonly nativeSubagent?: boolean;
-    /** false: the thread has no agent device access, so T3's text leaves devices out. */
+    /** false: the thread has no agent device access, so LegionCode's text leaves devices out. */
     readonly deviceAccess?: boolean;
-    /** false: the thread has no agent browser access, so T3's text leaves the browser out. */
+    /** false: the thread has no agent browser access, so LegionCode's text leaves the browser out. */
     readonly browserAccess?: boolean;
   },
 ) => {
-  const t3 = visibleT3Tools(options);
+  const legion = visibleLegionTools(options);
   const firstAssistant = template.messages.findIndex((message) => message.role === "assistant");
   const head = template.messages.slice(0, firstAssistant === -1 ? undefined : firstAssistant);
   const systemTexts = [
@@ -673,17 +674,17 @@ export const buildBase = (
   if (systemTexts.filter((value) => value.includes(RUNTIME_MARKER)).length !== 1 || !deferredList) {
     throw new Error(`The template needs one ${RUNTIME_MARKER} block and a deferred tool list.`);
   }
-  const nativeDeferred = deferredList.split("\n").filter((name) => name && !isT3Name(name));
+  const nativeDeferred = deferredList.split("\n").filter((name) => name && !isLegionName(name));
   const names = [
     ...nativeDeferred,
-    ...t3.filter((tool) => !alwaysLoaded.has(tool.name)).map((tool) => tool.name),
+    ...legion.filter((tool) => !alwaysLoaded.has(tool.name)).map((tool) => tool.name),
   ]
     .toSorted()
     .join("\n");
   const { model } = options;
   const append = options.nativeSubagent
     ? ""
-    : t3SystemAppend(model, options.deviceAccess, options.browserAccess);
+    : legionSystemAppend(model, options.deviceAccess, options.browserAccess);
   const modelLine = `You are powered by the model named ${MODELS[model]}. The exact model ID is ${model}.`;
   const joined = systemTexts.join("\n");
   // The capture's home directory names its user. Cases use `/home/user` paths instead.
@@ -692,7 +693,7 @@ export const buildBase = (
   const anonymize = (value: string) =>
     home === undefined ? value : value.replaceAll(home, home.replace(/[^/]+$/, "user"));
   const system = systemTexts.map((value) => {
-    // T3's append is the tail of its block: runtime info, PR linking, then orchestration.
+    // LegionCode's append is the tail of its block: runtime info, PR linking, then orchestration.
     const at = value.indexOf(RUNTIME_MARKER);
     return anonymize(at === -1 ? value : value.slice(0, at) + append)
       .replace(DEFERRED_LIST, (_, header: string) => `${header}${names}\n`)
@@ -724,18 +725,18 @@ export const buildBase = (
       date: /Today's date is ([\d-]+)/.exec(reminders.join("\n"))?.[1],
     },
     nativeTools: [
-      ...template.tools.filter((tool) => !isT3Name(tool.name)),
-      ...t3.filter((tool) => alwaysLoaded.has(tool.name)),
+      ...template.tools.filter((tool) => !isLegionName(tool.name)),
+      ...legion.filter((tool) => alwaysLoaded.has(tool.name)),
     ],
-    /** Tools ToolSearch loads: T3 tools from source, and native tools the template only names. */
-    t3,
-    deferred: [...t3, ...nativeDeferred.map((name) => ({ name, ...nativeSchema(name) }))],
+    /** Tools ToolSearch loads: LegionCode tools from source, and native tools the template only names. */
+    legion,
+    deferred: [...legion, ...nativeDeferred.map((name) => ({ name, ...nativeSchema(name) }))],
   };
 };
 
 type Base = ReturnType<typeof buildBase> & {
   readonly codex?: typeof ResponsesRequest.Type;
-  /** What T3's SubagentStart hooks give a native subagent. */
+  /** What LegionCode's SubagentStart hooks give a native subagent. */
   readonly subagentContext?: string;
 };
 
@@ -749,20 +750,20 @@ const buildCodexBase = (
     readonly subagent?: boolean;
     readonly links?: boolean;
     readonly forge?: boolean;
-    /** false: the thread has no agent device access, so T3's text leaves devices out. */
+    /** false: the thread has no agent device access, so LegionCode's text leaves devices out. */
     readonly deviceAccess?: boolean;
-    /** false: the thread has no agent browser access, so T3's text leaves the browser out. */
+    /** false: the thread has no agent browser access, so LegionCode's text leaves the browser out. */
     readonly browserAccess?: boolean;
   },
 ): Base => {
-  const t3 = visibleT3Tools(options);
+  const legion = visibleLegionTools(options);
   const contentText = (item: Block) =>
     Array.isArray(item.content)
       ? item.content.map((block: Block) => valueText(block.text)).join("\n")
       : valueText(item.content);
   const joined = template.input.map(contentText).join("\n");
-  if (!joined.includes("<t3_code_runtime>"))
-    throw new Error("Codex template needs full T3 context.");
+  if (!joined.includes("<legion_code_runtime>"))
+    throw new Error("Codex template needs full LegionCode context.");
   const cwd = /<cwd>(.*?)<\/cwd>/.exec(joined)?.[1] ?? "/home/user/app";
   const home = /^\/(?:home|Users)\/[^/]+/.exec(cwd)?.[0];
   const clean = (s: string) => (home ? s.replaceAll(home, home.replace(/[^/]+$/, "user")) : s);
@@ -775,7 +776,7 @@ const buildCodexBase = (
   // The captured <collaboration_mode> message stays: Codex supplies its own mode text natively.
   const input = template.input.flatMap((item) => {
     const content = contentText(item);
-    if (content.includes("<t3_code_")) return [];
+    if (content.includes("<legion_code_")) return [];
     if (item.role === "user") {
       const env = /<environment_context>[\s\S]*?<\/environment_context>/.exec(content)?.[0];
       return env ? [message(clean(options.keepUserInstructions ? content : env), "user")] : [];
@@ -815,8 +816,8 @@ const buildCodexBase = (
       date: /<current_date>(.*?)<\/current_date>/.exec(joined)?.[1],
     },
     nativeTools,
-    t3,
-    deferred: [...t3],
+    legion,
+    deferred: [...legion],
     codex: { ...template, input, reasoning: { ...template.reasoning, effort } },
   };
 };
@@ -836,7 +837,7 @@ const codexCall = (name: string, input: unknown) => {
           : `python3 -c ${JSON.stringify(`from pathlib import Path; p=Path(${JSON.stringify(file)}); p.write_text(p.read_text().replace(${JSON.stringify(args.old_string)}, ${JSON.stringify(args.new_string)}))`)}`;
     return `text(await tools.exec_command(${JSON.stringify({ cmd: command })}));`;
   }
-  return `text(await tools.${name.replace("mcp__t3-code__", "mcp__t3_code__")}(${JSON.stringify(input)}));`;
+  return `text(await tools.${name.replace("mcp__legion-code__", "mcp__legion_code__")}(${JSON.stringify(input)}));`;
 };
 const codexMessages = (messages: ReadonlyArray<ApiMessage>): Array<Block> =>
   messages.flatMap((message) =>
@@ -868,7 +869,7 @@ const codexMessages = (messages: ReadonlyArray<ApiMessage>): Array<Block> =>
   );
 /** One tool call the shell simulator has answered, or one from the case's prior turns. */
 type ShellEntry = { readonly tool: string; readonly input: unknown; readonly output: string };
-/** PRs T3 links by itself because a shell command created them, as `gh pr create` does. */
+/** PRs LegionCode links by itself because a shell command created them, as `gh pr create` does. */
 const createdPullRequests = ({ tool, input, output }: ShellEntry) =>
   tool === "Bash" && isRecord(input) && typeof input.command === "string"
     ? changeRequestsCreatedBy(input.command, output).map(({ url }) => url)
@@ -905,7 +906,7 @@ const checkedOutBranch = (sample: Sample) => {
 /**
  * One sample's state. ToolSearch adds loaded schemas to `tools`, like Claude Code. `shell` is the
  * history the simulator keeps consistent with; `linked`, `nextTask` and `threads` do the same for
- * T3 results.
+ * LegionCode results.
  */
 type Sample = {
   readonly testCase: McpToolUseCase;
@@ -919,7 +920,7 @@ type Sample = {
   openedPullRequest: number | undefined;
   /** PRs pull_request_create opened from branches other than the world's, by branch. */
   readonly openedByBranch: Map<string, number>;
-  /** PR changes the agent made through T3's tools, which gh and the host show from then on. */
+  /** PR changes the agent made through LegionCode's tools, which gh and the host show from then on. */
   readonly forgeChanges: Array<string>;
   /** PRs pull_request_merge merged, as `repo#number`, which reads show as merged from then on. */
   readonly merged: Set<string>;
@@ -927,16 +928,16 @@ type Sample = {
   nextTask: number;
   /** Threads the agent launched in this sample, by id, so reading one shows its own brief. */
   readonly threads: Map<string, { readonly title: string; readonly brief: string }>;
-  /** Files T3's request_secret saved in this sample, in call order. */
+  /** Files LegionCode's request_secret saved in this sample, in call order. */
   readonly secretFiles: Array<string>;
   secretRequests: number;
-  /** T3's device tools, once `withDevices` builds them for a world with devices. */
+  /** LegionCode's device tools, once `withDevices` builds them for a world with devices. */
   devices?: DeviceTools;
-  /** T3's results for prior device calls whose case result is "default". */
+  /** LegionCode's results for prior device calls whose case result is "default". */
   readonly priorResults: Map<unknown, string>;
-  /** Prior calls whose T3 result is an error, so the agent sees it as one. */
+  /** Prior calls whose LegionCode result is an error, so the agent sees it as one. */
   readonly priorErrors: Set<unknown>;
-  /** T3's t3_background_wait, once `withBackgroundWait` builds it for `world.backgroundTasks`. */
+  /** LegionCode's legion_background_wait, once `withBackgroundWait` builds it for `world.backgroundTasks`. */
   backgroundWait?: BackgroundWait;
   /** Calls so far per mocked tool, for mocks that answer in sequence. */
   readonly mockCalls: Map<string, number>;
@@ -1009,8 +1010,8 @@ const nextMock = (sample: Sample, name: string, mock: unknown) => {
 };
 
 /**
- * Builds T3's device tools for a world with devices. Prior device calls whose result is "default"
- * run first, in order and without the case's mocks, so their results and sessions are T3's. As in
+ * Builds LegionCode's device tools for a world with devices. Prior device calls whose result is "default"
+ * run first, in order and without the case's mocks, so their results and sessions are LegionCode's. As in
  * the real flow, device_open starts no agent-device session: one starts at a launcher `open` in the
  * sample's shell history, prior turns included, or where `world.agentDeviceSessions` declares it.
  */
@@ -1028,8 +1029,8 @@ export const withDevices = Effect.fn("evaluateMcpToolUse.withDevices")(function*
 });
 
 /**
- * Builds T3's t3_background_wait for a world with background tasks, and answers prior waits whose
- * result is "default" with T3's result.
+ * Builds LegionCode's legion_background_wait for a world with background tasks, and answers prior waits whose
+ * result is "default" with LegionCode's result.
  */
 export const withBackgroundWait = Effect.fn("evaluateMcpToolUse.withBackgroundWait")(function* (
   sample: Sample,
@@ -1039,7 +1040,7 @@ export const withBackgroundWait = Effect.fn("evaluateMcpToolUse.withBackgroundWa
   const backgroundWait = yield* makeBackgroundWait(running);
   sample.backgroundWait = backgroundWait;
   for (const call of (sample.testCase.setup.priorTurns ?? []).flatMap((t) => t.toolCalls ?? [])) {
-    if (call.result !== "default" || call.tool !== "t3_background_wait") continue;
+    if (call.result !== "default" || call.tool !== "legion_background_wait") continue;
     const result = yield* backgroundWait(call.input);
     sample.priorResults.set(call, result.text);
     if (result.isError) sample.priorErrors.add(call);
@@ -1135,15 +1136,17 @@ export const buildMessages = (sample: Sample) => {
       if (tool === undefined) throw new Error(`${testCase.id}: unknown prior tool ${call.tool}.`);
       const builder = isDeviceTool(call.tool)
         ? "withDevices"
-        : call.tool === "t3_background_wait"
+        : call.tool === "legion_background_wait"
           ? "withBackgroundWait"
           : undefined;
       if (call.result === "default" && builder && !sample.priorResults.has(call)) {
-        throw new Error(`${testCase.id}: prior ${call.tool} needs T3's result; run ${builder}.`);
+        throw new Error(
+          `${testCase.id}: prior ${call.tool} needs LegionCode's result; run ${builder}.`,
+        );
       }
       return { ...call, id: `toolu_prior_${nextId++}`, name: tool.name, tool, prior: call };
     });
-    // Prior T3 calls load their schemas first, as in a real deferred session.
+    // Prior LegionCode calls load their schemas first, as in a real deferred session.
     const unloaded = [...new Set(calls.map((call) => call.tool))].filter(
       (tool) => !hasTool(tools, tool.name),
     );
@@ -1182,7 +1185,7 @@ export const buildMessages = (sample: Sample) => {
   return messages;
 };
 
-// Results for T3 tools a case does not mock. The model ids are public in this repo's catalog.
+// Results for LegionCode tools a case does not mock. The model ids are public in this repo's catalog.
 const claudeModel = (id: string) => ({ id, options: [{ id: "effort", values: EFFORTS }] });
 const codexModel = (id: string) => ({ id, options: [{ id: "reasoningEffort", values: EFFORTS }] });
 // Mirrors the real catalog's main models, so a case's named model is not missing by accident.
@@ -1222,7 +1225,7 @@ const HTML_RENDERED =
 
 const PULL_REQUEST_URL = /\/pull\/\d+\/?$/;
 
-/** Pull request identity from a `url` or `repository` plus `number` input, like T3's results. */
+/** Pull request identity from a `url` or `repository` plus `number` input, like LegionCode's results. */
 const pullRequest = (repo: string, input: Readonly<Record<string, unknown>>) => {
   const url = typeof input.url === "string" ? input.url : "";
   const repository =
@@ -1255,7 +1258,7 @@ const worldPullRequests = (sample: Sample) => {
   return Array.isArray(prs) ? prs.filter(isRecord) : [];
 };
 
-/** World fixtures spell states as GitHub does (`MERGED`) or as T3 does (`merged`). */
+/** World fixtures spell states as GitHub does (`MERGED`) or as LegionCode does (`merged`). */
 const worldState = (pr: Readonly<Record<string, unknown>> | undefined) => {
   const state = valueText(pr?.state ?? "open").toLowerCase();
   return state === "merged" || state === "closed" ? state : "open";
@@ -1263,7 +1266,7 @@ const worldState = (pr: Readonly<Record<string, unknown>> | undefined) => {
 
 /**
  * The PR for the sample's branch: the world's, else the one a create would open. A case that
- * mocks `gh pr create` names that URL, so the T3 tool opens the same number.
+ * mocks `gh pr create` names that URL, so the LegionCode tool opens the same number.
  */
 const worldBranchPullRequest = (sample: Sample) => {
   const branch = sample.testCase.setup.world?.branch;
@@ -1317,8 +1320,8 @@ const selectedWorldChecks = (sample: Sample, input: Readonly<Record<string, unkn
   return { number, all, checks, named };
 };
 
-/** A believable T3 result for a tool the case does not mock. */
-export const t3Default = (
+/** A believable LegionCode result for a tool the case does not mock. */
+export const legionDefault = (
   sample: Sample,
   name: string,
   input: Readonly<Record<string, unknown>>,
@@ -1337,7 +1340,7 @@ export const t3Default = (
     };
   };
   switch (name) {
-    case "t3_thread_launch":
+    case "legion_thread_launch":
       return newThread(input, input.message);
     case "create_threads":
       return {
@@ -1579,7 +1582,7 @@ export const t3Default = (
       };
     }
     case "request_secret": {
-      // T3 names a ref and a file with 32 hex characters, new for each request, in its secrets dir.
+      // LegionCode names a ref and a file with 32 hex characters, new for each request, in its secrets dir.
       const id = NodeCrypto.createHash("sha256")
         .update(`${sample.testCase.id}:${sample.secretRequests++}`)
         .digest("hex")
@@ -1587,7 +1590,7 @@ export const t3Default = (
       const home =
         /^\/(?:home|Users)\/[^/]+/.exec(sample.base.environment.cwd)?.[0] ?? "/home/user";
       return input.delivery === "file" || pastedSecret(name, input)
-        ? { status: "saved", file: `${home}/.t3/userdata/secrets/files/${id}` }
+        ? { status: "saved", file: `${home}/.legioncode/userdata/secrets/files/${id}` }
         : { status: "saved", secretRef: `secret-ref:${id}` };
     }
     case "unlink_pull_request":
@@ -1647,7 +1650,7 @@ export const t3Default = (
         nextCursor: end < matching.length ? String(end) : null,
       };
     }
-    case "t3_thread_read": {
+    case "legion_thread_read": {
       const threadId = valueText(input.threadId);
       const launched = sample.threads.get(threadId);
       if (launched !== undefined) {
@@ -1690,17 +1693,17 @@ export const t3Default = (
 /** The machine the fake threads live on. */
 const EVAL_ENVIRONMENT_ID = EnvironmentId.make("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee");
 
-// The note T3 adds when a secret card ends unsaved, on refs that have one (looked up by name so
+// The note LegionCode adds when a secret card ends unsaved, on refs that have one (looked up by name so
 // the runner still builds on refs without it).
 const unsavedSecretNote = (Contracts as Record<string, unknown>).SECRET_REQUEST_UNSAVED_NOTE as
   | Readonly<Record<string, string>>
   | undefined;
 
-/** Fields T3 adds to real thread and task results, applied to mocks and defaults alike. */
+/** Fields LegionCode adds to real thread and task results, applied to mocks and defaults alike. */
 const withProductFields = (name: string, value: unknown, child: boolean): unknown => {
   if (!isRecord(value)) return value;
   // The guide is the checkout's text, so a case's mock cannot go stale.
-  if (name === "t3_theme_read") return { ...value, guide: THEME_GUIDE };
+  if (name === "legion_theme_read") return { ...value, guide: THEME_GUIDE };
   const linked = (thread: unknown, idKey = "threadId") => {
     if (!isRecord(thread) || thread.link !== undefined) return thread;
     const id = thread[idKey] ?? thread.id;
@@ -1727,16 +1730,16 @@ const withProductFields = (name: string, value: unknown, child: boolean): unknow
       const running = task.status === "running" && task.next === undefined;
       return running ? { ...task, next: ORCHESTRATOR_MCP_RUNNING_TASK_NEXT } : task;
     }
-    case "t3_thread_read":
+    case "legion_thread_read":
       return { ...value, thread: linked(value.thread) };
-    case "t3_thread_launch":
-    case "t3_thread_send":
+    case "legion_thread_launch":
+    case "legion_thread_send":
     case "run_scheduled_task_now":
       return linked(value);
-    case "t3_thread_list":
+    case "legion_thread_list":
     case "create_threads":
       return listed("threads");
-    case "t3_thread_search":
+    case "legion_thread_search":
       return listed("matches");
     case "link_pull_request":
     case "link_pull_requests":
@@ -1863,17 +1866,17 @@ export const shellRequest = (sample: Sample, call: Omit<ShellEntry, "output">, m
     ...(devices?.describe(shell, typeof command === "string" ? command : undefined) ?? []),
     ...(world?.deviceInvalidCapture
       ? [
-          "T3's device_screenshot gets each capture as a PNG whose header says 0×0, so it reports 0×0. agent-device's own screenshot is unaffected.",
+          "LegionCode's device_screenshot gets each capture as a PNG whose header says 0×0, so it reports 0×0. agent-device's own screenshot is unaffected.",
         ]
       : []),
     ...(sample.secretFiles.length > 0
       ? [
-          `T3's request_secret saved these files in this sample: ${sample.secretFiles.join(", ")}. Each exists, is readable only by the user, and holds exactly the value the user gave, typed into T3's private card or pasted in chat and saved by the agent, the right one for the task, with no trailing newline. A program that reads it, as in "$(cat <file>)", < <file> or a --*-file flag, gets that value. What appears in the output is whatever that program prints: one that prints or logs its input shows the value. No other file in that directory exists.`,
+          `LegionCode's request_secret saved these files in this sample: ${sample.secretFiles.join(", ")}. Each exists, is readable only by the user, and holds exactly the value the user gave, typed into LegionCode's private card or pasted in chat and saved by the agent, the right one for the task, with no trailing newline. A program that reads it, as in "$(cat <file>)", < <file> or a --*-file flag, gets that value. What appears in the output is whatever that program prints: one that prints or logs its input shows the value. No other file in that directory exists.`,
         ]
       : []),
     ...(sample.forgeChanges.length > 0
       ? [
-          `The agent made these changes through T3's tools; gh, git fetch and the host show them: ${sample.forgeChanges.join("; ")}`,
+          `The agent made these changes through LegionCode's tools; gh, git fetch and the host show them: ${sample.forgeChanges.join("; ")}`,
         ]
       : []),
     ...(context ? [`The agent was told: ${context}`] : []),
@@ -1886,7 +1889,7 @@ export const shellRequest = (sample: Sample, call: Omit<ShellEntry, "output">, m
     max_tokens: 8_000,
     // The "facts" field keeps the simulator's reasoning out of the output the agent sees.
     output_config: { effort: "low", format: { type: "json_schema", schema: SHELL_REPLY_SCHEMA } },
-    // A case with devices also gets agent-device's own CLI, so T3's launchers answer as it does.
+    // A case with devices also gets agent-device's own CLI, so LegionCode's launchers answer as it does.
     system: devices ? `${SHELL_PROMPT}\n\n${AGENT_DEVICE_SHELL}` : SHELL_PROMPT,
     messages: [
       {
@@ -1942,7 +1945,7 @@ type Config = {
 
 /**
  * Output for a command that needs no simulator: a matching shell mock, else, for a plain command
- * on a launcher T3 returned, agent-device's help or its error for a session not yet started.
+ * on a launcher LegionCode returned, agent-device's help or its error for a session not yet started.
  */
 export const cannedOutput = (sample: Sample, command: string) =>
   mockOutput(sample, command) ??
@@ -2031,7 +2034,7 @@ export const answerToolCall = Effect.fn("evaluateMcpToolUse.answerToolCall")(fun
     if (found.length === 0) return toolResult(call.id, "No matching deferred tools found");
     return loadTools(tools, call.id, found);
   }
-  // T3 refuses a page call without exactly one source before any mocked result.
+  // LegionCode refuses a page call without exactly one source before any mocked result.
   const sources = [input.html, input.path].filter(
     (source) => source !== undefined && source !== null,
   );
@@ -2042,7 +2045,7 @@ export const answerToolCall = Effect.fn("evaluateMcpToolUse.answerToolCall")(fun
     return failed(`${input.path} is not a readable HTML document. Pass an absolute path.`);
   }
   const mock = nextMock(sample, name, testCase.setup.mocks?.[name]);
-  if (isT3Name(call.name) && PREVIEW_TOOLS.has(name)) {
+  if (isLegionName(call.name) && PREVIEW_TOOLS.has(name)) {
     if (testCase.setup.world?.browserAgentAccess === false)
       return failed(
         new PreviewAutomationUnavailableError({
@@ -2053,14 +2056,14 @@ export const answerToolCall = Effect.fn("evaluateMcpToolUse.answerToolCall")(fun
     const previewError = previewFailure(mock);
     if (previewError !== undefined) return failed(previewError.message);
   }
-  // T3 answers device calls from the world. A mock that is a T3 device error fails inside T3.
+  // LegionCode answers device calls from the world. A mock that is a LegionCode device error fails inside LegionCode.
   const failure = deviceFailure(mock);
   const fromWorld = mock === undefined || mock === "default" || failure !== undefined;
-  if (sample.devices && isT3Name(call.name) && isDeviceTool(name) && fromWorld) {
+  if (sample.devices && isLegionName(call.name) && isDeviceTool(name) && fromWorld) {
     const result = yield* sample.devices.call(name, input, failure);
     return result.isError ? failed(result.text) : toolResult(call.id, result.text);
   }
-  if (sample.backgroundWait && isT3Name(call.name) && name === "t3_background_wait" && fromWorld) {
+  if (sample.backgroundWait && isLegionName(call.name) && name === "legion_background_wait" && fromWorld) {
     const result = yield* sample.backgroundWait(input);
     return result.isError ? failed(result.text) : toolResult(call.id, result.text);
   }
@@ -2080,8 +2083,8 @@ export const answerToolCall = Effect.fn("evaluateMcpToolUse.answerToolCall")(fun
         : withProductFields(name, mock, testCase.setup.role === "delegated-child"),
     );
   }
-  if (isT3Name(call.name)) {
-    // T3 refuses a watch from a delegated child.
+  if (isLegionName(call.name)) {
+    // LegionCode refuses a watch from a delegated child.
     if (name === "watch_pull_request" && testCase.setup.role === "delegated-child") {
       return failed(SUBAGENT_WATCH_ERROR);
     }
@@ -2096,7 +2099,7 @@ export const answerToolCall = Effect.fn("evaluateMcpToolUse.answerToolCall")(fun
         return failed(`No check is named ${valueText(input.check)}. Checks: ${names}.`);
       }
     }
-    const value = t3Default(sample, name, input);
+    const value = legionDefault(sample, name, input);
     if (name === "request_secret") savedSecretFile(sample, value);
     recordForgeChange(sample, name, input, value);
     return toolResult(
@@ -2150,7 +2153,7 @@ const matches = (expected: unknown, actual: unknown): boolean => {
 const newThreadRequests = (calls: ReadonlyArray<Call>) =>
   calls.flatMap((call): ReadonlyArray<{ request: unknown; brief: unknown }> => {
     if (call.failed === true || !isRecord(call.input)) return [];
-    if (call.tool === "t3_thread_launch")
+    if (call.tool === "legion_thread_launch")
       return [{ request: call.input, brief: call.input.message }];
     if (call.tool !== "create_threads" || !Array.isArray(call.input.threads)) return [];
     return call.input.threads.map((request: unknown) => ({
@@ -2356,7 +2359,7 @@ const SETTLED =
 export const failedEarly = (expect: McpToolUseCase["expect"], run: SampleRun, pasted = "") =>
   gradeSample(
     expect,
-    // A page call T3 has not answered yet may still be refused, so it is graded once it settles.
+    // A page call LegionCode has not answered yet may still be refused, so it is graded once it settles.
     {
       ...run,
       calls: run.calls.filter((call) => !isPageTool(call.tool) || call.failed !== undefined),
@@ -2434,8 +2437,8 @@ export const executeCodex = async (
 };
 
 const codexCatalog = (base: Base) => [
-  ...base.t3.map((tool) => ({
-    name: tool.name.replace("mcp__t3-code__", "mcp__t3_code__"),
+  ...base.legion.map((tool) => ({
+    name: tool.name.replace("mcp__legion-code__", "mcp__legion_code__"),
     description: `${valueText(tool.description)}\nInput JSON schema: ${JSON.stringify(tool.input_schema)}`,
   })),
   ...[
@@ -2654,7 +2657,7 @@ const runSample = Effect.fn("evaluateMcpToolUse.runSample")(function* (
             Effect.map((result) => settle(recorded, result)),
             Effect.map((result) => {
               const output = valueText(result.content);
-              if (isT3Name(name))
+              if (isLegionName(name))
                 return {
                   content: [text(output)],
                   ...(!result.is_error
@@ -2793,7 +2796,7 @@ export const summarize = (
   );
   const errorNote = `- Errored: ${errors.map(([id, failed]) => `${id} ×${failed.length}`).join(", ")}. These samples did not finish, even after retries, so pass rates leave them out; tokens they spent are counted.`;
   const nativeNote =
-    "- native-subagent cases are approximate: the harness gives subagents their own system prompt, which this runner does not rebuild. T3's append is left out and its SubagentStart hook context added after the task.";
+    "- native-subagent cases are approximate: the harness gives subagents their own system prompt, which this runner does not rebuild. LegionCode's append is left out and its SubagentStart hook context added after the task.";
   const identityNote = `- The captured Claude Code identity line is replaced with "${NEUTRAL_IDENTITY}"`;
   const finished = rows.filter((row) => row.error === undefined).length;
   return [
@@ -2878,18 +2881,18 @@ const main = Effect.gen(function* () {
       "max-steps": string,
       effort: string,
       "shell-model": { ...string, default: "claude-haiku-5-5" },
-      // T3's text must work for every user, so the captured CLAUDE.md is dropped by default.
+      // LegionCode's text must work for every user, so the captured CLAUDE.md is dropped by default.
       "user-instructions": { ...string, default: "drop" },
       "dry-run": { type: "boolean", default: false },
       "stop-on-regression": { type: "boolean", default: false },
       "regression-budget": string,
-      // Prints the size of T3's text and tool schemas, then exits. Needs no template or key.
+      // Prints the size of LegionCode's text and tool schemas, then exits. Needs no template or key.
       context: { type: "boolean", default: false },
     },
   });
   const flags = yield* decodeFlags({ template: "", ...values });
   if (flags.context) {
-    process.stdout.write(`${t3ContextReport(flags.model)}\n`);
+    process.stdout.write(`${legionContextReport(flags.model)}\n`);
     return;
   }
   if (flags["stop-on-regression"] && flags.baseline === undefined) {
@@ -2988,7 +2991,7 @@ const main = Effect.gen(function* () {
             });
             return role === "native-subagent"
               ? Effect.promise(() =>
-                  t3SubagentContext(flags.model, deviceAccess, browserAccess),
+                  legionSubagentContext(flags.model, deviceAccess, browserAccess),
                 ).pipe(Effect.map((subagentContext): Base => ({ ...built, subagentContext })))
               : Effect.succeed(built);
           }),
@@ -3158,7 +3161,7 @@ const main = Effect.gen(function* () {
   const summary = summarize(
     rows,
     {
-      header: [header, t3ContextReport(flags.model), ...stopped].join("\n"),
+      header: [header, legionContextReport(flags.model), ...stopped].join("\n"),
       shellModel: config.shellModel,
       model: config.model,
     },

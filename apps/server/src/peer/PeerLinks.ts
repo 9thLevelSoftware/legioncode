@@ -10,8 +10,8 @@ import {
   type PeerLinkCreateInput,
   PeerLinkError,
   type PeerLinkSummary,
-} from "@t3tools/contracts";
-import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
+} from "@legioncode/contracts";
+import * as NodeSqliteClient from "@legioncode/shared/nodeSqliteClient";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Digest from "effect/crypto/Digest";
@@ -34,7 +34,7 @@ import * as HttpClient from "effect/http/HttpClient";
 import * as HttpClientError from "effect/http/HttpClientError";
 import * as HttpApi from "effect/http-api/HttpApi";
 import * as HttpApiClient from "effect/http-api/HttpApiClient";
-import { isLocalLoopbackHost, isTailnetHost } from "@t3tools/shared/hostClassification";
+import { isLocalLoopbackHost, isTailnetHost } from "@legioncode/shared/hostClassification";
 
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
@@ -46,7 +46,7 @@ const PeerHttpApi = HttpApi.make(EnvironmentHttpApi.identifier)
   .annotateMerge(EnvironmentHttpApi.annotations);
 
 /** The redirect registered for a link. Nothing ever listens there: the code comes back in the response. */
-const LINK_REDIRECT_URI = "http://127.0.0.1/t3code-peer-link";
+const LINK_REDIRECT_URI = "http://127.0.0.1/legioncode-peer-link";
 /**
  * How long a peer's descriptor or MCP handshake may take before a route counts
  * as unreachable. A tailnet or relayed route to a machine that is waking up takes longer.
@@ -113,7 +113,7 @@ export class PeerLinks extends Context.Service<
       outcome: { readonly error: string | null },
     ) => Effect.Effect<void>;
   }
->()("t3/peer/PeerLinks") {}
+>()("legioncode/peer/PeerLinks") {}
 
 interface PeerLinkRow {
   readonly environment_id: string;
@@ -183,7 +183,7 @@ const connectionCode = (cause: unknown) =>
     .map((error) => (Predicate.hasProperty(error, "code") ? error.code : undefined))
     .find(Predicate.isString);
 
-/** Why `origin` did not answer as T3 Code, short enough for a toast. Never echoes a body. */
+/** Why `origin` did not answer as LegionCode, short enough for a toast. Never echoes a body. */
 const probeFailure = (
   origin: string,
   error: HttpClientError.HttpClientError | Schema.SchemaError | Cause.TimeoutError,
@@ -204,14 +204,14 @@ const probeFailure = (
     );
   }
   return new PeerLinkError({
-    reason: "not_a_t3_environment",
-    message: `${origin} answered, but not as a T3 Code environment this version understands.`,
+    reason: "not_a_legioncode_environment",
+    message: `${origin} answered, but not as a LegionCode environment this version understands.`,
   });
 };
 
 /** Whether a host is this machine's own loopback. Tests serve their peers there, so they narrow it. */
 export const LoopbackHost = Context.Reference<(host: string) => boolean>(
-  "t3/peer/PeerLinks/LoopbackHost",
+  "legioncode/peer/PeerLinks/LoopbackHost",
   { defaultValue: () => isLocalLoopbackHost },
 );
 
@@ -250,7 +250,7 @@ const make = Effect.gen(function* () {
       Effect.provideService(HttpClient.HttpClient, peerHttpClient),
     );
 
-  /** The environment answering at `origin`, or why nothing there answers as T3 Code. */
+  /** The environment answering at `origin`, or why nothing there answers as LegionCode. */
   const probe = (origin: string) => {
     const timeout = probeTimeout(origin);
     return clientFor(origin).pipe(
@@ -522,10 +522,10 @@ const make = Effect.gen(function* () {
     if (!linkLimitsHold(peer)) {
       return yield* new PeerLinkError({
         reason: "incompatible",
-        message: `${peer.label} runs a T3 Code version that cannot keep a linked agent's limits. Update it, then link again.`,
+        message: `${peer.label} runs a LegionCode version that cannot keep a linked agent's limits. Update it, then link again.`,
       });
     }
-    const issued = yield* signIn(primary, input, `T3 Code · ${self.label}`);
+    const issued = yield* signIn(primary, input, `LegionCode · ${self.label}`);
     const now = yield* DateTime.now;
     const linked: PeerLink = {
       environmentId: peer.environmentId,
@@ -637,7 +637,7 @@ const make = Effect.gen(function* () {
     function* (environmentId) {
       const notLinked = new PeerLinkError({
         reason: "unknown_link",
-        message: `This environment is not linked to ${environmentId}. t3_environment_links lists the linked ones.`,
+        message: `This environment is not linked to ${environmentId}. legion_environment_links lists the linked ones.`,
       });
       const row = yield* readRow(environmentId);
       if (Option.isNone(row)) return yield* notLinked;
@@ -683,7 +683,7 @@ const make = Effect.gen(function* () {
       if (!linkLimitsHold(peer)) {
         return yield* new PeerLinkError({
           reason: "incompatible",
-          message: `${link.label} runs a T3 Code version that cannot keep a linked agent's limits. Update it, then link again.`,
+          message: `${link.label} runs a LegionCode version that cannot keep a linked agent's limits. Update it, then link again.`,
         });
       }
       return {

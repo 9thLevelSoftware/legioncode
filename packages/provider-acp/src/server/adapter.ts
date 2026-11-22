@@ -33,17 +33,17 @@ import {
   type ThreadId,
   isRuntimeModeAbove,
   type TurnTokenUsage,
-} from "@t3tools/contracts";
-import { AgentScope, AgentScopeThreadId } from "@t3tools/shared/AgentScope";
-import { HTML_RENDER_TOOL_NAME } from "@t3tools/shared/htmlRender";
-import { modelSelectionsEqual } from "@t3tools/shared/model";
-import { type SelfInvocation, selfInvocationArgs } from "@t3tools/shared/nodeRuntime";
-import { resolveT3McpToolId } from "@t3tools/shared/t3McpToolPresentation";
+} from "@legioncode/contracts";
+import { AgentScope, AgentScopeThreadId } from "@legioncode/shared/AgentScope";
+import { HTML_RENDER_TOOL_NAME } from "@legioncode/shared/htmlRender";
+import { modelSelectionsEqual } from "@legioncode/shared/model";
+import { type SelfInvocation, selfInvocationArgs } from "@legioncode/shared/nodeRuntime";
+import { resolveLegionMcpToolId } from "@legioncode/shared/legionMcpToolPresentation";
 import {
   compactDynamicToolOutput,
   htmlRenderFromToolItem,
   mcpToolResultOutput,
-} from "@t3tools/shared/toolOutput";
+} from "@legioncode/shared/toolOutput";
 import { FILE_HEADERS_ONLY, formatPatch, structuredPatch } from "diff";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
@@ -69,13 +69,13 @@ import * as EffectAcpErrors from "effect-acp/errors";
 import type * as EffectAcpProtocol from "effect-acp/protocol";
 import type * as EffectAcpSchema from "effect-acp/compat";
 
-import { formatReadToolLabel, formatSearchToolLabel } from "@t3tools/shared/toolActivity";
-import { isWorkspaceImagePreviewPath } from "@t3tools/shared/mediaPreview";
-import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
+import { formatReadToolLabel, formatSearchToolLabel } from "@legioncode/shared/toolActivity";
+import { isWorkspaceImagePreviewPath } from "@legioncode/shared/mediaPreview";
+import * as ProviderHost from "@legioncode/provider-core/server/ProviderHost";
 import { makeAcpMcpOverAcpBridge, type AcpMcpOverAcpBridge } from "./mcpOverAcpBridge.ts";
-import { mcpToolPresentation } from "@t3tools/provider-core/server/mcpToolPresentation";
-import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
-import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
+import { mcpToolPresentation } from "@legioncode/provider-core/server/mcpToolPresentation";
+import * as McpProviderSessions from "@legioncode/provider-core/server/McpProviderSessions";
+import * as McpProviderSession from "@legioncode/provider-core/server/mcpSession";
 import {
   applyAcpAgentTerminalUpdate,
   acpContentBlockDisplayText,
@@ -113,32 +113,32 @@ import {
 } from "./sessionConfig.ts";
 import * as AcpSessionRuntime from "./AcpSessionRuntime.ts";
 import {
-  t3AcpPromptWithInstructions,
-  type T3AcpInstructionState,
-} from "@t3tools/provider-core/server/orchestrationInstructions";
-import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
-import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
-import type * as ProviderContinuationRequests from "@t3tools/provider-core/server/ProviderContinuationRequests";
+  legionAcpPromptWithInstructions,
+  type LegionAcpInstructionState,
+} from "@legioncode/provider-core/server/orchestrationInstructions";
+import { buildRuntimeInstructions } from "@legioncode/provider-core/server/runtimeInstructions";
+import * as IdAllocator from "@legioncode/provider-core/server/IdAllocator";
+import type * as ProviderContinuationRequests from "@legioncode/provider-core/server/ProviderContinuationRequests";
 import {
   type BackgroundWork,
   type BackgroundWorkReport,
   backgroundWorkNotification,
-} from "@t3tools/provider-core/server/notification";
+} from "@legioncode/provider-core/server/notification";
 import {
   makeProviderFailure,
   makeProviderRetryTurnItem,
-} from "@t3tools/provider-core/server/failure";
-import { acpSelectionTransition } from "@t3tools/provider-core/server/selectionTransition";
+} from "@legioncode/provider-core/server/failure";
+import { acpSelectionTransition } from "@legioncode/provider-core/server/selectionTransition";
 import {
   isProviderNativeImageAttachment,
   providerMessageTextWithAttachmentPaths,
-} from "@t3tools/provider-core/server/attachmentPrompt";
+} from "@legioncode/provider-core/server/attachmentPrompt";
 import {
   makeSubagentChildThread,
   makeSubagentConversationArtifacts,
   subagentThreadTitle,
-} from "@t3tools/provider-core/server/subagentProjection";
-import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+} from "@legioncode/provider-core/server/subagentProjection";
+import * as ProviderAdapter from "@legioncode/provider-core/server/ProviderAdapter";
 
 export const ACP_PROTOCOL = "acp.ndjson-jsonrpc" as const;
 
@@ -394,7 +394,7 @@ export interface AcpAdapterV2Flavor {
   >;
   readonly requiresSignIn?: (cause: unknown) => boolean;
   /**
-   * Runs before attachment paths, T3 instructions and native slash-command detection,
+   * Runs before attachment paths, LegionCode instructions and native slash-command detection,
    * so a rewrite can turn the user's text into a native command.
    */
   readonly rewriteUserText?: (
@@ -408,7 +408,7 @@ export interface AcpAdapterV2Flavor {
     EffectAcpSchema.InitializeRequest["clientCapabilities"]
   >["_meta"];
   readonly mcpOverHttp?: boolean;
-  /** The agent has no tool search of its own, so T3 lists optional tools on demand. */
+  /** The agent has no tool search of its own, so LegionCode lists optional tools on demand. */
   readonly deferMcpTools?: boolean;
   readonly normalizeSessionUpdate?: (
     notification: EffectAcpSchema.SessionNotification,
@@ -510,7 +510,7 @@ export interface AcpAdapterV2Flavor {
         ) => EffectAcpSchema.RequestPermissionResponse | undefined;
       }
     | undefined;
-  /** Grok Auto asks only about classifier refusals; T3 policy must not auto-approve them. */
+  /** Grok Auto asks only about classifier refusals; LegionCode policy must not auto-approve them. */
   readonly permissionDisposition?: (
     policy: ProviderAdapter.ProviderAdapterV2RuntimePolicy,
     request: EffectAcpSchema.RequestPermissionRequest,
@@ -518,7 +518,7 @@ export interface AcpAdapterV2Flavor {
   readonly approvalOptions?: (
     request: EffectAcpSchema.RequestPermissionRequest,
   ) => ReadonlyArray<ProviderApprovalOption>;
-  /** Options T3 may answer with; the rest (e.g. Devin's bypass-permissions plan exit) are never sent. */
+  /** Options LegionCode may answer with; the rest (e.g. Devin's bypass-permissions plan exit) are never sent. */
   readonly answerablePermissionOptions?: (
     request: EffectAcpSchema.RequestPermissionRequest,
   ) => ReadonlyArray<EffectAcpSchema.PermissionOption>;
@@ -682,7 +682,7 @@ export interface AcpAdapterV2Flavor {
    */
   readonly supportsImagePrompts?: boolean;
   /**
-   * True when this session's native system prompt carries T3's PR-linking instructions, so
+   * True when this session's native system prompt carries LegionCode's PR-linking instructions, so
    * turns omit them. Must use the same negotiated check that sent them on session setup.
    */
   readonly sessionCarriesPullRequestLinking?: (
@@ -1005,23 +1005,23 @@ function acpMcpContext(
   return {
     servers: [
       {
-        name: "t3-code",
+        name: "legion-code",
         command: self.command,
         args: [...selfInvocationArgs(self, ["acp-mcp-bridge"])],
         env: [
           { name: "ELECTRON_RUN_AS_NODE", value: "1" },
-          { name: "T3_ACP_MCP_ENDPOINT", value: session.endpoint },
-          { name: "T3_ACP_MCP_AUTHORIZATION", value: session.authorizationHeader },
+          { name: "LEGIONCODE_ACP_MCP_ENDPOINT", value: session.endpoint },
+          { name: "LEGIONCODE_ACP_MCP_AUTHORIZATION", value: session.authorizationHeader },
         ],
       },
     ],
-    acpServers: [{ type: "acp", name: "t3-code", serverId: "t3-code" }],
+    acpServers: [{ type: "acp", name: "legion-code", serverId: "legion-code" }],
     httpServers:
       mcpOverHttp === true
         ? [
             {
               type: "http",
-              name: "t3-code",
+              name: "legion-code",
               url: session.endpoint,
               headers: [
                 { name: "Authorization", value: session.authorizationHeader },
@@ -1036,14 +1036,14 @@ function acpMcpContext(
     authorization: session.authorizationHeader,
     processEnvironment: {
       // The thread id every process the agent starts inherits, so a tool run
-      // from its shell can find its T3 thread. Claude and Codex sessions set
+      // from its shell can find its LegionCode thread. Claude and Codex sessions set
       // the same variable (PortScanner.AGENT_THREAD_ENV; a string literal here
       // because this package cannot reach apps/server).
-      T3CODE_THREAD_ID: session.threadId,
-      T3_ACP_MCP_ENDPOINT: session.endpoint,
-      T3_ACP_MCP_AUTHORIZATION: session.authorizationHeader,
-      T3_ACP_MCP_NODE: self.command,
-      ...(self.entrypoint === undefined ? {} : { T3_ACP_MCP_ENTRYPOINT: self.entrypoint }),
+      LEGIONCODE_THREAD_ID: session.threadId,
+      LEGIONCODE_ACP_MCP_ENDPOINT: session.endpoint,
+      LEGIONCODE_ACP_MCP_AUTHORIZATION: session.authorizationHeader,
+      LEGIONCODE_ACP_MCP_NODE: self.command,
+      ...(self.entrypoint === undefined ? {} : { LEGIONCODE_ACP_MCP_ENTRYPOINT: self.entrypoint }),
     },
   };
 }
@@ -2253,13 +2253,15 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
         const configuredRuntimeMode = yield* Ref.make<
           ProviderAdapter.ProviderAdapterV2RuntimePolicy["runtimeMode"] | null
         >(null);
-        const promptInstructionStates = yield* Ref.make(new Map<string, T3AcpInstructionState>());
+        const promptInstructionStates = yield* Ref.make(
+          new Map<string, LegionAcpInstructionState>(),
+        );
         const promptRuntimeInstructions = yield* Ref.make(new Map<string, string>());
         // Unique markers keep delayed prompt completions from clearing later compactions.
         const compactionMarkers = yield* Ref.make(new Map<string, symbol>());
         // ACP may patch a completed compaction again; each compaction id marks its session once.
         const completedCompactionIds = yield* Ref.make(new Set<string>());
-        // The next prompt in a compacted session resends T3's instructions and runtime notes.
+        // The next prompt in a compacted session resends LegionCode's instructions and runtime notes.
         // Only root sessions get prompts, so a marker on a child session is never read.
         const markSessionCompacted = Effect.fn("AcpAdapterV2.markSessionCompacted")(function* (
           sessionId: string,
@@ -2781,7 +2783,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               elicitation: { form: {}, ...(flavor.onUrlElicitation ? { url: {} } : {}) },
               ...(flavor.clientCapabilitiesMeta ? { _meta: flavor.clientCapabilitiesMeta } : {}),
             },
-            clientInfo: { name: "t3-code", version: "0.0.0" },
+            clientInfo: { name: "legion-code", version: "0.0.0" },
             onTermination: (error) =>
               Effect.sync(() => agentRequests.clear()).pipe(Effect.andThen(onTermination(error))),
             ...(promptInactivityTimeoutMillis === undefined
@@ -4655,7 +4657,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             const input =
               mcpIdentity.input ?? unknownRecord(rawInputRecord?.arguments) ?? rawInputRecord ?? {};
             let output = rawOutput === undefined ? undefined : acpMcpToolCallOutput(rawOutput);
-            const isHtmlRender = resolveT3McpToolId(toolName) === HTML_RENDER_TOOL_NAME;
+            const isHtmlRender = resolveLegionMcpToolId(toolName) === HTML_RENDER_TOOL_NAME;
             const isError =
               compactDynamicToolOutput(output)?.isError === true ||
               compactDynamicToolOutput(rawOutputRecord?.result)?.isError === true;
@@ -6556,7 +6558,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           const waiting = turnAttached;
           turnAttached = yield* Deferred.make<boolean>();
           yield* Deferred.succeed(waiting, false);
-          // session/cancel does not end the agent's MCP calls; T3 runs them, so it stops them.
+          // session/cancel does not end the agent's MCP calls; LegionCode runs them, so it stops them.
           if (options.stopMcpCalls && runtimeMcpBridge !== undefined) {
             yield* runtimeMcpBridge.stopCalls;
           }
@@ -7053,8 +7055,8 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               Effect.fail(
                 EffectAcpErrors.AcpRequestError.internalError(
                   disposition === "ask"
-                    ? `The active T3 runtime policy requires approval for ${operation}. Request permission with session/request_permission before retrying.`
-                    : `The active T3 runtime policy does not allow ${operation}.`,
+                    ? `The active LegionCode runtime policy requires approval for ${operation}. Request permission with session/request_permission before retrying.`
+                    : `The active LegionCode runtime policy does not allow ${operation}.`,
                 ),
               ),
             ),
@@ -8738,7 +8740,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                 "failed",
                 makeProviderFailure({
                   class: "provider_error",
-                  message: `${flavor.runtimeHarness ?? driver} sent nothing for ${minutes} ${minutes === 1 ? "minute" : "minutes"}, so T3 Code stopped the turn and restarted the agent. Send a message to continue.`,
+                  message: `${flavor.runtimeHarness ?? driver} sent nothing for ${minutes} ${minutes === 1 ? "minute" : "minutes"}, so LegionCode stopped the turn and restarted the agent. Send a message to continue.`,
                 }),
               );
               return "retired" as const;
@@ -8862,9 +8864,9 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           const mcpSession = yield* mcpSessions.read(turnInput.threadId);
           const instructionState = {
             interactionMode: turnInput.runtimePolicy.interactionMode,
-            hasT3Mcp: mcpSession !== undefined,
+            hasLegionMcp: mcpSession !== undefined,
             hasDeviceTools: mcpSession?.capabilities?.has("device") === true,
-          } satisfies T3AcpInstructionState;
+          } satisfies LegionAcpInstructionState;
           const userText =
             flavor.rewriteUserText === undefined
               ? turnInput.message.text
@@ -8891,7 +8893,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           // while the prompt is prepared still resends the notes in this prompt.
           const previousInstructionState = (yield* Ref.get(promptInstructionStates)).get(sessionId);
           const compactionMarker = (yield* Ref.get(compactionMarkers)).get(sessionId);
-          const text = t3AcpPromptWithInstructions({
+          const text = legionAcpPromptWithInstructions({
             prompt: messageText,
             state: instructionState,
             ...(previousInstructionState === undefined || compactionMarker !== undefined
@@ -8943,7 +8945,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           yield* Ref.set(activeSessionSetup, null);
           yield* Ref.set(activeSelection, null);
           yield* Ref.set(activeInteractionMode, null);
-          // A failed prompt may have been dropped, so the fresh runtime sends T3's notes again.
+          // A failed prompt may have been dropped, so the fresh runtime sends LegionCode's notes again.
           yield* Ref.set(promptInstructionStates, new Map());
           yield* Ref.set(promptRuntimeInstructions, new Map());
           yield* Ref.set(compactionMarkers, new Map());

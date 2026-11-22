@@ -5,8 +5,8 @@ import * as NodePath from "node:path";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, describe, expect, it } from "@effect/vitest";
-import { AgentScope } from "@t3tools/shared/AgentScope";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import { AgentScope } from "@legioncode/shared/AgentScope";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -75,7 +75,7 @@ const withFakeSystemd = <A, E>(
   } = {},
 ) =>
   Effect.gen(function* () {
-    const bin = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-agent-scope-"));
+    const bin = NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "legion-agent-scope-"));
     for (const name of ["systemd-run", "systemctl", "agent"]) {
       NodeFS.writeFileSync(NodePath.join(bin, name), "", { mode: 0o755 });
     }
@@ -146,7 +146,7 @@ const withFakeSystemd = <A, E>(
   }).pipe(
     Effect.scoped,
     Effect.provide(
-      ServerConfig.layerTest(process.cwd(), { prefix: "t3-agent-scope-" }).pipe(
+      ServerConfig.layerTest(process.cwd(), { prefix: "legion-agent-scope-" }).pipe(
         Layer.provideMerge(NodeServices.layer),
       ),
     ),
@@ -315,7 +315,7 @@ describe("AgentScope service", () => {
             "--user",
             "set-property",
             "--runtime",
-            "app-t3code-agents.slice",
+            "app-legioncode-agents.slice",
             expect.stringMatching(/^MemoryHigh=\d+$/),
             expect.stringMatching(/^MemoryMax=\d+$/),
           ],
@@ -323,7 +323,7 @@ describe("AgentScope service", () => {
             "--user",
             "set-property",
             "--runtime",
-            "app-t3code.slice",
+            "app-legioncode.slice",
             "CPUWeight=10",
             "IOWeight=10",
             "TasksMax=25%",
@@ -342,7 +342,8 @@ describe("AgentScope service", () => {
         const memoryLimits = () =>
           calls
             .filter(
-              ([, verb, , slice]) => verb === "set-property" && slice === "app-t3code-agents.slice",
+              ([, verb, , slice]) =>
+                verb === "set-property" && slice === "app-legioncode-agents.slice",
             )
             .map((args) => args.slice(4));
         yield* launch;
@@ -388,7 +389,7 @@ describe("AgentScope service", () => {
             name: "terminal",
             survivesRestart: true,
           });
-          expect(sliceOf(terminal)).toBe("app-t3code-agents.slice");
+          expect(sliceOf(terminal)).toBe("app-legioncode-agents.slice");
           expect(stopsOf(calls)).toHaveLength(1);
         }),
       { leftovers: true },

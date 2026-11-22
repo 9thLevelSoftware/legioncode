@@ -7,10 +7,10 @@ import {
   type ProjectUpdatePayload,
   type ProjectSnapshot,
   type ThreadId,
-} from "@t3tools/contracts";
-import * as HostProcess from "@t3tools/shared/HostProcess";
-import * as KeyedLock from "@t3tools/shared/KeyedLock";
-import { isWslSharePath } from "@t3tools/shared/path";
+} from "@legioncode/contracts";
+import * as HostProcess from "@legioncode/shared/HostProcess";
+import * as KeyedLock from "@legioncode/shared/KeyedLock";
+import { isWslSharePath } from "@legioncode/shared/path";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -22,7 +22,7 @@ import * as Schema from "effect/Schema";
 
 import { withCommandMetrics } from "../observability/Metrics.ts";
 import * as EventSink from "../orchestration-v2/EventSink.ts";
-import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import * as IdAllocator from "@legioncode/provider-core/server/IdAllocator";
 import * as LegacyV1ThreadImporter from "../orchestration-v2/legacy/LegacyV1ThreadImporter.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import {
@@ -173,7 +173,7 @@ export class ProjectService extends Context.Service<
       readonly projectIds?: ReadonlyArray<ProjectId>;
     }) => Effect.Effect<ReadonlyArray<OrchestrationProjectShell>, ProjectOperationError>;
   }
->()("t3/project/ProjectService") {}
+>()("legioncode/project/ProjectService") {}
 
 export const make = Effect.gen(function* () {
   const projects = yield* ProjectStore.ProjectStoreV2;

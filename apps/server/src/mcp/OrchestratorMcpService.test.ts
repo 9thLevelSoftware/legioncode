@@ -29,9 +29,9 @@ import {
   type OrchestrationV2StoredEvent,
   type OrchestrationV2ThreadProjection,
   type ServerProvider,
-} from "@t3tools/contracts";
-import { checkpointWorkspace } from "@t3tools/provider-testing/replayWorkspace";
-import { formatThreadLink, hostedThreadLink } from "@t3tools/shared/threadLinks";
+} from "@legioncode/contracts";
+import { checkpointWorkspace } from "@legioncode/provider-testing/replayWorkspace";
+import { formatThreadLink, hostedThreadLink } from "@legioncode/shared/threadLinks";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
@@ -78,7 +78,7 @@ import { idleThreadProjection, liveThreadShell } from "./McpToolAccess.testkit.t
 import * as OrchestratorMcpService from "./OrchestratorMcpService.ts";
 import { resolveRuntimeMode } from "./delegatedTaskModes.ts";
 import type { ProjectionRecordFilter } from "../orchestration-v2/ProjectionStore.ts";
-import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import type * as ProviderAdapter from "@legioncode/provider-core/server/ProviderAdapter";
 
 const decodeTarget = Schema.decodeUnknownEffect(OrchestratorMcpTarget);
 
@@ -1559,7 +1559,7 @@ describe("OrchestratorMcpService provider resolution", () => {
     version: input.enabled === false ? null : "test",
     status: input.enabled === false ? "disabled" : "ready",
     auth: { status: input.enabled === false ? "unknown" : "authenticated" },
-    ...(input.enabled === false ? { message: "Provider is disabled in T3 Code settings." } : {}),
+    ...(input.enabled === false ? { message: "Provider is disabled in LegionCode settings." } : {}),
     checkedAt: "2026-09-13T00:00:00.000Z",
     models:
       input.model === undefined
@@ -3693,7 +3693,7 @@ describe("OrchestratorMcpService provider resolution", () => {
       runCount: 0,
       webhook: {
         path: "/hooks/scheduled-task/secret",
-        url: "https://t3.example/hooks/secret",
+        url: "https://legion.example/hooks/secret",
         hasSecret: false,
       },
       ...overrides,
@@ -3810,7 +3810,7 @@ describe("OrchestratorMcpService provider resolution", () => {
           ),
           Effect.provide(service([hook], null, upserted)),
         );
-        assert.equal(created.webhookUrl, "https://t3.example/hooks/secret");
+        assert.equal(created.webhookUrl, "https://legion.example/hooks/secret");
         const converted = yield* OrchestratorMcpService.OrchestratorMcpService.pipe(
           Effect.flatMap((mcp) =>
             mcp.updateScheduledTask(supervisedClient, {
@@ -4524,7 +4524,7 @@ describe("OrchestratorMcpService provider resolution", () => {
 
   it.effect("accepts the inherited options it reports back as a delegate target", () =>
     Effect.gen(function* () {
-      // t3_thread_launch keeps a model selection as given, so a thread can hold an option its model lacks.
+      // legion_thread_launch keeps a model selection as given, so a thread can hold an option its model lacks.
       const inherited = {
         instanceId: codexInstanceId,
         model: "gpt-5.4",
@@ -4810,7 +4810,7 @@ describe("OrchestratorMcpService thread lookup", () => {
       yield* Effect.gen(function* () {
         const mcp = yield* OrchestratorMcpService.OrchestratorMcpService;
         for (const link of [
-          `t3-thread://v2/${ref.environmentId}/${ref.threadId}`,
+          `legion-thread://v2/${ref.environmentId}/${ref.threadId}`,
           formatThreadLink(ref, "Delegated task"),
           hostedThreadLink(ref),
         ]) {
@@ -5305,7 +5305,7 @@ describe("OrchestratorMcpService thread stop", () => {
       queued: true,
       stop: { reason: "Make room", message: "Stopped by an agent: Make room" },
     },
-  ])("t3_thread_interrupt stop reports the run it interrupted on $name", ({ queued, stop }) =>
+  ])("legion_thread_interrupt stop reports the run it interrupted on $name", ({ queued, stop }) =>
     Effect.gen(function* () {
       const cwd = yield* checkpointWorkspace("mcp-thread-stop");
       const layerAdapters = ProviderAdapterRegistry.layerSingle(liveAdapter(cwd));

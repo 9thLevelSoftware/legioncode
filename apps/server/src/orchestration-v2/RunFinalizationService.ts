@@ -1,4 +1,4 @@
-import { CheckpointScopeId, ProjectId, RunId, ThreadId } from "@t3tools/contracts";
+import { CheckpointScopeId, ProjectId, RunId, ThreadId } from "@legioncode/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as FiberMap from "effect/FiberMap";
@@ -38,7 +38,7 @@ export class RunFinalizationObserver extends Context.Reference<{
     readonly threadId: ThreadId;
     readonly runId: RunId;
   }) => Effect.Effect<void, RunFinalizationRefreshError>;
-}>("t3/orchestration-v2/RunFinalizationObserver", {
+}>("legion/orchestration-v2/RunFinalizationObserver", {
   defaultValue: () => ({ refresh: () => Effect.void, refreshAfterTurn: () => Effect.void }),
 }) {}
 
@@ -56,7 +56,7 @@ export class RunFinalizationService extends Context.Service<
       readonly scopeId: CheckpointScopeId;
     }) => Effect.Effect<void, RunFinalizationError>;
   }
->()("t3/orchestration-v2/RunFinalizationService") {}
+>()("legioncode/orchestration-v2/RunFinalizationService") {}
 
 const make = Effect.gen(function* () {
   const checkpointCapture = yield* CheckpointCapture.CheckpointCaptureServiceV2;

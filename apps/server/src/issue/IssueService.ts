@@ -32,8 +32,8 @@ import {
   type IssueUpdateInput,
   type OrchestrationProjectShell,
   type ProjectId,
-} from "@t3tools/contracts";
-import * as SourceControlRateLimit from "@t3tools/source-control-core/server/SourceControlRateLimit";
+} from "@legioncode/contracts";
+import * as SourceControlRateLimit from "@legioncode/source-control-core/server/SourceControlRateLimit";
 import {
   IssueTrackerError,
   isStandaloneIssueTracker,
@@ -41,8 +41,8 @@ import {
   type IssueTrackerApi,
   type StandaloneIssueTrackerApi,
   type TrackerIssueDetail,
-} from "@t3tools/source-control-core/server/IssueTracker";
-import { parseUrl } from "@t3tools/shared/url";
+} from "@legioncode/source-control-core/server/IssueTracker";
+import { parseUrl } from "@legioncode/shared/url";
 
 import * as IssueTrackerBindings from "../persistence/IssueTrackerBindings.ts";
 import * as ProjectService from "../project/ProjectService.ts";
@@ -182,7 +182,7 @@ export class IssueService extends Context.Service<
       IssueError
     >;
   }
->()("t3/issue/IssueService") {}
+>()("legioncode/issue/IssueService") {}
 
 const make = Effect.gen(function* () {
   const registry = yield* IssueTrackerRegistry.IssueTrackerRegistry;

@@ -1,11 +1,11 @@
-export type T3McpToolLogo = "t3-code";
+export type LegionMcpToolLogo = "legion-code";
 
-export interface T3McpToolPresentation {
+export interface LegionMcpToolPresentation {
   readonly displayName: string;
-  readonly logo: T3McpToolLogo;
+  readonly logo: LegionMcpToolLogo;
 }
 
-export type T3McpToolSummaryAction =
+export type LegionMcpToolSummaryAction =
   | "capabilities"
   | "delegate"
   | "task-status"
@@ -90,32 +90,32 @@ export type T3McpToolSummaryAction =
   | "html-render"
   | "send-to-user";
 
-export interface T3McpToolDefinition {
+export interface LegionMcpToolDefinition {
   readonly displayName: string;
   readonly labels: readonly [action: string, running: string, completed: string, detail: string];
-  readonly icon: "t3-code" | "browser" | "device" | "pull-request";
-  readonly summaryAction: T3McpToolSummaryAction;
+  readonly icon: "legion-code" | "browser" | "device" | "pull-request";
+  readonly summaryAction: LegionMcpToolSummaryAction;
 }
 
 function tool(
-  labels: T3McpToolDefinition["labels"],
-  summaryAction: T3McpToolSummaryAction,
-  icon: T3McpToolDefinition["icon"] = "t3-code",
+  labels: LegionMcpToolDefinition["labels"],
+  summaryAction: LegionMcpToolSummaryAction,
+  icon: LegionMcpToolDefinition["icon"] = "legion-code",
   displayName = `${labels[0]} ${labels[3]}`,
-): T3McpToolDefinition {
+): LegionMcpToolDefinition {
   return { displayName, labels, icon, summaryAction };
 }
 
-// Codex registers "t3-code-direct" for T3 tools kept out of Code Mode.
-const T3_MCP_SERVER_ALIASES = new Set([
-  "t3-code",
-  "t3_code",
-  "t3code",
-  "t3-code-direct",
-  "t3_code_direct",
+// Codex registers "legion-code-direct" for LegionCode tools kept out of Code Mode.
+const LEGION_MCP_SERVER_ALIASES = new Set([
+  "legion-code",
+  "legion_code",
+  "legioncode",
+  "legion-code-direct",
+  "legion_code_direct",
 ]);
 
-const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
+const LEGION_MCP_TOOLS: Readonly<Record<string, LegionMcpToolDefinition>> = {
   link_pull_request: tool(
     ["Link", "Linking", "Linked", "a pull request"],
     "link-pr",
@@ -226,29 +226,35 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
     "schedule-delete",
   ),
   request_secret: tool(["Ask for", "Asking for", "Asked for", "a secret"], "secret-request"),
-  create_threads: tool(["Create", "Creating", "Created", "T3 threads"], "thread-create"),
-  t3_thread_start: tool(["Start", "Starting", "Started", "a T3 thread"], "thread-create"),
-  t3_thread_list: tool(["List", "Listing", "Listed", "T3 threads"], "thread-list"),
-  t3_thread_read: tool(["Read", "Reading", "Read", "a T3 thread"], "thread-read"),
-  t3_thread_send: tool(["Send", "Sending", "Sent", "to a T3 thread"], "thread-send"),
-  t3_thread_wait: tool(["Wait", "Waiting", "Waited", "for a T3 thread"], "thread-wait"),
-  t3_workflow_stop: tool(
+  create_threads: tool(["Create", "Creating", "Created", "LegionCode threads"], "thread-create"),
+  legion_thread_start: tool(
+    ["Start", "Starting", "Started", "a LegionCode thread"],
+    "thread-create",
+  ),
+  legion_thread_list: tool(["List", "Listing", "Listed", "LegionCode threads"], "thread-list"),
+  legion_thread_read: tool(["Read", "Reading", "Read", "a LegionCode thread"], "thread-read"),
+  legion_thread_send: tool(["Send", "Sending", "Sent", "to a LegionCode thread"], "thread-send"),
+  legion_thread_wait: tool(["Wait", "Waiting", "Waited", "for a LegionCode thread"], "thread-wait"),
+  legion_workflow_stop: tool(
     ["Stop", "Stopping", "Requested a stop for", "a workflow"],
     "workflow-stop",
   ),
-  t3_background_wait: tool(
+  legion_background_wait: tool(
     ["Update", "Updating", "Updated", "background waits"],
     "background-wait",
   ),
-  t3_thread_interrupt: tool(
-    ["Interrupt", "Interrupting", "Requested an interrupt of", "a T3 thread"],
+  legion_thread_interrupt: tool(
+    ["Interrupt", "Interrupting", "Requested an interrupt of", "a LegionCode thread"],
     "thread-interrupt",
   ),
-  t3_worktree_handoff: tool(
+  legion_worktree_handoff: tool(
     ["Hand off", "Handing off", "Handed off", "thread to a git worktree"],
     "worktree-handoff",
   ),
-  t3_worktree_status: tool(["Get", "Getting", "Got", "thread worktree status"], "worktree-status"),
+  legion_worktree_status: tool(
+    ["Get", "Getting", "Got", "thread worktree status"],
+    "worktree-status",
+  ),
   preview_status: tool(["Get", "Getting", "Got", "preview browser status"], "browser", "browser"),
   preview_open: tool(
     ["Open", "Opening", "Opened", "a page in the preview browser"],
@@ -354,96 +360,129 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
     ["Run", "Running", "Requested a run of", "a scheduled task"],
     "schedule-run",
   ),
-  t3_queue: tool(["Manage", "Managing", "Managed", "queued messages"], "queue-edit"),
-  t3_pending_request: tool(
+  legion_queue: tool(["Manage", "Managing", "Managed", "queued messages"], "queue-edit"),
+  legion_pending_request: tool(
     ["Handle", "Handling", "Handled", "pending questions"],
     "question-respond",
   ),
-  t3_queue_list: tool(["List", "Listing", "Listed", "queued messages"], "queue-list"),
-  t3_queue_read: tool(["Read", "Reading", "Read", "a queued message"], "queue-read"),
-  t3_queue_edit: tool(["Edit", "Editing", "Edited", "a queued message"], "queue-edit"),
-  t3_queue_cancel: tool(
+  legion_queue_list: tool(["List", "Listing", "Listed", "queued messages"], "queue-list"),
+  legion_queue_read: tool(["Read", "Reading", "Read", "a queued message"], "queue-read"),
+  legion_queue_edit: tool(["Edit", "Editing", "Edited", "a queued message"], "queue-edit"),
+  legion_queue_cancel: tool(
     ["Cancel", "Canceling", "Requested cancellation of", "a queued run"],
     "queue-cancel",
   ),
-  t3_queue_reorder: tool(["Reorder", "Reordering", "Reordered", "a queued run"], "queue-reorder"),
-  t3_queue_promote_to_steer: tool(
+  legion_queue_reorder: tool(
+    ["Reorder", "Reordering", "Reordered", "a queued run"],
+    "queue-reorder",
+  ),
+  legion_queue_promote_to_steer: tool(
     ["Steer with", "Steering with", "Requested steering with", "a queued message"],
     "queue-steer",
   ),
-  t3_pending_request_list: tool(
+  legion_pending_request_list: tool(
     ["List", "Listing", "Listed", "pending questions"],
     "question-list",
   ),
-  t3_pending_request_read: tool(["Read", "Reading", "Read", "pending questions"], "question-read"),
-  t3_pending_request_respond: tool(
+  legion_pending_request_read: tool(
+    ["Read", "Reading", "Read", "pending questions"],
+    "question-read",
+  ),
+  legion_pending_request_respond: tool(
     ["Answer", "Answering", "Answered", "pending questions"],
     "question-respond",
   ),
-  t3_thread_configuration: tool(
+  legion_thread_configuration: tool(
     ["Read", "Reading", "Read", "thread configuration"],
     "thread-configuration",
   ),
-  t3_thread_configure: tool(["Use", "Using", "Used", "thread model settings"], "thread-configure"),
-  t3_thread_transfer: tool(["Use", "Using", "Used", "thread transfers"], "thread-fork"),
-  t3_thread_fork: tool(["Fork", "Forking", "Requested a fork of", "this thread"], "thread-fork"),
-  t3_thread_merge_back: tool(
+  legion_thread_configure: tool(
+    ["Use", "Using", "Used", "thread model settings"],
+    "thread-configure",
+  ),
+  legion_thread_transfer: tool(["Use", "Using", "Used", "thread transfers"], "thread-fork"),
+  legion_thread_fork: tool(
+    ["Fork", "Forking", "Requested a fork of", "this thread"],
+    "thread-fork",
+  ),
+  legion_thread_merge_back: tool(
     ["Merge", "Merging", "Requested a merge of", "thread context"],
     "thread-merge",
   ),
-  t3_thread_search: tool(["Search", "Searching", "Searched", "thread content"], "thread-search"),
-  t3_thread_transfers: tool(["Read", "Reading", "Read", "thread transfers"], "thread-transfers"),
-  t3_thread_organize: tool(["Organize", "Organizing", "Organized", "a thread"], "thread-organize"),
-  t3_thread_update: tool(["Update", "Updating", "Updated", "T3 thread metadata"], "thread-update"),
-  t3_worktree_list: tool(["List", "Listing", "Listed", "workspace branches"], "worktree-list"),
-  t3_preview_list: tool(["List", "Listing", "Listed", "preview tabs"], "browser", "browser"),
-  t3_preview_close: tool(["Close", "Closing", "Closed", "a preview tab"], "browser", "browser"),
-  t3_environment_read: tool(
+  legion_thread_search: tool(
+    ["Search", "Searching", "Searched", "thread content"],
+    "thread-search",
+  ),
+  legion_thread_transfers: tool(
+    ["Read", "Reading", "Read", "thread transfers"],
+    "thread-transfers",
+  ),
+  legion_thread_organize: tool(
+    ["Organize", "Organizing", "Organized", "a thread"],
+    "thread-organize",
+  ),
+  legion_thread_update: tool(
+    ["Update", "Updating", "Updated", "LegionCode thread metadata"],
+    "thread-update",
+  ),
+  legion_worktree_list: tool(["List", "Listing", "Listed", "workspace branches"], "worktree-list"),
+  legion_preview_list: tool(["List", "Listing", "Listed", "preview tabs"], "browser", "browser"),
+  legion_preview_close: tool(["Close", "Closing", "Closed", "a preview tab"], "browser", "browser"),
+  legion_environment_read: tool(
     ["Read", "Reading", "Read", "environment preferences"],
     "environment-read",
   ),
-  t3_environment_links: tool(
+  legion_environment_links: tool(
     ["List", "Listing", "Listed", "linked environments"],
     "environment-links",
   ),
-  t3_environment_link: tool(
+  legion_environment_link: tool(
     ["Ask to link", "Asking to link", "Asked to link", "an environment"],
     "environment-link",
   ),
-  t3_environment_unlink: tool(
+  legion_environment_unlink: tool(
     ["Forget", "Forgetting", "Forgot", "a linked environment"],
     "environment-unlink",
   ),
-  t3_environment_preferences_update: tool(
+  legion_environment_preferences_update: tool(
     ["Update", "Updating", "Updated", "environment preferences"],
     "environment-update",
   ),
-  t3_theme_read: tool(["Read", "Reading", "Read", "themes"], "theme-read"),
-  t3_theme_set: tool(["Set", "Setting", "Set", "the theme"], "theme-set"),
-  t3_thread_launch: tool(["Launch", "Launching", "Launched", "a project thread"], "thread-create"),
-  t3_project_list: tool(["List", "Listing", "Listed", "projects"], "project-list"),
-  t3_project_read: tool(["Read", "Reading", "Read", "a project"], "project-read"),
-  t3_project_create: tool(["Register", "Registering", "Registered", "a project"], "project-create"),
-  t3_project_update: tool(["Update", "Updating", "Updated", "a project"], "project-update"),
-  t3_project_delete: tool(["Delete", "Deleting", "Deleted", "a project"], "project-delete"),
-  t3_project_clone: tool(["Clone", "Cloning", "Cloned", "a repository"], "project-clone"),
-  t3_attachment_prepare_upload: tool(
+  legion_theme_read: tool(["Read", "Reading", "Read", "themes"], "theme-read"),
+  legion_theme_set: tool(["Set", "Setting", "Set", "the theme"], "theme-set"),
+  legion_thread_launch: tool(
+    ["Launch", "Launching", "Launched", "a project thread"],
+    "thread-create",
+  ),
+  legion_project_list: tool(["List", "Listing", "Listed", "projects"], "project-list"),
+  legion_project_read: tool(["Read", "Reading", "Read", "a project"], "project-read"),
+  legion_project_create: tool(
+    ["Register", "Registering", "Registered", "a project"],
+    "project-create",
+  ),
+  legion_project_update: tool(["Update", "Updating", "Updated", "a project"], "project-update"),
+  legion_project_delete: tool(["Delete", "Deleting", "Deleted", "a project"], "project-delete"),
+  legion_project_clone: tool(["Clone", "Cloning", "Cloned", "a repository"], "project-clone"),
+  legion_attachment_prepare_upload: tool(
     ["Prepare", "Preparing", "Prepared", "an attachment upload"],
     "attachment-prepare",
   ),
-  t3_attachment_discard: tool(
+  legion_attachment_discard: tool(
     ["Discard", "Discarding", "Discarded", "a pending attachment"],
     "attachment-discard",
   ),
-  t3_thread_send_attachments: tool(["Send", "Sending", "Sent", "attachments"], "attachment-send"),
+  legion_thread_send_attachments: tool(
+    ["Send", "Sending", "Sent", "attachments"],
+    "attachment-send",
+  ),
   html_preview: tool(["Preview", "Previewing", "Previewed", "an HTML page"], "html-preview"),
   html_render: tool(["Render", "Rendering", "Rendered", "an HTML page"], "html-render"),
   send_to_user: tool(["Send", "Sending", "Sent", "a message"], "send-to-user"),
 };
 
-export const T3_MCP_TOOL_NAMES: ReadonlySet<string> = new Set(Object.keys(T3_MCP_TOOLS));
+export const LEGION_MCP_TOOL_NAMES: ReadonlySet<string> = new Set(Object.keys(LEGION_MCP_TOOLS));
 
-function normalizeT3McpToolLabel(value: string): string {
+function normalizeLegionMcpToolLabel(value: string): string {
   return value.replace(/\s+(?:complete|completed)\s*$/i, "").trim();
 }
 
@@ -453,52 +492,52 @@ const toolNameCache = new Map<string, string | null>();
 const TOOL_NAME_CACHE_LIMIT = 10_000;
 const TOOL_NAME_CACHE_MAX_KEY_LENGTH = 256;
 
-function resolveT3McpToolName(value: string): string | null {
-  if (value.length > TOOL_NAME_CACHE_MAX_KEY_LENGTH) return parseT3McpToolName(value);
+function resolveLegionMcpToolName(value: string): string | null {
+  if (value.length > TOOL_NAME_CACHE_MAX_KEY_LENGTH) return parseLegionMcpToolName(value);
   const cached = toolNameCache.get(value);
   if (cached !== undefined) return cached;
-  const name = parseT3McpToolName(value);
+  const name = parseLegionMcpToolName(value);
   if (toolNameCache.size >= TOOL_NAME_CACHE_LIMIT) toolNameCache.clear();
   toolNameCache.set(value, name);
   return name;
 }
 
 // ACP tool prefixes vary; match loosely but require a known display-name entry.
-function parseT3McpToolName(value: string): string | null {
-  const label = normalizeT3McpToolLabel(value);
+function parseLegionMcpToolName(value: string): string | null {
+  const label = normalizeLegionMcpToolLabel(value);
   const mcpMatch = /^mcp__(?<server>.+?)__(?<tool>.+)$/i.exec(label);
   if (mcpMatch?.groups) {
     const { server, tool } = mcpMatch.groups;
     return server !== undefined &&
       tool !== undefined &&
-      T3_MCP_SERVER_ALIASES.has(server.toLowerCase())
+      LEGION_MCP_SERVER_ALIASES.has(server.toLowerCase())
       ? tool
       : null;
   }
 
   const namespaceMatch =
-    /^(?<server>t3[-_]code[-_]direct|t3-code|t3_code|t3code)(?:[.:/]|\s*·\s*)(?<tool>.+)$/i.exec(
+    /^(?<server>legion[-_]code[-_]direct|legion-code|legion_code|legioncode)(?:[.:/]|\s*·\s*)(?<tool>.+)$/i.exec(
       label,
     );
   if (namespaceMatch?.groups) {
     return namespaceMatch.groups.tool ?? null;
   }
 
-  const prefixed = /^(?:mcp[-_]{1,2})?t3[-_ ]?code(?:__|[-_.:/ ])(?<tool>.+)$/i.exec(label);
+  const prefixed = /^(?:mcp[-_]{1,2})?legion[-_ ]?code(?:__|[-_.:/ ])(?<tool>.+)$/i.exec(label);
   const candidate = prefixed?.groups?.tool ?? label;
-  if (Object.hasOwn(T3_MCP_TOOLS, candidate)) return candidate;
+  if (Object.hasOwn(LEGION_MCP_TOOLS, candidate)) return candidate;
   // OpenCode 2 thread prefixes can contain underscores; choose the longest known tool-name suffix.
-  if (!/^t3-code-/i.test(label)) return null;
+  if (!/^legion-code-/i.test(label)) return null;
   let longest: string | null = null;
-  for (const tool of Object.keys(T3_MCP_TOOLS)) {
+  for (const tool of Object.keys(LEGION_MCP_TOOLS)) {
     if (label.endsWith(`_${tool}`) && tool.length > (longest?.length ?? 0)) longest = tool;
   }
   return longest;
 }
 
-export function resolveT3McpToolId(toolName: string | null | undefined): string | null {
-  const name = toolName == null ? null : resolveT3McpToolName(toolName);
-  return name !== null && Object.hasOwn(T3_MCP_TOOLS, name) ? name : null;
+export function resolveLegionMcpToolId(toolName: string | null | undefined): string | null {
+  const name = toolName == null ? null : resolveLegionMcpToolName(toolName);
+  return name !== null && Object.hasOwn(LEGION_MCP_TOOLS, name) ? name : null;
 }
 
 type SummaryInput = Readonly<Record<string, unknown>>;
@@ -509,53 +548,55 @@ const asSummaryInput = (input: unknown): SummaryInput | undefined =>
 /** Action tools present each call as the single-purpose tool its action replaced. */
 const ACTION_TOOLS: Readonly<Record<string, (action: string) => string | undefined>> = {
   preview_act: (action) => `preview_${action}`,
-  t3_queue: (action) => `t3_queue_${action}`,
-  t3_pending_request: (action) => `t3_pending_request_${action}`,
-  t3_thread_transfer: (action) =>
-    ({ fork: "t3_thread_fork", merge_back: "t3_thread_merge_back", status: "t3_thread_transfers" })[
-      action
-    ],
+  legion_queue: (action) => `legion_queue_${action}`,
+  legion_pending_request: (action) => `legion_pending_request_${action}`,
+  legion_thread_transfer: (action) =>
+    ({
+      fork: "legion_thread_fork",
+      merge_back: "legion_thread_merge_back",
+      status: "legion_thread_transfers",
+    })[action],
 };
 
 /** Pass the call's input so an action tool resolves to the labels and summary of its action. */
-export function resolveT3McpToolDefinition(
+export function resolveLegionMcpToolDefinition(
   toolName: string | null | undefined,
   input?: unknown,
-): T3McpToolDefinition | null {
-  const name = toolName == null ? null : resolveT3McpToolName(toolName);
-  if (name === null || !Object.hasOwn(T3_MCP_TOOLS, name)) return null;
+): LegionMcpToolDefinition | null {
+  const name = toolName == null ? null : resolveLegionMcpToolName(toolName);
+  if (name === null || !Object.hasOwn(LEGION_MCP_TOOLS, name)) return null;
   const action = asSummaryInput(input)?.action;
   const actionTool = typeof action === "string" ? ACTION_TOOLS[name]?.(action) : undefined;
-  return actionTool !== undefined && Object.hasOwn(T3_MCP_TOOLS, actionTool)
-    ? T3_MCP_TOOLS[actionTool]!
-    : T3_MCP_TOOLS[name]!;
+  return actionTool !== undefined && Object.hasOwn(LEGION_MCP_TOOLS, actionTool)
+    ? LEGION_MCP_TOOLS[actionTool]!
+    : LEGION_MCP_TOOLS[name]!;
 }
 
 /** Tools whose summary depends on which fields a call sets. */
 const ACTION_SUMMARIES: Readonly<
-  Record<string, (input: SummaryInput) => T3McpToolSummaryAction | undefined>
+  Record<string, (input: SummaryInput) => LegionMcpToolSummaryAction | undefined>
 > = {
-  t3_thread_configure: ({ modelSelection }) =>
+  legion_thread_configure: ({ modelSelection }) =>
     modelSelection === undefined ? "thread-configuration" : "thread-configure",
   schedule_task: ({ scheduledTaskId }) =>
     scheduledTaskId === undefined ? "schedule-create" : "schedule-update",
 };
 
-export function resolveT3McpSummaryAction(
+export function resolveLegionMcpSummaryAction(
   toolName: string | null | undefined,
   input: unknown,
-): T3McpToolSummaryAction | null {
-  const definition = resolveT3McpToolDefinition(toolName, input);
+): LegionMcpToolSummaryAction | null {
+  const definition = resolveLegionMcpToolDefinition(toolName, input);
   if (definition === null) return null;
-  const summarize = ACTION_SUMMARIES[resolveT3McpToolName(toolName!) ?? ""];
+  const summarize = ACTION_SUMMARIES[resolveLegionMcpToolName(toolName!) ?? ""];
   const fields = asSummaryInput(input);
   return (fields && summarize?.(fields)) ?? definition.summaryAction;
 }
 
-export function resolveT3McpToolPresentation(
+export function resolveLegionMcpToolPresentation(
   toolName: string | null | undefined,
   input?: unknown,
-): T3McpToolPresentation | null {
-  const definition = resolveT3McpToolDefinition(toolName, input);
-  return definition === null ? null : { displayName: definition.displayName, logo: "t3-code" };
+): LegionMcpToolPresentation | null {
+  const definition = resolveLegionMcpToolDefinition(toolName, input);
+  return definition === null ? null : { displayName: definition.displayName, logo: "legion-code" };
 }

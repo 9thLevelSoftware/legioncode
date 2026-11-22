@@ -1,4 +1,4 @@
-import { isLocalEditorFileUrl, LOCAL_FILE_LINK_SCHEMES } from "@t3tools/contracts";
+import { isLocalEditorFileUrl, LOCAL_FILE_LINK_SCHEMES } from "@legioncode/contracts";
 import type {
   Heading,
   Link,
@@ -186,7 +186,7 @@ function rehypePreserveImageSourceMeta() {
   };
 }
 
-const IMAGE_SRC_PROTOCOLS = [...(defaultSchema.protocols?.src ?? []), "file", "t3-context"];
+const IMAGE_SRC_PROTOCOLS = [...(defaultSchema.protocols?.src ?? []), "file", "legion-context"];
 
 // The sanitizer compares schemes case-sensitively, so lowercase accepted editor links first.
 function rehypeNormalizeLocalEditorLinks() {
@@ -236,8 +236,8 @@ const CHAT_MARKDOWN_SANITIZE_SCHEMA = {
     href: [
       ...(defaultSchema.protocols?.href ?? []),
       "file",
-      "t3-citation",
-      "t3-context",
+      "legion-citation",
+      "legion-context",
       THREAD_LINK_PROTOCOL,
       // Scheme only: the renderer's URL transform checks the rest of the link shape.
       ...LOCAL_FILE_LINK_SCHEMES,

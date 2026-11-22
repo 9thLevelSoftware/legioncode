@@ -1,11 +1,11 @@
 import * as Schema from "effect/Schema";
 import { describe, expect, it } from "vite-plus/test";
 
-import { parseT3ProjectFile, T3ProjectFileFromJson } from "./t3ProjectFile.ts";
+import { parseLegionProjectFile, LegionProjectFileFromJson } from "./legionProjectFile.ts";
 
-const decodeJson = Schema.decodeUnknownSync(T3ProjectFileFromJson);
+const decodeJson = Schema.decodeUnknownSync(LegionProjectFileFromJson);
 
-describe("T3ProjectFileFromJson", () => {
+describe("LegionProjectFileFromJson", () => {
   it("decodes lenient JSONC with comments and trailing commas", () => {
     const decoded = decodeJson(`{
       // team scripts
@@ -20,11 +20,11 @@ describe("T3ProjectFileFromJson", () => {
   });
 });
 
-describe("parseT3ProjectFile", () => {
+describe("parseLegionProjectFile", () => {
   it("reads project defaults from JSONC with a URL in a block comment", () => {
     expect(
-      parseT3ProjectFile(`{
-        /* See https://t3.codes/schema/t3.json */
+      parseLegionProjectFile(`{
+        /* See https://legion.codes/schema/legioncode.json */
         "defaultThreadEnvMode": "worktree"
       }`),
     ).toEqual({ defaultThreadEnvMode: "worktree" });

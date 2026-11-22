@@ -12,7 +12,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as EffectAcpErrors from "effect-acp/errors";
 import type * as EffectAcpSchema from "effect-acp/compat";
 import * as NodeBuffer from "node:buffer";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 
 const MAX_LIVE_TERMINALS = 16;
 const MAX_UNRELEASED_TERMINALS = 64;
@@ -236,8 +236,8 @@ export const makeAcpClientTerminals = Effect.fn("makeAcpClientTerminals")(functi
           const inheritedEnvironment = Object.fromEntries(
             Object.entries(options.environment ?? (yield* HostProcess.Environment)).filter(
               ([name]) =>
-                !name.toUpperCase().startsWith("T3_ACP_MCP_") &&
-                name.toUpperCase() !== "T3CODE_THREAD_ID",
+                !name.toUpperCase().startsWith("LEGIONCODE_ACP_MCP_") &&
+                name.toUpperCase() !== "LEGIONCODE_THREAD_ID",
             ),
           );
           const sessionEnvironment = options.environmentForSession?.(request.sessionId);
@@ -273,7 +273,7 @@ export const makeAcpClientTerminals = Effect.fn("makeAcpClientTerminals")(functi
             ),
           );
 
-          const terminalId = `t3-term-${nextTerminalNumber}`;
+          const terminalId = `legion-term-${nextTerminalNumber}`;
           nextTerminalNumber += 1;
           const record: ManagedAcpTerminal = {
             terminalId,

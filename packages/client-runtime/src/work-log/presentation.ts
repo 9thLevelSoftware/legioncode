@@ -8,29 +8,29 @@ import {
   type ToolActivityIcon,
   type OrchestrationV2TurnItem,
   type ThreadId,
-} from "@t3tools/contracts";
-import type { ToolCallVisibility } from "@t3tools/contracts/settings";
+} from "@legioncode/contracts";
+import type { ToolCallVisibility } from "@legioncode/contracts/settings";
 import {
-  resolveT3McpSummaryAction,
-  resolveT3McpToolDefinition,
-  type T3McpToolDefinition,
-  type T3McpToolSummaryAction,
-} from "@t3tools/shared/t3McpToolPresentation";
-import { classifyMarkdownImageSource } from "@t3tools/client-runtime/markdown-images";
-import { resolveMediaSource } from "@t3tools/client-runtime/media-source";
-import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
-import { isWorkspaceImagePreviewPath } from "@t3tools/shared/mediaPreview";
-import { formatTokens } from "@t3tools/shared/usageFormat";
-import { classifyToolActivity } from "@t3tools/shared/toolActivity";
-import { toolOutputIndicatesFailure } from "@t3tools/shared/toolOutput";
+  resolveLegionMcpSummaryAction,
+  resolveLegionMcpToolDefinition,
+  type LegionMcpToolDefinition,
+  type LegionMcpToolSummaryAction,
+} from "@legioncode/shared/legionMcpToolPresentation";
+import { classifyMarkdownImageSource } from "@legioncode/client-runtime/markdown-images";
+import { resolveMediaSource } from "@legioncode/client-runtime/media-source";
+import { sourceControlClients } from "@legioncode/client-runtime/source-control-clients";
+import { isWorkspaceImagePreviewPath } from "@legioncode/shared/mediaPreview";
+import { formatTokens } from "@legioncode/shared/usageFormat";
+import { classifyToolActivity } from "@legioncode/shared/toolActivity";
+import { toolOutputIndicatesFailure } from "@legioncode/shared/toolOutput";
 
 import {
-  summarizeT3ToolCalls,
-  t3ToolResultIndicatesFailure,
-  type T3ToolSummaryCall,
-} from "@t3tools/client-runtime/t3ToolSummary";
+  summarizeLegionToolCalls,
+  legionToolResultIndicatesFailure,
+  type LegionToolSummaryCall,
+} from "@legioncode/client-runtime/legionToolSummary";
 import { mFallback, msg } from "gt-i18n";
-import { t3ToolSentence } from "./t3ToolSentences.ts";
+import { legionToolSentence } from "./legionToolSentences.ts";
 import type { MFunctionType } from "gt-i18n/types";
 
 export type WorkLogToolLifecycleStatus = RuntimeItemStatus | "stopped" | "idle";
@@ -87,7 +87,7 @@ export function contextCompactionLabel(
 }
 
 export interface WorkLogPresentationEntry {
-  readonly questionAnswer?: import("@t3tools/contracts").UserInputAttachmentAnswerPayload;
+  readonly questionAnswer?: import("@legioncode/contracts").UserInputAttachmentAnswerPayload;
   readonly id: string;
   readonly createdAt: string;
   readonly label: string;
@@ -148,7 +148,7 @@ function workEntryToolName(
     return `${data.server}.${data.tool}`;
   }
   if (typeof data?.toolName === "string") return data.toolName;
-  return resolveT3McpToolDefinition(entry.toolTitle) ? entry.toolTitle : entry.label;
+  return resolveLegionMcpToolDefinition(entry.toolTitle) ? entry.toolTitle : entry.label;
 }
 
 function workEntryToolInput(
@@ -171,7 +171,7 @@ function workEntryToolOutput(
     : (data?.output ?? data?.result ?? data?.rawOutput ?? data?.content);
 }
 
-function t3ToolStatusKey(status: string | undefined) {
+function legionToolStatusKey(status: string | undefined) {
   return status === "inProgress" ||
     status === "completed" ||
     status === "failed" ||
@@ -181,8 +181,8 @@ function t3ToolStatusKey(status: string | undefined) {
     : "other";
 }
 
-function resolveT3McpToolPresentation(
-  definition: T3McpToolDefinition | null,
+function resolveLegionMcpToolPresentation(
+  definition: LegionMcpToolDefinition | null,
   status: string | undefined,
   data: unknown,
   resolve: MFunctionType,
@@ -214,9 +214,9 @@ function resolveT3McpToolPresentation(
     number > 0
       ? number
       : null;
-  const sentence = t3ToolSentence(definition.labels);
-  const statusKey = t3ToolStatusKey(status);
-  // A tool added to the shared table after `t3ToolSentences.ts` was generated.
+  const sentence = legionToolSentence(definition.labels);
+  const statusKey = legionToolStatusKey(status);
+  // A tool added to the shared table after `legionToolSentences.ts` was generated.
   const [action, running, completed] = definition.labels;
   const fallbackVerb =
     status === "inProgress"
@@ -263,14 +263,14 @@ export function resolveWorkEntryToolPresentation(
   fallbackStatus?: "inProgress" | "completed",
   resolve: MFunctionType = mFallback,
 ) {
-  const definition = resolveT3McpToolDefinition(
+  const definition = resolveLegionMcpToolDefinition(
     workEntryToolName(entry),
     workEntryToolInput(entry),
   );
   const status = entry.toolLifecycleStatus ?? fallbackStatus;
-  return resolveT3McpToolPresentation(
+  return resolveLegionMcpToolPresentation(
     definition,
-    definition && t3ToolResultIndicatesFailure(workEntryToolOutput(entry)) ? "failed" : status,
+    definition && legionToolResultIndicatesFailure(workEntryToolOutput(entry)) ? "failed" : status,
     entry.toolData,
     resolve,
   );
@@ -305,8 +305,8 @@ function workEntryIndicatesToolFailureFromOutput(
   // "that exit code 2 is expected" as a failed tool.
   if (!workLogEntryIsToolLike(entry) || entry.itemType === "reasoning") return false;
   if (
-    resolveT3McpToolDefinition(workEntryToolName(entry)) &&
-    t3ToolResultIndicatesFailure(workEntryToolOutput(entry))
+    resolveLegionMcpToolDefinition(workEntryToolName(entry)) &&
+    legionToolResultIndicatesFailure(workEntryToolOutput(entry))
   ) {
     return true;
   }
@@ -611,7 +611,7 @@ function joinClauses(items: ReadonlyArray<string>, resolve: MFunctionType): stri
   );
 }
 
-function t3ToolSummaryCall(entry: WorkLogPresentationEntry): T3ToolSummaryCall {
+function legionToolSummaryCall(entry: WorkLogPresentationEntry): LegionToolSummaryCall {
   return {
     input: workEntryToolInput(entry),
     output: workEntryToolOutput(entry),
@@ -626,7 +626,7 @@ function t3ToolSummaryCall(entry: WorkLogPresentationEntry): T3ToolSummaryCall {
   };
 }
 
-function summaryActionPriority(action: ToolGroupAction | T3McpToolSummaryAction): number {
+function summaryActionPriority(action: ToolGroupAction | LegionMcpToolSummaryAction): number {
   switch (action) {
     case "command":
     case "edit":
@@ -689,35 +689,39 @@ export function summarizeToolGroup(
   }
   entries = toolEntries;
   const groups = new Map<
-    ToolGroupAction | T3McpToolSummaryAction,
+    ToolGroupAction | LegionMcpToolSummaryAction,
     {
       action: ToolGroupAction;
-      t3Action: T3McpToolSummaryAction | null;
+      legionAction: LegionMcpToolSummaryAction | null;
       entries: WorkLogPresentationEntry[];
     }
   >();
   const sources = new Map<string, ToolActivitySource>();
   for (const entry of entries) {
-    const t3Action = resolveT3McpSummaryAction(
+    const legionAction = resolveLegionMcpSummaryAction(
       workEntryToolName(entry),
-      t3ToolSummaryCall(entry).input,
+      legionToolSummaryCall(entry).input,
     );
-    if (entry.toolSource && t3Action === null) {
+    if (entry.toolSource && legionAction === null) {
       sources.set(entry.toolSource.key, entry.toolSource);
       continue;
     }
     const action = toolGroupAction(entry);
-    const key = t3Action ?? action;
+    const key = legionAction ?? action;
     const group = groups.get(key);
     if (group) group.entries.push(entry);
-    else groups.set(key, { action, t3Action, entries: [entry] });
+    else groups.set(key, { action, legionAction, entries: [entry] });
   }
   const summaries = [...groups].map(([action, group], index) => ({
     index,
     count: group.entries.length,
     priority: summaryActionPriority(action),
-    ...(group.t3Action
-      ? summarizeT3ToolCalls(group.t3Action, group.entries.map(t3ToolSummaryCall), resolve)
+    ...(group.legionAction
+      ? summarizeLegionToolCalls(
+          group.legionAction,
+          group.entries.map(legionToolSummaryCall),
+          resolve,
+        )
       : {
           label: toolGroupActionLabel(
             group.action,
@@ -751,7 +755,7 @@ export function summarizeToolGroup(
   const sourcedCount = entries.filter(
     (entry) =>
       entry.toolSource !== undefined &&
-      resolveT3McpToolDefinition(workEntryToolName(entry)) === null,
+      resolveLegionMcpToolDefinition(workEntryToolName(entry)) === null,
   ).length;
   const remainingCount =
     entries.length - sourcedCount - selected.reduce((count, group) => count + group.count, 0);

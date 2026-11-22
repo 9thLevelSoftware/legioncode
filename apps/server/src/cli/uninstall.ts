@@ -2,7 +2,7 @@
 // Windows cleanup must outlive this executable to delete its directory; scoped ChildProcess kills children on exit.
 import * as NodeChildProcess from "node:child_process";
 
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -64,7 +64,7 @@ export const findOwnedLauncher = Effect.fn("cli.uninstall.find_launcher")(functi
   return yield* findPosixLauncher({ launchedAs: input.launchedAs, versionsDir: input.versionsDir });
 });
 
-/** Whether `launcher` is a link, unedited `t3` script, or unedited `t3.cmd` into this home's runtime/versions. */
+/** Whether `launcher` is a link, unedited `legioncode` script, or unedited `legioncode.cmd` into this home's runtime/versions. */
 const ownsLauncher = Effect.fn("cli.uninstall.owns_launcher")(function* (
   launcher: string,
   versionsDir: string,
@@ -76,7 +76,7 @@ const ownsLauncher = Effect.fn("cli.uninstall.owns_launcher")(function* (
     .realPath(versionsDir)
     .pipe(Effect.orElseSucceed(() => versionsDir));
   // The link's own text keeps a pruned (dangling) target; the real path sees through a
-  // symlinked T3 home.
+  // symlinked LegionCode home.
   const targets =
     platform === "win32"
       ? [
@@ -102,7 +102,7 @@ const ownsLauncher = Effect.fn("cli.uninstall.owns_launcher")(function* (
 });
 
 /**
- * Launchers recorded in `runtime/launchers` by the install scripts and `t3 install` that still
+ * Launchers recorded in `runtime/launchers` by the install scripts and `legioncode install` that still
  * point into this home's runtime/versions. npx can run a different version than the installed
  * one, so the launcher this process started from does not always name them.
  */
@@ -130,10 +130,10 @@ export function spawnWindowsRemoval(comspec: string, dir: string) {
       "/v:off",
       "/s",
       "/c",
-      '"ping -n 3 127.0.0.1 >nul & rmdir /s /q "%T3_UNINSTALL_RUNTIME%""',
+      '"ping -n 3 127.0.0.1 >nul & rmdir /s /q "%LEGIONCODE_UNINSTALL_RUNTIME%""',
     ],
     {
-      env: { ...process.env, T3_UNINSTALL_RUNTIME: dir },
+      env: { ...process.env, LEGIONCODE_UNINSTALL_RUNTIME: dir },
       windowsVerbatimArguments: true,
       detached: true,
       stdio: "ignore",
@@ -187,7 +187,7 @@ export const uninstallCommand = Command.make("uninstall", {
   ),
 }).pipe(
   Command.withDescription(
-    "Remove t3 from this machine: the background service, the launcher, and every downloaded version. Your projects and threads are kept.",
+    "Remove legioncode from this machine: the background service, the launcher, and every downloaded version. Your projects and threads are kept.",
   ),
   Command.withHandler((flags) =>
     Effect.gen(function* () {
@@ -204,7 +204,7 @@ const logOtherHomeService = (plan: UninstallPlan) =>
   plan.otherHomeService === undefined
     ? Effect.void
     : Console.log(
-        `The T3 Code service serves ${plan.otherHomeService}, so it was not removed. Pass \`${BootService.formatBootServiceBaseDirOption(plan.otherHomeService)}\` to remove it.`,
+        `The LegionCode service serves ${plan.otherHomeService}, so it was not removed. Pass \`${BootService.formatBootServiceBaseDirOption(plan.otherHomeService)}\` to remove it.`,
       );
 
 const runUninstall = Effect.fn("cli.uninstall.run")(function* (input: {
@@ -218,10 +218,10 @@ const runUninstall = Effect.fn("cli.uninstall.run")(function* (input: {
   const plan = yield* planUninstall({ baseDir: input.baseDir });
 
   if (!plan.service && plan.launchers.length === 0 && plan.runtimeDir === undefined) {
-    yield* Console.log(`Nothing to remove: t3 is not installed for ${input.baseDir}.`);
+    yield* Console.log(`Nothing to remove: legioncode is not installed for ${input.baseDir}.`);
     if (!(yield* HostProcess.IsExecutable)) {
       yield* Console.log(
-        "  This t3 runs from a Node script, so it was installed by npm or built from source. Remove it the same way (`npm uninstall -g t3`, or delete the checkout).",
+        "  This legioncode runs from a Node script, so it was installed by npm or built from source. Remove it the same way (`npm uninstall -g legioncode`, or delete the checkout).",
       );
     }
     yield* logOtherHomeService(plan);
@@ -246,7 +246,7 @@ const runUninstall = Effect.fn("cli.uninstall.run")(function* (input: {
       });
     }
     const confirmed = yield* Prompt.run(
-      Prompt.Confirm({ message: "Remove t3 from this machine?", initial: false }),
+      Prompt.Confirm({ message: "Remove legioncode from this machine?", initial: false }),
     ).pipe(Effect.catchTags({ QuitError: () => Effect.succeed(false) }));
     if (!confirmed) {
       yield* Console.log("Left as is.");
@@ -261,7 +261,7 @@ const runUninstall = Effect.fn("cli.uninstall.run")(function* (input: {
   for (const launcher of plan.launchers) {
     // The prompt can wait a long time; never delete a file that replaced the launcher meanwhile.
     if (!(yield* ownsLauncher(launcher, plan.versionsDir))) {
-      yield* Console.log(`Left ${launcher}: it no longer runs this t3.`);
+      yield* Console.log(`Left ${launcher}: it no longer runs this legioncode.`);
       continue;
     }
     yield* fs
@@ -285,7 +285,7 @@ const runUninstall = Effect.fn("cli.uninstall.run")(function* (input: {
       yield* awaitDetachedSpawn(() => spawnWindowsRemoval(comspec, runtimeDir)).pipe(
         Effect.mapError(notScheduled),
       );
-      yield* Console.log(`${runtimeDir} will be removed once t3 exits.`);
+      yield* Console.log(`${runtimeDir} will be removed once legioncode exits.`);
     } else {
       yield* fs
         .remove(plan.runtimeDir, { recursive: true, force: true })
@@ -298,6 +298,6 @@ const runUninstall = Effect.fn("cli.uninstall.run")(function* (input: {
     }
   }
   yield* Console.log("");
-  yield* Console.log("t3 is uninstalled. Thanks for trying T3 Code.");
+  yield* Console.log("legioncode is uninstalled. Thanks for trying LegionCode.");
   yield* logOtherHomeService(plan);
 });

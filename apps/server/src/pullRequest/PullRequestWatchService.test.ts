@@ -9,7 +9,7 @@ import {
   type OrchestrationProjectShell,
   type ThreadPullRequestLink,
   SourceControlProviderKind,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import { describe, expect, it } from "@effect/vitest";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
@@ -33,16 +33,16 @@ const testCrypto = SecureRandom.make((size) => new Uint8Array(size).fill(7));
 
 function makeProject(
   repositoryIdentity: OrchestrationProjectShell["repositoryIdentity"] = {
-    canonicalKey: "github.com/t3tools/t3code",
+    canonicalKey: "github.com/9thLevelSoftware/legioncode",
     locator: {
       source: "git-remote",
       remoteName: "origin",
-      remoteUrl: "git@github.com:T3Tools/T3Code.git",
+      remoteUrl: "git@github.com:9thLevelSoftware/LegionCode.git",
     },
     provider: SourceControlProviderKind.make("github"),
-    displayName: "T3Tools/T3Code",
-    owner: "T3Tools",
-    name: "T3Code",
+    displayName: "9thLevelSoftware/LegionCode",
+    owner: "LegionCode",
+    name: "LegionCode",
   },
 ): OrchestrationProjectShell {
   return {
@@ -87,9 +87,9 @@ function makeLink(
   const { headBranch, baseBranch, ...rest } = overrides;
   return {
     host: "github.com",
-    repository: "t3tools/t3code",
+    repository: "9thLevelSoftware/legioncode",
     number,
-    url: `https://github.com/t3tools/t3code/pull/${number}`,
+    url: `https://github.com/9thLevelSoftware/legioncode/pull/${number}`,
     source: "manual",
     linkedAt: "2026-08-10T00:00:00.000Z",
     snapshot:
@@ -185,7 +185,7 @@ describe("PullRequestWatchService", () => {
       for (const [options, checksPending] of cases) {
         const harness = yield* makeHarness(options);
         const result = yield* harness.setWatching(true, {
-          url: "https://github.com/t3tools/t3code/pull/9",
+          url: "https://github.com/9thLevelSoftware/legioncode/pull/9",
         });
         expect(result).toMatchObject({ number: 9, wasWatching: false });
         const commands = yield* Ref.get(harness.commands);
@@ -194,7 +194,7 @@ describe("PullRequestWatchService", () => {
             type: "thread.pull-request.watch",
             number: 9,
             watching: true,
-            link: { url: "https://github.com/t3tools/t3code/pull/9", source: "agent" },
+            link: { url: "https://github.com/9thLevelSoftware/legioncode/pull/9", source: "agent" },
           },
         ]);
         const [command] = commands;
@@ -210,7 +210,7 @@ describe("PullRequestWatchService", () => {
       const missing = new PullRequestUnavailableError({
         reason: "cli-missing",
         provider: SourceControlProviderKind.make("gitlab"),
-        requirement: "Install glab on the T3 server's PATH.",
+        requirement: "Install glab on the LegionCode server's PATH.",
       });
       const harness = yield* makeHarness({ readFailure: missing });
       const target = { url: "https://gitlab.example.com/team/project/-/merge_requests/42" };
@@ -229,7 +229,7 @@ describe("PullRequestWatchService", () => {
     Effect.gen(function* () {
       const freshMerged = yield* makeHarness({ readState: "merged" });
       const freshError = yield* freshMerged
-        .setWatching(true, { repository: "t3tools/t3code", number: 1 })
+        .setWatching(true, { repository: "9thLevelSoftware/legioncode", number: 1 })
         .pipe(Effect.flip);
       expect(freshError).toMatchObject({ _tag: "PullRequestNotOpenError", state: "merged" });
       expect(yield* Ref.get(freshMerged.commands)).toEqual([]);
@@ -255,14 +255,14 @@ describe("PullRequestWatchService", () => {
         ]),
       });
       const error = yield* harness
-        .setWatching(true, { repository: "t3tools/t3code", number: 1 })
+        .setWatching(true, { repository: "9thLevelSoftware/legioncode", number: 1 })
         .pipe(Effect.flip);
       expect(error).toMatchObject({ _tag: "PullRequestNotOpenError", state: "merged" });
       expect(
-        yield* harness.setWatching(true, { repository: "t3tools/t3code", number: 3 }),
+        yield* harness.setWatching(true, { repository: "9thLevelSoftware/legioncode", number: 3 }),
       ).toMatchObject({ watching: true, wasWatching: true });
       expect(
-        yield* harness.setWatching(false, { repository: "t3tools/t3code", number: 3 }),
+        yield* harness.setWatching(false, { repository: "9thLevelSoftware/legioncode", number: 3 }),
       ).toMatchObject({ wasWatching: true });
       expect(yield* Ref.get(harness.commands)).toMatchObject([
         { type: "thread.pull-request.watch", number: 3, watching: true },
@@ -280,7 +280,7 @@ describe("PullRequestWatchService", () => {
           { ...closed, snapshot: closed.snapshot && { ...closed.snapshot, state: "closed" } },
         ]),
       });
-      yield* harness.setWatching(true, { repository: "t3tools/t3code", number: 1 });
+      yield* harness.setWatching(true, { repository: "9thLevelSoftware/legioncode", number: 1 });
       expect(yield* Ref.get(harness.commands)).toMatchObject([
         { type: "thread.pull-request.watch", number: 1, watching: true },
       ]);
@@ -300,7 +300,7 @@ describe("PullRequestWatchService", () => {
         },
       });
       const error = yield* harness
-        .setWatching(true, { repository: "t3tools/t3code", number: 1 })
+        .setWatching(true, { repository: "9thLevelSoftware/legioncode", number: 1 })
         .pipe(Effect.flip);
       expect(error).toMatchObject({ _tag: "PullRequestWatchFromSubagentError" });
       expect(yield* Ref.get(harness.commands)).toEqual([]);

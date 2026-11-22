@@ -3,9 +3,9 @@ import * as NodeHttp from "node:http";
 
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as HostProcess from "@t3tools/shared/HostProcess";
-import * as NetService from "@t3tools/shared/Net";
-import * as RelayClient from "@t3tools/shared/relayClient";
+import * as HostProcess from "@legioncode/shared/HostProcess";
+import * as NetService from "@legioncode/shared/Net";
+import * as RelayClient from "@legioncode/shared/relayClient";
 import { assert, it } from "@effect/vitest";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Console from "effect/Console";
@@ -62,41 +62,45 @@ it.effect("does not install the relay client when the user declines the managed 
 );
 
 it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer))(
-  "t3 connect next steps",
+  "legioncode connect next steps",
   (it) => {
     it.effect.each([
       { subcommand: "status", hint: "connect link" },
       { subcommand: "publish", hint: "connect login" },
-    ])("t3 connect $subcommand names `t3 $hint` with --base-dir", ({ subcommand, hint }) =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-connect-hint-test-" });
+    ])(
+      "legioncode connect $subcommand names `legioncode $hint` with --base-dir",
+      ({ subcommand, hint }) =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const baseDir = yield* fs.makeTempDirectoryScoped({
+            prefix: "legion-connect-hint-test-",
+          });
 
-        yield* Command.runWith(makeCli({ cloudEnabled: true }), { version: "0.0.0" })([
-          "connect",
-          subcommand,
-          "--base-dir",
-          baseDir,
-        ]);
+          yield* Command.runWith(makeCli({ cloudEnabled: true }), { version: "0.0.0" })([
+            "connect",
+            subcommand,
+            "--base-dir",
+            baseDir,
+          ]);
 
-        const { command } = yield* resolveHostCliCommand(hint, ["--base-dir", baseDir]);
-        assert.include((yield* TestConsole.logLines).join("\n"), `\`${command}\``);
-      }).pipe(
-        Effect.scoped,
-        Effect.provideService(HostProcess.Environment, {}),
-        Effect.provide(
-          Layer.mergeAll(
-            ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })),
-            Layer.fresh(TestConsole.layer),
+          const { command } = yield* resolveHostCliCommand(hint, ["--base-dir", baseDir]);
+          assert.include((yield* TestConsole.logLines).join("\n"), `\`${command}\``);
+        }).pipe(
+          Effect.scoped,
+          Effect.provideService(HostProcess.Environment, {}),
+          Effect.provide(
+            Layer.mergeAll(
+              ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })),
+              Layer.fresh(TestConsole.layer),
+            ),
           ),
         ),
-      ),
     );
   },
 );
 
 it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer))(
-  "t3 connect unlink and status",
+  "legioncode connect unlink and status",
   (it) => {
     const runConnect = (
       recordedPid: number,
@@ -131,7 +135,9 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer))
         }
 
         const fs = yield* FileSystem.FileSystem;
-        const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-connect-unlink-test-" });
+        const baseDir = yield* fs.makeTempDirectoryScoped({
+          prefix: "legion-connect-unlink-test-",
+        });
         const state = yield* makePersistedServerRuntimeState({
           config: { host: "127.0.0.1", devUrl: undefined },
           port: address.port,
@@ -182,7 +188,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer))
       Effect.gen(function* () {
         const { printed, warnings } = yield* runConnect(deadPid, { portFreed: true });
 
-        assert.include(printed, "T3 Connect is disabled locally.");
+        assert.include(printed, "Legion Connect is disabled locally.");
         assert.notInclude(warnings.join("\n"), "Restart that server");
       }),
     );
@@ -236,7 +242,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer, NetService.layer))
         const { requests, printed, warnings } = yield* runConnect(process.pid);
 
         assert.deepEqual(requests, ["POST /api/connect/unlink"]);
-        assert.include(printed, "T3 Connect is disabled locally.");
+        assert.include(printed, "Legion Connect is disabled locally.");
         assert.notInclude(warnings.join("\n"), "cloudflared process");
       }),
     );

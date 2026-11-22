@@ -13,8 +13,8 @@ import { DEVELOPMENT_ICON_OVERRIDES } from "../../../scripts/lib/brand-assets.ts
 import { findEsmImportsOfExternalPackages } from "../../../scripts/lib/cli-executable-imports.ts";
 import { injectLinuxArm64Sea } from "../../../scripts/lib/linux-arm64-sea.ts";
 import rootPackageJson from "../../../package.json" with { type: "json" };
-import * as HostProcess from "@t3tools/shared/HostProcess";
-import { resolveSpawnCommand } from "@t3tools/shared/shell";
+import * as HostProcess from "@legioncode/shared/HostProcess";
+import { resolveSpawnCommand } from "@legioncode/shared/shell";
 import {
   ServerCliBootstrapTooLargeError,
   ServerCliBuildAssetMissingError,
@@ -149,7 +149,7 @@ const buildExeCmd = Command.make(
         target === undefined || target === hostTarget || target === `${hostPlatform}-${hostArch}`;
 
       if (!isLegacyNodeForced(env) && matchesHostTarget) {
-        const executableName = hostPlatform === "win32" ? "t3.exe" : "t3";
+        const executableName = hostPlatform === "win32" ? "legioncode.exe" : "legioncode";
         const distExeDir = path.join(serverDir, "dist-exe");
         const outputPath = path.join(distExeDir, executableName);
         let rustBinary = resolveRustCliBinary({ repoRoot, platform: hostPlatform, env });
@@ -162,9 +162,9 @@ const buildExeCmd = Command.make(
             "--manifest-path",
             path.join(repoRoot, "rust/Cargo.toml"),
             "-p",
-            "t3-cli",
+            "legion-cli",
           ]);
-          yield* Effect.log("[cli] Building standalone Rust t3 binary...");
+          yield* Effect.log("[cli] Building standalone Rust legioncode binary...");
           yield* runCommand(
             ChildProcess.make(cargo.command, cargo.args, {
               cwd: repoRoot,
@@ -195,16 +195,16 @@ const buildExeCmd = Command.make(
       // TEMPORARY one-time Node fix. Remove when fixed: https://github.com/nodejs/node/issues/67048
       const linuxArm64 = !target && hostPlatform === "linux" && hostArch === "arm64";
       const spawnCommand = yield* resolveSpawnCommand("vp", ["pack"]);
-      const cliAssetDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cli-asset-" });
+      const cliAssetDir = yield* fs.makeTempDirectoryScoped({ prefix: "legion-cli-asset-" });
       const pack = (packMode: "bundle" | "bootstrap" | "1") =>
         runCommand(
           ChildProcess.make(spawnCommand.command, spawnCommand.args, {
             cwd: serverDir,
             env: {
               ...env,
-              T3CODE_PACK_EXE: packMode,
-              T3CODE_CLI_ASSET_DIR: cliAssetDir,
-              T3CODE_PACK_EXE_TARGET: target ?? "",
+              LEGIONCODE_PACK_EXE: packMode,
+              LEGIONCODE_CLI_ASSET_DIR: cliAssetDir,
+              LEGIONCODE_PACK_EXE_TARGET: target ?? "",
             },
             stdout: config.verbose ? "inherit" : "ignore",
             stderr: "inherit",
@@ -237,13 +237,13 @@ const buildExeCmd = Command.make(
         yield* injectLinuxArm64Sea({
           bundlePath: bootstrapPath,
           cliAssetPath: cliMainPath,
-          outputPath: path.join(serverDir, "dist-exe/t3"),
+          outputPath: path.join(serverDir, "dist-exe/legioncode"),
           nodeVersion: rootPackageJson.engines.node,
           verbose: config.verbose,
         });
       }
       yield* Effect.log(
-        "[cli] Built dist-exe/t3 (expects client/, resource-monitor/, and the runtime-external node_modules beside it; scripts/build-cli-archive.ts assembles that tree)",
+        "[cli] Built dist-exe/legioncode (expects client/, resource-monitor/, and the runtime-external node_modules beside it; scripts/build-cli-archive.ts assembles that tree)",
       );
     }),
 ).pipe(
@@ -270,7 +270,7 @@ const publishCmd = Command.make(
       const path = yield* Path.Path;
       const fs = yield* FileSystem.FileSystem;
       const packagesDir = path.resolve(config.packagesDir);
-      const launcherTarball = path.join(packagesDir, "t3.tgz");
+      const launcherTarball = path.join(packagesDir, "legioncode.tgz");
       if (!(yield* fs.exists(launcherTarball))) {
         return yield* new ServerCliBuildAssetMissingError({ assetPath: launcherTarball });
       }
@@ -279,7 +279,7 @@ const publishCmd = Command.make(
       if (config.provenance) args.push("--provenance");
       if (config.dryRun) args.push("--dry-run");
       const spawnCommand = yield* resolveSpawnCommand("npm", [...args, launcherTarball]);
-      yield* Effect.log(`[cli] npm ${args.join(" ")} t3.tgz`);
+      yield* Effect.log(`[cli] npm ${args.join(" ")} legioncode.tgz`);
       yield* runCommand(
         ChildProcess.make(spawnCommand.command, spawnCommand.args, {
           cwd: packagesDir,
@@ -289,10 +289,10 @@ const publishCmd = Command.make(
         }),
       );
     }),
-).pipe(Command.withDescription("Publish the t3 launcher to npm."));
+).pipe(Command.withDescription("Publish the legioncode launcher to npm."));
 
 const cli = Command.make("cli").pipe(
-  Command.withDescription("T3 server build & publish CLI."),
+  Command.withDescription("LegionCode server build & publish CLI."),
   Command.withSubcommands([buildCmd, buildExeCmd, publishCmd]),
 );
 

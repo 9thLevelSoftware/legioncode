@@ -14,14 +14,14 @@ import {
   type SourceControlRepositoryVisibility,
   type VcsError,
   type VcsProcessExitFailureKind,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 
-import * as SourceControlHost from "@t3tools/source-control-core/server/SourceControlHost";
+import * as SourceControlHost from "@legioncode/source-control-core/server/SourceControlHost";
 import {
   decodeGitLabMergeRequestJson,
   decodeGitLabMergeRequestListJson,
 } from "./gitLabMergeRequests.ts";
-import type * as SourceControlProvider from "@t3tools/source-control-core/server/SourceControlProvider";
+import type * as SourceControlProvider from "@legioncode/source-control-core/server/SourceControlProvider";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 // GitLab allows ~1M-character descriptions; glab's JSON escaping (`\u003c`) can grow one sixfold.
@@ -351,7 +351,7 @@ export class GitLabCli extends Context.Service<
       readonly force?: boolean;
     }) => Effect.Effect<void, GitLabCliError>;
   }
->()("@t3tools/source-control-gitlab/server/GitLabCli") {}
+>()("@legioncode/source-control-gitlab/server/GitLabCli") {}
 
 const RawGitLabRepositoryCloneUrlsSchema = Schema.Struct({
   path_with_namespace: TrimmedNonEmptyString,

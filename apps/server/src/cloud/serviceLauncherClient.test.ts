@@ -4,7 +4,7 @@ import * as Path from "effect/Path";
 import * as Logger from "effect/Logger";
 import * as PlatformError from "effect/PlatformError";
 import { assert, expect, it } from "@effect/vitest";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 
@@ -63,10 +63,11 @@ it.effect.each([3, SERVICE_LAUNCHER_PROTOCOL])(
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-trial-" });
-      const baseDir = path.join(root, ".t3");
-      const exe = (version: string) => path.join(baseDir, "runtime/versions", version, "t3");
-      const installed = path.join(root, ".local/bin/t3");
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "legion-trial-" });
+      const baseDir = path.join(root, ".legioncode");
+      const exe = (version: string) =>
+        path.join(baseDir, "runtime/versions", version, "legioncode");
+      const installed = path.join(root, ".local/bin/legioncode");
       for (const file of [exe("1.0.0"), exe("1.1.0")]) {
         yield* fs.makeDirectory(path.dirname(file), { recursive: true });
         yield* fs.writeFileString(file, "");
@@ -215,11 +216,12 @@ it.layer(NodeServices.layer)("self-update launchers", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-update-" });
-        const baseDir = path.join(root, ".t3");
-        const exe = (version: string) => path.join(baseDir, "runtime/versions", version, "t3");
-        const installed = path.join(root, "custom/bin/t3");
-        const onPath = path.join(root, "bin/t3");
+        const root = yield* fs.makeTempDirectoryScoped({ prefix: "legion-update-" });
+        const baseDir = path.join(root, ".legioncode");
+        const exe = (version: string) =>
+          path.join(baseDir, "runtime/versions", version, "legioncode");
+        const installed = path.join(root, "custom/bin/legioncode");
+        const onPath = path.join(root, "bin/legioncode");
         for (const file of [exe("1.0.0"), exe("1.5.0"), exe("2.0.0")]) {
           yield* fs.makeDirectory(path.dirname(file), { recursive: true });
           yield* fs.writeFileString(file, "");
@@ -232,7 +234,7 @@ it.layer(NodeServices.layer)("self-update launchers", (it) => {
         yield* ServiceLauncherClient.repointLaunchers({ baseDir, targetVersion: "2.0.0" }).pipe(
           Effect.provideService(HostProcess.Environment, {
             HOME: root,
-            T3CODE_INSTALL_BIN_DIR: path.dirname(installed),
+            LEGIONCODE_INSTALL_BIN_DIR: path.dirname(installed),
             PATH: path.dirname(onPath),
           }),
         );
@@ -247,11 +249,12 @@ it.layer(NodeServices.layer)("self-update launchers", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-update-" });
-      const baseDir = path.join(root, ".t3");
-      const exe = (version: string) => path.join(baseDir, "runtime/versions", version, "t3");
-      const installed = path.join(root, ".local/bin/t3");
-      const onPath = path.join(root, "bin/t3");
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "legion-update-" });
+      const baseDir = path.join(root, ".legioncode");
+      const exe = (version: string) =>
+        path.join(baseDir, "runtime/versions", version, "legioncode");
+      const installed = path.join(root, ".local/bin/legioncode");
+      const onPath = path.join(root, "bin/legioncode");
       for (const file of [exe("1.0.0"), exe("2.0.0")]) {
         yield* fs.makeDirectory(path.dirname(file), { recursive: true });
         yield* fs.writeFileString(file, "");
@@ -301,12 +304,12 @@ it.layer(NodeServices.layer)("self-update launchers", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-update-" });
-      const baseDir = path.join(root, ".t3");
-      const installed = path.join(root, ".local/bin/t3");
-      const onPath = path.join(root, "bin/t3");
-      const foreign = path.join(root, "other-home/runtime/versions/1.0.0/t3");
-      const target = path.join(baseDir, "runtime/versions/2.0.0/t3");
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "legion-update-" });
+      const baseDir = path.join(root, ".legioncode");
+      const installed = path.join(root, ".local/bin/legioncode");
+      const onPath = path.join(root, "bin/legioncode");
+      const foreign = path.join(root, "other-home/runtime/versions/1.0.0/legioncode");
+      const target = path.join(baseDir, "runtime/versions/2.0.0/legioncode");
       for (const file of [installed, foreign, target]) {
         yield* fs.makeDirectory(path.dirname(file), { recursive: true });
         yield* fs.writeFileString(file, "user-owned file");

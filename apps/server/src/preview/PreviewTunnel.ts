@@ -2,7 +2,7 @@
 // connection per WebSocket. Raw bytes, so pages keep their own origin, HMR sockets and TLS.
 import * as NodeHttpServerRequest from "@effect/platform-node/NodeHttpServerRequest";
 import * as NodeSocket from "@effect/platform-node/NodeSocket";
-import { AuthTerminalOperateScope } from "@t3tools/contracts";
+import { AuthTerminalOperateScope } from "@legioncode/contracts";
 import type * as NodeNet from "node:net";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -22,7 +22,7 @@ const PREVIEW_TUNNEL_ROUTE = "/api/preview/tunnel";
  * Marks a refusal about the port itself, so a client can tell "nothing listens there" from a proxy
  * in front of the environment answering 502 because the environment is down.
  */
-export const PREVIEW_TUNNEL_PORT_REFUSED_HEADER = "x-t3-tunnel-port-refused";
+export const PREVIEW_TUNNEL_PORT_REFUSED_HEADER = "x-legioncode-tunnel-port-refused";
 
 const CONNECT_TIMEOUT = "5 seconds";
 
@@ -31,7 +31,7 @@ export class PreviewTunnelPortRefusedError extends Schema.TaggedError<PreviewTun
   { port: Schema.Number },
 ) {
   override get message(): string {
-    return `Port ${this.port} is this T3 Code server's own port.`;
+    return `Port ${this.port} is this LegionCode server's own port.`;
   }
 }
 
@@ -57,7 +57,7 @@ export class PreviewTunnel extends Context.Service<
       Scope.Scope
     >;
   }
->()("t3/preview/PreviewTunnel") {}
+>()("legioncode/preview/PreviewTunnel") {}
 
 const make = Effect.sync(() => {
   const dial = Effect.fnUntraced(function* (host: string, port: number) {

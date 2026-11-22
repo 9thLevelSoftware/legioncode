@@ -1,17 +1,17 @@
 import {
   DESKTOP_UPDATE_IN_PROGRESS_MARKER_FILE,
   DESKTOP_UPDATE_IN_PROGRESS_TTL_MS,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import type {
   DesktopSshEnvironmentBootstrap,
   DesktopSshEnvironmentTarget,
-} from "@t3tools/contracts";
-import { waitForHttpReady as waitForHttpReadyShared } from "@t3tools/shared/httpReadiness";
-import { cliReleaseDownloadBaseUrl } from "@t3tools/shared/cliRelease";
-import * as KeyedLock from "@t3tools/shared/KeyedLock";
-import * as NetService from "@t3tools/shared/Net";
-import { extractJsonObject, fromLenientJson } from "@t3tools/shared/schemaJson";
-import { satisfiesSemverRange } from "@t3tools/shared/semver";
+} from "@legioncode/contracts";
+import { waitForHttpReady as waitForHttpReadyShared } from "@legioncode/shared/httpReadiness";
+import { cliReleaseDownloadBaseUrl } from "@legioncode/shared/cliRelease";
+import * as KeyedLock from "@legioncode/shared/KeyedLock";
+import * as NetService from "@legioncode/shared/Net";
+import { extractJsonObject, fromLenientJson } from "@legioncode/shared/schemaJson";
+import { satisfiesSemverRange } from "@legioncode/shared/semver";
 import * as Context from "effect/Context";
 import * as Digest from "effect/crypto/Digest";
 import * as Duration from "effect/Duration";
@@ -107,7 +107,7 @@ const REMOTE_LAUNCH_TIMEOUT_MS =
   REMOTE_OWNER_WAIT_MS +
   REMOTE_LAUNCH_BASE_TIMEOUT_MS;
 
-export interface RemoteT3RunnerOptions {
+export interface RemoteLegionRunnerOptions {
   readonly nodeScriptPath?: string | null;
   readonly nodeEngineRange?: string | null;
   readonly archiveVersion?: string | null;
@@ -115,7 +115,7 @@ export interface RemoteT3RunnerOptions {
 }
 
 export interface SshEnvironmentManagerOptions {
-  readonly resolveCliRunner?: Effect.Effect<RemoteT3RunnerOptions>;
+  readonly resolveCliRunner?: Effect.Effect<RemoteLegionRunnerOptions>;
   // Identifies this install to the remote across edits of a connection; null when unknown.
   readonly resolveLauncherId?: Effect.Effect<string | null>;
 }
@@ -150,11 +150,11 @@ type SshEnvironmentEffectError =
   | SshPasswordPromptError
   | NetService.NetError;
 
-function isNodeScriptRunner(runner: RemoteT3RunnerOptions | undefined): boolean {
+function isNodeScriptRunner(runner: RemoteLegionRunnerOptions | undefined): boolean {
   return Boolean(runner?.nodeScriptPath?.trim());
 }
 
-function sshRunnerLogFields(runner: RemoteT3RunnerOptions | undefined) {
+function sshRunnerLogFields(runner: RemoteLegionRunnerOptions | undefined) {
   if (runner?.nodeScriptPath?.trim()) {
     return { runner: "node-script", nodeScriptPath: runner.nodeScriptPath.trim() };
   }
@@ -379,12 +379,12 @@ const REMOTE_NODE_ENV_SCRIPT = `prepend_path_if_dir() {
 }
 
 remote_node_satisfies_engine() {
-  T3_NODE_ENGINE_RANGE=@@T3_NODE_ENGINE_RANGE@@
-  if [ -z "$T3_NODE_ENGINE_RANGE" ]; then
+  LEGION_NODE_ENGINE_RANGE=@@LEGION_NODE_ENGINE_RANGE@@
+  if [ -z "$LEGION_NODE_ENGINE_RANGE" ]; then
     return 0
   fi
-  node - "$T3_NODE_ENGINE_RANGE" <<'NODE'
-@@T3_NODE_ENGINE_CHECK_SCRIPT@@
+  node - "$LEGION_NODE_ENGINE_RANGE" <<'NODE'
+@@LEGION_NODE_ENGINE_CHECK_SCRIPT@@
 NODE
 }
 
@@ -451,9 +451,9 @@ ensure_remote_node_path() {
   fi
 
   if ! command -v node >/dev/null 2>&1 && [ -d "$NVM_DIR/versions/node" ]; then
-    for T3_NODE_BIN in "$NVM_DIR"/versions/node/*/bin; do
-      if [ -x "$T3_NODE_BIN/node" ]; then
-        PATH="$T3_NODE_BIN:$PATH"
+    for LEGION_NODE_BIN in "$NVM_DIR"/versions/node/*/bin; do
+      if [ -x "$LEGION_NODE_BIN/node" ]; then
+        PATH="$LEGION_NODE_BIN:$PATH"
         export PATH
       fi
     done
@@ -465,9 +465,9 @@ ensure_remote_node_path() {
 
 const REMOTE_RUNNER_SCRIPT = `#!/bin/sh
 set -eu
-@@T3_NODE_ENV_SCRIPT@@
-T3_NODE_SCRIPT_PATH=@@T3_NODE_SCRIPT_PATH@@
-if [ -n "$T3_NODE_SCRIPT_PATH" ]; then
+@@LEGION_NODE_ENV_SCRIPT@@
+LEGION_NODE_SCRIPT_PATH=@@LEGION_NODE_SCRIPT_PATH@@
+if [ -n "$LEGION_NODE_SCRIPT_PATH" ]; then
   # Dev mode: a source checkout on the remote. This is the only path that
   # needs Node, so Node discovery runs here and nowhere else.
   ensure_remote_node_path || true
@@ -475,114 +475,114 @@ if [ -n "$T3_NODE_SCRIPT_PATH" ]; then
     printf 'Remote host is missing node on PATH. Install Node or configure a supported version manager for non-interactive shells.\\n' >&2
     exit 1
   fi
-  exec node "$T3_NODE_SCRIPT_PATH" "$@"
+  exec node "$LEGION_NODE_SCRIPT_PATH" "$@"
 fi
-T3_ARCHIVE_VERSION=@@T3_ARCHIVE_VERSION@@
-if [ -z "$T3_ARCHIVE_VERSION" ]; then
-  printf 'No t3 release version was provided for the remote runtime.\\n' >&2
+LEGION_ARCHIVE_VERSION=@@LEGION_ARCHIVE_VERSION@@
+if [ -z "$LEGION_ARCHIVE_VERSION" ]; then
+  printf 'No legioncode release version was provided for the remote runtime.\\n' >&2
   exit 1
 fi
-T3_SYSTEM_EXECUTABLE="$(command -v t3 2>/dev/null || true)"
-if [ -n "$T3_SYSTEM_EXECUTABLE" ] && T3_SYSTEM_VERSION="$("$T3_SYSTEM_EXECUTABLE" --version 2>/dev/null)" && [ "$T3_SYSTEM_VERSION" = "t3 v$T3_ARCHIVE_VERSION" ]; then
+LEGION_SYSTEM_EXECUTABLE="$(command -v legioncode 2>/dev/null || true)"
+if [ -n "$LEGION_SYSTEM_EXECUTABLE" ] && LEGION_SYSTEM_VERSION="$("$LEGION_SYSTEM_EXECUTABLE" --version 2>/dev/null)" && [ "$LEGION_SYSTEM_VERSION" = "legioncode v$LEGION_ARCHIVE_VERSION" ]; then
   # A matching host-provided runtime supports platforms such as musl Linux,
   # where the portable release archive cannot run.
-  exec "$T3_SYSTEM_EXECUTABLE" "$@"
+  exec "$LEGION_SYSTEM_EXECUTABLE" "$@"
 fi
 # Self-contained release archive: no Node, npm, or compiler on the remote.
-# Unpacked into the pinned-runtime layout so \`t3 service install\` reuses it.
-T3_RELEASE_BASE_URL=@@T3_RELEASE_BASE_URL@@
-T3_RUNTIME_DIR="$HOME/.t3/runtime/versions/$T3_ARCHIVE_VERSION"
-t3_runtime_ready() {
-  [ -x "$T3_RUNTIME_DIR/t3" ] && [ "$(cat "$T3_RUNTIME_DIR/.install-complete" 2>/dev/null)" = "$T3_ARCHIVE_VERSION" ]
+# Unpacked into the pinned-runtime layout so \`legioncode service install\` reuses it.
+LEGION_RELEASE_BASE_URL=@@LEGION_RELEASE_BASE_URL@@
+LEGION_RUNTIME_DIR="$HOME/.legioncode/runtime/versions/$LEGION_ARCHIVE_VERSION"
+legion_runtime_ready() {
+  [ -x "$LEGION_RUNTIME_DIR/legioncode" ] && [ "$(cat "$LEGION_RUNTIME_DIR/.install-complete" 2>/dev/null)" = "$LEGION_ARCHIVE_VERSION" ]
 }
-if ! t3_runtime_ready; then
-  mkdir -p "$HOME/.t3/runtime/versions"
-  T3_LOCK="$HOME/.t3/runtime/versions/.$T3_ARCHIVE_VERSION.install.lock"
+if ! legion_runtime_ready; then
+  mkdir -p "$HOME/.legioncode/runtime/versions"
+  LEGION_LOCK="$HOME/.legioncode/runtime/versions/.$LEGION_ARCHIVE_VERSION.install.lock"
   # uutils mkdir can report success on EEXIST, so use shell noclobber.
   # An empty lock gets a short grace period for its owner to publish a PID.
-  T3_LOCK_WAITED=0
-  T3_LOCK_UNOWNED=0
-  while ! (set -C; printf '%s\\n' "$$" > "$T3_LOCK") 2>/dev/null; do
-    T3_LOCK_OWNER="$(cat "$T3_LOCK" 2>/dev/null || true)"
-    if [ -n "$T3_LOCK_OWNER" ]; then
-      T3_LOCK_UNOWNED=0
-      if ! kill -0 "$T3_LOCK_OWNER" 2>/dev/null; then
-        rm -rf "$T3_LOCK"
+  LEGION_LOCK_WAITED=0
+  LEGION_LOCK_UNOWNED=0
+  while ! (set -C; printf '%s\\n' "$$" > "$LEGION_LOCK") 2>/dev/null; do
+    LEGION_LOCK_OWNER="$(cat "$LEGION_LOCK" 2>/dev/null || true)"
+    if [ -n "$LEGION_LOCK_OWNER" ]; then
+      LEGION_LOCK_UNOWNED=0
+      if ! kill -0 "$LEGION_LOCK_OWNER" 2>/dev/null; then
+        rm -rf "$LEGION_LOCK"
         continue
       fi
     else
-      T3_LOCK_UNOWNED=$((T3_LOCK_UNOWNED + 1))
-      if [ "$T3_LOCK_UNOWNED" -ge 5 ]; then
-        rm -rf "$T3_LOCK"
+      LEGION_LOCK_UNOWNED=$((LEGION_LOCK_UNOWNED + 1))
+      if [ "$LEGION_LOCK_UNOWNED" -ge 5 ]; then
+        rm -rf "$LEGION_LOCK"
         continue
       fi
     fi
-    if [ "$T3_LOCK_WAITED" -ge @@T3_ARCHIVE_LOCK_WAIT_SECONDS@@ ]; then
-      printf 'Another t3 %s installation has held %s for too long.\\n' "$T3_ARCHIVE_VERSION" "$T3_LOCK" >&2
+    if [ "$LEGION_LOCK_WAITED" -ge @@LEGION_ARCHIVE_LOCK_WAIT_SECONDS@@ ]; then
+      printf 'Another legioncode %s installation has held %s for too long.\\n' "$LEGION_ARCHIVE_VERSION" "$LEGION_LOCK" >&2
       exit 1
     fi
     sleep 1
-    T3_LOCK_WAITED=$((T3_LOCK_WAITED + 1))
+    LEGION_LOCK_WAITED=$((LEGION_LOCK_WAITED + 1))
   done
-  trap 'rm -rf "$T3_LOCK"' EXIT
+  trap 'rm -rf "$LEGION_LOCK"' EXIT
 fi
-if ! t3_runtime_ready; then
+if ! legion_runtime_ready; then
   # Keep aligned with CLI_ARCHIVE_PLATFORM_KEYS in packages/shared/src/cliRelease.ts.
   case "$(uname -s) $(uname -m)" in
-    "Darwin arm64") T3_PLATFORM_KEY="darwin-arm64" ;;
-    "Linux arm64" | "Linux aarch64") T3_PLATFORM_KEY="linux-arm64" ;;
-    "Linux x86_64" | "Linux amd64") T3_PLATFORM_KEY="linux-x64" ;;
-    *) printf 'Remote host %s has no t3 release archive.\\n' "$(uname -s) $(uname -m)" >&2; exit 1 ;;
+    "Darwin arm64") LEGION_PLATFORM_KEY="darwin-arm64" ;;
+    "Linux arm64" | "Linux aarch64") LEGION_PLATFORM_KEY="linux-arm64" ;;
+    "Linux x86_64" | "Linux amd64") LEGION_PLATFORM_KEY="linux-x64" ;;
+    *) printf 'Remote host %s has no legioncode release archive.\\n' "$(uname -s) $(uname -m)" >&2; exit 1 ;;
   esac
-  T3_ARCHIVE="t3-$T3_ARCHIVE_VERSION-$T3_PLATFORM_KEY.tar.gz"
+  LEGION_ARCHIVE="legioncode-$LEGION_ARCHIVE_VERSION-$LEGION_PLATFORM_KEY.tar.gz"
   if ! command -v tar >/dev/null 2>&1; then
-    printf 'Remote host needs tar to unpack %s. Install tar on it and try again.\\n' "$T3_ARCHIVE" >&2
+    printf 'Remote host needs tar to unpack %s. Install tar on it and try again.\\n' "$LEGION_ARCHIVE" >&2
     exit 1
   fi
-  T3_STAGING="$(mktemp -d "$HOME/.t3/runtime/versions/.staging-XXXXXX")"
-  trap 'rm -rf "$T3_STAGING" "$T3_LOCK"' EXIT
-  t3_fetch() {
+  LEGION_STAGING="$(mktemp -d "$HOME/.legioncode/runtime/versions/.staging-XXXXXX")"
+  trap 'rm -rf "$LEGION_STAGING" "$LEGION_LOCK"' EXIT
+  legion_fetch() {
     if command -v curl >/dev/null 2>&1; then curl -fsSL --connect-timeout 30 --max-time "$3" "$1" -o "$2"
     elif command -v wget >/dev/null 2>&1; then wget -q --timeout=30 --tries=1 "$1" -O "$2"
-    else printf 'Remote host needs curl or wget to download %s.\\n' "$T3_ARCHIVE" >&2; exit 1
+    else printf 'Remote host needs curl or wget to download %s.\\n' "$LEGION_ARCHIVE" >&2; exit 1
     fi || {
-      printf 'Could not download t3 %s from %s. If this host cannot reach it, install t3 %s on it with https://t3.codes/install.sh (T3CODE_VERSION=%s; T3CODE_RELEASE_BASE_URL selects a mirror).\\n' "$T3_ARCHIVE_VERSION" "$1" "$T3_ARCHIVE_VERSION" "$T3_ARCHIVE_VERSION" >&2
+      printf 'Could not download legioncode %s from %s. If this host cannot reach it, install legioncode %s on it with https://legion.codes/install.sh (LEGIONCODE_VERSION=%s; LEGIONCODE_RELEASE_BASE_URL selects a mirror).\\n' "$LEGION_ARCHIVE_VERSION" "$1" "$LEGION_ARCHIVE_VERSION" "$LEGION_ARCHIVE_VERSION" >&2
       exit 1
     }
   }
-  t3_fetch "$T3_RELEASE_BASE_URL/v$T3_ARCHIVE_VERSION/SHA256SUMS" "$T3_STAGING/SHA256SUMS" @@T3_ARCHIVE_CHECKSUMS_SECONDS@@
-  t3_fetch "$T3_RELEASE_BASE_URL/v$T3_ARCHIVE_VERSION/$T3_ARCHIVE" "$T3_STAGING/$T3_ARCHIVE" @@T3_ARCHIVE_DOWNLOAD_SECONDS@@
-  T3_EXPECTED="$(grep " \\*\\{0,1\\}$T3_ARCHIVE$" "$T3_STAGING/SHA256SUMS" | cut -d' ' -f1)"
+  legion_fetch "$LEGION_RELEASE_BASE_URL/v$LEGION_ARCHIVE_VERSION/SHA256SUMS" "$LEGION_STAGING/SHA256SUMS" @@LEGION_ARCHIVE_CHECKSUMS_SECONDS@@
+  legion_fetch "$LEGION_RELEASE_BASE_URL/v$LEGION_ARCHIVE_VERSION/$LEGION_ARCHIVE" "$LEGION_STAGING/$LEGION_ARCHIVE" @@LEGION_ARCHIVE_DOWNLOAD_SECONDS@@
+  LEGION_EXPECTED="$(grep " \\*\\{0,1\\}$LEGION_ARCHIVE$" "$LEGION_STAGING/SHA256SUMS" | cut -d' ' -f1)"
   if command -v sha256sum >/dev/null 2>&1; then
-    T3_ACTUAL="$(sha256sum < "$T3_STAGING/$T3_ARCHIVE" | cut -d' ' -f1)"
+    LEGION_ACTUAL="$(sha256sum < "$LEGION_STAGING/$LEGION_ARCHIVE" | cut -d' ' -f1)"
   else
-    T3_ACTUAL="$(shasum -a 256 < "$T3_STAGING/$T3_ARCHIVE" | cut -d' ' -f1)"
+    LEGION_ACTUAL="$(shasum -a 256 < "$LEGION_STAGING/$LEGION_ARCHIVE" | cut -d' ' -f1)"
   fi
-  if [ -z "$T3_EXPECTED" ] || [ "$T3_ACTUAL" != "$T3_EXPECTED" ]; then
-    printf 'Checksum mismatch for %s.\\n' "$T3_ARCHIVE" >&2; exit 1
+  if [ -z "$LEGION_EXPECTED" ] || [ "$LEGION_ACTUAL" != "$LEGION_EXPECTED" ]; then
+    printf 'Checksum mismatch for %s.\\n' "$LEGION_ARCHIVE" >&2; exit 1
   fi
-  if ! T3_TAR_ERROR="$(tar -xzf "$T3_STAGING/$T3_ARCHIVE" -C "$T3_STAGING" --strip-components=1 2>&1)"; then
+  if ! LEGION_TAR_ERROR="$(tar -xzf "$LEGION_STAGING/$LEGION_ARCHIVE" -C "$LEGION_STAGING" --strip-components=1 2>&1)"; then
     # Some tars (BusyBox) gunzip internally, so gzip is only blamed once extraction fails.
-    if command -v gzip >/dev/null 2>&1; then printf '%s\\n' "$T3_TAR_ERROR" >&2
-    else printf 'Remote host needs gzip to unpack %s. Install gzip on it and try again.\\n' "$T3_ARCHIVE" >&2
+    if command -v gzip >/dev/null 2>&1; then printf '%s\\n' "$LEGION_TAR_ERROR" >&2
+    else printf 'Remote host needs gzip to unpack %s. Install gzip on it and try again.\\n' "$LEGION_ARCHIVE" >&2
     fi
     exit 1
   fi
-  rm -f "$T3_STAGING/$T3_ARCHIVE" "$T3_STAGING/SHA256SUMS"
+  rm -f "$LEGION_STAGING/$LEGION_ARCHIVE" "$LEGION_STAGING/SHA256SUMS"
   # Prove the binary runs here (libc, arch) before marking it ready, or every
   # later launch would exec a broken install instead of retrying.
-  if ! "$T3_STAGING/t3" --version >/dev/null 2>&1; then
-    printf 'The t3 %s executable does not run on this host.\\n' "$T3_ARCHIVE_VERSION" >&2; exit 1
+  if ! "$LEGION_STAGING/legioncode" --version >/dev/null 2>&1; then
+    printf 'The legioncode %s executable does not run on this host.\\n' "$LEGION_ARCHIVE_VERSION" >&2; exit 1
   fi
-  printf '%s\\n' "$T3_ARCHIVE_VERSION" > "$T3_STAGING/.install-complete"
-  rm -rf "$T3_RUNTIME_DIR"
-  mv "$T3_STAGING" "$T3_RUNTIME_DIR"
+  printf '%s\\n' "$LEGION_ARCHIVE_VERSION" > "$LEGION_STAGING/.install-complete"
+  rm -rf "$LEGION_RUNTIME_DIR"
+  mv "$LEGION_STAGING" "$LEGION_RUNTIME_DIR"
 fi
-if [ -n "\${T3_LOCK:-}" ]; then
-  rm -rf "$T3_LOCK"
+if [ -n "\${LEGION_LOCK:-}" ]; then
+  rm -rf "$LEGION_LOCK"
   trap - EXIT
 fi
-exec "$T3_RUNTIME_DIR/t3" "$@"
+exec "$LEGION_RUNTIME_DIR/legioncode" "$@"
 `;
 
 // kill -0 also passes for a zombie, a reused PID and, on Linux, a thread ID,
@@ -599,28 +599,28 @@ const REMOTE_MANAGED_SERVER_RUNNING_SCRIPT = `managed_server_running() {
   ! ps -ww -o args= -p "$$" >/dev/null 2>&1
 }`;
 
-// NFS-shared homes can link ~/.t3 to a directory that does not exist yet, and
+// NFS-shared homes can link ~/.legioncode to a directory that does not exist yet, and
 // mkdir -p fails with EEXIST on a dangling symlink, so create its target first.
-const REMOTE_ENSURE_T3_HOME_SCRIPT = `if [ -L "$HOME/.t3" ] && [ ! -e "$HOME/.t3" ]; then
-  (cd "$HOME" && mkdir -p "$(readlink .t3)")
+const REMOTE_ENSURE_LEGION_HOME_SCRIPT = `if [ -L "$HOME/.legioncode" ] && [ ! -e "$HOME/.legioncode" ]; then
+  (cd "$HOME" && mkdir -p "$(readlink .legioncode)")
 fi`;
 
 const REMOTE_LAUNCH_SCRIPT = `set -eu
-@@T3_NODE_ENV_SCRIPT@@
+@@LEGION_NODE_ENV_SCRIPT@@
 STATE_KEY="$1"
 LAUNCHER_ID="\${2:-}"
-STATE_DIR="$HOME/.t3/ssh-launch/$STATE_KEY"
-DEFAULT_SERVER_HOME="$HOME/.t3"
+STATE_DIR="$HOME/.legioncode/ssh-launch/$STATE_KEY"
+DEFAULT_SERVER_HOME="$HOME/.legioncode"
 DEFAULT_RUNTIME_FILE="$DEFAULT_SERVER_HOME/userdata/server-runtime.json"
 PORT_FILE="$STATE_DIR/port"
 PID_FILE="$STATE_DIR/pid"
 MANAGED_FILE="$STATE_DIR/managed"
 LOG_FILE="$STATE_DIR/server.log"
-RUNNER_FILE="$STATE_DIR/run-t3.sh"
-RUNNER_NEXT="$STATE_DIR/run-t3.next.$$"
+RUNNER_FILE="$STATE_DIR/run-legioncode.sh"
+RUNNER_NEXT="$STATE_DIR/run-legioncode.next.$$"
 LAUNCH_LOCK="$DEFAULT_SERVER_HOME/ssh-launch/.launch.lock"
 LAUNCH_BREAK_LOCK="$LAUNCH_LOCK.break"
-@@T3_ENSURE_T3_HOME_SCRIPT@@
+@@LEGION_ENSURE_HOME_SCRIPT@@
 mkdir -p "$STATE_DIR"
 cleanup_launch() {
   rm -f "$RUNNER_NEXT"
@@ -635,11 +635,11 @@ trap cleanup_launch EXIT
 # the lock is released.
 trap 'exit 1' HUP INT PIPE TERM
 cat >"$RUNNER_NEXT" <<'SH'
-@@T3_RUNNER_SCRIPT@@
+@@LEGION_RUNNER_SCRIPT@@
 SH
 chmod 700 "$RUNNER_NEXT"
-T3_ARCHIVE_MODE=@@T3_ARCHIVE_MODE@@
-if [ "$T3_ARCHIVE_MODE" = "1" ]; then
+LEGION_ARCHIVE_MODE=@@LEGION_ARCHIVE_MODE@@
+if [ "$LEGION_ARCHIVE_MODE" = "1" ]; then
   # The archive ships the helpers below inside the executable; the remote
   # needs no Node at all. Resolving the runner once here also downloads the
   # archive before the port and readiness probes rely on it.
@@ -681,11 +681,11 @@ while ! (set -C; printf '%s\\n' "$$" >"$LAUNCH_LOCK") 2>/dev/null; do
       continue
     fi
   fi
-  if [ "$LAUNCH_LOCK_WAITED" -ge @@T3_LAUNCH_LOCK_WAIT_SECONDS@@ ]; then
+  if [ "$LAUNCH_LOCK_WAITED" -ge @@LEGION_LAUNCH_LOCK_WAIT_SECONDS@@ ]; then
     if [ -e "$LAUNCH_BREAK_LOCK" ]; then
-      printf 'A T3 server launch stopped while recovering %s. If no launch is running, delete %s.\\n' "$LAUNCH_LOCK" "$LAUNCH_BREAK_LOCK" >&2
+      printf 'A LegionCode server launch stopped while recovering %s. If no launch is running, delete %s.\\n' "$LAUNCH_LOCK" "$LAUNCH_BREAK_LOCK" >&2
     else
-      printf 'Another T3 server launch has held %s for too long.\\n' "$LAUNCH_LOCK" >&2
+      printf 'Another LegionCode server launch has held %s for too long.\\n' "$LAUNCH_LOCK" >&2
     fi
     exit 1
   fi
@@ -701,27 +701,27 @@ if [ -n "$LAUNCHER_ID" ]; then
   printf '%s\\n' "$LAUNCHER_ID" >"$STATE_DIR/launcher"
 fi
 pick_port() {
-  if [ "$T3_ARCHIVE_MODE" = "1" ]; then
-    "$RUNNER_FILE" __ssh-helper pick-port "$PORT_FILE" "@@T3_DEFAULT_REMOTE_PORT@@" "@@T3_REMOTE_PORT_SCAN_WINDOW@@"
+  if [ "$LEGION_ARCHIVE_MODE" = "1" ]; then
+    "$RUNNER_FILE" __ssh-helper pick-port "$PORT_FILE" "@@LEGION_DEFAULT_REMOTE_PORT@@" "@@LEGION_REMOTE_PORT_SCAN_WINDOW@@"
     return
   fi
-  node - "$PORT_FILE" "@@T3_DEFAULT_REMOTE_PORT@@" "@@T3_REMOTE_PORT_SCAN_WINDOW@@" <<'NODE'
-@@T3_PICK_PORT_SCRIPT@@
+  node - "$PORT_FILE" "@@LEGION_DEFAULT_REMOTE_PORT@@" "@@LEGION_REMOTE_PORT_SCAN_WINDOW@@" <<'NODE'
+@@LEGION_PICK_PORT_SCRIPT@@
 NODE
 }
 wait_ready() {
-  if [ "$T3_ARCHIVE_MODE" = "1" ]; then
-    "$RUNNER_FILE" __ssh-helper wait-ready "$REMOTE_PORT" "$1" "@@T3_READY_PROBE_TIMEOUT_MS@@"
+  if [ "$LEGION_ARCHIVE_MODE" = "1" ]; then
+    "$RUNNER_FILE" __ssh-helper wait-ready "$REMOTE_PORT" "$1" "@@LEGION_READY_PROBE_TIMEOUT_MS@@"
     return
   fi
-  node - "$REMOTE_PORT" "$1" "@@T3_READY_PROBE_TIMEOUT_MS@@" <<'NODE'
-@@T3_WAIT_READY_SCRIPT@@
+  node - "$REMOTE_PORT" "$1" "@@LEGION_READY_PROBE_TIMEOUT_MS@@" <<'NODE'
+@@LEGION_WAIT_READY_SCRIPT@@
 NODE
 }
 wait_for_pid_exit() {
   PID_TO_WAIT="$1"
   WAIT_COUNT=0
-  while kill -0 "$PID_TO_WAIT" 2>/dev/null && [ "$WAIT_COUNT" -lt @@T3_PID_EXIT_WAIT_TICKS@@ ]; do
+  while kill -0 "$PID_TO_WAIT" 2>/dev/null && [ "$WAIT_COUNT" -lt @@LEGION_PID_EXIT_WAIT_TICKS@@ ]; do
     WAIT_COUNT=$((WAIT_COUNT + 1))
     sleep 0.1
   done
@@ -736,16 +736,16 @@ server_running() {
 }
 # An older client replacing a same-or-newer server would run below the database's migrations.
 keeps_running_server() {
-  [ "$T3_ARCHIVE_MODE" = "1" ] &&
+  [ "$LEGION_ARCHIVE_MODE" = "1" ] &&
     "$RUNNER_FILE" __ssh-helper keep-server "$DEFAULT_RUNTIME_FILE" "$REMOTE_PID" >/dev/null 2>&1
 }
-@@T3_MANAGED_SERVER_RUNNING_SCRIPT@@
+@@LEGION_MANAGED_SERVER_RUNNING_SCRIPT@@
 # Both are SQLite locks the OS drops with their holder: a server holds
 # server-owner.sqlite, and a boot service holds service-serving.lock from
 # before it starts a server, between two of them during its own update, until
 # it stops or idles behind another server.
 home_owned() {
-  if [ "$T3_ARCHIVE_MODE" = "1" ]; then
+  if [ "$LEGION_ARCHIVE_MODE" = "1" ]; then
     "$RUNNER_FILE" __ssh-helper home-owned "$DEFAULT_SERVER_HOME" 2>/dev/null
     return
   fi
@@ -774,7 +774,7 @@ process.exitCode =
 NODE
 }
 resolve_default_runtime_port() {
-  if [ "$T3_ARCHIVE_MODE" = "1" ]; then
+  if [ "$LEGION_ARCHIVE_MODE" = "1" ]; then
     "$RUNNER_FILE" __ssh-helper runtime-port "$DEFAULT_RUNTIME_FILE"
     return
   fi
@@ -801,11 +801,11 @@ NODE
 }
 # This script ships with the SSH client; older clients do not honor this marker.
 update_remaining() {
-  if [ "$T3_ARCHIVE_MODE" = "1" ]; then
-    "$RUNNER_FILE" __ssh-helper update-remaining "$DEFAULT_SERVER_HOME/runtime/@@T3_UPDATE_MARKER_FILE@@"
+  if [ "$LEGION_ARCHIVE_MODE" = "1" ]; then
+    "$RUNNER_FILE" __ssh-helper update-remaining "$DEFAULT_SERVER_HOME/runtime/@@LEGION_UPDATE_MARKER_FILE@@"
     return
   fi
-  node - "$DEFAULT_SERVER_HOME/runtime/@@T3_UPDATE_MARKER_FILE@@" <<'NODE'
+  node - "$DEFAULT_SERVER_HOME/runtime/@@LEGION_UPDATE_MARKER_FILE@@" <<'NODE'
 const fs = require("node:fs");
 const path = process.argv[2];
 try {
@@ -813,7 +813,7 @@ try {
   const now = Date.now();
   if (Number.isFinite(startedAt) && Number.isFinite(expiresAt) &&
       startedAt <= now && expiresAt > now && expiresAt > startedAt) {
-    process.stdout.write(String(Math.min(expiresAt - now, @@T3_UPDATE_TTL_MS@@)));
+    process.stdout.write(String(Math.min(expiresAt - now, @@LEGION_UPDATE_TTL_MS@@)));
   }
 } catch {}
 NODE
@@ -839,7 +839,7 @@ if [ -n "$DEFAULT_REMOTE_PORT" ] && [ "$REMOTE_MANAGED" = "managed" ] && [ "$DEF
   return 0
 elif [ -n "$DEFAULT_REMOTE_PORT" ]; then
   REMOTE_PORT="$DEFAULT_REMOTE_PORT"
-  if wait_ready "@@T3_REUSE_READY_TIMEOUT_MS@@"; then
+  if wait_ready "@@LEGION_REUSE_READY_TIMEOUT_MS@@"; then
     ADOPTED_PID="$DEFAULT_RUNTIME_PID"
     if [ "$REMOTE_MANAGED" = "managed" ]; then
       if managed_server_running "$REMOTE_PID"; then
@@ -884,7 +884,7 @@ if adopt_default_server && [ -n "$ADOPTED_PID" ] && [ -n "$LAUNCHER_ID" ]; then
     printf 'external\\n' >"$SIBLING_DIR/managed"
     rm -f "$SIBLING_DIR/pid"
     RUNNER_CHANGED=1
-    if cmp -s "$RUNNER_FILE" "$SIBLING_DIR/run-t3.sh"; then
+    if cmp -s "$RUNNER_FILE" "$SIBLING_DIR/run-legioncode.sh"; then
       RUNNER_CHANGED=0
     fi
     break
@@ -895,7 +895,7 @@ if [ "$REMOTE_MANAGED" = "external" ]; then
   # it again could catch a momentary stall and launch a second server beside it.
   if server_running "$ADOPTED_PID"; then
     :
-  elif [ -z "$REMOTE_PORT" ] || ! wait_ready "@@T3_REUSE_READY_TIMEOUT_MS@@"; then
+  elif [ -z "$REMOTE_PORT" ] || ! wait_ready "@@LEGION_REUSE_READY_TIMEOUT_MS@@"; then
     REMOTE_PID=""
     REMOTE_PORT=""
     REMOTE_MANAGED=""
@@ -909,8 +909,8 @@ elif [ -n "$REMOTE_PORT" ] && managed_server_running "$REMOTE_PID"; then
     REMOTE_PID=""
     REMOTE_PORT=""
     REMOTE_MANAGED=""
-  elif ! wait_ready "@@T3_READY_TIMEOUT_MS@@"; then
-    printf 'Remote T3 server is still running but did not become ready. Retry the connection; the server was left running.\\n' >&2
+  elif ! wait_ready "@@LEGION_READY_TIMEOUT_MS@@"; then
+    printf 'Remote LegionCode server is still running but did not become ready. Retry the connection; the server was left running.\\n' >&2
     exit 1
   fi
 else
@@ -926,7 +926,7 @@ if [ -z "$REMOTE_PORT" ] && [ -z "$DEFAULT_RUNTIME_INFO" ]; then
     [ "$SIBLING_DIR" != "$STATE_DIR" ] && [ "$(cat "$SIBLING_DIR/managed" 2>/dev/null || true)" = "managed" ] || continue
     managed_server_running "$(cat "$SIBLING_DIR/pid" 2>/dev/null || true)" || continue
     REMOTE_PORT="$(cat "$SIBLING_DIR/port" 2>/dev/null || true)"
-    if [ -n "$REMOTE_PORT" ] && wait_ready "@@T3_REUSE_READY_TIMEOUT_MS@@"; then
+    if [ -n "$REMOTE_PORT" ] && wait_ready "@@LEGION_REUSE_READY_TIMEOUT_MS@@"; then
       REMOTE_MANAGED="external"
       rm -f "$PID_FILE"
       printf '%s\\n' "$REMOTE_PORT" >"$PORT_FILE"
@@ -941,11 +941,11 @@ if [ -z "$REMOTE_PORT" ]; then
   # The sleep count bounds a host clock that stops advancing.
   UPDATE_WAITED=0
   UPDATE_SAW_MARKER=0
-  while [ "$UPDATE_WAITED" -le @@T3_UPDATE_TTL_SECONDS@@ ]; do
+  while [ "$UPDATE_WAITED" -le @@LEGION_UPDATE_TTL_SECONDS@@ ]; do
     UPDATE_REMAINING="$(update_remaining 2>/dev/null || true)"
     [ -n "$UPDATE_REMAINING" ] || break
     UPDATE_SAW_MARKER=1
-    [ "$UPDATE_WAITED" -lt @@T3_UPDATE_TTL_SECONDS@@ ] || break
+    [ "$UPDATE_WAITED" -lt @@LEGION_UPDATE_TTL_SECONDS@@ ] || break
     if adopt_default_server; then break; fi
     REMOTE_PID=""
     REMOTE_PORT=""
@@ -967,14 +967,14 @@ fi
 # held and start one only once it is free. The managed server an update just
 # stopped may still be exiting. The sleep count bounds a host clock that stops.
 OWNER_WAITED=0
-OWNER_DEADLINE=$(($(date +%s) + @@T3_READY_TIMEOUT_SECONDS@@))
+OWNER_DEADLINE=$(($(date +%s) + @@LEGION_READY_TIMEOUT_SECONDS@@))
 while [ -z "$REMOTE_PORT" ] && ! managed_server_running "$(cat "$PID_FILE" 2>/dev/null || true)" && home_owned; do
   if adopt_default_server; then break; fi
   REMOTE_PID=""
   REMOTE_PORT=""
   REMOTE_MANAGED=""
-  if [ "$OWNER_WAITED" -ge @@T3_READY_TIMEOUT_SECONDS@@ ] || [ "$(date +%s)" -ge "$OWNER_DEADLINE" ]; then
-    printf 'A T3 server or boot service holds %s but did not become ready, so no second server was started. Retry once it has started.\\n' "$DEFAULT_SERVER_HOME" >&2
+  if [ "$OWNER_WAITED" -ge @@LEGION_READY_TIMEOUT_SECONDS@@ ] || [ "$(date +%s)" -ge "$OWNER_DEADLINE" ]; then
+    printf 'A LegionCode server or boot service holds %s but did not become ready, so no second server was started. Retry once it has started.\\n' "$DEFAULT_SERVER_HOME" >&2
     exit 1
   fi
   sleep 1
@@ -983,7 +983,7 @@ done
 if [ -z "$REMOTE_PORT" ]; then
   REMOTE_PORT="$(pick_port)" || true
   if [ -z "$REMOTE_PORT" ]; then
-    if [ "$T3_ARCHIVE_MODE" = "1" ]; then
+    if [ "$LEGION_ARCHIVE_MODE" = "1" ]; then
       printf 'Failed to find an available port on the remote host.\\n' >&2
     else
       printf 'Failed to find an available port on the remote host. Ensure node is available on PATH.\\n' >&2
@@ -993,7 +993,7 @@ if [ -z "$REMOTE_PORT" ]; then
   # Start this launch's log empty. Unlink rather than truncate: a process from an
   # earlier launch can still hold the old log open and keep writing to it.
   rm -f "$LOG_FILE"
-  nohup env T3CODE_NO_BROWSER=1 "$RUNNER_FILE" serve --host 127.0.0.1 --port "$REMOTE_PORT" --base-dir "$DEFAULT_SERVER_HOME" >>"$LOG_FILE" 2>&1 < /dev/null &
+  nohup env LEGIONCODE_NO_BROWSER=1 "$RUNNER_FILE" serve --host 127.0.0.1 --port "$REMOTE_PORT" --base-dir "$DEFAULT_SERVER_HOME" >>"$LOG_FILE" 2>&1 < /dev/null &
   REMOTE_PID="$!"
   printf '%s\\n' "$REMOTE_PID" >"$PID_FILE"
   printf '%s\\n' "$REMOTE_PORT" >"$PORT_FILE"
@@ -1002,8 +1002,8 @@ if [ -z "$REMOTE_PORT" ]; then
   if [ -z "$LAUNCHER_ID" ]; then
     rm -f "$STATE_DIR/launcher"
   fi
-  if ! wait_ready "@@T3_READY_TIMEOUT_MS@@"; then
-    printf 'Remote T3 server did not become ready on 127.0.0.1:%s.\\n' "$REMOTE_PORT" >&2
+  if ! wait_ready "@@LEGION_READY_TIMEOUT_MS@@"; then
+    printf 'Remote LegionCode server did not become ready on 127.0.0.1:%s.\\n' "$REMOTE_PORT" >&2
     if [ -s "$LOG_FILE" ]; then
       tail -n 80 "$LOG_FILE" >&2 2>/dev/null || true
     else
@@ -1016,7 +1016,7 @@ if [ -z "$REMOTE_PORT" ]; then
   fi
   # Keep the lock until another alias's launch can find this server, or it
   # would start a second one that loses the home's owner lock.
-  RECORD_DEADLINE=$(($(date +%s) + @@T3_RUNTIME_RECORD_WAIT_SECONDS@@))
+  RECORD_DEADLINE=$(($(date +%s) + @@LEGION_RUNTIME_RECORD_WAIT_SECONDS@@))
   while [ "$(date +%s)" -lt "$RECORD_DEADLINE" ]; do
     DEFAULT_RUNTIME_INFO="$(resolve_default_runtime_port 2>/dev/null || true)"
     [ "\${DEFAULT_RUNTIME_INFO%% *}" = "$REMOTE_PID" ] && break
@@ -1040,13 +1040,13 @@ printf '{"remotePort":%s,"serverKind":"%s"}\\n' "$REMOTE_PORT" "\${REMOTE_MANAGE
 `;
 
 const REMOTE_PAIRING_SCRIPT = `set -eu
-STATE_DIR="$HOME/.t3/ssh-launch/@@T3_STATE_KEY@@"
-DEFAULT_SERVER_HOME="$HOME/.t3"
-RUNNER_FILE="$STATE_DIR/run-t3.sh"
-@@T3_ENSURE_T3_HOME_SCRIPT@@
+STATE_DIR="$HOME/.legioncode/ssh-launch/@@LEGION_STATE_KEY@@"
+DEFAULT_SERVER_HOME="$HOME/.legioncode"
+RUNNER_FILE="$STATE_DIR/run-legioncode.sh"
+@@LEGION_ENSURE_HOME_SCRIPT@@
 mkdir -p "$STATE_DIR"
 cat >"$RUNNER_FILE" <<'SH'
-@@T3_RUNNER_SCRIPT@@
+@@LEGION_RUNNER_SCRIPT@@
 SH
 chmod 700 "$RUNNER_FILE"
 PAIRING_BASE_DIR="$DEFAULT_SERVER_HOME"
@@ -1054,13 +1054,13 @@ PAIRING_BASE_DIR="$DEFAULT_SERVER_HOME"
 `;
 
 const REMOTE_STOP_SCRIPT = `set -eu
-STATE_DIR="$HOME/.t3/ssh-launch/@@T3_STATE_KEY@@"
+STATE_DIR="$HOME/.legioncode/ssh-launch/@@LEGION_STATE_KEY@@"
 PID_FILE="$STATE_DIR/pid"
 PORT_FILE="$STATE_DIR/port"
 MANAGED_FILE="$STATE_DIR/managed"
 REMOTE_MANAGED="$(cat "$MANAGED_FILE" 2>/dev/null || true)"
 REMOTE_PID="$(cat "$PID_FILE" 2>/dev/null || true)"
-@@T3_MANAGED_SERVER_RUNNING_SCRIPT@@
+@@LEGION_MANAGED_SERVER_RUNNING_SCRIPT@@
 if [ "$REMOTE_MANAGED" != "external" ] && managed_server_running "$REMOTE_PID"; then
   kill "$REMOTE_PID" 2>/dev/null || true
   WAIT_COUNT=0
@@ -1069,7 +1069,7 @@ if [ "$REMOTE_MANAGED" != "external" ] && managed_server_running "$REMOTE_PID"; 
     sleep 0.1
   done
   if kill -0 "$REMOTE_PID" 2>/dev/null; then
-    printf 'Remote T3 server with PID %s did not stop within 2 seconds. Its ownership files were kept.\\n' "$REMOTE_PID" >&2
+    printf 'Remote LegionCode server with PID %s did not stop within 2 seconds. Its ownership files were kept.\\n' "$REMOTE_PID" >&2
     exit 1
   fi
 fi
@@ -1078,7 +1078,7 @@ printf '{"stopped":true}\\n'
 `;
 
 const REMOTE_LOG_TAIL_SCRIPT = `set -eu
-STATE_DIR="$HOME/.t3/ssh-launch/@@T3_STATE_KEY@@"
+STATE_DIR="$HOME/.legioncode/ssh-launch/@@LEGION_STATE_KEY@@"
 LOG_FILE="$STATE_DIR/server.log"
 if [ -f "$LOG_FILE" ]; then
   tail -n 80 "$LOG_FILE" 2>/dev/null || true
@@ -1090,7 +1090,7 @@ export class SshInvalidArchiveVersionError extends Schema.TaggedError<SshInvalid
   { archiveVersion: Schema.String },
 ) {
   override get message(): string {
-    return `'${this.archiveVersion}' is not an exact t3 version and cannot name a runtime directory.`;
+    return `'${this.archiveVersion}' is not an exact legioncode version and cannot name a runtime directory.`;
   }
 }
 
@@ -1105,11 +1105,11 @@ export class SshMissingRunnerError extends Schema.TaggedError<SshMissingRunnerEr
   {},
 ) {
   override get message(): string {
-    return "A remote t3 runner needs an archive version or a node script path.";
+    return "A remote legioncode runner needs an archive version or a node script path.";
   }
 }
 
-export function buildRemoteT3RunnerScript(input?: RemoteT3RunnerOptions): string {
+export function buildRemoteLegionRunnerScript(input?: RemoteLegionRunnerOptions): string {
   const nodeScriptPath = input?.nodeScriptPath?.trim() || "";
   const archiveVersion = input?.archiveVersion?.trim() || "";
   if (nodeScriptPath === "" && archiveVersion === "") {
@@ -1124,68 +1124,68 @@ export function buildRemoteT3RunnerScript(input?: RemoteT3RunnerOptions): string
   );
   return stripTrailingNewlines(
     applyScriptPlaceholders(REMOTE_RUNNER_SCRIPT, {
-      T3_NODE_SCRIPT_PATH: shellSingleQuote(nodeScriptPath),
-      T3_ARCHIVE_VERSION: shellSingleQuote(archiveVersion),
-      T3_RELEASE_BASE_URL: shellSingleQuote(releaseBaseUrl),
-      T3_ARCHIVE_LOCK_WAIT_SECONDS: String(REMOTE_ARCHIVE_LOCK_WAIT_SECONDS),
-      T3_ARCHIVE_DOWNLOAD_SECONDS: String(REMOTE_ARCHIVE_DOWNLOAD_SECONDS),
-      T3_ARCHIVE_CHECKSUMS_SECONDS: String(REMOTE_ARCHIVE_CHECKSUMS_SECONDS),
-      T3_NODE_ENV_SCRIPT: buildRemoteNodeEnvScript(input),
+      LEGION_NODE_SCRIPT_PATH: shellSingleQuote(nodeScriptPath),
+      LEGION_ARCHIVE_VERSION: shellSingleQuote(archiveVersion),
+      LEGION_RELEASE_BASE_URL: shellSingleQuote(releaseBaseUrl),
+      LEGION_ARCHIVE_LOCK_WAIT_SECONDS: String(REMOTE_ARCHIVE_LOCK_WAIT_SECONDS),
+      LEGION_ARCHIVE_DOWNLOAD_SECONDS: String(REMOTE_ARCHIVE_DOWNLOAD_SECONDS),
+      LEGION_ARCHIVE_CHECKSUMS_SECONDS: String(REMOTE_ARCHIVE_CHECKSUMS_SECONDS),
+      LEGION_NODE_ENV_SCRIPT: buildRemoteNodeEnvScript(input),
     }),
   );
 }
 
-export function buildRemoteNodeEnvScript(input?: RemoteT3RunnerOptions): string {
+export function buildRemoteNodeEnvScript(input?: RemoteLegionRunnerOptions): string {
   return stripTrailingNewlines(
     applyScriptPlaceholders(REMOTE_NODE_ENV_SCRIPT, {
-      T3_NODE_ENGINE_RANGE: shellSingleQuote(input?.nodeEngineRange?.trim() || ""),
-      T3_NODE_ENGINE_CHECK_SCRIPT: stripTrailingNewlines(buildRemoteNodeEngineCheckScript()),
+      LEGION_NODE_ENGINE_RANGE: shellSingleQuote(input?.nodeEngineRange?.trim() || ""),
+      LEGION_NODE_ENGINE_CHECK_SCRIPT: stripTrailingNewlines(buildRemoteNodeEngineCheckScript()),
     }),
   );
 }
 
-export function buildRemoteLaunchScript(input?: RemoteT3RunnerOptions): string {
+export function buildRemoteLaunchScript(input?: RemoteLegionRunnerOptions): string {
   return applyScriptPlaceholders(REMOTE_LAUNCH_SCRIPT, {
-    T3_UPDATE_MARKER_FILE: DESKTOP_UPDATE_IN_PROGRESS_MARKER_FILE,
-    T3_UPDATE_TTL_MS: String(DESKTOP_UPDATE_IN_PROGRESS_TTL_MS),
-    T3_UPDATE_TTL_SECONDS: String(DESKTOP_UPDATE_IN_PROGRESS_TTL_MS / 1000),
-    T3_ARCHIVE_MODE: isNodeScriptRunner(input) ? "0" : "1",
-    T3_NODE_ENV_SCRIPT: buildRemoteNodeEnvScript(input),
-    T3_RUNNER_SCRIPT: stripTrailingNewlines(buildRemoteT3RunnerScript(input)),
-    T3_PICK_PORT_SCRIPT: stripTrailingNewlines(REMOTE_PICK_PORT_SCRIPT),
-    T3_WAIT_READY_SCRIPT: stripTrailingNewlines(REMOTE_WAIT_READY_SCRIPT),
-    T3_MANAGED_SERVER_RUNNING_SCRIPT: REMOTE_MANAGED_SERVER_RUNNING_SCRIPT,
-    T3_ENSURE_T3_HOME_SCRIPT: REMOTE_ENSURE_T3_HOME_SCRIPT,
-    T3_DEFAULT_REMOTE_PORT: String(DEFAULT_REMOTE_PORT),
-    T3_REMOTE_PORT_SCAN_WINDOW: String(REMOTE_PORT_SCAN_WINDOW),
-    T3_READY_TIMEOUT_MS: String(REMOTE_READY_TIMEOUT_MS),
-    T3_READY_TIMEOUT_SECONDS: String(REMOTE_READY_TIMEOUT_MS / 1000),
-    T3_REUSE_READY_TIMEOUT_MS: String(REMOTE_REUSE_READY_TIMEOUT_MS),
-    T3_READY_PROBE_TIMEOUT_MS: String(SSH_READY_PROBE_TIMEOUT_MS),
-    T3_PID_EXIT_WAIT_TICKS: String(REMOTE_PID_EXIT_WAIT_MS / 100),
-    T3_LAUNCH_LOCK_WAIT_SECONDS: String(REMOTE_LAUNCH_LOCK_WAIT_SECONDS),
-    T3_RUNTIME_RECORD_WAIT_SECONDS: String(REMOTE_RUNTIME_RECORD_WAIT_SECONDS),
+    LEGION_UPDATE_MARKER_FILE: DESKTOP_UPDATE_IN_PROGRESS_MARKER_FILE,
+    LEGION_UPDATE_TTL_MS: String(DESKTOP_UPDATE_IN_PROGRESS_TTL_MS),
+    LEGION_UPDATE_TTL_SECONDS: String(DESKTOP_UPDATE_IN_PROGRESS_TTL_MS / 1000),
+    LEGION_ARCHIVE_MODE: isNodeScriptRunner(input) ? "0" : "1",
+    LEGION_NODE_ENV_SCRIPT: buildRemoteNodeEnvScript(input),
+    LEGION_RUNNER_SCRIPT: stripTrailingNewlines(buildRemoteLegionRunnerScript(input)),
+    LEGION_PICK_PORT_SCRIPT: stripTrailingNewlines(REMOTE_PICK_PORT_SCRIPT),
+    LEGION_WAIT_READY_SCRIPT: stripTrailingNewlines(REMOTE_WAIT_READY_SCRIPT),
+    LEGION_MANAGED_SERVER_RUNNING_SCRIPT: REMOTE_MANAGED_SERVER_RUNNING_SCRIPT,
+    LEGION_ENSURE_HOME_SCRIPT: REMOTE_ENSURE_LEGION_HOME_SCRIPT,
+    LEGION_DEFAULT_REMOTE_PORT: String(DEFAULT_REMOTE_PORT),
+    LEGION_REMOTE_PORT_SCAN_WINDOW: String(REMOTE_PORT_SCAN_WINDOW),
+    LEGION_READY_TIMEOUT_MS: String(REMOTE_READY_TIMEOUT_MS),
+    LEGION_READY_TIMEOUT_SECONDS: String(REMOTE_READY_TIMEOUT_MS / 1000),
+    LEGION_REUSE_READY_TIMEOUT_MS: String(REMOTE_REUSE_READY_TIMEOUT_MS),
+    LEGION_READY_PROBE_TIMEOUT_MS: String(SSH_READY_PROBE_TIMEOUT_MS),
+    LEGION_PID_EXIT_WAIT_TICKS: String(REMOTE_PID_EXIT_WAIT_MS / 100),
+    LEGION_LAUNCH_LOCK_WAIT_SECONDS: String(REMOTE_LAUNCH_LOCK_WAIT_SECONDS),
+    LEGION_RUNTIME_RECORD_WAIT_SECONDS: String(REMOTE_RUNTIME_RECORD_WAIT_SECONDS),
   });
 }
 
-function buildRemotePairingScript(stateKey: string, input?: RemoteT3RunnerOptions): string {
+function buildRemotePairingScript(stateKey: string, input?: RemoteLegionRunnerOptions): string {
   return applyScriptPlaceholders(REMOTE_PAIRING_SCRIPT, {
-    T3_STATE_KEY: stateKey,
-    T3_ENSURE_T3_HOME_SCRIPT: REMOTE_ENSURE_T3_HOME_SCRIPT,
-    T3_RUNNER_SCRIPT: stripTrailingNewlines(buildRemoteT3RunnerScript(input)),
+    LEGION_STATE_KEY: stateKey,
+    LEGION_ENSURE_HOME_SCRIPT: REMOTE_ENSURE_LEGION_HOME_SCRIPT,
+    LEGION_RUNNER_SCRIPT: stripTrailingNewlines(buildRemoteLegionRunnerScript(input)),
   });
 }
 
 function buildRemoteStopScript(stateKey: string): string {
   return applyScriptPlaceholders(REMOTE_STOP_SCRIPT, {
-    T3_STATE_KEY: stateKey,
-    T3_MANAGED_SERVER_RUNNING_SCRIPT: REMOTE_MANAGED_SERVER_RUNNING_SCRIPT,
+    LEGION_STATE_KEY: stateKey,
+    LEGION_MANAGED_SERVER_RUNNING_SCRIPT: REMOTE_MANAGED_SERVER_RUNNING_SCRIPT,
   });
 }
 
 function buildRemoteLogTailScript(stateKey: string): string {
   return applyScriptPlaceholders(REMOTE_LOG_TAIL_SCRIPT, {
-    T3_STATE_KEY: stateKey,
+    LEGION_STATE_KEY: stateKey,
   });
 }
 
@@ -1203,7 +1203,7 @@ export const launchOrReuseRemoteServer = Effect.fn("ssh/tunnel.launchOrReuseRemo
   function* (
     target: DesktopSshEnvironmentTarget,
     input?: SshAuth.SshAuthOptions,
-    runner?: RemoteT3RunnerOptions,
+    runner?: RemoteLegionRunnerOptions,
     launcherId?: string | null,
   ): Effect.fn.Return<
     { readonly remotePort: number; readonly remoteServerKind: "external" | "managed" | null },
@@ -1269,7 +1269,7 @@ export const launchOrReuseRemoteServer = Effect.fn("ssh/tunnel.launchOrReuseRemo
 export const issueRemotePairingToken = Effect.fn("ssh/tunnel.issueRemotePairingToken")(function* (
   target: DesktopSshEnvironmentTarget,
   input?: SshAuth.SshAuthOptions,
-  runner?: RemoteT3RunnerOptions,
+  runner?: RemoteLegionRunnerOptions,
 ): Effect.fn.Return<
   {
     readonly credential: string;
@@ -1920,7 +1920,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
   const createTunnelEntry = Effect.fn("ssh/tunnel.ensureTunnelEntry.create")(function* (input: {
     readonly key: string;
     readonly resolvedTarget: DesktopSshEnvironmentTarget;
-    readonly runner?: RemoteT3RunnerOptions;
+    readonly runner?: RemoteLegionRunnerOptions;
   }): Effect.fn.Return<SshTunnelEntry, SshEnvironmentEffectError, SshEnvironmentEffectContext> {
     yield* Effect.logDebug("ssh.environment.tunnel.create.start", {
       ...sshTargetLogFields(input.resolvedTarget),
@@ -2052,7 +2052,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
   const ensureTunnelEntry = Effect.fn("ssh/tunnel.ensureTunnelEntry")(function* (
     key: string,
     resolvedTarget: DesktopSshEnvironmentTarget,
-    runner?: RemoteT3RunnerOptions,
+    runner?: RemoteLegionRunnerOptions,
   ): Effect.fn.Return<SshTunnelEntry, SshEnvironmentEffectError, SshEnvironmentEffectContext> {
     const entry = tunnels.get(key) ?? null;
 
@@ -2220,7 +2220,7 @@ const makeSshEnvironmentManager = Effect.fn("ssh/tunnel.SshEnvironmentManager.ma
 export class SshEnvironmentManager extends Context.Service<
   SshEnvironmentManager,
   SshEnvironmentManagerShape
->()("@t3tools/ssh/tunnel/SshEnvironmentManager") {
+>()("@legioncode/ssh/tunnel/SshEnvironmentManager") {
   static readonly layer = (options: SshEnvironmentManagerOptions = {}) =>
     Layer.effect(SshEnvironmentManager, makeSshEnvironmentManager(options));
 }

@@ -1,8 +1,8 @@
 import { mFallback, msg } from "gt-i18n";
 import type { MFunctionType } from "gt-i18n/types";
-import type { T3McpToolSummaryAction } from "@t3tools/shared/t3McpToolPresentation";
+import type { LegionMcpToolSummaryAction } from "@legioncode/shared/legionMcpToolPresentation";
 
-export interface T3ToolSummaryCall {
+export interface LegionToolSummaryCall {
   readonly input: unknown;
   readonly output: unknown;
   readonly outcome: "completed" | "failed" | "unfinished";
@@ -66,7 +66,7 @@ function readInput(value: unknown): Record<string, unknown> | undefined {
 }
 
 /** MCP errors can be returned as data even when the provider completed the tool call. */
-export function t3ToolResultIndicatesFailure(output: unknown): boolean {
+export function legionToolResultIndicatesFailure(output: unknown): boolean {
   return readResult(output).failed;
 }
 
@@ -96,9 +96,9 @@ function pullRequestCount(
   return count;
 }
 
-export function summarizeT3ToolCalls(
-  action: T3McpToolSummaryAction,
-  calls: ReadonlyArray<T3ToolSummaryCall>,
+export function summarizeLegionToolCalls(
+  action: LegionMcpToolSummaryAction,
+  calls: ReadonlyArray<LegionToolSummaryCall>,
   resolve: MFunctionType = mFallback,
 ): { label: string; failedCount: number } {
   const results = calls.map((call) => {

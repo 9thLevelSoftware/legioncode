@@ -17,7 +17,7 @@ const SUPPORTED_WEB_LOCALES = [
 ] as const;
 
 interface WasmFfiExports {
-  readonly t3_wasm_abi_version: () => number;
+  readonly legion_wasm_abi_version: () => number;
   readonly sanitize_bracketed_paste_str: (raw: string) => string;
   readonly split_utf16_frame_parts_json: (inputJson: string) => string;
   readonly emit_web_app_bundle_json: () => string;
@@ -69,7 +69,7 @@ function isWasmFfiExports(value: unknown): value is WasmFfiExports {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Partial<Record<keyof WasmFfiExports, unknown>>;
   return (
-    typeof candidate.t3_wasm_abi_version === "function" &&
+    typeof candidate.legion_wasm_abi_version === "function" &&
     typeof candidate.sanitize_bracketed_paste_str === "function" &&
     typeof candidate.split_utf16_frame_parts_json === "function" &&
     typeof candidate.emit_web_app_bundle_json === "function"
@@ -79,9 +79,9 @@ function isWasmFfiExports(value: unknown): value is WasmFfiExports {
 export function isLegacyWebForced(env?: Readonly<Record<string, string | undefined>>): boolean {
   const proc = getRuntimeProcess();
   const raw =
-    env?.T3CODE_LEGACY_WEB ??
-    proc?.env?.T3CODE_LEGACY_WEB ??
-    (globalThis as { readonly T3CODE_LEGACY_WEB?: unknown }).T3CODE_LEGACY_WEB;
+    env?.LEGIONCODE_LEGACY_WEB ??
+    proc?.env?.LEGIONCODE_LEGACY_WEB ??
+    (globalThis as { readonly LEGIONCODE_LEGACY_WEB?: unknown }).LEGIONCODE_LEGACY_WEB;
   if (typeof raw !== "string" && typeof raw !== "number" && typeof raw !== "boolean") {
     return false;
   }
@@ -113,14 +113,14 @@ function loadNodeWasmExports(): WasmFfiExports | undefined {
     if (import.meta.url.startsWith("file:")) {
       const currentDir = nodePath.dirname(nodeUrl.fileURLToPath(import.meta.url));
       candidates.push(
-        nodePath.resolve(currentDir, "../../../../rust/dist/wasm-nodejs/t3_wasm_ffi.js"),
+        nodePath.resolve(currentDir, "../../../../rust/dist/wasm-nodejs/legion_wasm_ffi.js"),
       );
     }
     if (typeof proc.cwd === "function") {
       const cwd = proc.cwd();
       candidates.push(
-        nodePath.resolve(cwd, "rust/dist/wasm-nodejs/t3_wasm_ffi.js"),
-        nodePath.resolve(cwd, "../../rust/dist/wasm-nodejs/t3_wasm_ffi.js"),
+        nodePath.resolve(cwd, "rust/dist/wasm-nodejs/legion_wasm_ffi.js"),
+        nodePath.resolve(cwd, "../../rust/dist/wasm-nodejs/legion_wasm_ffi.js"),
       );
     }
 
@@ -170,7 +170,7 @@ export async function initRustCoreBridge(options?: {
     return true;
   }
 
-  const moduleUrl = options?.moduleUrl ?? "./t3_wasm_ffi.js";
+  const moduleUrl = options?.moduleUrl ?? "./legion_wasm_ffi.js";
   try {
     const imported: unknown = await import(/* @vite-ignore */ moduleUrl);
     if (typeof imported !== "object" || imported === null) {
@@ -193,7 +193,7 @@ export async function initRustCoreBridge(options?: {
 export function abiVersion(): number {
   const wasm = resolveActiveWasmExports();
   if (wasm) {
-    return wasm.t3_wasm_abi_version();
+    return wasm.legion_wasm_abi_version();
   }
   return FALLBACK_ABI_VERSION;
 }
@@ -471,7 +471,7 @@ function fallbackWebAppBundleJson(locale?: string): string {
       "  <head>",
       '    <meta charset="utf-8" />',
       '    <meta name="viewport" content="width=device-width, initial-scale=1" />',
-      "    <title>T3 Code</title>",
+      "    <title>LegionCode</title>",
       '    <link rel="stylesheet" href="./styles.css" />',
       "  </head>",
       "  <body>",
@@ -481,9 +481,9 @@ function fallbackWebAppBundleJson(locale?: string): string {
       "</html>",
       "",
     ].join("\n"),
-    stylesCss: ":root { color-scheme: dark; }\n.t3-shell { display: grid; min-height: 100vh; }\n",
+    stylesCss: ":root { color-scheme: dark; }\n.lc-shell { display: grid; min-height: 100vh; }\n",
     appMjs: [
-      'import init, { WasmWebApp } from "./t3_wasm_ffi.js";',
+      'import init, { WasmWebApp } from "./legion_wasm_ffi.js";',
       "await init();",
       'const app = new WasmWebApp(navigator.language || "en", Date.now());',
       'app.dispatch_json(JSON.stringify({ type: "setLocale", language: "system" }));',
@@ -531,17 +531,12 @@ export interface ActiveBrandConfig {
   readonly cliBinName: string;
   readonly desktopBinName: string;
   readonly primaryEnvPrefix: string;
-  readonly fallbackEnvPrefix: string;
   readonly homeDirName: string;
-  readonly fallbackHomeDirName: string;
   readonly urlScheme: string;
   readonly ipcPipePrefix: string;
   readonly httpHeaderPrefix: string;
-  readonly fallbackHttpHeaderPrefix: string;
   readonly mcpToolPrefix: string;
-  readonly fallbackMcpToolPrefix: string;
   readonly mcpNamespace: string;
-  readonly fallbackMcpNamespace: string;
   readonly systemdUnitName: string;
   readonly launchdLabel: string;
   readonly windowsTaskName: string;
@@ -550,27 +545,22 @@ export interface ActiveBrandConfig {
 }
 
 const ACTIVE_BRAND_FALLBACK: ActiveBrandConfig = {
-  productName: "T3 Code",
-  orgDomain: "t3.codes",
-  cliBinName: "t3",
-  desktopBinName: "t3-desktop",
-  primaryEnvPrefix: "T3CODE_",
-  fallbackEnvPrefix: "T3_",
-  homeDirName: ".t3",
-  fallbackHomeDirName: ".t3code",
-  urlScheme: "t3code",
-  ipcPipePrefix: "t3code",
-  httpHeaderPrefix: "x-t3-",
-  fallbackHttpHeaderPrefix: "t3-",
-  mcpToolPrefix: "t3_",
-  fallbackMcpToolPrefix: "legion_",
-  mcpNamespace: "mcp__t3_code__",
-  fallbackMcpNamespace: "mcp__legion_code__",
-  systemdUnitName: "t3code.service",
-  launchdLabel: "com.t3tools.t3code.service",
-  windowsTaskName: "t3code",
-  windowsPolicyKey: "SOFTWARE\\Policies\\T3Tools\\T3Code",
-  macosPolicyDomain: "com.t3tools.t3code",
+  productName: "LegionCode",
+  orgDomain: "legion.codes",
+  cliBinName: "legioncode",
+  desktopBinName: "legioncode-desktop",
+  primaryEnvPrefix: "LEGIONCODE_",
+  homeDirName: ".legioncode",
+  urlScheme: "legioncode",
+  ipcPipePrefix: "legioncode",
+  httpHeaderPrefix: "x-legioncode-",
+  mcpToolPrefix: "legion_",
+  mcpNamespace: "mcp__legion_code__",
+  systemdUnitName: "legioncode.service",
+  launchdLabel: "dev.legioncode.service",
+  windowsTaskName: "legioncode",
+  windowsPolicyKey: "SOFTWARE\\Policies\\LegionCode\\LegionCode",
+  macosPolicyDomain: "dev.legioncode",
 };
 
 function normalizeNfdFilenameFallback(path: string): string {

@@ -4,7 +4,7 @@ import {
   latestUnheldRun,
   threadErrorSummary,
   usageLimitRunPresentedAsLatest,
-} from "@t3tools/shared/orchestrationV2ThreadError";
+} from "@legioncode/shared/orchestrationV2ThreadError";
 import {
   isOrchestrationV2WorkActive,
   isProviderNativeSubagentThread,
@@ -23,20 +23,20 @@ import {
   orchestrationV2RunWorkStartedAt,
   type RunId,
   type ThreadId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   backgroundWorkHoldsCompletion,
   derivePendingBackgroundWork,
-} from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
+} from "@legioncode/shared/orchestrationV2PendingBackgroundWork";
 import {
   getModelSelectionStringOptionValue,
   getProviderOptionCurrentLabel,
   getProviderOptionStatedValue,
   resolveSelectableModel,
   withLegacyUltracodeEffort,
-} from "@t3tools/shared/model";
-import { unsentManualContinuationSource } from "@t3tools/shared/orchestrationV2ManualContinuation";
-import { formatDuration } from "@t3tools/shared/orchestrationTiming";
+} from "@legioncode/shared/model";
+import { unsentManualContinuationSource } from "@legioncode/shared/orchestrationV2ManualContinuation";
+import { formatDuration } from "@legioncode/shared/orchestrationTiming";
 import * as DateTime from "effect/DateTime";
 
 import {

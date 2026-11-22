@@ -6,7 +6,7 @@ import {
   type ProviderInteractionMode,
   type RuntimeMode,
   type ThreadId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -42,7 +42,7 @@ import {
 } from "./threadAccess.ts";
 
 /** Private constructors only enforce types; the token also blocks runtime construction. */
-const builtHere: unique symbol = Symbol("t3/mcp/McpToolAccess/builtHere");
+const builtHere: unique symbol = Symbol("legion/mcp/McpToolAccess/builtHere");
 
 const refuseOutsideConstruction = (token: symbol) => {
   if (token !== builtHere) {
@@ -88,7 +88,7 @@ let handlersLayer: <Tools extends Record<string, Tool.Any>, EX, RX>(
   layer: Layer.Layer<Tool.HandlersFor<Tools>, EX, RX>,
 ) => HandlersLayer<Tools, EX, RX>;
 
-/** t3code/no-raw-mcp-registration confines Effect's unchecked registration API to McpHttpServer. */
+/** legioncode/no-raw-mcp-registration confines Effect's unchecked registration API to McpHttpServer. */
 export class Declaration<out Handler> {
   readonly #handle: Handler;
   readonly #remote: RemoteCheck<never> | undefined;

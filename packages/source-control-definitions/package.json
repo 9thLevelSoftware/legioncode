@@ -1,5 +1,5 @@
 {
-  "name": "@t3tools/source-control-definitions",
+  "name": "@legioncode/source-control-definitions",
   "private": true,
   "type": "module",
   "exports": {
@@ -12,13 +12,13 @@
     "typecheck": "effect-tsgo tsrs --noEmit"
   },
   "dependencies": {
-    "@t3tools/source-control-azure-devops": "workspace:*",
-    "@t3tools/source-control-bitbucket": "workspace:*",
-    "@t3tools/source-control-core": "workspace:*",
-    "@t3tools/source-control-cursor-origin": "workspace:*",
-    "@t3tools/source-control-forgejo": "workspace:*",
-    "@t3tools/source-control-gitcafe": "workspace:*",
-    "@t3tools/source-control-github": "workspace:*",
-    "@t3tools/source-control-gitlab": "workspace:*"
+    "@legioncode/source-control-azure-devops": "workspace:*",
+    "@legioncode/source-control-bitbucket": "workspace:*",
+    "@legioncode/source-control-core": "workspace:*",
+    "@legioncode/source-control-cursor-origin": "workspace:*",
+    "@legioncode/source-control-forgejo": "workspace:*",
+    "@legioncode/source-control-gitcafe": "workspace:*",
+    "@legioncode/source-control-github": "workspace:*",
+    "@legioncode/source-control-gitlab": "workspace:*"
   }
 }

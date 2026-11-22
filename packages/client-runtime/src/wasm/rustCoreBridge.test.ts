@@ -15,17 +15,17 @@ import {
 } from "./rustCoreBridge.ts";
 
 function withLegacyWebEnv<T>(value: string | undefined, fn: () => Promise<T>): Promise<T> {
-  const previous = process.env.T3CODE_LEGACY_WEB;
+  const previous = process.env.LEGIONCODE_LEGACY_WEB;
   if (value === undefined) {
-    delete process.env.T3CODE_LEGACY_WEB;
+    delete process.env.LEGIONCODE_LEGACY_WEB;
   } else {
-    process.env.T3CODE_LEGACY_WEB = value;
+    process.env.LEGIONCODE_LEGACY_WEB = value;
   }
   return fn().finally(() => {
     if (previous === undefined) {
-      delete process.env.T3CODE_LEGACY_WEB;
+      delete process.env.LEGIONCODE_LEGACY_WEB;
     } else {
-      process.env.T3CODE_LEGACY_WEB = previous;
+      process.env.LEGIONCODE_LEGACY_WEB = previous;
     }
   });
 }
@@ -58,12 +58,12 @@ describe("rustCoreBridge", () => {
       expect(bundle.indexHtml).toContain('<html lang="sv">');
       expect(bundle.indexHtml).toContain("./styles.css");
       expect(bundle.indexHtml).toContain("./app.mjs");
-      expect(bundle.stylesCss).toContain(".t3-shell");
+      expect(bundle.stylesCss).toContain(".lc-shell");
       expect(bundle.appMjs).toContain("WasmWebApp");
     });
   });
 
-  it("bypasses WASM and runs pure TypeScript fallbacks when T3CODE_LEGACY_WEB=1", async () => {
+  it("bypasses WASM and runs pure TypeScript fallbacks when LEGIONCODE_LEGACY_WEB=1", async () => {
     const rawPaste = "a\u001b[20\u001b[201~1~b\u001b]0;unterminated\nc\u001b]52;c;dGVzdA==\u0007d";
     let fallbackPaste = "";
     let fallbackParts: ReadonlyArray<string> = [];
@@ -90,7 +90,7 @@ describe("rustCoreBridge", () => {
       };
       expect(fallbackBundle.indexHtml).toContain('<html lang="de">');
       expect(fallbackBundle.indexHtml).toContain("./styles.css");
-      expect(fallbackBundle.stylesCss).toContain(".t3-shell");
+      expect(fallbackBundle.stylesCss).toContain(".lc-shell");
       expect(fallbackBundle.appMjs).toContain("WasmWebApp");
     });
 
@@ -169,14 +169,13 @@ describe("rustCoreBridge", () => {
       ).toBe(true);
 
       const brand = activeBrand();
-      expect(brand.productName).toBe("T3 Code");
-      expect(brand.orgDomain).toBe("t3.codes");
-      expect(brand.cliBinName).toBe("t3");
-      expect(brand.primaryEnvPrefix).toBe("T3CODE_");
-      expect(brand.mcpToolPrefix).toBe("t3_");
-      expect(brand.fallbackMcpToolPrefix).toBe("legion_");
-      expect(brand.windowsPolicyKey).toBe("SOFTWARE\\Policies\\T3Tools\\T3Code");
-      expect(Object.keys(brand)).toHaveLength(21);
+      expect(brand.productName).toBe("LegionCode");
+      expect(brand.orgDomain).toBe("legion.codes");
+      expect(brand.cliBinName).toBe("legioncode");
+      expect(brand.primaryEnvPrefix).toBe("LEGIONCODE_");
+      expect(brand.mcpToolPrefix).toBe("legion_");
+      expect(brand.windowsPolicyKey).toBe("SOFTWARE\\Policies\\LegionCode\\LegionCode");
+      expect(Object.keys(brand)).toHaveLength(16);
     };
 
     await withLegacyWebEnv(undefined, async () => {

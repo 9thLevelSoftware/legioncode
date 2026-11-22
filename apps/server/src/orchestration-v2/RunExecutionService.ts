@@ -1,5 +1,5 @@
 import { makeAssistantStreamingFilter } from "./assistantStreaming.ts";
-import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
+import { resolveProjectSettings } from "@legioncode/shared/projectSettings";
 import {
   isOrchestrationV2WorkActive,
   CommandId,
@@ -23,7 +23,7 @@ import {
   type RunAttemptId,
   type ThreadId,
   type TurnItemId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Context from "effect/Context";
 import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
@@ -44,9 +44,9 @@ import * as PreviewAgentActivity from "../preview/PreviewAgentActivity.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as CheckpointService from "./CheckpointService.ts";
 import * as EventSink from "./EventSink.ts";
-import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
-import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
-import { PROVIDER_STOP_REASON_SIGNAL } from "@t3tools/provider-core/server/subagentProjection";
+import * as IdAllocator from "@legioncode/provider-core/server/IdAllocator";
+import * as ProviderAdapter from "@legioncode/provider-core/server/ProviderAdapter";
+import { PROVIDER_STOP_REASON_SIGNAL } from "@legioncode/provider-core/server/subagentProjection";
 import * as ProviderEventIngestor from "./ProviderEventIngestor.ts";
 import * as ProviderUsageAnalytics from "../telemetry/ProviderUsageAnalytics.ts";
 import type { ProjectionStoreV2Error } from "./ProjectionStore.ts";
@@ -54,7 +54,7 @@ import {
   knownProviderFailureMessage,
   makeProviderFailure,
   makeProviderFailureTurnItem,
-} from "@t3tools/provider-core/server/failure";
+} from "@legioncode/provider-core/server/failure";
 import * as RunFinalizationService from "./RunFinalizationService.ts";
 import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
 import * as TurnItemPositionStore from "./TurnItemPositionStore.ts";
@@ -689,7 +689,7 @@ export interface RunExecutionServiceV2Shape {
 export class RunExecutionServiceV2 extends Context.Service<
   RunExecutionServiceV2,
   RunExecutionServiceV2Shape
->()("t3/orchestration-v2/RunExecutionService/RunExecutionServiceV2") {}
+>()("legioncode/orchestration-v2/RunExecutionService/RunExecutionServiceV2") {}
 
 export const layer: Layer.Layer<
   RunExecutionServiceV2,
@@ -731,7 +731,7 @@ export const layer: Layer.Layer<
         readonly loadRunInterruptReason?: () => Effect.Effect<string | undefined, never>;
         readonly openRunOwnedSubagents?: OpenRunOwnedSubagentProjection;
         readonly openRunOwnedSubagentsTerminal?: ProviderTerminalEvent;
-        // Root turn snapshot written with the run when T3 ends the run itself.
+        // Root turn snapshot written with the run when LegionCode ends the run itself.
         readonly abandonedProviderTurn?: OrchestrationV2ProviderTurn;
         // Stored root tool calls still open when the provider runtime was lost; nothing else ends them.
         readonly lostToolCalls?: ReadonlyArray<OrchestrationV2TurnItem>;
@@ -2003,7 +2003,7 @@ export const layer: Layer.Layer<
                     cause: new ProviderAdapter.ProviderAdapterEventStreamError({
                       driver: input.providerThread.driver,
                       providerSessionId: input.providerSessionId,
-                      raisedByT3: true,
+                      raisedByLegion: true,
                       cause: "Provider event stream ended without a root terminal.",
                     }),
                   });
@@ -2061,12 +2061,12 @@ export const layer: Layer.Layer<
                     runId: input.run.id,
                     cause,
                   });
-                  // An adapter fails its stream when its runtime is gone. A failed write, or a session T3
+                  // An adapter fails its stream when its runtime is gone. A failed write, or a session LegionCode
                   // released or saw end, leaves work that can still report or that the releaser settles.
                   const runtimeLost =
                     isRunExecutionIngestError(squashed) &&
                     isProviderEventStreamError(squashed.cause) &&
-                    squashed.cause.raisedByT3 !== true;
+                    squashed.cause.raisedByLegion !== true;
                   if (yield* Ref.get(rootRunFinalized)) {
                     if (runtimeLost) yield* endWorkLostAfterRootRun(completedAt);
                     return;

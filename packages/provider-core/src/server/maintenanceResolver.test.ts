@@ -5,8 +5,8 @@ import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
-import { ProviderDriverKind, ProviderInstanceId, type ServerProvider } from "@t3tools/contracts";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import { ProviderDriverKind, ProviderInstanceId, type ServerProvider } from "@legioncode/contracts";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -39,7 +39,7 @@ import {
   type PackageManagedProviderMaintenanceDefinition,
   type ProviderMaintenanceCapabilities,
 } from "./maintenanceResolver.ts";
-import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
+import { symlinksSupported } from "@legioncode/shared/testing/symlinks";
 
 const driver = (value: string) => ProviderDriverKind.make(value);
 // Shell stubs use POSIX paths; Windows temp paths cannot split on colon.
@@ -368,7 +368,7 @@ it.layer(
     "uses npm's registry for $install installs (exit $exitCode, output $stdout)",
     (fixture) =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-registry-version");
+        const tempDir = yield* makeTempDir("legion-registry-version");
         const npmBinDir = NodePath.join(tempDir, "npm-bin");
         writeExecutable(NodePath.join(npmBinDir, "npm"));
         const binaryPath = NodePath.join(tempDir, ".local/bin/native-package-tool");
@@ -440,7 +440,7 @@ it.layer(
     "does not offer a Vite+ update npm's release-age policy will not install",
     () =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-release-age");
+        const tempDir = yield* makeTempDir("legion-release-age");
         const npmBinDir = NodePath.join(tempDir, "npm-bin");
         const npmPath = NodePath.join(npmBinDir, "npm");
         writeExecutable(npmPath);
@@ -508,7 +508,7 @@ it.layer(
     "keeps configured npm registries' latest versions apart for one install",
     () =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-npm-registry-isolation");
+        const tempDir = yield* makeTempDir("legion-npm-registry-isolation");
         yield* Effect.addFinalizer(() =>
           Effect.sync(() => NodeFS.rmSync(tempDir, { recursive: true, force: true })),
         );
@@ -618,7 +618,7 @@ it.layer(
       updateCommand: null,
       canUpdate: false,
       message:
-        "Version 2.1.117 is out. T3 Code runs /Applications/Tool.app/Contents/Resources/bin/package-tool; update it with the app or tool that installed it.",
+        "Version 2.1.117 is out. LegionCode runs /Applications/Tool.app/Contents/Resources/bin/package-tool; update it with the app or tool that installed it.",
     });
   });
 
@@ -679,7 +679,7 @@ it.layer(
     "pins npm updates to the global prefix that owns the package and the provider's PATH",
     () =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-npm-capabilities");
+        const tempDir = yield* makeTempDir("legion-npm-capabilities");
         const link = linkIntoPackage(tempDir, "package-tool", [
           "lib",
           "node_modules",
@@ -1192,7 +1192,7 @@ it.layer(
 
   it.effect.skipIf(windowsHost)("upgrades a mise tool through a shim of a Nix-installed mise", () =>
     Effect.gen(function* () {
-      const tempDir = yield* makeTempDir("t3-nix-mise-shim");
+      const tempDir = yield* makeTempDir("legion-nix-mise-shim");
       const mise = miseFixture(tempDir, { misePresent: false });
       const nixMise = "/nix/store/0c2kbzqz3m0m4hcx2g7hq1n5wfs9a6xd-mise-2026.1.0/bin/mise";
       const spawned: Array<ReadonlyArray<string>> = [];
@@ -1228,7 +1228,7 @@ it.layer(
 
   it.effect("proves Windows npm ownership from the package manifest beside the shim", () =>
     Effect.gen(function* () {
-      const tempDir = yield* makeTempDir("t3-npm-windows-capabilities");
+      const tempDir = yield* makeTempDir("legion-npm-windows-capabilities");
       const shim = NodePath.join(tempDir, "package-tool.cmd");
       NodeFS.mkdirSync(tempDir, { recursive: true });
       NodeFS.writeFileSync(shim, "@echo off\r\n");
@@ -1270,7 +1270,7 @@ it.layer(
     "switches to pnpm updates when the real path lives in pnpm's global store",
     () =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-pnpm-capabilities");
+        const tempDir = yield* makeTempDir("legion-pnpm-capabilities");
         const link = linkIntoPackage(tempDir, "package-tool", [
           ".local",
           "share",
@@ -1350,7 +1350,7 @@ it.layer(
     "advertises $case for pnpm-global installs",
     (fixture) =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-pnpm-latest");
+        const tempDir = yield* makeTempDir("legion-pnpm-latest");
         const pnpmBinDir = NodePath.join(tempDir, "pnpm-bin");
         writeExecutable(NodePath.join(pnpmBinDir, "pnpm"));
         if (fixture.npmOutput !== undefined) writeExecutable(NodePath.join(pnpmBinDir, "npm"));
@@ -1454,7 +1454,7 @@ it.layer(
     "advertises $case for npm-global installs",
     (fixture) =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-npm-latest");
+        const tempDir = yield* makeTempDir("legion-npm-latest");
         const npmBinDir = NodePath.join(tempDir, "npm-bin");
         const npmPath = NodePath.join(npmBinDir, "npm");
         writeExecutable(npmPath);
@@ -1534,7 +1534,7 @@ it.layer(
     "advertises $case for bun-global installs",
     (fixture) =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-bun-latest");
+        const tempDir = yield* makeTempDir("legion-bun-latest");
         const bunBinDir = NodePath.join(tempDir, ".bun", "bin");
         writeExecutable(NodePath.join(bunBinDir, "bun"));
         writeExecutable(NodePath.join(bunBinDir, "package-tool"));
@@ -1586,7 +1586,7 @@ it.layer(
     "switches to bun updates when the resolved binary lives in bun's global bin",
     () =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-bun-capabilities");
+        const tempDir = yield* makeTempDir("legion-bun-capabilities");
         const bunBinDir = NodePath.join(tempDir, ".bun", "bin");
         writeExecutable(NodePath.join(bunBinDir, "package-tool"));
 
@@ -1610,7 +1610,7 @@ it.layer(
 
   it.effect.skipIf(windowsHost)("switches to native updates and runs the resolved executable", () =>
     Effect.gen(function* () {
-      const tempDir = yield* makeTempDir("t3-native-capabilities");
+      const tempDir = yield* makeTempDir("legion-native-capabilities");
       const nativeBinDir = NodePath.join(tempDir, ".local", "bin");
       const nativePath = NodePath.join(nativeBinDir, "native-package-tool");
       writeExecutable(nativePath);
@@ -1648,7 +1648,7 @@ it.layer(
     (launcher, { skip }) => {
       if (windowsHost || (launcher !== "wrapper" && !symlinksSupported)) skip();
       return Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-native-mise");
+        const tempDir = yield* makeTempDir("legion-native-mise");
         const nativePath = NodePath.join(tempDir, ".local", "bin", "native-package-tool");
         if (launcher === "wrapper") {
           writeExecutable(nativePath);
@@ -1692,7 +1692,7 @@ it.layer(
     "updates an npm-owned launcher in a native install location with npm",
     () =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-native-npm");
+        const tempDir = yield* makeTempDir("legion-native-npm");
         const prefix = NodePath.join(tempDir, ".local");
         const packageBin = NodePath.join("node_modules", "@example", "native-package-tool", "bin");
         writeExecutable(NodePath.join(prefix, "lib", packageBin, "native-package-tool.exe"));
@@ -1720,7 +1720,7 @@ it.layer(
     "prefers npm ownership over the Node keg the package lives under",
     () =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-homebrew-node-capabilities");
+        const tempDir = yield* makeTempDir("legion-homebrew-node-capabilities");
         const keg = NodePath.join(tempDir, "Cellar", "node", "22.1.0");
         const target = NodePath.join(
           keg,
@@ -1768,7 +1768,7 @@ it.layer(
       `leaves ${fixture.name} owned by MacPorts to MacPorts`,
       () =>
         Effect.gen(function* () {
-          const prefix = yield* makeTempDir("t3-macports");
+          const prefix = yield* makeTempDir("legion-macports");
           writeExecutable(NodePath.join(prefix, "bin", "port"));
           const target = NodePath.join(prefix, ...fixture.target);
           writeExecutable(target);
@@ -1832,7 +1832,7 @@ it.layer(
 
   it.effect.skipIf(windowsHost)("carries the native updater's environment into the action", () =>
     Effect.gen(function* () {
-      const tempDir = yield* makeTempDir("t3-native-env");
+      const tempDir = yield* makeTempDir("legion-native-env");
       const nativePath = NodePath.join(tempDir, ".local", "bin", "native-package-tool");
       writeExecutable(nativePath);
       const resolver = makePackageManagedProviderMaintenanceResolver({
@@ -1968,7 +1968,7 @@ it.layer(
     "stays manual-only when the keg is not under the resolved brew's prefix",
     () =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-homebrew-foreign-prefix");
+        const tempDir = yield* makeTempDir("legion-homebrew-foreign-prefix");
         const brewBinDir = NodePath.join(tempDir, "brew-bin");
         writeExecutable(NodePath.join(brewBinDir, "brew"));
         const kegBinary = NodePath.join(
@@ -2020,7 +2020,7 @@ it.layer(
     "disables one-click updates for explicit custom binary paths it cannot safely map",
     () =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-custom-capabilities");
+        const tempDir = yield* makeTempDir("legion-custom-capabilities");
         const customPath = NodePath.join(tempDir, "tools", "package-tool");
         writeExecutable(customPath);
 
@@ -2043,7 +2043,7 @@ it.layer(
     "falls back to the provider's own updater when no installer is proven",
     () =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-self-update-fallback");
+        const tempDir = yield* makeTempDir("legion-self-update-fallback");
         const customPath = NodePath.join(tempDir, "tools", "package-tool");
         writeExecutable(customPath);
         const selfUpdating = makePackageManagedProviderMaintenanceResolver({
@@ -2102,7 +2102,7 @@ it.layer(
     "upgrades the mapped mise tool through $name requested as latest",
     (fixture) =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-mise-upgrade");
+        const tempDir = yield* makeTempDir("legion-mise-upgrade");
         const mise = miseFixture(tempDir, {
           ...(fixture.dataDir ? { dataDir: NodePath.join(tempDir, fixture.dataDir) } : {}),
           ...(fixture.backend ? { backend: fixture.backend } : {}),
@@ -2153,7 +2153,7 @@ it.layer(
     },
   ] as const)("upgrades the mapped mise tool through Windows $name", (fixture) =>
     Effect.gen(function* () {
-      const tempDir = yield* makeTempDir("t3-mise-windows-shim");
+      const tempDir = yield* makeTempDir("legion-mise-windows-shim");
       const miseBinDir = NodePath.join(tempDir, "mise-bin");
       const miseExe = NodePath.join(miseBinDir, "mise.exe");
       writeExecutable(miseExe);
@@ -2238,7 +2238,7 @@ it.layer(
     "leaves $name manual-only",
     (fixture) =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-mise-manual");
+        const tempDir = yield* makeTempDir("legion-mise-manual");
         const mise = miseFixture(tempDir, {
           misePresent: !("misePresent" in fixture),
           tool: "tool" in fixture ? fixture.tool : "package-tool",
@@ -2290,7 +2290,7 @@ it.layer(
     "keeps the provider's own updater for an install mise does not own",
     () =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-mise-native");
+        const tempDir = yield* makeTempDir("legion-mise-native");
         const nativePath = NodePath.join(tempDir, ".local", "bin", "native-package-tool");
         writeExecutable(nativePath);
         const miseMappedNative = makePackageManagedProviderMaintenanceResolver({
@@ -2337,7 +2337,7 @@ it.layer(
     "keeps $name in a custom data dir manual-only instead of running its own updater",
     (fixture) =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-mise-custom-manual");
+        const tempDir = yield* makeTempDir("legion-mise-custom-manual");
         const mise = miseFixture(tempDir, { dataDir: NodePath.join(tempDir, "data") });
         let binaryPath = mise.latestBinaryPath;
         let installed = mise.installed("pinned" in fixture ? { requested_version: "1.0.0" } : {});
@@ -2372,7 +2372,7 @@ it.layer(
     "updates an npm global under mise's Node with npm even when mise runs it",
     () =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-mise-node-npm");
+        const tempDir = yield* makeTempDir("legion-mise-node-npm");
         const mise = miseFixture(tempDir);
         const nodePrefix = NodePath.join(tempDir, "mise", "installs", "node", "22.0.0");
         const binaryPath = NodePath.join(nodePrefix, "bin", "package-tool");
@@ -2415,7 +2415,7 @@ it.layer(
     "asks mise for its latest release only while update checks are enabled",
     () =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-mise-latest");
+        const tempDir = yield* makeTempDir("legion-mise-latest");
         const mise = miseFixture(tempDir);
         const spawned: Array<ReadonlyArray<string>> = [];
         const capabilities = yield* resolveProviderMaintenanceCapabilitiesEffect(miseToolUpdate, {
@@ -2463,7 +2463,7 @@ it.layer(
     "keeps each mise environment's latest release apart",
     () =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-mise-latest-env");
+        const tempDir = yield* makeTempDir("legion-mise-latest-env");
         const mise = miseFixture(tempDir);
         const advise = (env: NodeJS.ProcessEnv, latest: string) =>
           resolveProviderMaintenanceCapabilitiesEffect(miseToolUpdate, {
@@ -2506,7 +2506,7 @@ it.layer(
     "reports an unknown latest version when mise latest $name",
     (fixture) =>
       Effect.gen(function* () {
-        const tempDir = yield* makeTempDir("t3-mise-latest-unknown");
+        const tempDir = yield* makeTempDir("legion-mise-latest-unknown");
         const mise = miseFixture(tempDir);
         const capabilities = yield* resolveProviderMaintenanceCapabilitiesEffect(miseToolUpdate, {
           binaryPath: mise.latestBinaryPath,
@@ -2545,7 +2545,7 @@ it.layer(
 
   it.effect.skipIf(!symlinksSupported)("updates Yarn global installs with yarn", () =>
     Effect.gen(function* () {
-      const tempDir = yield* makeTempDir("t3-yarn-capabilities");
+      const tempDir = yield* makeTempDir("legion-yarn-capabilities");
       const link = linkIntoPackage(tempDir, "package-tool", [
         ".config",
         "yarn",
@@ -2576,7 +2576,7 @@ it.layer(
     "updates Volta installs only when Volta has the package",
     () =>
       Effect.gen(function* () {
-        const voltaHome = NodePath.join(yield* makeTempDir("t3-volta-capabilities"), ".volta");
+        const voltaHome = NodePath.join(yield* makeTempDir("legion-volta-capabilities"), ".volta");
         const shim = NodePath.join(voltaHome, "bin", "volta-shim");
         writeExecutable(shim);
         const link = NodePath.join(voltaHome, "bin", "package-tool");
@@ -2619,7 +2619,7 @@ it.layer(
     "updates Windows Volta installs from $name only when Volta has the package",
     ({ script, owned }) =>
       Effect.gen(function* () {
-        const voltaHome = NodePath.join(yield* makeTempDir("t3-volta-windows"), "Volta");
+        const voltaHome = NodePath.join(yield* makeTempDir("legion-volta-windows"), "Volta");
         const shim = NodePath.join(voltaHome, "bin", "package-tool.CMD");
         NodeFS.mkdirSync(NodePath.dirname(shim), { recursive: true });
         NodeFS.writeFileSync(shim, script);
@@ -2649,7 +2649,7 @@ it.layer(
 
   it.effect.skipIf(windowsHost)("upgrades with the keg's own brew when brew is not on PATH", () =>
     Effect.gen(function* () {
-      const tempDir = yield* makeTempDir("t3-homebrew-keg-brew");
+      const tempDir = yield* makeTempDir("legion-homebrew-keg-brew");
       const brewPath = NodePath.join(tempDir, "bin", "brew");
       writeExecutable(brewPath);
       const kegBinary = NodePath.join(tempDir, "Cellar", "package-tool", "1.0.0", "bin", "tool");

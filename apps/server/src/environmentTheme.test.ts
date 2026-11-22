@@ -3,7 +3,7 @@ import {
   EnvironmentThemeFile,
   ServerSettingsError,
   THEME_CSS_MAX_LENGTH,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -18,7 +18,7 @@ import * as Stream from "effect/Stream";
 import * as ServerConfig from "./config.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
 import { ServerSettingsService } from "./serverSettings.ts";
-import { symlinksSupported } from "@t3tools/shared/testing/symlinks";
+import { symlinksSupported } from "@legioncode/shared/testing/symlinks";
 
 const encodeThemeFile = Schema.encodeSync(Schema.fromJsonString(EnvironmentThemeFile));
 /** Writes non-ASCII characters as `\uXXXX` escapes, as encoders such as Python's json.dumps do. */
@@ -62,7 +62,7 @@ const withEnvironmentThemes = <A, E>(
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3code-environment-theme-" });
+    const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "legioncode-environment-theme-" });
     const themesDir = path.join(baseDir, "userdata", "themes");
     yield* fs.makeDirectory(themesDir, { recursive: true });
     for (const [filename, contents] of Object.entries(seeds)) {
@@ -311,7 +311,7 @@ it.layer(NodeServices.layer)("environment theme", (it) => {
       Effect.gen(function* () {
         const themes = yield* EnvironmentTheme.EnvironmentThemeService;
         yield* themes.apply({ themeId: "agent-look", theme: NIGHTFALL_THEME });
-        yield* themes.apply({ themeId: "t3-code" });
+        yield* themes.apply({ themeId: "legion-code" });
         assert.deepEqual(selected, [{ theme: "agent-look" }, { theme: "" }]);
       }),
       selected,

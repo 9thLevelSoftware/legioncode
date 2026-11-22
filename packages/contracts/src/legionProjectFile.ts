@@ -5,12 +5,12 @@ import { ThreadEnvMode, WorktreeSubmodules } from "./environment.ts";
 import { ProjectScriptIcon } from "./project.ts";
 import type { ProjectScopedServerSettingKey, ServerSettings } from "./settings.ts";
 
-export const T3_PROJECT_FILE_NAME = "t3.json";
+export const LEGION_PROJECT_FILE_NAME = "legioncode.json";
 
-export const T3_PROJECT_FILE_SCHEMA_URL = "https://t3.codes/schema/t3.json";
+export const LEGION_PROJECT_FILE_SCHEMA_URL = "https://legion.codes/schema/legioncode.json";
 
-const T3_PROJECT_FILE_PATH_MAX_LENGTH = 512;
-const T3_PROJECT_FILE_MAX_SCRIPTS = 50;
+const LEGION_PROJECT_FILE_PATH_MAX_LENGTH = 512;
+const LEGION_PROJECT_FILE_MAX_SCRIPTS = 50;
 
 // Encoded-side annotations survive into JSON Schema; decoding still trims and rejects empty strings.
 const trimmedNonEmpty = (annotations: { readonly description: string }, maxLength?: number) => {
@@ -22,12 +22,12 @@ const trimmedNonEmpty = (annotations: { readonly description: string }, maxLengt
   return encoded.pipe(Schema.decodeTo(encoded, SchemaTransformation.trim()));
 };
 
-export const T3ProjectFileScript = Schema.Struct({
+export const LegionProjectFileScript = Schema.Struct({
   name: trimmedNonEmpty({
-    description: "Display name for the script, shown in the T3 Code scripts menu.",
+    description: "Display name for the script, shown in the LegionCode scripts menu.",
   }),
   command: trimmedNonEmpty({
-    description: "Shell command executed in a T3 Code terminal at the project root.",
+    description: "Shell command executed in a LegionCode terminal at the project root.",
   }),
   icon: Schema.optionalKey(
     ProjectScriptIcon.annotate({
@@ -49,7 +49,7 @@ export const T3ProjectFileScript = Schema.Struct({
   stopOnSettle: Schema.optionalKey(
     Schema.Boolean.annotate({
       description:
-        "When true, T3 stops this action's terminal and child processes when its thread settles.",
+        "When true, LegionCode stops this action's terminal and child processes when its thread settles.",
     }),
   ),
   async: Schema.optionalKey(
@@ -71,61 +71,62 @@ export const T3ProjectFileScript = Schema.Struct({
     }),
   ),
 }).annotate({
-  description: "A project script that team members can import into T3 Code.",
+  description: "A project script that team members can import into LegionCode.",
 });
-export type T3ProjectFileScript = typeof T3ProjectFileScript.Type;
+export type LegionProjectFileScript = typeof LegionProjectFileScript.Type;
 
-export const T3ProjectFile = Schema.Struct({
+export const LegionProjectFile = Schema.Struct({
   $schema: Schema.optionalKey(
     Schema.String.annotate({
-      description: `URL of the JSON Schema for this file, typically "${T3_PROJECT_FILE_SCHEMA_URL}".`,
+      description: `URL of the JSON Schema for this file, typically "${LEGION_PROJECT_FILE_SCHEMA_URL}".`,
     }),
   ),
   iconPath: Schema.optionalKey(
     trimmedNonEmpty(
       {
         description:
-          'Workspace-relative path to the project icon (e.g. "assets/logo.svg"). Checked before T3 Code\'s built-in icon locations.',
+          'Workspace-relative path to the project icon (e.g. "assets/logo.svg"). Checked before LegionCode\'s built-in icon locations.',
       },
-      T3_PROJECT_FILE_PATH_MAX_LENGTH,
+      LEGION_PROJECT_FILE_PATH_MAX_LENGTH,
     ),
   ),
   defaultThreadEnvMode: Schema.optionalKey(
     ThreadEnvMode.annotate({
       description:
-        'Where new threads start for this repository: "worktree" for a fresh git worktree, "local" for the current checkout. A per-project setting in T3 Code overrides this; when neither is set, the global default applies.',
+        'Where new threads start for this repository: "worktree" for a fresh git worktree, "local" for the current checkout. A per-project setting in LegionCode overrides this; when neither is set, the global default applies.',
     }),
   ),
   worktreeSubmodules: Schema.optionalKey(
     WorktreeSubmodules.annotate({
       description:
-        'How new worktrees populate git submodules: "recursive" (the default) initializes nested submodules too, "top-level" initializes only those declared by this repository, and "none" leaves every submodule empty for a setup script to handle. A project or environment setting in T3 Code overrides this.',
+        'How new worktrees populate git submodules: "recursive" (the default) initializes nested submodules too, "top-level" initializes only those declared by this repository, and "none" leaves every submodule empty for a setup script to handle. A project or environment setting in LegionCode overrides this.',
     }),
   ),
   worktreeSparsePatternsPath: Schema.optionalKey(
     trimmedNonEmpty(
       {
         description:
-          'Repository-relative path to a git sparse-checkout pattern file in non-cone syntax (e.g. ".t3/sparse-checkout"). New worktrees check out only the files it matches. Both files are read from the branch being checked out; a missing pattern file fails the worktree instead of checking out everything.',
+          'Repository-relative path to a git sparse-checkout pattern file in non-cone syntax (e.g. ".legioncode/sparse-checkout"). New worktrees check out only the files it matches. Both files are read from the branch being checked out; a missing pattern file fails the worktree instead of checking out everything.',
       },
-      T3_PROJECT_FILE_PATH_MAX_LENGTH,
+      LEGION_PROJECT_FILE_PATH_MAX_LENGTH,
     ),
   ),
   scripts: Schema.optionalKey(
-    Schema.Array(T3ProjectFileScript)
+    Schema.Array(LegionProjectFileScript)
       .annotate({
-        description: "Project scripts shared with everyone who opens this repository in T3 Code.",
+        description:
+          "Project scripts shared with everyone who opens this repository in LegionCode.",
       })
-      .check(Schema.isMaxLength(T3_PROJECT_FILE_MAX_SCRIPTS)),
+      .check(Schema.isMaxLength(LEGION_PROJECT_FILE_MAX_SCRIPTS)),
   ),
 }).annotate({
-  title: "T3 project file",
+  title: "LegionCode project file",
   description:
-    "Checked-in project configuration for T3 Code (t3.json at the repository root). See https://t3.codes for documentation.",
+    "Checked-in project configuration for LegionCode (legioncode.json at the repository root). See https://legion.codes for documentation.",
 });
-export type T3ProjectFile = typeof T3ProjectFile.Type;
+export type LegionProjectFile = typeof LegionProjectFile.Type;
 
-/** Keys must be nullable in ServerSettings so both environment and project overrides can inherit t3.json. */
+/** Keys must be nullable in ServerSettings so both environment and project overrides can inherit legioncode.json. */
 export const PROJECT_FILE_BACKED_SETTINGS = {
   defaultThreadEnvMode: { field: "defaultThreadEnvMode", builtIn: "local" },
   worktreeSubmodules: { field: "worktreeSubmodules", builtIn: "recursive" },
@@ -133,12 +134,12 @@ export const PROJECT_FILE_BACKED_SETTINGS = {
   // providerInstances overrides individual fields, so it cannot use whole-setting file inheritance.
   readonly [K in ProjectScopedServerSettingKey & keyof ServerSettings]?: {
     readonly field: {
-      readonly [F in keyof T3ProjectFile]: T3ProjectFile[F] extends
+      readonly [F in keyof LegionProjectFile]: LegionProjectFile[F] extends
         | Exclude<ServerSettings[K], null>
         | undefined
         ? F
         : never;
-    }[keyof T3ProjectFile];
+    }[keyof LegionProjectFile];
     readonly builtIn: Exclude<ServerSettings[K], null>;
   };
 };

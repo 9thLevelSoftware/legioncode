@@ -3,7 +3,7 @@ import * as NodeChildProcess from "node:child_process";
 import * as NodeSqlite from "node:sqlite";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import * as Clock from "effect/Clock";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Duration from "effect/Duration";
@@ -57,25 +57,29 @@ const windowsTaskOptions = {
   conhostPath: "C:\\Windows\\System32\\conhost.exe",
 };
 
-it("reads the served T3 home and log back out of a rendered unit, plist, or task", () => {
+it("reads the served LegionCode home and log back out of a rendered unit, plist, or task", () => {
   const plan = (baseDir: string) => ({
-    program: [`${baseDir}/runtime/versions/1.2.3/t3`, "__service-launcher"],
+    program: [`${baseDir}/runtime/versions/1.2.3/legioncode`, "__service-launcher"],
     baseDir,
     logPath: `${baseDir}/userdata/logs/boot-service.log`,
-    unitPath: "/home/theo/.config/systemd/user/t3code.service",
+    unitPath: "/home/theo/.config/systemd/user/legioncode.service",
   });
 
   expect(
-    BootService.bootServiceBaseDirOf(BootService.renderBootServiceUnit(plan("/home/theo/.t3"))),
-  ).toBe("/home/theo/.t3");
+    BootService.bootServiceBaseDirOf(
+      BootService.renderBootServiceUnit(plan("/home/theo/.legioncode")),
+    ),
+  ).toBe("/home/theo/.legioncode");
   expect(
     BootService.bootServiceBaseDirOf(
-      BootService.renderBootServiceUnit(plan("/home/theo/T3 Data/100%")),
+      BootService.renderBootServiceUnit(plan("/home/theo/LegionCode Data/100%")),
     ),
-  ).toBe("/home/theo/T3 Data/100%");
+  ).toBe("/home/theo/LegionCode Data/100%");
   expect(
-    serviceUnitLogPathOf(BootService.renderBootServiceUnit(plan("/home/theo/T3 Data/100%"))),
-  ).toBe("/home/theo/T3 Data/100%/userdata/logs/boot-service.log");
+    serviceUnitLogPathOf(
+      BootService.renderBootServiceUnit(plan("/home/theo/LegionCode Data/100%")),
+    ),
+  ).toBe("/home/theo/LegionCode Data/100%/userdata/logs/boot-service.log");
   expect(
     serviceUnitLogPathOf(
       BootService.renderBootServicePlist(plan("/Users/theo/a&b"), {
@@ -94,18 +98,18 @@ it("reads the served T3 home and log back out of a rendered unit, plist, or task
   ).toBe("/Users/theo/a&b");
   expect(
     BootService.bootServiceBaseDirOf(
-      BootService.renderBootServiceTask(plan("C:\\Users\\theo\\T3 a&b\\"), windowsTaskOptions),
+      BootService.renderBootServiceTask(plan("C:\\Users\\theo\\Legion a&b\\"), windowsTaskOptions),
     ),
-  ).toBe("C:\\Users\\theo\\T3 a&b\\");
+  ).toBe("C:\\Users\\theo\\Legion a&b\\");
   expect(BootService.bootServiceBaseDirOf("[Service]\nExecStart=/x\n")).toBeUndefined();
 });
 
 it("protects the server unit from agents under CPU and memory pressure", () => {
   const unit = BootService.renderBootServiceUnit({
-    program: ["/home/theo/.t3/runtime/versions/1.2.3/t3", "__service-launcher"],
-    baseDir: "/home/theo/.t3",
-    logPath: "/home/theo/.t3/userdata/logs/boot-service.log",
-    unitPath: "/home/theo/.config/systemd/user/t3code.service",
+    program: ["/home/theo/.legioncode/runtime/versions/1.2.3/legioncode", "__service-launcher"],
+    baseDir: "/home/theo/.legioncode",
+    logPath: "/home/theo/.legioncode/userdata/logs/boot-service.log",
+    unitPath: "/home/theo/.config/systemd/user/legioncode.service",
   });
   const service = unit.slice(unit.indexOf("[Service]"), unit.indexOf("[Install]"));
   for (const line of [
@@ -120,7 +124,7 @@ it("protects the server unit from agents under CPU and memory pressure", () => {
 });
 
 it.each([
-  ["a unit", "/home/theo/T3 Data/100%$x", BootService.renderBootServiceUnit],
+  ["a unit", "/home/theo/LegionCode Data/100%$x", BootService.renderBootServiceUnit],
   [
     "a plist",
     "/Users/theo/a&b <c>",
@@ -129,12 +133,12 @@ it.each([
   ],
   [
     "a task",
-    "C:\\Users\\theo\\T3 a&b <c>",
+    "C:\\Users\\theo\\Legion a&b <c>",
     (plan: BootService.BootServicePlan) =>
       BootService.renderBootServiceTask(plan, windowsTaskOptions),
   ],
 ] as const)("reads the launcher back out of %s", (_, baseDir, render) => {
-  const program = `${baseDir}/runtime/versions/1.2.3/t3`;
+  const program = `${baseDir}/runtime/versions/1.2.3/legioncode`;
   expect(
     BootService.bootServiceProgramOf(
       render({ program: [program, "__service-launcher"], baseDir, logPath: "/log", unitPath: "" }),
@@ -144,18 +148,18 @@ it.each([
 
 // systemd rejects a unit whose executable has a control character, quote or backslash, even quoted.
 it.each([
-  ["a double quote", '/home/theo/T3 "Data"'],
-  ["a single quote", "/home/theo/Theo's T3"],
-  ["a backslash", "/home/theo/T3\\Data"],
-  ["a newline", "/home/theo/T3\nData"],
-])("renders a loadable unit, or refuses, for a T3 home with %s", (_, baseDir) => {
+  ["a double quote", '/home/theo/Legion "Data"'],
+  ["a single quote", "/home/theo/Theo's LegionCode"],
+  ["a backslash", "/home/theo/LegionCode\\Data"],
+  ["a newline", "/home/theo/LegionCode\nData"],
+])("renders a loadable unit, or refuses, for a LegionCode home with %s", (_, baseDir) => {
   let unit: string;
   try {
     unit = BootService.renderBootServiceUnit({
-      program: [`${baseDir}/runtime/versions/1.2.3/t3`, "__service-launcher"],
+      program: [`${baseDir}/runtime/versions/1.2.3/legioncode`, "__service-launcher"],
       baseDir,
       logPath: `${baseDir}/userdata/logs/boot-service.log`,
-      unitPath: "/home/theo/.config/systemd/user/t3code.service",
+      unitPath: "/home/theo/.config/systemd/user/legioncode.service",
     });
   } catch {
     return;
@@ -189,7 +193,7 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const home = yield* fs.makeTempDirectoryScoped({ prefix: "t3-boot-service-test-" });
+  const home = yield* fs.makeTempDirectoryScoped({ prefix: "legion-boot-service-test-" });
   const managerUnitDir = path.join(
     managerXdgConfigHome !== undefined && path.isAbsolute(managerXdgConfigHome)
       ? managerXdgConfigHome
@@ -197,7 +201,7 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
     "systemd",
     "user",
   );
-  const baseDir = path.join(home, ".t3");
+  const baseDir = path.join(home, ".legioncode");
   const statePath = path.join(baseDir, "runtime", "service-state.json");
   const runtime = pinnedRuntimePaths(path, baseDir, "1.2.3", platform);
   yield* fs.makeDirectory(path.dirname(runtime.entryPath), { recursive: true });
@@ -242,17 +246,19 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
       commands.push(command);
       invocations.push(input);
       timeouts.set(command, input.timeout);
-      if (command === "systemctl --user reset-failed t3code.service") control.startLimitHit = false;
+      if (command === "systemctl --user reset-failed legioncode.service")
+        control.startLimitHit = false;
       const refusedStart = control.startLimitHit && command.startsWith("systemctl --user restart ");
       // `--no-block` only queues the job, so systemd reports success even when it refuses it.
       const failed =
         command === control.failCommand ||
-        (refusedStart && command === "systemctl --user restart t3code.service");
+        (refusedStart && command === "systemctl --user restart legioncode.service");
       if (!failed && command.startsWith("loginctl enable-linger --no-ask-password ")) {
         control.linger = "yes";
         control.managerReachable ||= control.lingerStartsManager;
       }
-      if (!failed && command === "systemctl --user enable t3code.service") control.enabled = true;
+      if (!failed && command === "systemctl --user enable legioncode.service")
+        control.enabled = true;
       const taskMissing =
         input.command === "schtasks" && input.args[0] !== "/Create" && control.task === undefined;
       if (input.command === "schtasks" && !failed) {
@@ -270,13 +276,13 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
         control.active = true;
       // The manager loads units only from its own unit directory.
       const unitOutsideManager =
-        command === "systemctl --user enable t3code.service" &&
-        !(yield* fs.exists(path.join(managerUnitDir, "t3code.service")));
+        command === "systemctl --user enable legioncode.service" &&
+        !(yield* fs.exists(path.join(managerUnitDir, "legioncode.service")));
       // A timed-out stop may still stop the service.
-      if (command === "systemctl --user stop t3code.service") control.active = false;
+      if (command === "systemctl --user stop legioncode.service") control.active = false;
       if (
         control.stateAfterStop !== undefined &&
-        (command === "systemctl --user stop t3code.service" ||
+        (command === "systemctl --user stop legioncode.service" ||
           command.startsWith("launchctl bootout --wait "))
       ) {
         yield* fs.writeFileString(statePath, control.stateAfterStop);
@@ -295,7 +301,7 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
                 ],
               })
             : input.args[0] === "--version"
-              ? `t3 v${/versions[\\/]([^\\/]+)[\\/]/.exec(input.command)?.[1] ?? "1.2.3"}\n`
+              ? `legioncode v${/versions[\\/]([^\\/]+)[\\/]/.exec(input.command)?.[1] ?? "1.2.3"}\n`
               : input.command === "schtasks" && input.args.includes("/XML")
                 ? control.task?.enabled === false
                   ? disabledServiceTask(control.task.xml)
@@ -338,7 +344,7 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
     cliVersion = "1.2.3",
     serviceBaseDir = baseDir,
     insideService = false,
-    hostExecPath = "/usr/bin/t3",
+    hostExecPath = "/usr/bin/legioncode",
     underSudo = false,
     serviceInstallBinDir: string | null | undefined = installBinDir,
   ) =>
@@ -370,7 +376,7 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
                 HOME: home,
                 ...(serviceInstallBinDir === undefined || serviceInstallBinDir === null
                   ? {}
-                  : { T3CODE_INSTALL_BIN_DIR: serviceInstallBinDir }),
+                  : { LEGIONCODE_INSTALL_BIN_DIR: serviceInstallBinDir }),
                 ...(xdgConfigHome === undefined ? {} : { XDG_CONFIG_HOME: xdgConfigHome }),
                 USERPROFILE: home,
                 LOCALAPPDATA: path.join(home, "AppData", "Local"),
@@ -381,8 +387,8 @@ const makeHarness = Effect.fn("test.make_boot_service_harness")(function* (
                   : { PATH: environmentPath }),
                 ...(insideService
                   ? {
-                      T3_BOOT_SERVICE_UNIT:
-                        platform === "win32" ? "t3code-task.xml" : "t3code.service",
+                      LEGIONCODE_BOOT_SERVICE_UNIT:
+                        platform === "win32" ? "legioncode-task.xml" : "legioncode.service",
                     }
                   : {}),
                 ...(underSudo ? { SUDO_USER: "julius" } : {}),
@@ -460,7 +466,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
         );
         expect(yield* fs.readFileString(statePath)).toBe(before);
         expect(yield* fs.readFileString(plan.unitPath)).toBe(unit);
-        expect(commands).not.toContain("systemctl --user stop t3code.service");
+        expect(commands).not.toContain("systemctl --user stop legioncode.service");
       }),
   );
 
@@ -514,7 +520,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
         _tag: "BootServicePrerequisiteError",
         problem: "user-manager-unavailable",
       });
-      expect(commands).not.toContain("systemctl --user enable t3code.service");
+      expect(commands).not.toContain("systemctl --user enable legioncode.service");
     }),
   );
 
@@ -538,7 +544,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
     Effect.gen(function* () {
       const path = yield* Path.Path;
       const fs = yield* FileSystem.FileSystem;
-      const shellConfigHome = yield* fs.makeTempDirectoryScoped({ prefix: "t3-xdg-config-" });
+      const shellConfigHome = yield* fs.makeTempDirectoryScoped({ prefix: "legion-xdg-config-" });
       const { makeService, home, control } = yield* makeHarness(
         "linux",
         undefined,
@@ -551,7 +557,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
 
       const plan = yield* service.install();
 
-      const unitPath = path.join(home, ".config", "systemd", "user", "t3code.service");
+      const unitPath = path.join(home, ".config", "systemd", "user", "legioncode.service");
       expect(plan.unitPath).toBe(unitPath);
       expect(yield* service.status).toMatchObject({ current: true, unitPath });
     }),
@@ -638,7 +644,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
     "preserves the custom install bin directory in the installed service on %s",
     (platform) =>
       Effect.gen(function* () {
-        const installBinDir = '/custom/T3\t& <100%>/"quoted"\\bin';
+        const installBinDir = '/custom/legioncode\t& <100%>/"quoted"\\bin';
         const { service, makeService, fs } = yield* makeHarness(
           platform,
           "",
@@ -650,8 +656,8 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
         const unit = yield* fs.readFileString(plan.unitPath);
         expect(unit).toContain(
           platform === "linux"
-            ? 'Environment=T3CODE_INSTALL_BIN_DIR="/custom/T3\t& <100%%>/\\"quoted\\"\\\\bin"'
-            : '<key>T3CODE_INSTALL_BIN_DIR</key>\n    <string>/custom/T3\t&amp; &lt;100%&gt;/"quoted"\\bin</string>',
+            ? 'Environment=LEGIONCODE_INSTALL_BIN_DIR="/custom/legioncode\t& <100%%>/\\"quoted\\"\\\\bin"'
+            : '<key>LEGIONCODE_INSTALL_BIN_DIR</key>\n    <string>/custom/legioncode\t&amp; &lt;100%&gt;/"quoted"\\bin</string>',
         );
         expect((yield* service.status).current).toBe(true);
 
@@ -709,7 +715,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
     Effect.gen(function* () {
       const path = yield* Path.Path;
       const fs = yield* FileSystem.FileSystem;
-      const configRoot = yield* fs.makeTempDirectoryScoped({ prefix: "t3-xdg-config-" });
+      const configRoot = yield* fs.makeTempDirectoryScoped({ prefix: "legion-xdg-config-" });
       const xdgConfigHome = {
         unset: undefined,
         empty: "",
@@ -733,7 +739,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
           : path.join(home, ".config"),
         "systemd",
         "user",
-        "t3code.service",
+        "legioncode.service",
       );
       expect(yield* service.status).toMatchObject({ installed: false, unitPath });
       const plan = yield* service.install();
@@ -749,7 +755,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
         activeVersion: "1.2.3",
       });
       expect(plan.program).toEqual([runtime.entryPath, "__service-launcher"]);
-      expect(yield* fs.readFileString(plan.unitPath)).not.toContain("T3CODE_INSTALL_BIN_DIR");
+      expect(yield* fs.readFileString(plan.unitPath)).not.toContain("LEGIONCODE_INSTALL_BIN_DIR");
       expect(yield* fs.readFileString(plan.unitPath)).toContain(
         `ExecStart=${runtime.entryPath} __service-launcher`,
       );
@@ -780,7 +786,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
       expect(yield* fs.exists(unitPath)).toBe(false);
       expect((yield* discoveredService.status).installed).toBe(false);
       // systemd can take 90s to stop, exceeding the runner's 60s default.
-      expect(timeouts.get("systemctl --user disable --now t3code.service")).toEqual(
+      expect(timeouts.get("systemctl --user disable --now legioncode.service")).toEqual(
         Duration.seconds(120),
       );
     }),
@@ -859,12 +865,12 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
         ).toEqual(
           platform === "linux"
             ? [
-                "systemctl --user stop t3code.service",
-                "systemctl --user reset-failed t3code.service",
-                "systemctl --user restart t3code.service",
+                "systemctl --user stop legioncode.service",
+                "systemctl --user reset-failed legioncode.service",
+                "systemctl --user restart legioncode.service",
               ]
             : [
-                "launchctl bootout --wait gui/501/com.t3tools.t3code.service",
+                "launchctl bootout --wait gui/501/dev.legioncode.service",
                 `launchctl bootstrap gui/501 ${plan.unitPath}`,
               ],
         );
@@ -912,7 +918,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
         const path = yield* Path.Path;
         const envPath = path.join(baseDir, SERVICE_ENV_FILE);
         const envBytes = new TextEncoder().encode(
-          '# user configuration\r\nT3CODE_TOKEN="literal $HOME # token"',
+          '# user configuration\r\nLEGIONCODE_TOKEN="literal $HOME # token"',
         );
         yield* fs.writeFile(envPath, envBytes);
         yield* service.install();
@@ -929,7 +935,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
           protocol: SERVICE_LAUNCHER_PROTOCOL,
           activeVersion: "1.2.4",
         });
-        expect(yield* fs.readFileString(plan.unitPath)).toContain("versions/1.2.4/t3");
+        expect(yield* fs.readFileString(plan.unitPath)).toContain("versions/1.2.4/legioncode");
         expect(
           commands.filter(
             (command) =>
@@ -951,7 +957,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
           protocol: SERVICE_LAUNCHER_PROTOCOL,
           activeVersion: "1.2.5",
         });
-        expect(yield* fs.readFileString(plan.unitPath)).toContain("versions/1.2.5/t3");
+        expect(yield* fs.readFileString(plan.unitPath)).toContain("versions/1.2.5/legioncode");
         expect((yield* latest.status).current).toBe(true);
         expect(
           yield* fs.exists(path.join(path.dirname(statePath), SERVICE_RESTART_PENDING_FILE)),
@@ -969,7 +975,7 @@ it.layer(NodeServices.layer)("boot service install", (it) => {
         const unit = yield* fs.readFileString(plan.unitPath);
         yield* fs.writeFileString(
           plan.unitPath,
-          unit.replace("versions/1.2.3/t3", "versions/1.2.2/t3"),
+          unit.replace("versions/1.2.3/legioncode", "versions/1.2.2/legioncode"),
         );
         yield* fs.writeFileString(
           statePath,
@@ -1097,7 +1103,7 @@ process.disconnect();
           protocol: SERVICE_LAUNCHER_PROTOCOL,
           activeVersion: "1.2.4",
         });
-        expect(yield* fs.readFileString(plan.unitPath)).toContain("versions/1.2.4/t3");
+        expect(yield* fs.readFileString(plan.unitPath)).toContain("versions/1.2.4/legioncode");
         expect(
           yield* fs.readFileString(
             path.join(path.dirname(statePath), SERVICE_RESTART_PENDING_FILE),
@@ -1166,7 +1172,7 @@ process.disconnect();
       expect(failure).toBe("repair failed");
       expect(control.active).toBe(true);
 
-      control.failCommand = "systemctl --user stop t3code.service";
+      control.failCommand = "systemctl --user stop legioncode.service";
       let ran = false;
       const stopFailure = yield* service
         .withStopped(
@@ -1187,12 +1193,12 @@ process.disconnect();
       commands.length = 0;
       yield* service.withStopped(Effect.sync(() => commands.push("repair")));
       expect(commands).toEqual([
-        "systemctl --user is-enabled t3code.service",
-        "systemctl --user is-active t3code.service",
-        "systemctl --user stop t3code.service",
+        "systemctl --user is-enabled legioncode.service",
+        "systemctl --user is-active legioncode.service",
+        "systemctl --user stop legioncode.service",
         "repair",
-        "systemctl --user reset-failed t3code.service",
-        "systemctl --user restart t3code.service",
+        "systemctl --user reset-failed legioncode.service",
+        "systemctl --user restart legioncode.service",
       ]);
       expect(control.active).toBe(true);
       control.enabled = false;
@@ -1202,14 +1208,14 @@ process.disconnect();
       control.enabled = false;
       commands.length = 0;
       yield* service.withStopped(Effect.sync(() => commands.push("repair")));
-      expect(commands).toContain("systemctl --user stop t3code.service");
-      expect(commands).not.toContain("systemctl --user restart t3code.service");
+      expect(commands).toContain("systemctl --user stop legioncode.service");
+      expect(commands).not.toContain("systemctl --user restart legioncode.service");
       expect(control.active).toBe(false);
       control.enabled = true;
       control.active = true;
 
       const fs = yield* FileSystem.FileSystem;
-      const otherHome = yield* fs.makeTempDirectoryScoped({ prefix: "t3-doctor-other-" });
+      const otherHome = yield* fs.makeTempDirectoryScoped({ prefix: "legion-doctor-other-" });
       const other = yield* makeService(undefined, "1.2.3", otherHome);
       commands.length = 0;
       expect(yield* other.withStopped(Effect.sync(() => control.active))).toBe(true);
@@ -1217,15 +1223,15 @@ process.disconnect();
     }),
   );
 
-  it.effect("restart and install leave a service that serves another T3 home alone", () =>
+  it.effect("restart and install leave a service that serves another LegionCode home alone", () =>
     Effect.gen(function* () {
       const { service, fs, baseDir, commands, makeService } = yield* makeHarness();
       const plan = yield* service.install();
       const unit = yield* fs.readFileString(plan.unitPath);
       const path = yield* Path.Path;
-      const otherHome = yield* fs.makeTempDirectoryScoped({ prefix: "t3-other-home-" });
+      const otherHome = yield* fs.makeTempDirectoryScoped({ prefix: "legion-other-home-" });
 
-      const other = yield* makeService(undefined, "1.2.3", path.join(otherHome, ".t3"));
+      const other = yield* makeService(undefined, "1.2.3", path.join(otherHome, ".legioncode"));
       commands.length = 0;
       expect(yield* other.restart).toBe("skipped");
       const refused = yield* other.install().pipe(Effect.flip);
@@ -1236,7 +1242,7 @@ process.disconnect();
       expect(commands).toEqual([]);
       expect((yield* other.status).otherBaseDir).toBe(baseDir);
 
-      const quoted = yield* makeService(undefined, "1.2.3", path.join(otherHome, 'T3 "Data"'));
+      const quoted = yield* makeService(undefined, "1.2.3", path.join(otherHome, 'Legion "Data"'));
       commands.length = 0;
       const unloadable = yield* quoted.install().pipe(Effect.flip);
       expect(unloadable._tag).toBe("BootServiceBaseDirUnsupportedError");
@@ -1250,8 +1256,8 @@ process.disconnect();
     Effect.gen(function* () {
       const { fs, commands, invocations, control, makeService } = yield* makeHarness();
       const path = yield* Path.Path;
-      const home = yield* fs.makeTempDirectoryScoped({ prefix: "t3-handoff-" });
-      const baseDir = path.join(home, "T3 Data 100%", "${UNSET}", "$literal");
+      const home = yield* fs.makeTempDirectoryScoped({ prefix: "legion-handoff-" });
+      const baseDir = path.join(home, "LegionCode Data 100%", "${UNSET}", "$literal");
       const outside = yield* makeService(undefined, "1.2.3", baseDir);
       const plan = yield* outside.install();
       const statePath = path.join(baseDir, "runtime", "service-state.json");
@@ -1265,7 +1271,7 @@ process.disconnect();
 
       expect(yield* fs.readFileString(statePath)).toBe(state);
       expect(yield* fs.readFileString(plan.unitPath)).toBe(unit);
-      expect(commands).not.toContain("systemctl --user stop t3code.service");
+      expect(commands).not.toContain("systemctl --user stop legioncode.service");
       expect(result).toMatchObject({ handedOff: true, logPath: plan.logPath });
       const handoffs = invocations.filter(({ command }) => command === "systemd-run");
       expect(handoffs).toHaveLength(1);
@@ -1275,12 +1281,12 @@ process.disconnect();
         "--quiet",
         `--property=StandardOutput=append:${plan.logPath}`,
         `--property=StandardError=append:${plan.logPath}`,
-        "--setenv=T3_BOOT_SERVICE_UNIT=",
+        "--setenv=LEGIONCODE_BOOT_SERVICE_UNIT=",
         pinnedRuntimePaths(path, baseDir, "1.2.4", "linux").entryPath,
         "service",
         "install",
         "--base-dir",
-        path.join(home, "T3 Data 100%", "$${UNSET}", "$$literal"),
+        path.join(home, "LegionCode Data 100%", "$${UNSET}", "$$literal"),
         "--allow-downgrade",
       ]);
 
@@ -1291,7 +1297,7 @@ process.disconnect();
       expect(yield* fs.readFileString(statePath)).toBe(state);
       expect(yield* fs.readFileString(plan.unitPath)).toBe(unit);
       expect(control.active).toBe(true);
-      expect(commands).not.toContain("systemctl --user stop t3code.service");
+      expect(commands).not.toContain("systemctl --user stop legioncode.service");
     }),
   );
 
@@ -1318,9 +1324,9 @@ process.disconnect();
         const outcome = yield* inside.restart;
         expect(commands).toEqual([
           "systemctl --user daemon-reload",
-          "systemctl --user enable t3code.service",
-          "systemctl --user reset-failed t3code.service",
-          "systemctl --user restart --no-block t3code.service",
+          "systemctl --user enable legioncode.service",
+          "systemctl --user reset-failed legioncode.service",
+          "systemctl --user restart --no-block legioncode.service",
         ]);
         expect(outcome).toBe("queued");
         expect(yield* fs.readFileString(statePath)).toBe(state);
@@ -1361,10 +1367,10 @@ process.disconnect();
           (command) => command.startsWith("systemctl ") && !command.includes("show-environment"),
         ),
       ).toEqual([
-        "systemctl --user stop t3code.service",
+        "systemctl --user stop legioncode.service",
         "systemctl --user daemon-reload",
-        "systemctl --user reset-failed t3code.service",
-        "systemctl --user restart t3code.service",
+        "systemctl --user reset-failed legioncode.service",
+        "systemctl --user restart legioncode.service",
       ]);
     }),
   );
@@ -1396,9 +1402,9 @@ process.disconnect();
             (command) => command.startsWith("systemctl ") && !command.includes("show-environment"),
           ),
         ).toEqual([
-          "systemctl --user stop t3code.service",
-          "systemctl --user reset-failed t3code.service",
-          "systemctl --user restart t3code.service",
+          "systemctl --user stop legioncode.service",
+          "systemctl --user reset-failed legioncode.service",
+          "systemctl --user restart legioncode.service",
         ]);
       }
     }),
@@ -1412,7 +1418,7 @@ process.disconnect();
 
       expect(
         plan.unitPath.endsWith(
-          path.join("Library", "LaunchAgents", "com.t3tools.t3code.service.plist"),
+          path.join("Library", "LaunchAgents", "dev.legioncode.service.plist"),
         ),
       ).toBe(true);
       expect(yield* fs.readFileString(plan.unitPath)).toContain(
@@ -1433,7 +1439,7 @@ process.disconnect();
       expect((yield* service.status).installed).toBe(false);
       expect(commands.some((command) => command.startsWith("systemctl "))).toBe(false);
       // launchd can take 90s to bootout; the runner's 60s default could let bootstrap race it.
-      expect(timeouts.get("launchctl bootout --wait gui/501/com.t3tools.t3code.service")).toEqual(
+      expect(timeouts.get("launchctl bootout --wait gui/501/dev.legioncode.service")).toEqual(
         Duration.seconds(120),
       );
     }),
@@ -1447,7 +1453,13 @@ process.disconnect();
       const task = decodeServiceUnit(yield* fs.readFile(plan.unitPath));
 
       expect(plan.unitPath).toBe(
-        path.join(path.dirname(plan.baseDir), "AppData", "Local", "t3code", "t3code-task.xml"),
+        path.join(
+          path.dirname(plan.baseDir),
+          "AppData",
+          "Local",
+          "legioncode",
+          "legioncode-task.xml",
+        ),
       );
       expect(BootService.bootServiceProgramOf(task)).toBe(runtime.entryPath);
       expect(BootService.bootServiceBaseDirOf(task)).toBe(plan.baseDir);
@@ -1460,8 +1472,8 @@ process.disconnect();
         activeVersion: "1.2.3",
       });
       expect(commands.filter((command) => command.startsWith("schtasks "))).toEqual([
-        `schtasks /Create /XML ${plan.unitPath} /TN t3code-PC-theo /F`,
-        "schtasks /Run /TN t3code-PC-theo",
+        `schtasks /Create /XML ${plan.unitPath} /TN legioncode-PC-theo /F`,
+        "schtasks /Run /TN legioncode-PC-theo",
       ]);
       // No launcher holds the lock here.
       expect(yield* service.status).toMatchObject({
@@ -1471,7 +1483,7 @@ process.disconnect();
       });
 
       // A task that Task Scheduler refuses to delete stays installed, so a retry finds it.
-      control.failCommand = "schtasks /Delete /TN t3code-PC-theo /F";
+      control.failCommand = "schtasks /Delete /TN legioncode-PC-theo /F";
       expect((yield* service.uninstall.pipe(Effect.flip))._tag).toBe("BootServiceCommandError");
       expect((yield* service.status).installed).toBe(true);
       control.failCommand = undefined;
@@ -1479,9 +1491,9 @@ process.disconnect();
       commands.length = 0;
       expect(yield* service.uninstall).toBe(true);
       expect(commands).toEqual([
-        "schtasks /Change /TN t3code-PC-theo /DISABLE",
-        "schtasks /End /TN t3code-PC-theo",
-        "schtasks /Delete /TN t3code-PC-theo /F",
+        "schtasks /Change /TN legioncode-PC-theo /DISABLE",
+        "schtasks /End /TN legioncode-PC-theo",
+        "schtasks /Delete /TN legioncode-PC-theo /F",
       ]);
       expect(control.task).toBeUndefined();
       expect((yield* service.status).installed).toBe(false);
@@ -1521,11 +1533,11 @@ process.disconnect();
       commands.length = 0;
       yield* service.withStopped(Effect.sync(() => commands.push("repair")));
       expect(commands.filter((command) => !command.includes("/Query"))).toEqual([
-        "schtasks /Change /TN t3code-PC-theo /DISABLE",
-        "schtasks /End /TN t3code-PC-theo",
+        "schtasks /Change /TN legioncode-PC-theo /DISABLE",
+        "schtasks /End /TN legioncode-PC-theo",
         "repair",
-        "schtasks /Change /TN t3code-PC-theo /ENABLE",
-        "schtasks /Run /TN t3code-PC-theo",
+        "schtasks /Change /TN legioncode-PC-theo /ENABLE",
+        "schtasks /Run /TN legioncode-PC-theo",
       ]);
     }),
   );
@@ -1536,9 +1548,9 @@ process.disconnect();
       const plan = yield* service.install();
       const inside = yield* makeService(undefined, "1.2.4", undefined, true);
       const handoff = [
-        `schtasks /Create /XML ${plan.unitPath} /TN t3code-PC-theo /F`,
-        "schtasks /End /TN t3code-PC-theo",
-        "schtasks /Run /TN t3code-PC-theo",
+        `schtasks /Create /XML ${plan.unitPath} /TN legioncode-PC-theo /F`,
+        "schtasks /End /TN legioncode-PC-theo",
+        "schtasks /Run /TN legioncode-PC-theo",
       ];
       commands.length = 0;
 
@@ -1634,7 +1646,7 @@ process.disconnect();
     Effect.gen(function* () {
       const { service, control } = yield* makeHarness("darwin");
       yield* service.install();
-      control.failCommand = "launchctl bootout --wait gui/501/com.t3tools.t3code.service";
+      control.failCommand = "launchctl bootout --wait gui/501/dev.legioncode.service";
 
       yield* service.install();
       expect((yield* service.status).current).toBe(true);

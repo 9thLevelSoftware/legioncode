@@ -3,7 +3,7 @@ import * as NodePath from "@effect/platform-node/NodePath";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Layer from "effect/Layer";
 import { expect, it } from "@effect/vitest";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import * as Digest from "effect/crypto/Digest";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -145,7 +145,7 @@ const makeHarness = Effect.fn("test.makeAntigravityInstallation")(function* (
   const path = yield* Path.Path;
   const digest = yield* Digest.Digest;
   const baseDir =
-    options.baseDir ?? (yield* fs.makeTempDirectoryScoped({ prefix: "t3-agy-test-" }));
+    options.baseDir ?? (yield* fs.makeTempDirectoryScoped({ prefix: "legion-agy-test-" }));
   const platform = options.platform ?? hostPlatform;
   const arch = options.arch ?? "x64";
   const archive = options.archive ?? completeArchive;
@@ -400,7 +400,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
               compatibility: [
                 {
                   driver: "antigravity",
-                  t3CodeRange: ">=0.0.42",
+                  legionCodeRange: ">=0.0.42",
                   ranges: [{ range: ">=1.5.7", status: "broken" }],
                 },
               ],
@@ -1065,7 +1065,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const baseDir = yield* fs
-          .makeTempDirectoryScoped({ prefix: "t3-agy-cli-test-" })
+          .makeTempDirectoryScoped({ prefix: "legion-agy-cli-test-" })
           .pipe(Effect.flatMap((directory) => fs.realPath(directory)));
         const cliDirectory = path.join(baseDir, 'cli" ');
         yield* fs.makeDirectory(cliDirectory);
@@ -1136,7 +1136,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const baseDir = yield* fs
-          .makeTempDirectoryScoped({ prefix: "t3-agy-path-test-" })
+          .makeTempDirectoryScoped({ prefix: "legion-agy-path-test-" })
           .pipe(Effect.flatMap((directory) => fs.realPath(directory)));
         const externalDirectory = path.join(baseDir, "external");
         const externalExecutable = path.join(externalDirectory, executableName);
@@ -1219,7 +1219,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const baseDir = yield* fs
-        .makeTempDirectoryScoped({ prefix: "t3-agy-launcher-$$-test-" })
+        .makeTempDirectoryScoped({ prefix: "legion-agy-launcher-$$-test-" })
         .pipe(Effect.flatMap((directory) => fs.realPath(directory)));
       const runtimeDirectory = path.join(baseDir, "runtime (x64)");
       const launcherDirectory = path.join(baseDir, "launchers");
@@ -1319,7 +1319,7 @@ it.layer(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))("Antigravity inst
       const win32 = yield* Path.Path.pipe(Effect.provide(NodePath.layerWin32));
       const serverOnC: Path.Path = {
         ...win32,
-        resolve: (...segments) => win32.resolve("C:\\t3", ...segments),
+        resolve: (...segments) => win32.resolve("C:\\legioncode", ...segments),
       };
       const launcherOnD = "D:\\launchers\\agy.cmd";
       for (const [written, expected] of [

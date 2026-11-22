@@ -15,9 +15,9 @@ import {
   type RuntimeMode,
   type RuntimeRequestId,
   ThreadId,
-} from "@t3tools/contracts";
-import { resolveSelfInvocation } from "@t3tools/shared/nodeRuntime";
-import { htmlRenderFromToolItem } from "@t3tools/shared/toolOutput";
+} from "@legioncode/contracts";
+import { resolveSelfInvocation } from "@legioncode/shared/nodeRuntime";
+import { htmlRenderFromToolItem } from "@legioncode/shared/toolOutput";
 import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
@@ -34,10 +34,10 @@ import * as TestClock from "effect/testing/TestClock";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import type * as EffectAcpSchema from "effect-acp/compat";
 
-import * as TestProviderHost from "@t3tools/provider-testing/TestProviderHost";
-import type * as AcpSessionRuntime from "@t3tools/provider-acp/server/AcpSessionRuntime";
-import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
-import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
+import * as TestProviderHost from "@legioncode/provider-testing/TestProviderHost";
+import type * as AcpSessionRuntime from "@legioncode/provider-acp/server/AcpSessionRuntime";
+import * as IdAllocator from "@legioncode/provider-core/server/IdAllocator";
+import * as McpProviderSessions from "@legioncode/provider-core/server/McpProviderSessions";
 import {
   ProviderAdapterTurnStartError,
   type ProviderAdapterV2Error,
@@ -45,7 +45,7 @@ import {
   type ProviderAdapterV2TurnInput,
   ProviderCompactionUnsupportedError,
   ProviderAdapterV2RuntimePolicy,
-} from "@t3tools/provider-core/server/ProviderAdapter";
+} from "@legioncode/provider-core/server/ProviderAdapter";
 import {
   decodeAcpReplayTranscript,
   makeAcpReplayCompletenessAssertion,
@@ -54,16 +54,16 @@ import {
 import {
   makeProviderReplayGate,
   type ProviderReplayGate,
-} from "@t3tools/provider-testing/replayGate";
-import { readProviderReplayTranscript } from "@t3tools/provider-testing/replayTranscript";
-import { KiroSettings } from "@t3tools/provider-kiro/settings";
+} from "@legioncode/provider-testing/replayGate";
+import { readProviderReplayTranscript } from "@legioncode/provider-testing/replayTranscript";
+import { KiroSettings } from "@legioncode/provider-kiro/settings";
 import {
   KIRO_PROVIDER,
   kiroApprovalOptions,
   kiroAutopilotValue,
   kiroPermissionDisposition,
   makeKiroAdapterV2,
-} from "@t3tools/provider-kiro/testing";
+} from "@legioncode/provider-kiro/testing";
 
 const testLayer = Layer.mergeAll(
   NodeServices.layer,
@@ -243,7 +243,7 @@ const configResult = (configOptions: ReadonlyArray<unknown>) =>
   answer("session/set_config_option", { configOptions });
 const reasoning = (value: string) => [{ id: "reasoningEffort", value }];
 
-/** Kiro's `session/new` result, recorded from 2.27.0 and trimmed to what T3 reads. */
+/** Kiro's `session/new` result, recorded from 2.27.0 and trimmed to what LegionCode reads. */
 const sessionSetup = (configOptions: ReadonlyArray<unknown>) => ({
   _meta: { schemaVersion: "1.0.0", id: SESSION_ID, agentMode: "vibe", source: "local" },
   sessionId: SESSION_ID,
@@ -258,13 +258,13 @@ const sessionSetup = (configOptions: ReadonlyArray<unknown>) => ({
   configOptions,
 });
 
-/** What Kiro sends right after `initialize` and around `session/new`, all unknown to T3. */
+/** What Kiro sends right after `initialize` and around `session/new`, all unknown to LegionCode. */
 const kiroSessionNoise: ReadonlyArray<Frame> = [
   kiroNotification("_kiro/mcp/status", { sessionId: SESSION_ID, servers: [] }),
   kiroNotification("_kiro/sessions/changed", { upserted: [], deleted: [] }),
 ];
 
-// Kiro advertises `sessionCapabilities.close`, so T3 closes the session on teardown.
+// Kiro advertises `sessionCapabilities.close`, so LegionCode closes the session on teardown.
 const closeSession: ReadonlyArray<Frame> = [
   outbound("session/close", { sessionId: SESSION_ID }),
   answer("session/close", {}),
@@ -320,7 +320,7 @@ const runKiroScript = Effect.fn("runKiroScript")(function* (input: {
       model: string,
       options?: ModelSelection["options"],
     ) => Effect.Effect<void, ProviderAdapterV2Error>;
-    /** Runs T3's compact action as turn `ordinal`. */
+    /** Runs LegionCode's compact action as turn `ordinal`. */
     readonly compact: (ordinal: number) => Effect.Effect<void, ProviderAdapterV2Error>;
     readonly interrupt: (
       providerTurnId: ProviderTurnId,
@@ -335,7 +335,7 @@ const runKiroScript = Effect.fn("runKiroScript")(function* (input: {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const replayDir = yield* fileSystem.makeTempDirectoryScoped({
-    prefix: `t3-kiro-${input.scenario}-`,
+    prefix: `legioncode-kiro-${input.scenario}-`,
   });
   const statusPath = path.join(replayDir, "status.json");
   const transcript = yield* decodeAcpReplayTranscript(
@@ -487,7 +487,7 @@ describe("KiroAdapterV2", () => {
         outbound("initialize"),
         answer("initialize", KIRO_V3_INITIALIZE_WITHOUT_EXTENSIONS),
         outbound("session/new", { cwd: "<workspace>", mcpServers: "<any>" }),
-        // No autopilot option advertised, so T3 sends no config write.
+        // No autopilot option advertised, so LegionCode sends no config write.
         answer("session/new", sessionSetup([modeOption])),
         turnPrompt,
         update({
@@ -500,7 +500,7 @@ describe("KiroAdapterV2", () => {
         Effect.gen(function* () {
           yield* startTurn;
           assert.equal(terminalStatus(yield* collectTurn(events)), "completed");
-          // `_kiro/session/compact` is not advertised, so T3 must not send it.
+          // `_kiro/session/compact` is not advertised, so LegionCode must not send it.
           const compacted = yield* Effect.exit(compact(2));
           const error = Exit.isFailure(compacted) ? Cause.squash(compacted.cause) : undefined;
           assert.instanceOf(error, ProviderAdapterTurnStartError);
@@ -1020,7 +1020,7 @@ describe("KiroAdapterV2 early Stop", () => {
 
   /**
    * Runs a Kiro turn and presses Stop as soon as it runs. Once Stop holds its
-   * cancel, `drive` gets the replay gate, a receipt for the cancel T3 sends,
+   * cancel, `drive` gets the replay gate, a receipt for the cancel LegionCode sends,
    * and Stop's exit.
    */
   const earlyStop = (input: {
@@ -1270,91 +1270,93 @@ describe("KiroAdapterV2 early Stop", () => {
 });
 
 describe("KiroAdapterV2 MCP tools", () => {
-  // Probed live on Kiro 2.33.1 against a stdio MCP server named t3-code, without
-  // the permission round trip. Kiro titles the call "@t3-code/html_render", names
+  // Probed live on Kiro 2.33.1 against a stdio MCP server named legion-code, without
+  // the permission round trip. Kiro titles the call "@legion-code/html_render", names
   // it in `tool_id`, and keeps only the result's text.
-  it.effect("shows T3's html_render as T3's tool with the page T3 published", () =>
-    Effect.gen(function* () {
-      const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
-      const toolCallId = "tooluse_4N3LnlI9PRlphUtzdBQGDD";
-      const args = { html: "<p>hi</p>", title: "Probe", height: 120 };
-      const rawInput = { tool_id: "t3-code::html_render", arguments: args };
-      const kiroMeta = { kiro: { serverName: "t3-code", toolOrigin: "default" } };
-      const page = { attachmentId: "kiro-mcp-html-render-page", title: "Probe", height: 120 };
-      yield* runKiroScript({
-        scenario: "mcp-html-render",
-        frames: [
-          ...openSessionFrames({
-            initialize: KIRO_V3_INITIALIZE,
-            configOptions: [modeOption, autopilotOption("on")],
-          }),
-          turnPrompt,
-          update({
-            sessionUpdate: "tool_call",
-            toolCallId,
-            title: "@t3-code/html_render",
-            kind: "other",
-            status: "pending",
-            rawInput,
-            _meta: kiroMeta,
-          }),
-          update({
-            sessionUpdate: "tool_call_update",
-            toolCallId,
-            status: "in_progress",
-            rawInput,
-            _meta: kiroMeta,
-          }),
-          update({
-            sessionUpdate: "tool_call_update",
-            toolCallId,
-            status: "completed",
-            title: "@t3-code/html_render",
-            rawInput,
-            rawOutput: { response: "Rendered.", imageBase64Urls: [], message: "Rendered." },
-            content: [{ type: "content", content: { type: "text", text: "Rendered." } }],
-            _meta: kiroMeta,
-          }),
-          answer("session/prompt", { stopReason: "end_turn" }),
-          ...closeSession,
-        ],
-        drive: ({ events, startTurn }) =>
-          Effect.gen(function* () {
-            // T3's MCP server records the page when Kiro calls html_render.
-            yield* mcpSessions.recordHtmlRender(
-              ThreadId.make("thread-kiro-mcp-html-render"),
-              args,
-              page,
-            );
-            yield* startTurn;
-            const turn = yield* collectTurn(events);
-            const items = turn.flatMap((event) =>
-              event.type === "turn_item.updated" &&
-              event.turnItem.type === "dynamic_tool" &&
-              event.turnItem.nativeItemRef?.nativeId === toolCallId
-                ? [event.turnItem]
-                : [],
-            );
-            const completed = items.at(-1);
-            assert.deepEqual(
-              items.map((item) => item.toolName),
-              items.map(() => "t3-code.html_render"),
-            );
-            assert.equal(completed?.status, "completed");
-            assert.deepEqual(completed?.input, args);
-            assert.deepEqual(
-              completed === undefined ? undefined : htmlRenderFromToolItem(completed),
-              page,
-            );
-          }),
-      });
-    }).pipe(Effect.provide(testLayer)),
+  it.effect(
+    "shows LegionCode's html_render as LegionCode's tool with the page LegionCode published",
+    () =>
+      Effect.gen(function* () {
+        const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
+        const toolCallId = "tooluse_4N3LnlI9PRlphUtzdBQGDD";
+        const args = { html: "<p>hi</p>", title: "Probe", height: 120 };
+        const rawInput = { tool_id: "legion-code::html_render", arguments: args };
+        const kiroMeta = { kiro: { serverName: "legion-code", toolOrigin: "default" } };
+        const page = { attachmentId: "kiro-mcp-html-render-page", title: "Probe", height: 120 };
+        yield* runKiroScript({
+          scenario: "mcp-html-render",
+          frames: [
+            ...openSessionFrames({
+              initialize: KIRO_V3_INITIALIZE,
+              configOptions: [modeOption, autopilotOption("on")],
+            }),
+            turnPrompt,
+            update({
+              sessionUpdate: "tool_call",
+              toolCallId,
+              title: "@legion-code/html_render",
+              kind: "other",
+              status: "pending",
+              rawInput,
+              _meta: kiroMeta,
+            }),
+            update({
+              sessionUpdate: "tool_call_update",
+              toolCallId,
+              status: "in_progress",
+              rawInput,
+              _meta: kiroMeta,
+            }),
+            update({
+              sessionUpdate: "tool_call_update",
+              toolCallId,
+              status: "completed",
+              title: "@legion-code/html_render",
+              rawInput,
+              rawOutput: { response: "Rendered.", imageBase64Urls: [], message: "Rendered." },
+              content: [{ type: "content", content: { type: "text", text: "Rendered." } }],
+              _meta: kiroMeta,
+            }),
+            answer("session/prompt", { stopReason: "end_turn" }),
+            ...closeSession,
+          ],
+          drive: ({ events, startTurn }) =>
+            Effect.gen(function* () {
+              // LegionCode's MCP server records the page when Kiro calls html_render.
+              yield* mcpSessions.recordHtmlRender(
+                ThreadId.make("thread-kiro-mcp-html-render"),
+                args,
+                page,
+              );
+              yield* startTurn;
+              const turn = yield* collectTurn(events);
+              const items = turn.flatMap((event) =>
+                event.type === "turn_item.updated" &&
+                event.turnItem.type === "dynamic_tool" &&
+                event.turnItem.nativeItemRef?.nativeId === toolCallId
+                  ? [event.turnItem]
+                  : [],
+              );
+              const completed = items.at(-1);
+              assert.deepEqual(
+                items.map((item) => item.toolName),
+                items.map(() => "legion-code.html_render"),
+              );
+              assert.equal(completed?.status, "completed");
+              assert.deepEqual(completed?.input, args);
+              assert.deepEqual(
+                completed === undefined ? undefined : htmlRenderFromToolItem(completed),
+                page,
+              );
+            }),
+        });
+      }).pipe(Effect.provide(testLayer)),
   );
 });
 
 describe("KiroAdapterV2 unknown model", () => {
   // Recorded live from Kiro 2.27.0 with the thread on a model id the account
-  // lacks. Kiro has not advertised `model` yet, so T3 sends the id; Kiro
+  // lacks. Kiro has not advertised `model` yet, so LegionCode sends the id; Kiro
   // accepts it and fails the prompt with its own explanation.
   it.effect("fails the turn with Kiro's own unavailable-model message", () =>
     Effect.gen(function* () {
@@ -1383,7 +1385,7 @@ describe("KiroAdapterV2 unknown model", () => {
       yield* runKiroScript({
         scenario: "unknown-model",
         model: "not-a-kiro-model",
-        // As recorded: Kiro already runs on Autopilot, so T3 writes only the model.
+        // As recorded: Kiro already runs on Autopilot, so LegionCode writes only the model.
         runtimeMode: "full-access",
         frames: [
           ...(frames as ReadonlyArray<Frame>),

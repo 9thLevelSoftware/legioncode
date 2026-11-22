@@ -8,8 +8,8 @@ import {
   ProviderSessionId,
   ThreadId,
   type AntigravitySettings,
-} from "@t3tools/contracts";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+} from "@legioncode/contracts";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -27,11 +27,11 @@ import {
   ANTIGRAVITY_AUTH_STDOUT_PREFIX,
   resolveAntigravityInstanceDirectories,
 } from "../antigravityAuthSupport.ts";
-import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
-import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
+import * as ProviderEventLoggers from "@legioncode/provider-core/server/ProviderEventLoggers";
+import * as McpProviderSessions from "@legioncode/provider-core/server/McpProviderSessions";
 import * as ModelManifest from "../ModelManifest.ts";
-import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
-import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import * as IdAllocator from "@legioncode/provider-core/server/IdAllocator";
+import * as ProviderAdapter from "@legioncode/provider-core/server/ProviderAdapter";
 import { AntigravityDriver } from "./AntigravityDriver.ts";
 import * as ProviderHostLive from "../ProviderHostLive.ts";
 import * as ServerSecretStore from "../../auth/ServerSecretStore.ts";
@@ -61,7 +61,7 @@ const makeHarness = Effect.fn("makeAntigravityDriverHarness")(function* (
   options: {
     readonly config?: Partial<AntigravitySettings>;
     readonly enabled?: boolean;
-    /** Extra instance variables, such as ones a parent T3 turn already exported. */
+    /** Extra instance variables, such as ones a parent LegionCode turn already exported. */
     readonly environment?: ReadonlyArray<{ readonly name: string; readonly value: string }>;
   } = {},
 ) {
@@ -71,7 +71,7 @@ const makeHarness = Effect.fn("makeAntigravityDriverHarness")(function* (
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const nodePath = yield* HostProcess.ExecutablePath;
   const baseEnv = yield* HostProcess.Environment;
-  const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-antigravity-driver-" });
+  const root = yield* fs.makeTempDirectoryScoped({ prefix: "legion-antigravity-driver-" });
   const instanceId = ProviderInstanceId.make(path.basename(root));
   const mockAgentPath = yield* path.fromFileUrl(
     new URL("../../../scripts/acp-mock-agent.ts", import.meta.url),
@@ -106,11 +106,11 @@ const makeHarness = Effect.fn("makeAntigravityDriverHarness")(function* (
         ...(options.newSessionErrorData === undefined
           ? []
           : [
-              `export T3_ACP_NEW_SESSION_ERROR_DATA=${shellQuote(JSON.stringify(options.newSessionErrorData))}`,
+              `export LEGION_ACP_NEW_SESSION_ERROR_DATA=${shellQuote(JSON.stringify(options.newSessionErrorData))}`,
             ]),
         ...(options.initialMode === undefined
           ? []
-          : [`export T3_ACP_INITIAL_MODE=${shellQuote(options.initialMode)}`]),
+          : [`export LEGION_ACP_INITIAL_MODE=${shellQuote(options.initialMode)}`]),
         `exec ${shellQuote(nodePath)} ${shellQuote(mockAgentPath)} "$@"`,
         "",
       ].join("\n"),
@@ -220,8 +220,8 @@ const makeHarness = Effect.fn("makeAntigravityDriverHarness")(function* (
     config: { ...AntigravityDriver.defaultConfig(), ...options.config },
     environment: [
       { name: "PATH", value: instancePath },
-      { name: "T3_ACP_ANTIGRAVITY", value: "1" },
-      { name: "T3_ACP_REQUEST_LOG_PATH", value: requestLog },
+      { name: "LEGION_ACP_ANTIGRAVITY", value: "1" },
+      { name: "LEGION_ACP_REQUEST_LOG_PATH", value: requestLog },
       { name: "GEMINI_API_KEY", value: "must-not-be-used" },
       { name: "google_api_key", value: "must-not-be-used" },
       { name: "GOOGLE_APPLICATION_CREDENTIALS", value: "/must-not-be-used.json" },
@@ -274,7 +274,7 @@ const makeHarness = Effect.fn("makeAntigravityDriverHarness")(function* (
 });
 
 const layerDeps = ServerConfig.layerTest(process.cwd(), {
-  prefix: "t3-antigravity-driver-config-",
+  prefix: "legion-antigravity-driver-config-",
 }).pipe(
   Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
   Layer.provideMerge(
@@ -376,7 +376,7 @@ it.layer(layerTest)("AntigravityDriver", (it) => {
             modelSelection: { instanceId: h.instance.instanceId, model: "gemini-test-low" },
           })
           .pipe(Effect.ignore);
-        const workspace = yield* h.fs.makeTempDirectoryScoped({ prefix: "t3-ag-chat-" });
+        const workspace = yield* h.fs.makeTempDirectoryScoped({ prefix: "legion-ag-chat-" });
         const threadId = ThreadId.make("thread-antigravity-capabilities");
         const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
           runtimeMode: "approval-required",
@@ -414,7 +414,7 @@ it.layer(layerTest)("AntigravityDriver", (it) => {
           },
         ]);
 
-        // The agy CLI rejects `yolo` and `auto_edit`; it stays in `default` and T3 answers its requests.
+        // The agy CLI rejects `yolo` and `auto_edit`; it stays in `default` and LegionCode answers its requests.
         h.controls.selected = {
           ...(yield* h.makeExecutable("runtime cli", { initialMode: "auto_edit" })),
           harnessPath: null,
@@ -460,16 +460,16 @@ it.layer(layerTest)("AntigravityDriver", (it) => {
   );
 
   it.effect.skipIf(windowsHost)(
-    "gives a thread session its own T3 thread and MCP fallback environment",
+    "gives a thread session its own LegionCode thread and MCP fallback environment",
     () =>
       Effect.gen(function* () {
         const h = yield* makeHarness({
           environment: [
-            { name: "T3CODE_THREAD_ID", value: "thread-antigravity-ambient" },
-            { name: "T3_ACP_MCP_ENDPOINT", value: "http://127.0.0.1:9/ambient" },
-            { name: "T3_ACP_MCP_AUTHORIZATION", value: "Bearer ambient-token" },
-            { name: "T3_ACP_MCP_NODE", value: "/ambient/node" },
-            { name: "T3_ACP_MCP_ENTRYPOINT", value: "/ambient/entrypoint.mjs" },
+            { name: "LEGIONCODE_THREAD_ID", value: "thread-antigravity-ambient" },
+            { name: "LEGIONCODE_ACP_MCP_ENDPOINT", value: "http://127.0.0.1:9/ambient" },
+            { name: "LEGIONCODE_ACP_MCP_AUTHORIZATION", value: "Bearer ambient-token" },
+            { name: "LEGIONCODE_ACP_MCP_NODE", value: "/ambient/node" },
+            { name: "LEGIONCODE_ACP_MCP_ENTRYPOINT", value: "/ambient/entrypoint.mjs" },
           ],
         });
         yield* h.refresh();
@@ -488,7 +488,9 @@ it.layer(layerTest)("AntigravityDriver", (it) => {
         const entrypoint = h.path.resolve(process.argv[1]!);
         yield* Effect.scoped(
           Effect.gen(function* () {
-            const workspace = yield* h.fs.makeTempDirectoryScoped({ prefix: "t3-ag-environment-" });
+            const workspace = yield* h.fs.makeTempDirectoryScoped({
+              prefix: "legion-ag-environment-",
+            });
             const runtimePolicy = ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
               runtimeMode: "approval-required",
               interactionMode: "default",
@@ -514,19 +516,19 @@ it.layer(layerTest)("AntigravityDriver", (it) => {
         );
         expect(agentLaunches).toHaveLength(2);
         expect(agentLaunches[1]?.environment).toMatchObject({
-          T3CODE_THREAD_ID: threadId,
-          T3_ACP_MCP_ENDPOINT: endpoint,
-          T3_ACP_MCP_AUTHORIZATION: "Bearer antigravity-thread-token",
-          T3_ACP_MCP_NODE: process.execPath,
-          T3_ACP_MCP_ENTRYPOINT: entrypoint,
+          LEGIONCODE_THREAD_ID: threadId,
+          LEGIONCODE_ACP_MCP_ENDPOINT: endpoint,
+          LEGIONCODE_ACP_MCP_AUTHORIZATION: "Bearer antigravity-thread-token",
+          LEGIONCODE_ACP_MCP_NODE: process.execPath,
+          LEGIONCODE_ACP_MCP_ENTRYPOINT: entrypoint,
         });
         // Model refresh and sign-in launches are not part of a thread.
         expect(agentLaunches[0]?.environment).toMatchObject({
-          T3CODE_THREAD_ID: "thread-antigravity-ambient",
-          T3_ACP_MCP_ENDPOINT: "http://127.0.0.1:9/ambient",
-          T3_ACP_MCP_AUTHORIZATION: "Bearer ambient-token",
-          T3_ACP_MCP_NODE: "/ambient/node",
-          T3_ACP_MCP_ENTRYPOINT: "/ambient/entrypoint.mjs",
+          LEGIONCODE_THREAD_ID: "thread-antigravity-ambient",
+          LEGIONCODE_ACP_MCP_ENDPOINT: "http://127.0.0.1:9/ambient",
+          LEGIONCODE_ACP_MCP_AUTHORIZATION: "Bearer ambient-token",
+          LEGIONCODE_ACP_MCP_NODE: "/ambient/node",
+          LEGIONCODE_ACP_MCP_ENTRYPOINT: "/ambient/entrypoint.mjs",
         });
         yield* h.assertClosed;
       }),

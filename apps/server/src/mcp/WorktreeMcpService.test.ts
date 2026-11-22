@@ -10,7 +10,7 @@ import {
   ProviderInstanceId,
   ThreadId,
   WorktreeMcpHandoffInput,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -378,7 +378,7 @@ const runStatus = (harness: ReturnType<typeof makeHarness>) =>
 
 const decodeHandoffInput = Schema.decodeUnknownEffect(WorktreeMcpHandoffInput);
 
-describe("t3_worktree_handoff", () => {
+describe("legion_worktree_handoff", () => {
   // regression: #22971 a separate send let the detach settle the run before its follow-up existed
   it.effect("commits the continuation with the thread binding", () => {
     const harness = makeHarness();
@@ -680,7 +680,7 @@ describe("t3_worktree_handoff", () => {
   });
 });
 
-describe("t3_worktree_status", () => {
+describe("legion_worktree_status", () => {
   it.effect("reports an attached thread's worktree and branch", () => {
     const harness = makeHarness({
       thread: {
@@ -701,7 +701,7 @@ describe("t3_worktree_status", () => {
   });
 });
 
-describe("t3_worktree_list", () => {
+describe("legion_worktree_list", () => {
   const listRefs = (harness: ReturnType<typeof makeHarness>, worktreePath: string | null) =>
     Effect.gen(function* () {
       const service = yield* WorktreeMcpService.WorktreeMcpService;

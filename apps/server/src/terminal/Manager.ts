@@ -38,15 +38,15 @@ import {
   ClaudeSettings,
   CodexSettings,
   ProviderInstanceId,
-} from "@t3tools/contracts";
-import { makeKeyedCoalescingWorker } from "@t3tools/shared/KeyedCoalescingWorker";
-import * as KeyedLock from "@t3tools/shared/KeyedLock";
-import { AgentScope } from "@t3tools/shared/AgentScope";
-import * as HostProcess from "@t3tools/shared/HostProcess";
-import { SpawnExecutableResolution, mergePathEntries } from "@t3tools/shared/shell";
+} from "@legioncode/contracts";
+import { makeKeyedCoalescingWorker } from "@legioncode/shared/KeyedCoalescingWorker";
+import * as KeyedLock from "@legioncode/shared/KeyedLock";
+import { AgentScope } from "@legioncode/shared/AgentScope";
+import * as HostProcess from "@legioncode/shared/HostProcess";
+import { SpawnExecutableResolution, mergePathEntries } from "@legioncode/shared/shell";
 
-import { acpRegistryManagedBinaryDirectories } from "@t3tools/provider-acp-registry/server";
-import { getTerminalLabel } from "@t3tools/shared/terminalLabels";
+import { acpRegistryManagedBinaryDirectories } from "@legioncode/provider-acp-registry/server";
+import { getTerminalLabel } from "@legioncode/shared/terminalLabels";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Context from "effect/Context";
@@ -68,18 +68,18 @@ import * as SynchronizedRef from "effect/SynchronizedRef";
 
 import packageJson from "../../package.json" with { type: "json" };
 import * as ServerConfig from "../config.ts";
-import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/instanceEnvironment";
+import { mergeProviderInstanceEnvironment } from "@legioncode/provider-core/server/instanceEnvironment";
 import { resolveCodexHomeLayout } from "../provider/Drivers/CodexHomeLayout.ts";
 import { makeClaudeEnvironment } from "../provider/Drivers/ClaudeHome.ts";
 import type { deriveProviderInstanceConfigMap } from "../provider/ProviderInstanceRegistryHydration.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import { increment, terminalSessionsTotal } from "../observability/Metrics.ts";
-import { expandHomeVariable } from "@t3tools/provider-core/server/pathExpansion";
+import { expandHomeVariable } from "@legioncode/provider-core/server/pathExpansion";
 import * as ProcessRunner from "../processRunner.ts";
 import * as PortScanner from "../preview/PortScanner.ts";
 import * as NativeTelemetryClient from "../resourceTelemetry/NativeTelemetryClient.ts";
 import { terminalOutputStream } from "./OutputProtocol.ts";
-import * as PtyAdapter from "@t3tools/shared/PtyAdapter";
+import * as PtyAdapter from "@legioncode/shared/PtyAdapter";
 
 export {
   TerminalCwdError,
@@ -172,7 +172,7 @@ class TerminalProcessSignalError extends Schema.TaggedError<TerminalProcessSigna
 
 export class TerminalCwdRecovery extends Context.Reference<
   (error: TerminalCwdNotFoundError) => Effect.Effect<void, TerminalCwdNotFoundError>
->("t3/terminal/TerminalCwdRecovery", { defaultValue: () => (error) => Effect.fail(error) }) {}
+>("legion/terminal/TerminalCwdRecovery", { defaultValue: () => (error) => Effect.fail(error) }) {}
 
 export class TerminalManager extends Context.Service<
   TerminalManager,
@@ -251,7 +251,7 @@ export class TerminalManager extends Context.Service<
       listener: (event: TerminalMetadataStreamEvent) => Effect.Effect<void>,
     ) => Effect.Effect<() => void>;
   }
->()("t3/terminal/Manager/TerminalManager") {}
+>()("legioncode/terminal/Manager/TerminalManager") {}
 
 interface TerminalSubprocessInspectResult {
   readonly hasRunningSubprocess: boolean;
@@ -1552,7 +1552,7 @@ function toSessionKey(threadId: string, terminalId: string): string {
 
 function shouldExcludeTerminalEnvKey(key: string): boolean {
   const normalizedKey = key.toUpperCase();
-  if (normalizedKey.startsWith("T3CODE_")) {
+  if (normalizedKey.startsWith("LEGIONCODE_")) {
     return true;
   }
   if (normalizedKey.startsWith("VITE_")) {
@@ -1619,8 +1619,8 @@ function createTerminalSpawnEnv(
     spawnEnv[key] = value;
   }
   // The server inherits its launcher's identity (e.g. Apple_Terminal); shells
-  // and tools inside the integrated terminal should see T3 Code instead.
-  spawnEnv.TERM_PROGRAM = "t3code";
+  // and tools inside the integrated terminal should see LegionCode instead.
+  spawnEnv.TERM_PROGRAM = "legioncode";
   spawnEnv.TERM_PROGRAM_VERSION = packageJson.version;
   if (runtimeEnv) {
     for (const [key, value] of Object.entries(runtimeEnv)) {
@@ -2862,7 +2862,7 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
               shellResolver,
               platform,
               baseEnv,
-              session.runtimeEnv?.T3CODE_TERMINAL_SHELL ?? baseEnv.T3CODE_TERMINAL_SHELL,
+              session.runtimeEnv?.LEGIONCODE_TERMINAL_SHELL ?? baseEnv.LEGIONCODE_TERMINAL_SHELL,
             ).pipe(Effect.provideService(FileSystem.FileSystem, fileSystem));
             const terminalEnv = createTerminalSpawnEnv(
               baseEnv,

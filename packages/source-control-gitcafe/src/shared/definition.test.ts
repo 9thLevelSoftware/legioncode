@@ -1,4 +1,4 @@
-import { recognizeRemoteWith } from "@t3tools/source-control-core/shared/definition";
+import { recognizeRemoteWith } from "@legioncode/source-control-core/shared/definition";
 import { describe, expect, it } from "vite-plus/test";
 
 import { canonicalizePullRequestUrl, definition, parsePullRequestUrl } from "./definition.ts";
@@ -42,11 +42,11 @@ describe("GitCafe change request URLs", () => {
 
   it("reads its canonical /pull/ path and the older /pulls/ path on its own hosts", () => {
     for (const path of ["pull", "pulls"]) {
-      expect(parse(`https://git.cafe/PingDotGG/T3Code/${path}/23897`), path).toEqual({
+      expect(parse(`https://git.cafe/9thLevelSoftware/LegionCode/${path}/23897`), path).toEqual({
         host: "git.cafe",
-        repository: "pingdotgg/t3code",
+        repository: "9thlevelsoftware/legioncode",
         number: 23897,
-        repositoryUrl: "https://git.cafe/PingDotGG/T3Code",
+        repositoryUrl: "https://git.cafe/9thLevelSoftware/LegionCode",
       });
     }
     expect(parse("https://staging.git.cafe/team/repo/pull/7/files")).toMatchObject({
@@ -60,9 +60,9 @@ describe("GitCafe change request URLs", () => {
     for (const url of [
       "https://github.com/team/repo/pull/7",
       "https://forge.example/team/repo/pulls/7",
-      "https://git.cafe/pingdotgg/t3code/issues/23897",
-      "https://git.cafe/pingdotgg/t3code/pull/abc",
-      "https://git.cafe/pingdotgg/t3code",
+      "https://git.cafe/9thlevelsoftware/legioncode/issues/23897",
+      "https://git.cafe/9thlevelsoftware/legioncode/pull/abc",
+      "https://git.cafe/9thlevelsoftware/legioncode",
     ]) {
       expect(parse(url), url).toBeNull();
     }

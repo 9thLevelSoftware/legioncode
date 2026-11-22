@@ -3,28 +3,25 @@
 
 use std::path::PathBuf;
 
-use legion_edge::boot_service_units::{
-    BOOT_SERVICE_LOG_FILE, BOOT_SERVICE_PLIST_FILE, BOOT_SERVICE_TASK_FILE, BOOT_SERVICE_UNIT_FILE,
-    BootServicePlan, encode_windows_task_utf16le_bom, render_boot_service_launchd_plist,
-    render_boot_service_systemd_unit, render_boot_service_windows_task_xml,
-};
 use legion_edge::desktop_updates::DesktopUpdateMachine;
 use legion_persistence::paths::ServerDerivedPaths;
 use legion_persistence::service_preflight::{SERVICE_LAUNCHER_PROTOCOL, run_service_preflight};
 use legion_surfaces::SURFACE_PROTOCOL_VERSION;
 use legion_surfaces::desktop::{DESKTOP_HOST, DisplayRect, WindowBounds, build_desktop_csp};
 use serde_json::Value;
-use sha2::{Digest, Sha256};
 
 use crate::apple_speech_ipc::{
     AppleSpeechHelper, AppleSpeechIpcService, UnavailableAppleSpeechHelper,
     handle_apple_speech_available, handle_apple_speech_prepare,
     handle_apple_speech_supported_locales, handle_apple_speech_transcribe,
 };
+use crate::bridge_types::DesktopBridgeRuntimeState;
+use crate::ipc_bridge::dispatch_core_bridge;
+use crate::ipc_bridge_extra::dispatch_extra_bridge;
 use crate::ipc_handlers::{
     apply_update_action, decode_optional_params, decode_params, encode_result,
-    handle_clamp_window_bounds, handle_resolve_scheme, infer_channel_from_version, ipc_error,
-    resolve_branding,
+    handle_clamp_window_bounds, handle_render_units, handle_resolve_scheme,
+    infer_channel_from_version, ipc_error, resolve_branding,
 };
 pub use crate::ipc_types::{
     BootstrapParams, BootstrapResult, ClampWindowBoundsParams, ClampWindowBoundsResult,
@@ -43,6 +40,7 @@ pub struct DesktopIpcRouter {
     sidecar: SidecarController,
     update_machine: DesktopUpdateMachine,
     apple_speech: AppleSpeechIpcService,
+    bridge_state: DesktopBridgeRuntimeState,
 }
 
 impl Default for DesktopIpcRouter {
@@ -56,11 +54,46 @@ impl DesktopIpcRouter {
     pub fn new(sidecar: SidecarController) -> Self {
         let version = sidecar.config().app_version.clone();
         let channel = infer_channel_from_version(&version);
+        let bridge_state = DesktopBridgeRuntimeState::from_base_dir(&sidecar.config().base_dir);
         Self {
             sidecar,
             update_machine: DesktopUpdateMachine::new(channel, version),
             apple_speech: AppleSpeechIpcService::default(),
+            bridge_state,
         }
+    }
+
+    /// Configures local environment URLs and pairing bootstrap token for `window.desktopBridge`.
+    #[must_use]
+    pub fn with_local_bootstrap(
+        mut self,
+        http_base_url: Option<String>,
+        ws_base_url: Option<String>,
+        bootstrap_token: Option<String>,
+    ) -> Self {
+        self.bridge_state.local_http_base_url = http_base_url;
+        self.bridge_state.local_ws_base_url = ws_base_url;
+        self.bridge_state.local_bootstrap_token = bootstrap_token;
+        self
+    }
+
+    /// Borrows the runtime state backing `window.desktopBridge`.
+    pub const fn bridge_state(&self) -> &DesktopBridgeRuntimeState {
+        &self.bridge_state
+    }
+
+    /// Mutably borrows the runtime state backing `window.desktopBridge`.
+    pub fn bridge_state_mut(&mut self) -> &mut DesktopBridgeRuntimeState {
+        &mut self.bridge_state
+    }
+
+    /// Resolves current [`DesktopAppBranding`] metadata matching `DesktopEnvironment.ts`.
+    #[must_use]
+    pub fn resolve_app_branding(&self) -> DesktopAppBranding {
+        resolve_branding(
+            self.sidecar.config().mode.is_development(),
+            self.update_machine.current_version(),
+        )
     }
 
     /// Replaces the initial [`DesktopUpdateMachine`] carried by this router.
@@ -126,10 +159,36 @@ impl DesktopIpcRouter {
                 request.params,
                 speech_helper,
             ),
-            None => Err(ipc_error(
-                "UnknownMethod",
-                format!("unsupported desktop IPC method `{}`", request.method),
-            )),
+            None => {
+                if request.method.starts_with("desktop.bridge.") {
+                    if let Some(outcome) = dispatch_core_bridge(
+                        &request.method,
+                        request.params.clone(),
+                        &mut self.bridge_state,
+                        &mut self.update_machine,
+                    )
+                    .or_else(|| {
+                        dispatch_extra_bridge(
+                            &request.method,
+                            request.params,
+                            &mut self.bridge_state,
+                            &self.sidecar,
+                        )
+                    }) {
+                        outcome
+                    } else {
+                        Err(ipc_error(
+                            "UnknownMethod",
+                            format!("unsupported desktop bridge method `{}`", request.method),
+                        ))
+                    }
+                } else {
+                    Err(ipc_error(
+                        "UnknownMethod",
+                        format!("unsupported desktop IPC method `{}`", request.method),
+                    ))
+                }
+            }
         };
 
         match outcome {
@@ -301,65 +360,7 @@ impl DesktopIpcRouter {
     }
 
     fn handle_render_units(&self, params: Value) -> Result<Value, DesktopIpcErrorPayload> {
-        let req: RenderServiceUnitsParams = decode_optional_params(params)?;
-        let base_dir = req.base_dir.unwrap_or_else(|| {
-            self.sidecar
-                .config()
-                .base_dir
-                .to_string_lossy()
-                .into_owned()
-        });
-        let program = req.program.unwrap_or_else(|| {
-            vec![
-                "/usr/bin/legioncode".to_owned(),
-                "__service-launcher".to_owned(),
-            ]
-        });
-        let log_path = req
-            .log_path
-            .unwrap_or_else(|| format!("{base_dir}/userdata/logs/{BOOT_SERVICE_LOG_FILE}"));
-        let unit_path = req
-            .unit_path
-            .unwrap_or_else(|| format!("{base_dir}/services/{BOOT_SERVICE_UNIT_FILE}"));
-
-        let mut plan = BootServicePlan::new(program, base_dir, log_path, unit_path);
-        if let Some(bin_dir) = req.install_bin_dir {
-            plan = plan.with_install_bin_dir(bin_dir);
-        }
-
-        let systemd_unit = render_boot_service_systemd_unit(&plan)
-            .map_err(|err| ipc_error("BootServiceRenderError", err.to_string()))?;
-        let launchd_plist = render_boot_service_launchd_plist(
-            &plan,
-            req.home_dir.as_deref().unwrap_or("/Users/legioncode"),
-            req.environment_path
-                .as_deref()
-                .unwrap_or("/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"),
-        );
-        let windows_task_xml = render_boot_service_windows_task_xml(
-            &plan,
-            req.windows_user_id
-                .as_deref()
-                .unwrap_or("DESKTOP\\legioncode"),
-            req.home_dir.as_deref().unwrap_or("C:\\Users\\legioncode"),
-            req.conhost_path
-                .as_deref()
-                .unwrap_or("C:\\Windows\\System32\\conhost.exe"),
-        );
-        let bom_bytes = encode_windows_task_utf16le_bom(&windows_task_xml);
-        let sha256_hex = hex::encode(Sha256::digest(&bom_bytes));
-
-        encode_result(RenderServiceUnitsResult {
-            systemd_unit,
-            launchd_plist,
-            windows_task_xml,
-            windows_task_utf16le_bom_sha256: sha256_hex,
-            windows_task_utf16le_bom_bytes: bom_bytes.len(),
-            file_names: ServiceUnitFileNames {
-                systemd: BOOT_SERVICE_UNIT_FILE.to_owned(),
-                launchd: BOOT_SERVICE_PLIST_FILE.to_owned(),
-                windows_task: BOOT_SERVICE_TASK_FILE.to_owned(),
-            },
-        })
+        let default_base_dir = self.sidecar.config().base_dir.to_string_lossy();
+        handle_render_units(&default_base_dir, params)
     }
 }

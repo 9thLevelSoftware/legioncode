@@ -11,10 +11,15 @@ use legion_process_ffi::env::SanitizedChildEnv;
 use legion_process_ffi::pipes::PipeSetConfig;
 use legion_process_ffi::supervisor::{JobProcessSupervisor, SpawnSpec};
 
-use crate::sidecar_discovery::probe_runtime_candidates;
 pub use crate::sidecar_discovery::{
     PreparedSidecarLaunch, RuntimeDiscoverySource, SidecarConfig, SidecarError, SidecarMode,
     SidecarRuntimeDiscovery, SupervisedSidecar,
+};
+use crate::sidecar_discovery::{probe_runtime_candidates, probe_runtime_candidates_with_rust_bin};
+pub use crate::sidecar_process::{
+    ManagedDesktopSidecar, desktop_serve_launch_args, discover_static_web_dir,
+    generate_ephemeral_hex_token, mint_desktop_pairing_token, pick_unused_loopback_port,
+    poll_environment_ready, start_managed_desktop_sidecar,
 };
 
 /// Environment variables cleared before launching desktop-managed `legioncode` backend sidecars
@@ -135,16 +140,19 @@ impl SidecarController {
         args
     }
 
-    /// Discovers the `legioncode` sidecar executable from explicit config, Tauri `binaries/`, sibling
-    /// binaries, `LEGIONCODE_CLI_PATH`, or `PATH`.
+    /// Discovers the `legioncode` sidecar executable from explicit config, `LEGIONCODE_RUST_BIN`,
+    /// Tauri `binaries/`, sibling `../bin/`, workspace targets, `LEGIONCODE_CLI_PATH`, or `PATH`.
     pub fn discover_runtime(&self) -> SidecarRuntimeDiscovery {
+        let rust_bin = legion_contracts::brand::ACTIVE_BRAND.read_env("RUST_BIN");
         let cli_path = legion_contracts::brand::ACTIVE_BRAND.read_env("CLI_PATH");
         let path_env = env::var("PATH").ok();
         let current_exe = env::current_exe().ok();
-        self.discover_runtime_with_inputs(
+        self.discover_runtime_with_env_inputs(
+            rust_bin.as_deref(),
             cli_path.as_deref(),
             path_env.as_deref(),
             current_exe.as_deref(),
+            true,
         )
     }
 
@@ -160,6 +168,25 @@ impl SidecarController {
             cli_path_env,
             path_env,
             current_exe,
+        )
+    }
+
+    /// Deterministic runtime discovery including optional `LEGIONCODE_RUST_BIN` and workspace probing.
+    pub fn discover_runtime_with_env_inputs(
+        &self,
+        rust_bin_env: Option<&str>,
+        cli_path_env: Option<&str>,
+        path_env: Option<&str>,
+        current_exe: Option<&Path>,
+        include_workspace_targets: bool,
+    ) -> SidecarRuntimeDiscovery {
+        probe_runtime_candidates_with_rust_bin(
+            self.config.explicit_binary_path.as_deref(),
+            rust_bin_env,
+            cli_path_env,
+            path_env,
+            current_exe,
+            include_workspace_targets,
         )
     }
 

@@ -2,13 +2,13 @@
 
 use std::path::PathBuf;
 
+use legion_persistence::paths::resolve_base_dir;
 use legion_surfaces::desktop::{
     DEFAULT_MAIN_WINDOW_HEIGHT, DEFAULT_MAIN_WINDOW_WIDTH, DisplayRect, WindowBounds,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::sidecar::SidecarConfig;
 use crate::window_host_protocol::desktop_scheme_name;
 
 /// Custom events delivered into the `tao` main event loop via `EventLoopProxy`.
@@ -16,6 +16,8 @@ use crate::window_host_protocol::desktop_scheme_name;
 pub enum DesktopUserEvent {
     /// Serialized [`crate::ipc::DesktopIpcResponse`] dispatched to `window.__legionReceiveIpc`.
     IpcReply(String),
+    /// Brings the main desktop window out of minimized/background state and focuses it.
+    RevealWindow,
     /// Workspace activation received from [`crate::control_server::DesktopControlServer`].
     ActivateWorkspace {
         /// Request correlation identifier.
@@ -38,6 +40,9 @@ pub enum DesktopHostError {
     /// Native `WebView` (`wry` / `WebView2`) creation failed.
     #[error("failed creating desktop webview: {0}")]
     WebViewCreate(String),
+    /// Managed `legioncode` server sidecar startup or readiness probe failed.
+    #[error("managed sidecar startup failed: {0}")]
+    SidecarStartup(String),
     /// Creating an isolated `WebView` data directory failed.
     #[error("failed preparing isolated webview data directory '{}': {source}", path.display())]
     TempDirIo {
@@ -47,6 +52,44 @@ pub enum DesktopHostError {
         #[source]
         source: std::io::Error,
     },
+}
+
+/// Origin indicating whether `base_dir` came from an explicit override or default home path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BaseDirOrigin {
+    /// Resolved automatically from OS home directory.
+    DefaultHome,
+    /// Explicitly configured via `--home-dir`, `--base-dir`, or `LEGIONCODE_HOME`.
+    Explicit,
+}
+
+impl BaseDirOrigin {
+    /// Returns `true` when `base_dir` was explicitly configured (`userdata/` rather than `dev/`).
+    #[must_use]
+    pub const fn is_explicit(self) -> bool {
+        matches!(self, Self::Explicit)
+    }
+
+    /// Constructs [`BaseDirOrigin`] from a boolean flag.
+    #[must_use]
+    pub const fn from_is_explicit(is_explicit: bool) -> Self {
+        if is_explicit {
+            Self::Explicit
+        } else {
+            Self::DefaultHome
+        }
+    }
+}
+
+/// Controls whether [`DesktopLaunchConfig`] starts a managed local `legioncode serve` sidecar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DesktopSidecarPolicy {
+    /// Do not spawn a local sidecar (load `initial_url`, `dev_url`, or `--headless-smoke`).
+    Disabled,
+    /// Spawn a supervised `legioncode serve` sidecar on an unused loopback port.
+    ManagedLocal,
 }
 
 /// Configuration for [`crate::window_host::launch_desktop_window`].
@@ -79,15 +122,22 @@ pub struct DesktopLaunchConfig {
     pub clerk_frontend_api_hostname: Option<String>,
     /// Whether to start [`crate::control_server::DesktopControlServer`] alongside the window.
     pub enable_control_server: bool,
+    /// Whether `base_dir` was explicitly configured via CLI/env.
+    pub base_dir_origin: BaseDirOrigin,
+    /// Explicit external dev-server URL (`--dev-url` / `LEGIONCODE_DESKTOP_DEV_URL`).
+    pub dev_url: Option<String>,
+    /// Controls local managed sidecar spawning outside smoke / external dev-server modes.
+    pub sidecar_policy: DesktopSidecarPolicy,
 }
 
 impl Default for DesktopLaunchConfig {
     fn default() -> Self {
+        let (base_dir, base_dir_is_explicit) = resolve_base_dir(None);
         Self {
             title: "LegionCode".to_owned(),
             initial_url: format!("{}://app/", desktop_scheme_name()),
             static_dir: None,
-            base_dir: SidecarConfig::default().base_dir,
+            base_dir,
             web_data_dir: None,
             bounds: WindowBounds {
                 x: 80,
@@ -107,6 +157,9 @@ impl Default for DesktopLaunchConfig {
             app_version: env!("CARGO_PKG_VERSION").to_owned(),
             clerk_frontend_api_hostname: None,
             enable_control_server: false,
+            base_dir_origin: BaseDirOrigin::from_is_explicit(base_dir_is_explicit),
+            dev_url: None,
+            sidecar_policy: DesktopSidecarPolicy::Disabled,
         }
     }
 }

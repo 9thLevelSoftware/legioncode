@@ -46,6 +46,7 @@
 //! # }
 //! ```
 
+mod client_ops;
 pub mod create_ops;
 pub mod message_ops;
 pub mod output_ops;
@@ -94,6 +95,11 @@ pub fn decide_command(
         OrchestrationCommand::QueuedRunEdit(cmd) => {
             queue_edit_ops::decide_queued_run_edit(state, cmd, now_iso)
         }
+        OrchestrationCommand::QueuedRunCancel {
+            command_id,
+            thread_id,
+            run_id,
+        } => client_ops::decide_queued_run_cancel(state, command_id, thread_id, run_id, now_iso),
         OrchestrationCommand::RunInterrupt(cmd) => {
             run_ops::decide_run_interrupt(state, cmd, now_iso)
         }
@@ -112,6 +118,69 @@ pub fn decide_command(
             model_selection,
             now_iso,
         ),
+        other => decide_client_pref_command(state, other, now_iso),
+    }
+}
+
+fn decide_client_pref_command(
+    state: &DeciderThreadState,
+    command: &OrchestrationCommand,
+    now_iso: &str,
+) -> Result<CommandDecision, DeciderError> {
+    match command {
+        OrchestrationCommand::ThreadMetadataUpdate(cmd) => {
+            client_ops::decide_thread_metadata_update(state, cmd, now_iso)
+        }
+        OrchestrationCommand::ThreadRuntimeModeSet {
+            command_id,
+            thread_id,
+            runtime_mode,
+        } => client_ops::decide_runtime_mode_set(
+            state,
+            command_id,
+            thread_id,
+            *runtime_mode,
+            now_iso,
+        ),
+        OrchestrationCommand::ThreadInteractionModeSet {
+            command_id,
+            thread_id,
+            interaction_mode,
+        } => client_ops::decide_interaction_mode_set(
+            state,
+            command_id,
+            thread_id,
+            *interaction_mode,
+            now_iso,
+        ),
+        OrchestrationCommand::ThreadVisit(cmd) => {
+            client_ops::decide_thread_visit(state, cmd, now_iso)
+        }
+        OrchestrationCommand::ThreadMarkUnread {
+            command_id,
+            thread_id,
+        } => client_ops::decide_thread_mark_unread(state, command_id, thread_id, now_iso),
+        OrchestrationCommand::ThreadAutoSettleSet {
+            command_id,
+            thread_id,
+            enabled,
+        } => client_ops::decide_auto_settle_set(state, command_id, thread_id, *enabled, now_iso),
+        OrchestrationCommand::ThreadPinReorder {
+            command_id,
+            thread_id,
+            order_key,
+        } => client_ops::decide_pin_reorder(state, command_id, thread_id, order_key, now_iso),
+        OrchestrationCommand::ThreadActiveReorder {
+            command_id,
+            thread_id,
+            order_key,
+        } => client_ops::decide_active_reorder(state, command_id, thread_id, order_key, now_iso),
+        OrchestrationCommand::ThreadTagSet {
+            command_id,
+            thread_id,
+            tag,
+            tagged,
+        } => client_ops::decide_tag_set(state, command_id, thread_id, tag, *tagged, now_iso),
         other => Err(DeciderError::UnsupportedCommand {
             command_type: other.command_type().to_owned(),
         }),

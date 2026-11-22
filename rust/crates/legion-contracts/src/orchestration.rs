@@ -51,6 +51,7 @@ mod run_output;
 mod runtime_models;
 mod state_models;
 mod stream;
+mod wire_command;
 
 pub use checkpoint_models::{
     Checkpoint, CheckpointRollbackRequest, CheckpointScope, ContextHandoff, ContextTransfer,
@@ -112,3 +113,8 @@ pub use runtime_models::{
 };
 pub use state_models::{AppThread, RollbackUnrestored, ThreadLineage, ThreadVisit};
 pub use stream::{StreamItem, ThreadProjection};
+pub use wire_command::{
+    ProjectCreateWireCommand, ProjectUpdateWireCommand, ProjectWireCommand, ThreadEnvMode,
+    WireClientCommand, decode_wire_client_command, decode_wire_orchestration_command,
+    sha256_digest,
+};

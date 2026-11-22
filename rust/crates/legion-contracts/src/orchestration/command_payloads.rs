@@ -62,6 +62,7 @@ pub struct InitialThreadMessage {
     /// Prompt text.
     pub text: String,
     /// Attached chat files/images.
+    #[serde(default)]
     pub attachments: Vec<Value>,
     /// Optional inline composer context.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -249,6 +250,7 @@ pub struct MessageDispatchCommand {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<Value>,
     /// Chat attachments.
+    #[serde(default)]
     pub attachments: Vec<Value>,
     /// Optional title generation seed.
     #[serde(default, skip_serializing_if = "Option::is_none")]

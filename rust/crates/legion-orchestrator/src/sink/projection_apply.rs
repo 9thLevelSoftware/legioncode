@@ -69,7 +69,9 @@ pub fn apply_events_to_projections(
             DomainEventPayload::MessageUpdated(message) => {
                 upsert_message_projection(conn, message)?;
             }
-            _ => {}
+            _ => {
+                crate::sink::projection_apply_extra::apply_extended_event(conn, &persisted.event)?;
+            }
         }
     }
     if max_seq > 0 {

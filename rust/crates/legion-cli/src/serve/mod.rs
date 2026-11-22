@@ -5,6 +5,7 @@ pub mod cli_flags;
 pub mod config;
 pub mod mcp;
 mod mcp_tools;
+pub(crate) mod rpc;
 mod rpc_terminal;
 pub mod rpc_wave_d;
 pub mod rpc_wave_h;

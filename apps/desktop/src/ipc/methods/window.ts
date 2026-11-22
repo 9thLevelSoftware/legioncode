@@ -15,12 +15,12 @@ import {
   SystemSettingsPaneSchema,
   type DesktopEnvironmentBootstrap,
   type PickedThemeFile,
-} from "@t3tools/contracts";
-import { PROJECT_FAVICON_EXTENSIONS } from "@t3tools/shared/projectFavicon";
-import { resolveEditorCommand } from "@t3tools/shared/editor";
-import { withPathDirectoryListings } from "@t3tools/shared/shell";
-import * as HostProcess from "@t3tools/shared/HostProcess";
-import { isRelayTracingEnabled } from "@t3tools/shared/otelEnvironment";
+} from "@legioncode/contracts";
+import { PROJECT_FAVICON_EXTENSIONS } from "@legioncode/shared/projectFavicon";
+import { resolveEditorCommand } from "@legioncode/shared/editor";
+import { withPathDirectoryListings } from "@legioncode/shared/shell";
+import * as HostProcess from "@legioncode/shared/HostProcess";
+import { isRelayTracingEnabled } from "@legioncode/shared/otelEnvironment";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Effect from "effect/Effect";

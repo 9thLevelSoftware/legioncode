@@ -9,9 +9,9 @@ const rustRoot = path.resolve(scriptDir, "..");
 const distDir = path.join(rustRoot, "dist");
 
 const req = createRequire(import.meta.url);
-const wasmNode = req(path.join(distDir, "wasm-nodejs", "t3_wasm_ffi.js"));
+const wasmNode = req(path.join(distDir, "wasm-nodejs", "legion_wasm_ffi.js"));
 
-assert.equal(wasmNode.t3_wasm_abi_version(), 1);
+assert.equal(wasmNode.legion_wasm_abi_version(), 1);
 assert.equal(wasmNode.sanitize_bracketed_paste_str("hi\x1b[201~evil\x00!"), "hievil!");
 
 const app = new wasmNode.WasmWebApp("sv", 1_700_000_000_000);
@@ -32,8 +32,8 @@ try {
 const vt = new wasmNode.WasmTerminalVt(80, 24);
 try {
   vt.feed("\x1b[32mok\x1b[0m");
-  const snapshot = vt.export_t3vt();
-  assert.ok(snapshot.length >= 36, `Expected T3VT snapshot >= 36 bytes, got ${snapshot.length}`);
+  const snapshot = vt.export_lcvt();
+  assert.ok(snapshot.length >= 36, `Expected LCVT snapshot >= 36 bytes, got ${snapshot.length}`);
 } finally {
   vt.free?.();
 }

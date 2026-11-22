@@ -4,8 +4,8 @@ import {
   ANTIGRAVITY_DEFAULT_MODEL,
   PROVIDER_SEND_TURN_MAX_IMAGE_BYTES,
   type ChatAttachment,
-} from "@t3tools/contracts";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+} from "@legioncode/contracts";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -95,7 +95,7 @@ describe("Antigravity release gates", () => {
         filter || native || advertisedAppend ? { antigravity } : undefined,
       );
       expect(isQualifiedAntigravityRelease(version)).toBe(native);
-      expect(antigravityClientInfo(version).name).toBe(ownName ? "t3-code" : "zed");
+      expect(antigravityClientInfo(version).name).toBe(ownName ? "legion-code" : "zed");
     },
   );
 });
@@ -248,7 +248,7 @@ const makeAttachmentFixture = Effect.fn("AntigravityAcpSupportTest.makeAttachmen
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const attachmentsDir = yield* fs.makeTempDirectoryScoped({
-      prefix: "t3-antigravity-attachments-",
+      prefix: "legion-antigravity-attachments-",
     });
     const write = Effect.fn("AntigravityAcpSupportTest.writeAttachment")(function* (
       attachment: ChatAttachment,

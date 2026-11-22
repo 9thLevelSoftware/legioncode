@@ -1,4 +1,4 @@
-import { threadPullRequestKeyOf } from "@t3tools/client-runtime/thread-pull-requests";
+import { threadPullRequestKeyOf } from "@legioncode/client-runtime/thread-pull-requests";
 import * as Dialog from "../../components/ui/Dialog";
 import type {
   EnvironmentId,
@@ -6,22 +6,22 @@ import type {
   ServerProvider,
   ThreadId,
   ThreadPullRequestLink,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   type ComposerEnvironmentCandidate,
   matchComposerEnvironmentItems,
   matchComposerThreadItems,
-} from "@t3tools/client-runtime/composerThreadItems";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/models";
+} from "@legioncode/client-runtime/composerThreadItems";
+import type { EnvironmentThreadShell } from "@legioncode/client-runtime/state/models";
 
 const EMPTY_THREAD_SHELLS: ReadonlyArray<EnvironmentThreadShell> = [];
 const EMPTY_ENVIRONMENTS: ReadonlyArray<ComposerEnvironmentCandidate> = [];
 const NO_LINKED_ENVIRONMENTS: ReadonlyMap<EnvironmentId, string> = new Map();
-import { COMPOSER_CONTEXT_MAX_RECORDS } from "@t3tools/contracts";
+import { COMPOSER_CONTEXT_MAX_RECORDS } from "@legioncode/contracts";
 import {
   formatComposerContextReference,
   threadContextRecord,
-} from "@t3tools/shared/composerContextReferences";
+} from "@legioncode/shared/composerContextReferences";
 import { environmentComposerContext, pullRequestComposerContext } from "../../lib/composerContext";
 import { uuidv4 } from "../../lib/uuid";
 import {
@@ -29,18 +29,18 @@ import {
   setComposerDraftContext,
   useComposerDraftSelection,
 } from "../../state/use-composer-drafts";
-import { USAGE_LIMITS_COMMAND } from "@t3tools/shared/usageLimits";
+import { USAGE_LIMITS_COMMAND } from "@legioncode/shared/usageLimits";
 import {
   detectComposerTrigger,
   replaceTextRange,
   serializeComposerFileLink,
   type ComposerTrigger,
-} from "@t3tools/shared/composerTrigger";
+} from "@legioncode/shared/composerTrigger";
 import {
   insertRankedSearchResult,
   normalizeSearchQuery,
   scoreQueryMatch,
-} from "@t3tools/shared/searchRanking";
+} from "@legioncode/shared/searchRanking";
 import {
   dedupeProviderSkillsByName,
   getProviderSkillsForSlashMenu,
@@ -48,11 +48,11 @@ import {
   isProviderSkillUserInvocable,
   resolveProviderSkillsForCwd,
   resolveProviderSlashCommandsForCwd,
-} from "@t3tools/client-runtime/providerSkills";
+} from "@legioncode/client-runtime/providerSkills";
 import {
   formatComposerModelMention,
   rankComposerModelMentions,
-} from "@t3tools/client-runtime/composer-model-mentions";
+} from "@legioncode/client-runtime/composer-model-mentions";
 import { useAtomRefresh } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
 import { msg, useGT, useMessages } from "gt-react-native";
@@ -112,7 +112,7 @@ export function buildComposerSlashCommandItems(
     readonly hasThread: boolean;
     readonly hasCompactableConversation?: boolean;
     readonly offersUsageLimits?: boolean;
-    /** T3's `/clear` replaces the provider's, which would clear a session T3 still treats as live. */
+    /** LegionCode's `/clear` replaces the provider's, which would clear a session LegionCode still treats as live. */
     readonly offersFreshSession?: boolean;
     readonly offersSideChat?: boolean;
     readonly selectedProviderStatus: Pick<ServerProvider, "driver" | "slashCommands"> | null;
@@ -132,7 +132,7 @@ export function buildComposerSlashCommandItems(
       ]
     : [];
 
-  // Providers expand commands only at the start of a message. T3 commands
+  // Providers expand commands only at the start of a message. LegionCode commands
   // change local state and do not have this restriction, except `/clear`.
   if (!input.atMessageStart) return items;
   if (input.offersSideChat) {
@@ -333,7 +333,7 @@ export function useComposerCommandMenu({
   );
   // Every draft change rechecks a stale snapshot, including drafts written by
   // another surface (a prompt link) that never move the editor selection.
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- refreshes the provider workspace snapshot atom whenever the draft text changes from any surface
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- refreshes the provider workspace snapshot atom whenever the draft text changes from any surface
   useEffect(() => {
     refreshWorkspaceSnapshot();
   }, [

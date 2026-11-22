@@ -1,8 +1,8 @@
 import "~/index.css";
 
 import { RegistryContext } from "@effect/atom-react";
-import { scopeThreadRef } from "@t3tools/client-runtime/environment";
-import { type DeviceServiceState, type EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { scopeThreadRef } from "@legioncode/client-runtime/environment";
+import { type DeviceServiceState, type EnvironmentId, ThreadId } from "@legioncode/contracts";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { useState } from "react";
 import { expect, it, vi } from "vite-plus/test";

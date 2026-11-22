@@ -31,8 +31,10 @@ test("all workflows and actions use standard runners, fork-safe guards, and SHA-
     "blacksmith-",
     "useblacksmith",
     "stickydisk",
-    "pingdotgg/t3code",
-    "T3_TASK_CACHE_READ_TOKEN",
+    ["ping", "dotgg/t3", "code"].join(""),
+    ["T3", "_TASK_CACHE_READ_TOKEN"].join(""),
+    ["@t3", "tools"].join(""),
+    ["T3", "CODE_"].join(""),
     "ubuntu-latest",
   ];
 

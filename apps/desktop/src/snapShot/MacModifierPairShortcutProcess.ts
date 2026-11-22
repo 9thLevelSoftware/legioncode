@@ -3,7 +3,7 @@
 
 import * as NodeChildProcess from "node:child_process";
 
-import type { SnapShotModifier } from "@t3tools/contracts";
+import type { SnapShotModifier } from "@legioncode/contracts";
 
 const MAC_MODIFIER_PAIR_DEVICE_MASKS: Record<SnapShotModifier, readonly [number, number]> = {
   shift: [0x2, 0x4],

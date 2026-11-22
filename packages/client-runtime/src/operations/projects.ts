@@ -8,10 +8,14 @@ import type {
   ServerSettings,
   SourceControlDiscoveryResult,
   SourceControlRepositoryInfo,
-} from "@t3tools/contracts";
-import { SourceControlProviderKind } from "@t3tools/contracts";
-import { cloneUrlRepositoryPath } from "@t3tools/shared/cloneUrl";
-import { isAbsolutePath, isExplicitRelativePath, newProjectFolderName } from "@t3tools/shared/path";
+} from "@legioncode/contracts";
+import { SourceControlProviderKind } from "@legioncode/contracts";
+import { cloneUrlRepositoryPath } from "@legioncode/shared/cloneUrl";
+import {
+  isAbsolutePath,
+  isExplicitRelativePath,
+  newProjectFolderName,
+} from "@legioncode/shared/path";
 import * as Arr from "effect/Array";
 import * as Option from "effect/Option";
 import * as Order from "effect/Order";

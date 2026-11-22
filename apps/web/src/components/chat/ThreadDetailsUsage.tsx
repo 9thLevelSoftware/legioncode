@@ -3,22 +3,22 @@ import type {
   ServerProvider,
   ServerProviderUsageWindow,
   UsageLimitSourceSnapshots,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   collectProviderUsageLimits,
   type LimitPace,
   paceOf,
   paceRemainingPercent,
   remainingPercent,
-} from "@t3tools/shared/usageLimits";
-import { formatDuration, limitsNotice } from "@t3tools/shared/usageLimitsCopy";
+} from "@legioncode/shared/usageLimits";
+import { formatDuration, limitsNotice } from "@legioncode/shared/usageLimitsCopy";
 import { Link } from "@tanstack/react-router";
 import { msg, useGT, useLocale, useMessages } from "gt-react";
 import type { ReactNode } from "react";
 
 import { usePrimarySettings } from "../../hooks/useSettings";
 import { useNowMinute } from "../../hooks/useNowMinute";
-import type { ContextWindowSnapshot } from "@t3tools/client-runtime/state/context-window";
+import type { ContextWindowSnapshot } from "@legioncode/client-runtime/state/context-window";
 import { formatContextWindowTokens } from "../../lib/contextWindow";
 import { cn } from "../../lib/utils";
 import { formatUpcomingTimestamp } from "../../timestampFormat";

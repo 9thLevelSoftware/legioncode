@@ -1,5 +1,5 @@
 {
-  "name": "@t3tools/issue-tracker-linear",
+  "name": "@legioncode/issue-tracker-linear",
   "private": true,
   "type": "module",
   "exports": {
@@ -18,8 +18,8 @@
     "generate": "graphqlgen"
   },
   "dependencies": {
-    "@t3tools/contracts": "workspace:*",
-    "@t3tools/source-control-core": "workspace:*",
+    "@legioncode/contracts": "workspace:*",
+    "@legioncode/source-control-core": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

@@ -11,9 +11,9 @@ import { assert, describe, it } from "@effect/vitest";
 import { vi } from "vite-plus/test";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as HostProcess from "@t3tools/shared/HostProcess";
-import { SpawnExecutableResolution } from "@t3tools/shared/shell";
-import { mergeUsage } from "@t3tools/shared/usageMerge";
+import * as HostProcess from "@legioncode/shared/HostProcess";
+import { SpawnExecutableResolution } from "@legioncode/shared/shell";
+import { mergeUsage } from "@legioncode/shared/usageMerge";
 import {
   EnvironmentId,
   ProviderDriverKind,
@@ -22,7 +22,7 @@ import {
   type UsageSource,
   type UsageSummary,
   type UsageSummaryInput,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Duration from "effect/Duration";
 import * as Clock from "effect/Clock";
 import * as DateTime from "effect/DateTime";
@@ -44,17 +44,17 @@ import * as ServerConfig from "../config.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as Sqlite from "../persistence/Sqlite.ts";
 import * as CodexUsageHistory from "./CodexUsageHistory.ts";
-import * as CursorAccountReader from "@t3tools/provider-cursor/server/CursorAccountReader";
-import * as CursorUsageAccounts from "@t3tools/provider-cursor/server/CursorUsageAccounts";
+import * as CursorAccountReader from "@legioncode/provider-cursor/server/CursorAccountReader";
+import * as CursorUsageAccounts from "@legioncode/provider-cursor/server/CursorUsageAccounts";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as BackgroundPolicy from "../background/BackgroundPolicy.ts";
 import * as AntigravityUsage from "../provider/Drivers/AntigravityUsage.ts";
 import * as ProviderHostLive from "../provider/ProviderHostLive.ts";
-import { totalTokens, type UsageRecord } from "@t3tools/provider-core/server/usage";
+import { totalTokens, type UsageRecord } from "@legioncode/provider-core/server/usage";
 import * as UsageService from "./UsageService.ts";
 import { DESKTOP_HOST_SCOPE_ENV, physicalSourceIdOf } from "./usageTranscriptReader.ts";
 import * as MuseSdk from "../../../../packages/provider-muse/src/server/sdk.ts";
-import { MuseUsageHome } from "@t3tools/provider-muse/server";
+import { MuseUsageHome } from "@legioncode/provider-muse/server";
 import { makeScanCacheWriter, SCAN_CACHE_FILE_NAME } from "./usageScanCache.ts";
 
 vi.mock("node:fs/promises", { spy: true });
@@ -727,7 +727,7 @@ describe("UsageService", () => {
               home,
               settings,
               hostname,
-              environment: override === undefined ? {} : { T3CODE_HOST_ID: override },
+              environment: override === undefined ? {} : { LEGIONCODE_HOST_ID: override },
             }),
           ),
         );
@@ -1983,56 +1983,58 @@ describe("UsageService", () => {
     }),
   );
 
-  it.effect("reads the Cursor account of an API key or T3 sign-in instead of a CLI login", () =>
-    Effect.gen(function* () {
-      const { settings, home } = yield* setup;
-      const signIn = new TextEncoder().encode(
-        encodeUnknownJsonString({
-          version: 1,
-          backendUrl: "https://api2.cursor.sh",
-          apiKey: "signed-in-key",
-          createdAtMs: 0,
-        }),
-      );
-      yield* Effect.promise(async () => {
-        await NodeFSP.mkdir(NodePath.join(home, ".cursor"), { recursive: true });
-        await NodeFSP.writeFile(
-          NodePath.join(home, ".cursor", "auth.json"),
-          '{"accessToken":"stale-cli-token"}',
+  it.effect(
+    "reads the Cursor account of an API key or LegionCode sign-in instead of a CLI login",
+    () =>
+      Effect.gen(function* () {
+        const { settings, home } = yield* setup;
+        const signIn = new TextEncoder().encode(
+          encodeUnknownJsonString({
+            version: 1,
+            backendUrl: "https://api2.cursor.sh",
+            apiKey: "signed-in-key",
+            createdAtMs: 0,
+          }),
         );
-      });
-      for (const [index, testCase] of [
-        { environment: { CURSOR_API_KEY: "environment-key" }, stored: Option.none() },
-        { environment: {}, stored: Option.some(signIn) },
-        { environment: {}, stored: Option.none() },
-      ].entries()) {
-        const cursor = makeFakeCursor();
-        const summary = yield* Effect.gen(function* () {
-          const service = yield* makeWithCursor(cursor.read);
-          return yield* service.readSummary({ ...WINDOW, awaitRefresh: true });
-        }).pipe(
-          Effect.provide(
-            layerService({
-              prefix: `usage-service-cursor-api-key-${index}`,
-              home,
-              settings,
-              platform: "darwin",
-              environment: testCase.environment,
-              secretStore: { get: () => Effect.succeed(testCase.stored) },
-            }),
-          ),
-        );
-        if (index === 2) {
-          assert.deepStrictEqual(cursor.state.credentials, []);
-          assert.isUndefined(cursorSource(summary));
-          continue;
+        yield* Effect.promise(async () => {
+          await NodeFSP.mkdir(NodePath.join(home, ".cursor"), { recursive: true });
+          await NodeFSP.writeFile(
+            NodePath.join(home, ".cursor", "auth.json"),
+            '{"accessToken":"stale-cli-token"}',
+          );
+        });
+        for (const [index, testCase] of [
+          { environment: { CURSOR_API_KEY: "environment-key" }, stored: Option.none() },
+          { environment: {}, stored: Option.some(signIn) },
+          { environment: {}, stored: Option.none() },
+        ].entries()) {
+          const cursor = makeFakeCursor();
+          const summary = yield* Effect.gen(function* () {
+            const service = yield* makeWithCursor(cursor.read);
+            return yield* service.readSummary({ ...WINDOW, awaitRefresh: true });
+          }).pipe(
+            Effect.provide(
+              layerService({
+                prefix: `usage-service-cursor-api-key-${index}`,
+                home,
+                settings,
+                platform: "darwin",
+                environment: testCase.environment,
+                secretStore: { get: () => Effect.succeed(testCase.stored) },
+              }),
+            ),
+          );
+          if (index === 2) {
+            assert.deepStrictEqual(cursor.state.credentials, []);
+            assert.isUndefined(cursorSource(summary));
+            continue;
+          }
+          assert.deepStrictEqual(cursor.state.credentials, [
+            { kind: "apiKey", apiKey: index === 0 ? "environment-key" : "signed-in-key" },
+          ]);
+          assert.strictEqual(cursorSource(summary)?.status, "ok");
         }
-        assert.deepStrictEqual(cursor.state.credentials, [
-          { kind: "apiKey", apiKey: index === 0 ? "environment-key" : "signed-in-key" },
-        ]);
-        assert.strictEqual(cursorSource(summary)?.status, "ok");
-      }
-    }),
+      }),
   );
 
   it.effect("does not show a previous Cursor account's history after the API key changes", () =>
@@ -4187,7 +4189,7 @@ describe("UsageService", () => {
       );
 
       let orphanedAt: number | undefined;
-      // oxlint-disable-next-line t3code/no-polling-loop-in-tests -- Fixed-count scheduler interruption matrix; each iteration exercises a different interruption point.
+      // oxlint-disable-next-line legioncode/no-polling-loop-in-tests -- Fixed-count scheduler interruption matrix; each iteration exercises a different interruption point.
       for (let interruptAt = 1; interruptAt <= 31; interruptAt += 1) {
         const tasks: Array<() => void> = [];
         const dispatcher: Scheduler.SchedulerDispatcher = {

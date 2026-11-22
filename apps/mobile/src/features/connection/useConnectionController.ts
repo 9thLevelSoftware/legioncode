@@ -2,13 +2,13 @@ import { useAtomValue } from "@effect/atom-react";
 import {
   RelayConnectionRegistration,
   RelayConnectionTarget,
-} from "@t3tools/client-runtime/connection";
-import type { EnvironmentId } from "@t3tools/contracts";
+} from "@legioncode/client-runtime/connection";
+import type { EnvironmentId } from "@legioncode/contracts";
 import type {
   RelayClientEnvironmentRecord,
   RelayEnvironmentStatusResponse,
-} from "@t3tools/contracts/relay";
-import { errorDisplayMessage } from "@t3tools/client-runtime/errors";
+} from "@legioncode/contracts/relay";
+import { errorDisplayMessage } from "@legioncode/client-runtime/errors";
 import { useMessages } from "gt-react-native";
 import * as Option from "effect/Option";
 import { useMemo } from "react";

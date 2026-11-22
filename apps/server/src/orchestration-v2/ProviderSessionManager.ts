@@ -1,6 +1,6 @@
-import { AgentScope } from "@t3tools/shared/AgentScope";
-import * as KeyedLock from "@t3tools/shared/KeyedLock";
-import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
+import { AgentScope } from "@legioncode/shared/AgentScope";
+import * as KeyedLock from "@legioncode/shared/KeyedLock";
+import { resolveProjectSettings } from "@legioncode/shared/projectSettings";
 import {
   isOrchestrationV2WorkActive,
   ModelSelection,
@@ -18,7 +18,7 @@ import {
   type OrchestrationV2TurnItem,
   type ProviderThreadId,
   type ProviderTurnId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
@@ -51,19 +51,19 @@ import {
 import { ProviderWorkspaceMissingError } from "../provider/Errors.ts";
 import * as ProviderInstallationGate from "../provider/ProviderInstallationGate.ts";
 import * as ProjectService from "../project/ProjectService.ts";
-import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
+import * as McpProviderSessions from "@legioncode/provider-core/server/McpProviderSessions";
 import * as ServerSettings from "../serverSettings.ts";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
 import * as EventSink from "./EventSink.ts";
 import * as CommandOutputHub from "./CommandOutputHub.ts";
-import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import * as IdAllocator from "@legioncode/provider-core/server/IdAllocator";
 import * as ProviderEventIngestor from "./ProviderEventIngestor.ts";
-import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
-import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
+import * as ProviderAdapter from "@legioncode/provider-core/server/ProviderAdapter";
+import { makeProviderFailure } from "@legioncode/provider-core/server/failure";
 import {
   endOrphanedNativeSubagent,
   endRunlessRootTurns,
-} from "@t3tools/provider-core/server/subagentProjection";
+} from "@legioncode/provider-core/server/subagentProjection";
 import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 
@@ -300,7 +300,7 @@ export interface ProviderSessionManagerV2Shape {
 export class ProviderSessionManagerV2 extends Context.Service<
   ProviderSessionManagerV2,
   ProviderSessionManagerV2Shape
->()("t3/orchestration-v2/ProviderSessionManager/ProviderSessionManagerV2") {}
+>()("legioncode/orchestration-v2/ProviderSessionManager/ProviderSessionManagerV2") {}
 
 interface LiveSessionEntry {
   readonly attachedThreadIds: ReadonlySet<ThreadId>;
@@ -679,7 +679,7 @@ export const layerWithOptions = (
         const error = new ProviderAdapter.ProviderAdapterEventStreamError({
           driver: entry.runtime.driver,
           providerSessionId: entry.runtime.providerSessionId,
-          raisedByT3: true,
+          raisedByLegion: true,
           ...(detachedThreadId === undefined ? {} : { detachedThreadId }),
           cause: detail,
         });
@@ -2902,7 +2902,7 @@ export const layerWithOptions = (
                               new ProviderAdapter.ProviderAdapterEventStreamError({
                                 driver: entry.runtime.driver,
                                 providerSessionId: entry.runtime.providerSessionId,
-                                raisedByT3: true,
+                                raisedByLegion: true,
                                 cause,
                               }),
                           ),
@@ -2943,7 +2943,7 @@ export const layerWithOptions = (
                       new ProviderAdapter.ProviderAdapterEventStreamError({
                         driver: entry.runtime.driver,
                         providerSessionId: entry.runtime.providerSessionId,
-                        raisedByT3: true,
+                        raisedByLegion: true,
                         cause: "Provider event stream ended unexpectedly.",
                       }),
                     );

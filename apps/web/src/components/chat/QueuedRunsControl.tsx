@@ -1,22 +1,22 @@
-import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { scopeThreadRef } from "@legioncode/client-runtime/environment";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
-import { deriveThreadQueueWorkflowState } from "@t3tools/client-runtime/state/thread-workflows";
-import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";
+} from "@legioncode/client-runtime/state/runtime";
+import { deriveThreadQueueWorkflowState } from "@legioncode/client-runtime/state/thread-workflows";
+import { assistantCitationsToPlainText } from "@legioncode/shared/assistantCitations";
 import {
   isAttachmentOnlyBootstrapPrompt,
   replaceComposerContextReferences,
-} from "@t3tools/shared/composerContextReferences";
+} from "@legioncode/shared/composerContextReferences";
 import type {
   ChatAttachment as ContractChatAttachment,
   EnvironmentId,
   MessageId,
   RunId,
   ThreadId,
-} from "@t3tools/contracts";
-import { resolveUserMessagePresentation } from "@t3tools/client-runtime/user-message";
+} from "@legioncode/contracts";
+import { resolveUserMessagePresentation } from "@legioncode/client-runtime/user-message";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowUpIcon,
@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import * as DateTime from "effect/DateTime";
 import { msg, T, useGT, useMessages } from "gt-react";
-import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { thrownErrorMessage } from "@legioncode/client-runtime/errors";
 import { useId, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 
 import { useAssetUrls } from "../../assets/assetUrls";
@@ -43,7 +43,7 @@ import { Button, InlineButton } from "../ui/button";
 import { toastManager } from "../ui/toast";
 import { m } from "../../i18n/messages";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
-import type { TimestampFormat } from "@t3tools/contracts/settings";
+import type { TimestampFormat } from "@legioncode/contracts/settings";
 import { GuestMessageName } from "./guestMessageStyle";
 import { TimelineRowTimestamp } from "./TimelineRowParts";
 import { FoldedMessageHeader, useScheduledTaskTitle } from "./TimelineUserMessageRow";
@@ -502,9 +502,9 @@ function QueuedMessage(props: {
 
   return (
     <>
-      {attribution === "t3code" ? (
+      {attribution === "legioncode" ? (
         <p className="me-1 text-2xs text-muted-foreground/70">
-          <T>Sent by T3 Code</T>
+          <T>Sent by LegionCode</T>
         </p>
       ) : null}
       {presentation?.guestName === undefined ? null : (

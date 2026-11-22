@@ -1,7 +1,7 @@
-import { type RemoteOpenTarget } from "@t3tools/contracts";
-import * as HostProcess from "@t3tools/shared/HostProcess";
-import * as NetService from "@t3tools/shared/Net";
-import { readTailscaleSshEnabled, readTailscaleStatus } from "@t3tools/tailscale";
+import { type RemoteOpenTarget } from "@legioncode/contracts";
+import * as HostProcess from "@legioncode/shared/HostProcess";
+import * as NetService from "@legioncode/shared/Net";
+import { readTailscaleSshEnabled, readTailscaleStatus } from "@legioncode/tailscale";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -17,7 +17,7 @@ export class RemoteOpenTargets extends Context.Service<
   {
     readonly resolveTargets: () => Effect.Effect<ReadonlyArray<RemoteOpenTarget>>;
   }
->()("t3/environment/RemoteOpenTargets") {}
+>()("legioncode/environment/RemoteOpenTargets") {}
 
 /** @public */
 export const make = Effect.gen(function* () {

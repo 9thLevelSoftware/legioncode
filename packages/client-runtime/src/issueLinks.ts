@@ -1,9 +1,9 @@
-import type { IssueRef, IssueTrackerConnectionList } from "@t3tools/contracts";
+import type { IssueRef, IssueTrackerConnectionList } from "@legioncode/contracts";
 import {
   LINEAR_HOST,
   LINEAR_KIND,
   parseLinearIssueUrl,
-} from "@t3tools/issue-tracker-linear/shared/issueUrl";
+} from "@legioncode/issue-tracker-linear/shared/issueUrl";
 
 import { sourceControlClients } from "./sourceControlClients.ts";
 import type { EnvironmentProject } from "./state/shell.ts";

@@ -1,15 +1,15 @@
-import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import { errorDisplayMessage } from "@t3tools/client-runtime/errors";
+import { squashAtomCommandFailure } from "@legioncode/client-runtime/state/runtime";
+import { errorDisplayMessage } from "@legioncode/client-runtime/errors";
 import { AsyncResult } from "effect/reactivity";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
-import { limitRecoveryOwnsSnooze } from "@t3tools/client-runtime/state/thread-execution";
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { EnvironmentThreadShell } from "@legioncode/client-runtime/state/shell";
+import { limitRecoveryOwnsSnooze } from "@legioncode/client-runtime/state/thread-execution";
+import type { EnvironmentId } from "@legioncode/contracts";
 import {
   CHATGPT_USAGE_LIMIT_CODE,
   CHATGPT_USAGE_URL,
   CHATGPT_WORKSPACE_ADMIN_REQUEST,
   CHATGPT_WORKSPACE_USAGE_LIMIT_CODE,
-} from "@t3tools/shared/usageLimits";
+} from "@legioncode/shared/usageLimits";
 import * as Clipboard from "expo-clipboard";
 import { T, useGT } from "gt-react-native";
 import { m } from "../../i18n/messages";
@@ -151,7 +151,7 @@ export function UsageLimitRecoveryCard({
       ) : null}
       <View className="min-w-0 flex-1 gap-1">
         {chatGptLimit ? (
-          <Text className="text-sm font-t3-medium text-foreground">
+          <Text className="text-sm font-legion-medium text-foreground">
             <T>ChatGPT usage limit reached</T>
           </Text>
         ) : null}
@@ -231,8 +231,8 @@ function RecoveryAction(props: {
       <Text
         className={
           props.disabled
-            ? "text-sm font-t3-medium text-foreground-muted"
-            : "text-sm font-t3-medium text-primary"
+            ? "text-sm font-legion-medium text-foreground-muted"
+            : "text-sm font-legion-medium text-primary"
         }
       >
         {props.label}

@@ -39,14 +39,14 @@ import {
   type ServerProviderUpdateState,
   type ServerProviderVersionAdvisoryStatus,
   type ServerSettings as ContractServerSettings,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import { HttpClient, HttpClientResponse } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
-import * as HostProcess from "@t3tools/shared/HostProcess";
-import { WindowsShellEnvironment } from "@t3tools/shared/shell";
-import { deepMerge } from "@t3tools/shared/Struct";
-import { createModelCapabilities } from "@t3tools/shared/model";
-import { applyServerSettingsPatch } from "@t3tools/shared/serverSettings";
+import * as HostProcess from "@legioncode/shared/HostProcess";
+import { WindowsShellEnvironment } from "@legioncode/shared/shell";
+import { deepMerge } from "@legioncode/shared/Struct";
+import { createModelCapabilities } from "@legioncode/shared/model";
+import { applyServerSettingsPatch } from "@legioncode/shared/serverSettings";
 
 import {
   checkCodexProviderStatus,
@@ -60,11 +60,11 @@ import * as AntigravityInstallation from "./AntigravityInstallation.ts";
 import * as ModelManifest from "./ModelManifest.ts";
 import { applyProviderCompatibility } from "./providerCompatibility.ts";
 import * as ResetCreditCoordinator from "./resetCreditCoordinator.ts";
-import * as ProviderLatestVersions from "@t3tools/provider-core/server/ProviderLatestVersions";
-import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
-import * as OpenCodeRuntime from "@t3tools/provider-opencode/server/OpenCodeRuntime";
-import * as OpenCodeServerLedger from "@t3tools/provider-opencode/server/OpenCodeServerLedger";
-import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
+import * as ProviderLatestVersions from "@legioncode/provider-core/server/ProviderLatestVersions";
+import * as McpProviderSessions from "@legioncode/provider-core/server/McpProviderSessions";
+import * as OpenCodeRuntime from "@legioncode/provider-opencode/server/OpenCodeRuntime";
+import * as OpenCodeServerLedger from "@legioncode/provider-opencode/server/OpenCodeServerLedger";
+import * as ProviderEventLoggers from "@legioncode/provider-core/server/ProviderEventLoggers";
 import * as ProviderInstallationGate from "./ProviderInstallationGate.ts";
 import * as ProviderInstanceRegistryHydration from "./ProviderInstanceRegistryHydration.ts";
 import * as PortScanner from "../preview/PortScanner.ts";
@@ -76,17 +76,17 @@ import {
   resolveProviderStatusCachePath,
   writeProviderStatusCache,
 } from "./providerStatusCache.ts";
-import { COMPACT_SLASH_COMMAND } from "@t3tools/provider-core/server/snapshotProbe";
+import { COMPACT_SLASH_COMMAND } from "@legioncode/provider-core/server/snapshotProbe";
 import type {
   ProviderInstance,
   ProviderWorkspaceSnapshot,
-} from "@t3tools/provider-core/server/driver";
+} from "@legioncode/provider-core/server/driver";
 import * as ProviderInstanceRegistry from "./ProviderInstanceRegistry.ts";
 import * as ProviderInstanceRegistryMutator from "./ProviderInstanceRegistryMutator.ts";
 import * as ProviderRegistry from "./ProviderRegistry.ts";
-import { ProviderDriverError } from "@t3tools/provider-core/server/errors";
-import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/instanceEnvironment";
-import { makeManualOnlyProviderMaintenanceCapabilities } from "@t3tools/provider-core/server/maintenanceResolver";
+import { ProviderDriverError } from "@legioncode/provider-core/server/errors";
+import { mergeProviderInstanceEnvironment } from "@legioncode/provider-core/server/instanceEnvironment";
+import { makeManualOnlyProviderMaintenanceCapabilities } from "@legioncode/provider-core/server/maintenanceResolver";
 vi.mock("@anthropic-ai/claude-agent-sdk", { spy: true });
 
 const decodeServerProvider = Schema.decodeSync(ServerProvider);
@@ -109,7 +109,7 @@ const defaultClaudeSettings: ClaudeSettings = Schema.decodeSync(ClaudeSettings)(
 const decodeCodexSettings = Schema.decodeSync(CodexSettings);
 const defaultCodexSettings: CodexSettings = Schema.decodeSync(CodexSettings)({});
 
-process.env.T3CODE_CURSOR_ENABLED = "1";
+process.env.LEGIONCODE_CURSOR_ENABLED = "1";
 
 const encoder = new TextEncoder();
 const TEST_EPOCH = DateTime.makeUnsafe("1970-01-01T00:00:00.000Z");
@@ -232,7 +232,9 @@ const makeWorkspaceRescanHarness = Effect.gen(function* () {
           subscribeChanges: PubSub.subscribe(changes),
         }),
       ),
-      Layer.provideMerge(ServerConfig.layerTest(process.cwd(), { prefix: "t3-workspace-rescan-" })),
+      Layer.provideMerge(
+        ServerConfig.layerTest(process.cwd(), { prefix: "legion-workspace-rescan-" }),
+      ),
       Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
     ),
   ).pipe(Scope.provide(scope));
@@ -369,7 +371,7 @@ function layerMockSpawner(
 const writeFakeCodexCli = Effect.fn("writeFakeCodexCli")(function* (script: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-fake-codex-" });
+  const directory = yield* fs.makeTempDirectoryScoped({ prefix: "legion-fake-codex-" });
   const binaryPath = path.join(directory, "codex");
   yield* fs.writeFileString(binaryPath, `#!/bin/sh\n${script}\n`);
   yield* fs.chmod(binaryPath, 0o755);
@@ -543,7 +545,7 @@ const buildRegistryOverSnapshot = Effect.fn("buildRegistryOverSnapshot")(functio
       Layer.provide(layerUnusedMutator),
       Layer.provideMerge(layerInstanceRegistry),
       Layer.provideMerge(
-        ServerConfig.layerTest(process.cwd(), { prefix: "t3-provider-registry-update-state-" }),
+        ServerConfig.layerTest(process.cwd(), { prefix: "legion-provider-registry-update-state-" }),
       ),
       Layer.provideMerge(layerBackgroundPolicyAlwaysRun),
       Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
@@ -640,7 +642,7 @@ it.layer(
         const fiber = yield* checkCodexProviderStatus(
           defaultCodexSettings,
           () => Effect.sleep("22 seconds").pipe(Effect.as(makeCodexProbeSnapshot())),
-          { T3CODE_CODEX_PROBE_TIMEOUT_MS: "60000" },
+          { LEGIONCODE_CODEX_PROBE_TIMEOUT_MS: "60000" },
         ).pipe(Effect.forkChild);
         yield* TestClock.adjust("22 seconds");
         const status = yield* Fiber.join(fiber);
@@ -816,7 +818,7 @@ it.layer(
       Effect.gen(function* () {
         if ((yield* HostProcess.Platform) === "win32") return;
         const codexHome = yield* FileSystem.FileSystem.pipe(
-          Effect.flatMap((fs) => fs.makeTempDirectoryScoped({ prefix: "t3-codex-home-" })),
+          Effect.flatMap((fs) => fs.makeTempDirectoryScoped({ prefix: "legion-codex-home-" })),
         );
         const { binaryPath } = yield* writeFakeCodexCli(
           [
@@ -1664,7 +1666,7 @@ it.layer(
         checkedAt: "2026-10-03T00:02:00.000Z",
         status: "ready",
         version: "1.0.0",
-        message: "Pi is available, but T3 Code could not refresh its models and commands.",
+        message: "Pi is available, but LegionCode could not refresh its models and commands.",
       } satisfies ServerProvider;
 
       it("retains Pi inventories during incomplete probes without restoring removed custom models", () => {
@@ -1783,7 +1785,7 @@ it.layer(
           }).pipe(
             Effect.provide(
               ServerConfig.layerTest(process.cwd(), {
-                prefix: "t3-pi-model-cache-",
+                prefix: "legion-pi-model-cache-",
               }).pipe(Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
             ),
           ),
@@ -1943,7 +1945,7 @@ it.layer(
         }).pipe(
           Effect.provide(
             ServerConfig.layerTest(process.cwd(), {
-              prefix: "t3-codex-retired-model-cache-",
+              prefix: "legion-codex-retired-model-cache-",
             }).pipe(Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
           ),
         ),
@@ -2021,7 +2023,7 @@ it.layer(
         }).pipe(
           Effect.provide(
             ServerConfig.layerTest(process.cwd(), {
-              prefix: "t3-codex-probed-before-boot-",
+              prefix: "legion-codex-probed-before-boot-",
             }).pipe(Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
           ),
         ),
@@ -2459,7 +2461,7 @@ it.layer(
               Layer.provide(layerUnusedMutator),
               Layer.provideMerge(
                 ServerConfig.layerTest(process.cwd(), {
-                  prefix: "t3-provider-registry-model-cache-",
+                  prefix: "legion-provider-registry-model-cache-",
                 }),
               ),
               Layer.provideMerge(NodeServices.layer),
@@ -2538,7 +2540,7 @@ it.layer(
               Layer.provideMerge(layerInstanceRegistry),
               Layer.provideMerge(
                 ServerConfig.layerTest(process.cwd(), {
-                  prefix: "t3-provider-registry-shared-workspace-scan-",
+                  prefix: "legion-provider-registry-shared-workspace-scan-",
                 }),
               ),
               Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
@@ -2627,7 +2629,9 @@ it.layer(
                   }),
                 ),
                 Layer.provideMerge(
-                  ServerConfig.layerTest(process.cwd(), { prefix: "t3-provider-registry-path-" }),
+                  ServerConfig.layerTest(process.cwd(), {
+                    prefix: "legion-provider-registry-path-",
+                  }),
                 ),
                 Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
               ),
@@ -2861,7 +2865,7 @@ it.layer(
             Layer.provideMerge(layerInstanceRegistry),
             Layer.provideMerge(
               ServerConfig.layerTest(process.cwd(), {
-                prefix: "t3-provider-registry-scan-cwd-",
+                prefix: "legion-provider-registry-scan-cwd-",
               }),
             ),
             Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
@@ -2958,7 +2962,7 @@ it.layer(
             Layer.provideMerge(layerInstanceRegistry),
             Layer.provideMerge(
               ServerConfig.layerTest(process.cwd(), {
-                prefix: "t3-provider-registry-unhealthy-workspace-",
+                prefix: "legion-provider-registry-unhealthy-workspace-",
               }),
             ),
             Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
@@ -3086,7 +3090,7 @@ it.layer(
             Layer.provideMerge(layerInstanceRegistry),
             Layer.provideMerge(
               ServerConfig.layerTest(process.cwd(), {
-                prefix: "t3-provider-registry-pending-workspace-models-",
+                prefix: "legion-provider-registry-pending-workspace-models-",
               }),
             ),
             Layer.provideMerge(NodeServices.layer),
@@ -3196,7 +3200,7 @@ it.layer(
             Layer.provideMerge(instanceRegistryLayer),
             Layer.provideMerge(
               ServerConfig.layerTest(process.cwd(), {
-                prefix: "t3-provider-registry-shared-refresh-",
+                prefix: "legion-provider-registry-shared-refresh-",
               }),
             ),
             Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
@@ -3309,7 +3313,7 @@ it.layer(
               Layer.provideMerge(instanceRegistryLayer),
               Layer.provideMerge(
                 ServerConfig.layerTest(process.cwd(), {
-                  prefix: "t3-provider-registry-retired-refresh-",
+                  prefix: "legion-provider-registry-retired-refresh-",
                 }),
               ),
               Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
@@ -3438,7 +3442,7 @@ it.layer(
             Layer.provideMerge(instanceRegistryLayer),
             Layer.provideMerge(
               ServerConfig.layerTest(process.cwd(), {
-                prefix: "t3-provider-registry-enriched-refresh-",
+                prefix: "legion-provider-registry-enriched-refresh-",
               }),
             ),
             Layer.provideMerge(NodeServices.layer),
@@ -3564,7 +3568,7 @@ it.layer(
             Layer.provideMerge(layerInstanceRegistry),
             Layer.provideMerge(
               ServerConfig.layerTest(process.cwd(), {
-                prefix: "t3-provider-registry-merged-persist-",
+                prefix: "legion-provider-registry-merged-persist-",
               }),
             ),
             Layer.provideMerge(layerBackgroundPolicyAlwaysRun),
@@ -3691,7 +3695,7 @@ it.layer(
             Layer.provideMerge(layerInstanceRegistry),
             Layer.provideMerge(
               ServerConfig.layerTest(process.cwd(), {
-                prefix: "t3-provider-registry-update-state-race-",
+                prefix: "legion-provider-registry-update-state-race-",
               }),
             ),
             Layer.provideMerge(layerBackgroundPolicyAlwaysRun),
@@ -3715,7 +3719,7 @@ it.layer(
             status: "unchanged",
             finishedAt: "2026-04-14T00:01:30.000Z",
             message:
-              "Update command completed, but T3 Code still detects an outdated provider version.",
+              "Update command completed, but LegionCode still detects an outdated provider version.",
           } as const;
           yield* registry.setProviderMaintenanceActionState({
             instanceId: claudeInstanceId,
@@ -3855,7 +3859,7 @@ it.layer(
               Layer.provideMerge(layerInstanceRegistry),
               Layer.provideMerge(
                 ServerConfig.layerTest(process.cwd(), {
-                  prefix: "t3-provider-registry-opencode-authoritative-persist-",
+                  prefix: "legion-provider-registry-opencode-authoritative-persist-",
                 }),
               ),
               Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
@@ -3959,7 +3963,7 @@ it.layer(
             Layer.provideMerge(layerInstanceRegistry),
             Layer.provideMerge(
               ServerConfig.layerTest(process.cwd(), {
-                prefix: "t3-provider-registry-refresh-failure-",
+                prefix: "legion-provider-registry-refresh-failure-",
               }),
             ),
             Layer.provideMerge(layerBackgroundPolicyAlwaysRun),
@@ -4046,8 +4050,8 @@ it.layer(
 
     it.effect("re-probes when settings change the codex binaryPath", () =>
       Effect.gen(function* () {
-        const firstMissing = `t3code_codex_first_`;
-        const secondMissing = `t3code_codex_second_`;
+        const firstMissing = `legioncode_codex_first_`;
+        const secondMissing = `legioncode_codex_second_`;
         const spawnedCommands: Array<string> = [];
         const secondProbeStarted = yield* Deferred.make<void>();
         const releaseSecondProbe = yield* Deferred.make<void>();
@@ -4095,7 +4099,7 @@ it.layer(
           Layer.provideMerge(ServerSecretStore.layer),
           Layer.provideMerge(
             ServerConfig.layerTest(process.cwd(), {
-              prefix: "t3-provider-registry-",
+              prefix: "legion-provider-registry-",
             }),
           ),
           Layer.provideMerge(layerTestHttpClient),
@@ -4221,7 +4225,7 @@ it.layer(
           Layer.provideMerge(ServerSecretStore.layer),
           Layer.provideMerge(
             ServerConfig.layerTest(process.cwd(), {
-              prefix: "t3-provider-registry-",
+              prefix: "legion-provider-registry-",
             }),
           ),
           Layer.provideMerge(layerTestHttpClient),
@@ -4330,7 +4334,7 @@ it.layer(
             Layer.succeed(ServerSettingsModule.ServerSettingsService, serverSettings),
           ),
           Layer.provideMerge(
-            ServerConfig.layerTest(process.cwd(), { prefix: "t3-provider-registry-" }),
+            ServerConfig.layerTest(process.cwd(), { prefix: "legion-provider-registry-" }),
           ),
           Layer.provideMerge(layerTestHttpClient),
           Layer.provideMerge(
@@ -4483,7 +4487,7 @@ it.layer(
         if ((yield* HostProcess.Platform) === "win32") return;
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-fake-mise-claude-" });
+        const directory = yield* fs.makeTempDirectoryScoped({ prefix: "legion-fake-mise-claude-" });
         const installMarker = path.join(directory, "installed");
         const binaryPath = path.join(directory, "claude");
         // A `lazy = true` mise shim downloads and installs the tool unless MISE_OFFLINE is set.
@@ -4703,7 +4707,7 @@ it.layer(
           const fileSystem = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
           const configDir = yield* fileSystem.makeTempDirectoryScoped({
-            prefix: "t3-claude-settings-",
+            prefix: "legion-claude-settings-",
           });
           yield* fileSystem.writeFileString(
             path.join(configDir, "settings.json"),

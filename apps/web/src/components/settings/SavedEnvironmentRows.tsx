@@ -1,4 +1,4 @@
-import { managedCapabilityDenial } from "@t3tools/client-runtime/contract-labels";
+import { managedCapabilityDenial } from "@legioncode/client-runtime/contract-labels";
 import { SessionPermissions } from "./SessionPermissions";
 import {
   ChevronRightIcon,
@@ -14,14 +14,14 @@ import {
   connectReachabilityHelpUrl,
   formatConnectReachable,
   resolveEnvironmentMachineKind,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   connectionRoutes,
   hasSavedBearerRoute,
   connectionErrorText,
   connectionStatusText,
   environmentMcpUrl,
-} from "@t3tools/client-runtime/connection";
+} from "@legioncode/client-runtime/connection";
 import * as Option from "effect/Option";
 import { msg, T, useGT, useMessages } from "gt-react";
 import { m, type MessageResolver } from "../../i18n/messages";
@@ -51,10 +51,10 @@ import {
   supportsDesktopAppUpdate,
 } from "~/versionSkew";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
-import { useT3ConnectTurnOn } from "~/cloud/useT3ConnectTurnOn";
+import { useLegionConnectTurnOn } from "~/cloud/useLegionConnectTurnOn";
 import { useCloudLinkController } from "~/cloud/useCloudLinkController";
 import { useManagedTunnelUsage } from "~/cloud/managedRelayState";
-import { useT3ConnectAccountPage } from "../clerk/T3ConnectAccountPages";
+import { useLegionConnectAccountPage } from "../clerk/LegionConnectAccountPages";
 import { TunnelLimitAlert, TunnelUsageMeter } from "../cloud/TunnelUsage";
 import { environmentCatalog } from "~/connection/catalog";
 import { readEnvironmentScope } from "~/state/session";
@@ -70,7 +70,7 @@ import {
   ServerUpdateProgress,
 } from "../ServerUpdateAction";
 import { CloudEnvironmentConnectRows } from "../cloud/CloudEnvironmentConnectList";
-import { useT3ConnectAuthPrompt } from "../clerk/useT3ConnectAuthPrompt";
+import { useLegionConnectAuthPrompt } from "../clerk/useLegionConnectAuthPrompt";
 
 type SavedBackendListRowProps = {
   environment: EnvironmentPresentation;
@@ -170,9 +170,12 @@ export function SavedBackendListRow({
       toastManager.add({
         type: "success",
         title: gt("MCP URL copied"),
-        description: gt("Add it to an agent, e.g. claude mcp add --transport http t3 {url}", {
-          url,
-        }),
+        description: gt(
+          "Add it to an agent, e.g. claude mcp add --transport http legioncode {url}",
+          {
+            url,
+          },
+        ),
       });
     },
     onError: (error) => {
@@ -386,7 +389,7 @@ export function SavedBackendListRow({
           environmentId={environmentId}
           serverLabel={gt("{label} server", {
             label: environment.label,
-            $context: "names a T3 server inside sentences such as {serverLabel} updated",
+            $context: "names a LegionCode server inside sentences such as {serverLabel} updated",
           })}
           fromVersion={lastDescriptor?.serverVersion}
           targetVersion={APP_VERSION}
@@ -398,7 +401,7 @@ export function SavedBackendListRow({
           environmentId={environmentId}
           serverLabel={gt("{label} server", {
             label: environment.label,
-            $context: "names a T3 server inside sentences such as {serverLabel} updated",
+            $context: "names a LegionCode server inside sentences such as {serverLabel} updated",
           })}
           selfUpdate={resolveServerSelfUpdateCapability(environment.serverConfig)}
           installation={environment.serverConfig?.environment.capabilities.serverInstallation}
@@ -487,7 +490,7 @@ function CloudLinkSwitch({
   const gt = useGT();
   const control = (
     <Switch
-      aria-label={ariaLabel ?? gt("Enable T3 Connect")}
+      aria-label={ariaLabel ?? gt("Enable Legion Connect")}
       checked={checked}
       disabled={disabled}
       {...(onCheckedChange ? { onCheckedChange } : {})}
@@ -504,9 +507,9 @@ function CloudLinkSwitch({
 }
 
 /** Tunnel meter, plus the upgrade prompt after the relay refuses a tunnel at the cap. */
-function T3ConnectTunnelUsage({ tunnelLimit }: { readonly tunnelLimit: number | null }) {
+function LegionConnectTunnelUsage({ tunnelLimit }: { readonly tunnelLimit: number | null }) {
   const usage = useManagedTunnelUsage();
-  const accountPage = useT3ConnectAccountPage();
+  const accountPage = useLegionConnectAccountPage();
   const openAccountPage = accountPage.open;
   // Usage when the relay refused. The relay also counts tunnels still being set up, so only
   // a freed tunnel or a higher cap clears the alert, not a meter that merely shows room.
@@ -532,7 +535,7 @@ function T3ConnectTunnelUsage({ tunnelLimit }: { readonly tunnelLimit: number | 
               <T>Get more tunnels</T>
             </InlineButton>
           ) : usage.used >= usage.limit ? (
-            <InlineButton onClick={() => openAccountPage("t3-connect")}>
+            <InlineButton onClick={() => openAccountPage("legion-connect")}>
               <T>Manage tunnels</T>
             </InlineButton>
           ) : null
@@ -548,7 +551,7 @@ function T3ConnectTunnelUsage({ tunnelLimit }: { readonly tunnelLimit: number | 
             <TunnelLimitAlert
               upgrade={usage.upgrade}
               onLinkT3Chat={openAccountPage ? () => openAccountPage("t3-chat") : null}
-              onManageTunnels={openAccountPage ? () => openAccountPage("t3-connect") : null}
+              onManageTunnels={openAccountPage ? () => openAccountPage("legion-connect") : null}
             />
           ) : null}
         </div>
@@ -584,7 +587,7 @@ function ConfiguredCloudLinkRow({
     needsRelayConfiguration,
     reconcileCloudState,
   } = useCloudLinkController(environmentId);
-  const { openAuthPrompt } = useT3ConnectAuthPrompt();
+  const { openAuthPrompt } = useLegionConnectAuthPrompt();
   // The server unlinks and refuses relay changes under such a policy; unlinking stays possible.
   const messages = useMessages();
   const connectDenial = managedCapabilityDenial(
@@ -592,7 +595,7 @@ function ConfiguredCloudLinkRow({
     "connect",
     messages,
   );
-  const turnOn = useT3ConnectTurnOn(environmentId);
+  const turnOn = useLegionConnectTurnOn(environmentId);
   // Turning on needs relay configuration permission; turning off works from anywhere.
   const showSwitch = turnOn.kind !== "on-host" || managedTunnelActive;
   const [isUpdating, setIsUpdating] = useState(false);
@@ -600,7 +603,7 @@ function ConfiguredCloudLinkRow({
 
   const disabledReason = canManageRelay
     ? null
-    : gt("Your session does not have permission to manage T3 Connect access.");
+    : gt("Your session does not have permission to manage Legion Connect access.");
   const isBusy = isUpdating || isUpdatingPreference;
   const switchDisabled =
     !canManageRelay ||
@@ -609,7 +612,7 @@ function ConfiguredCloudLinkRow({
     cloudLinkState.isPending ||
     isBusy;
   const configureReason = gt(
-    "This connection needs the relay configuration permission to configure T3 Connect.",
+    "This connection needs the relay configuration permission to configure Legion Connect.",
   );
   const tunnelNeedsConfigure = needsRelayConfiguration({
     managedTunnel: !managedTunnelActive,
@@ -631,7 +634,7 @@ function ConfiguredCloudLinkRow({
   const refreshLinkState = useEffectEvent(cloudLinkState.refresh);
   // The server rechecks reachability when the tunnel's 30 s readiness poll changes.
   // Poll while mounted, so a failed read does not stop later ones.
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- 30 s interval that refreshes the cloud link reachability while mounted
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- 30 s interval that refreshes the cloud link reachability while mounted
   useEffect(() => {
     const interval = window.setInterval(() => refreshLinkState(), 30_000);
     return () => window.clearInterval(interval);
@@ -664,15 +667,15 @@ function ConfiguredCloudLinkRow({
       toastManager.add({
         type: "success",
         title: enabled
-          ? gt("T3 Connect linked")
+          ? gt("Legion Connect linked")
           : publishAgentActivity
-            ? gt("T3 Connect tunnel disabled")
-            : gt("T3 Connect unlinked"),
+            ? gt("Legion Connect tunnel disabled")
+            : gt("Legion Connect unlinked"),
         description: enabled
-          ? gt("This environment is available through T3 Connect.")
+          ? gt("This environment is available through Legion Connect.")
           : publishAgentActivity
             ? gt("The managed tunnel was removed. Agent activity publishing stays on.")
-            : gt("This environment is no longer available through T3 Connect."),
+            : gt("This environment is no longer available through Legion Connect."),
       });
     }
     setIsUpdating(false);
@@ -707,7 +710,7 @@ function ConfiguredCloudLinkRow({
         title: enabled ? gt("Webhooks held while offline") : gt("Webhooks no longer held"),
         description: enabled
           ? gt(
-              "T3 Connect keeps webhook requests for up to 24 hours while this environment is offline.",
+              "Legion Connect keeps webhook requests for up to 24 hours while this environment is offline.",
             )
           : gt(
               "Requests to an offline environment now fail. Anything already held is still delivered.",
@@ -721,30 +724,32 @@ function ConfiguredCloudLinkRow({
     <>
       {showSwitch ? (
         <SettingsRow
-          title={setting("t3-connect").title}
+          title={setting("legion-connect").title}
           description={
             connectDenial !== undefined && !managedTunnelActive
               ? connectDenial
               : signedOut
                 ? gt(
-                    "Sign in to make this environment available to your other devices through T3 Connect.",
+                    "Sign in to make this environment available to your other devices through Legion Connect.",
                   )
                 : linkRevoked
-                  ? gt("This environment was removed from T3 Connect. Turn it on to link it again.")
+                  ? gt(
+                      "This environment was removed from Legion Connect. Turn it on to link it again.",
+                    )
                   : managedTunnelActive
                     ? reachability?.status === "unreachable"
-                      ? gt("T3 Connect is on, but other devices cannot reach this environment.")
+                      ? gt("Legion Connect is on, but other devices cannot reach this environment.")
                       : reachability?.status === "reachable"
                         ? gt(
-                            "This environment is available to your other devices through T3 Connect.",
+                            "This environment is available to your other devices through Legion Connect.",
                           )
-                        : gt("T3 Connect is on. Reachability has not been checked yet.")
+                        : gt("Legion Connect is on. Reachability has not been checked yet.")
                     : managedTunnelOutOfSync
                       ? gt(
-                          "T3 Connect is out of sync. This environment is linked only to publish agent activity, so other devices cannot connect. Turn T3 Connect on to repair it.",
+                          "Legion Connect is out of sync. This environment is linked only to publish agent activity, so other devices cannot connect. Turn Legion Connect on to repair it.",
                         )
                       : gt(
-                          "Make this environment available to your other devices through T3 Connect.",
+                          "Make this environment available to your other devices through Legion Connect.",
                         )
           }
           status={operationError ?? cloudLinkState.error ?? reachabilityStatus}
@@ -763,20 +768,22 @@ function ConfiguredCloudLinkRow({
           }
         >
           {signedOut || connectDenial !== undefined ? null : (
-            <T3ConnectTunnelUsage tunnelLimit={tunnelLimit} />
+            <LegionConnectTunnelUsage tunnelLimit={tunnelLimit} />
           )}
         </SettingsRow>
       ) : linkRevoked ? (
         <SettingsRow
-          title={setting("t3-connect").title}
+          title={setting("legion-connect").title}
           description={gt(
-            "This environment was removed from T3 Connect. Run `t3 connect link` on the host to link it again.",
+            "This environment was removed from Legion Connect. Run `legioncode connect link` on the host to link it again.",
           )}
         />
       ) : (
         <SettingsRow
-          title={setting("t3-connect").title}
-          description={gt("Run `t3 connect link` on the host, then restart T3 Code there.")}
+          title={setting("legion-connect").title}
+          description={gt(
+            "Run `legioncode connect link` on the host, then restart LegionCode there.",
+          )}
         />
       )}
       {signedOut && showSwitch ? null : (
@@ -785,7 +792,9 @@ function ConfiguredCloudLinkRow({
           description={
             signedOut
               ? gt("Sign in to send activity to mobile notifications and Live Activities.")
-              : gt("Send activity to mobile notifications and Live Activities without T3 Connect.")
+              : gt(
+                  "Send activity to mobile notifications and Live Activities without Legion Connect.",
+                )
           }
           managed={connectDenial}
           control={
@@ -807,7 +816,7 @@ function ConfiguredCloudLinkRow({
         <SettingsRow
           title={setting("hold-webhooks-while-offline").title}
           description={gt(
-            "Keep webhook requests for up to 24 hours while this environment is offline, then deliver them. Off: T3 Connect only forwards requests and stores nothing.",
+            "Keep webhook requests for up to 24 hours while this environment is offline, then deliver them. Off: Legion Connect only forwards requests and stores nothing.",
           )}
           managed={connectDenial}
           control={
@@ -825,12 +834,12 @@ function ConfiguredCloudLinkRow({
         <SettingsRow
           title={setting("connect-device-approval").title}
           description={gt(
-            "Devices that sign in to your T3 Connect account wait until someone already connected here approves them.",
+            "Devices that sign in to your Legion Connect account wait until someone already connected here approves them.",
           )}
           managed={connectDenial}
           control={
             <CloudLinkSwitch
-              ariaLabel={gt("Require approval for new T3 Connect devices")}
+              ariaLabel={gt("Require approval for new Legion Connect devices")}
               checked={connectDeviceApproval.required}
               disabled={!connectDeviceApproval.canManage}
               disabledReason={
@@ -871,7 +880,7 @@ export function CloudLinkRow({
   if (!canReadRelay) {
     return (
       <SettingsRow
-        title={gt("T3 Connect")}
+        title={gt("Legion Connect")}
         description={gt(
           "To edit these settings, pair this connection with both View relay and Manage relay permissions.",
         )}
@@ -901,7 +910,7 @@ function EmptyRemoteEnvironments({ cloudEnabled = true }: { readonly cloudEnable
         <EmptyDescription>
           {cloudEnabled
             ? gt(
-                "Click “Add environment” to pair another environment, or connect one from T3 Connect.",
+                "Click “Add environment” to pair another environment, or connect one from Legion Connect.",
               )
             : gt("Click “Add environment” to pair another environment.")}
         </EmptyDescription>

@@ -1,8 +1,12 @@
-import type { EnvironmentConnectionPhase } from "@t3tools/client-runtime/connection";
-import { availableScratchWorkspaceRoot } from "@t3tools/client-runtime/operations/projects";
-import { isPickableProjectMember } from "@t3tools/client-runtime/state/project-grouping";
-import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
-import { repositoryGroupingKeyOf, type EnvironmentId, type ServerConfig } from "@t3tools/contracts";
+import type { EnvironmentConnectionPhase } from "@legioncode/client-runtime/connection";
+import { availableScratchWorkspaceRoot } from "@legioncode/client-runtime/operations/projects";
+import { isPickableProjectMember } from "@legioncode/client-runtime/state/project-grouping";
+import type { EnvironmentProject } from "@legioncode/client-runtime/state/shell";
+import {
+  repositoryGroupingKeyOf,
+  type EnvironmentId,
+  type ServerConfig,
+} from "@legioncode/contracts";
 
 import { scopedProjectKey } from "../../lib/scopedEntities";
 import type { HomeProjectScope } from "../home/homeThreadList";

@@ -1,5 +1,5 @@
-import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import { errorDisplayMessage } from "@t3tools/client-runtime/errors";
+import { settlePromise, squashAtomCommandFailure } from "@legioncode/client-runtime/state/runtime";
+import { errorDisplayMessage } from "@legioncode/client-runtime/errors";
 import * as Dialog from "../components/ui/Dialog";
 import type { MediaActionsSource } from "../lib/mediaActionsSource";
 import { useNavigation } from "@react-navigation/native";
@@ -8,13 +8,13 @@ import { m } from "../i18n/messages";
 import {
   formatFilePathForClipboard,
   type MediaActionId,
-} from "@t3tools/client-runtime/media-actions";
+} from "@legioncode/client-runtime/media-actions";
 import {
   AuthFilesystemReadScope,
   type EnvironmentId,
   sessionGrantsScope,
   type SessionGrantInput,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import { normalizeNativeMarkdownUrl } from "../lib/markdownLinks";
 import { AsyncResult } from "effect/reactivity";
 import * as Haptics from "expo-haptics";
@@ -64,7 +64,7 @@ export function useMediaActions(source: MediaActionsSource | undefined, onOpenFi
   );
   const controller = useRef<AbortController | null>(null);
   const [busy, setBusy] = useState<"share" | "save-image" | null>(null);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- aborts the in-flight media task when the component unmounts
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- aborts the in-flight media task when the component unmounts
   useEffect(() => () => controller.current?.abort(), []);
 
   const run = (

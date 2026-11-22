@@ -1,10 +1,13 @@
-import { resolveFilesystemReadAccess } from "@t3tools/client-runtime/state/filesystem";
-import { isScratchProject } from "@t3tools/client-runtime/state/projects";
-import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
-import type { ProjectReadFileResult } from "@t3tools/contracts";
-import { DEFAULT_SERVER_SETTINGS, T3_PROJECT_FILE_NAME } from "@t3tools/contracts";
-import { resolveNewThreadEnvMode, resolveProjectSettings } from "@t3tools/shared/projectSettings";
-import { parseT3ProjectFile } from "@t3tools/shared/t3ProjectFile";
+import { resolveFilesystemReadAccess } from "@legioncode/client-runtime/state/filesystem";
+import { isScratchProject } from "@legioncode/client-runtime/state/projects";
+import type { EnvironmentProject } from "@legioncode/client-runtime/state/shell";
+import type { ProjectReadFileResult } from "@legioncode/contracts";
+import { DEFAULT_SERVER_SETTINGS, LEGION_PROJECT_FILE_NAME } from "@legioncode/contracts";
+import {
+  resolveNewThreadEnvMode,
+  resolveProjectSettings,
+} from "@legioncode/shared/projectSettings";
+import { parseLegionProjectFile } from "@legioncode/shared/legionProjectFile";
 
 import { m } from "../../i18n/messages";
 import { useEnvironmentServerConfig } from "../../state/entities";
@@ -15,7 +18,7 @@ import { useEnvironmentQuery } from "../../state/query";
 import { environmentSession } from "../../state/session";
 
 /**
- * A project's new-task defaults: server settings merged with its t3.json. The
+ * A project's new-task defaults: server settings merged with its legioncode.json. The
  * new-task flow and the home pending-drafts list both read the default
  * workspace mode here, so a draft that never picked one shows what it sends.
  * Every read is a shared per-environment or per-project atom.
@@ -39,28 +42,30 @@ export function useNewTaskProjectDefaults(project: EnvironmentProject | null) {
     m,
   );
   const fileAccessPending = hasWorkspace && fileAccess.isPending;
-  const t3ProjectFileQuery = useEnvironmentQuery(
+  const legionProjectFileQuery = useEnvironmentQuery(
     fileAccess.canReadFiles && hasWorkspace
       ? projectEnvironment.readFile({
           environmentId: project.environmentId,
           input: {
             cwd: project.workspaceRoot,
-            relativePath: T3_PROJECT_FILE_NAME,
+            relativePath: LEGION_PROJECT_FILE_NAME,
             allowMissing: true,
           },
         })
       : null,
   );
-  const t3ProjectFileData = t3ProjectFileQuery.data as ProjectReadFileResult | null;
-  const t3ProjectFile =
-    t3ProjectFileData === null || t3ProjectFileData.exists === false || t3ProjectFileData.truncated
+  const legionProjectFileData = legionProjectFileQuery.data as ProjectReadFileResult | null;
+  const legionProjectFile =
+    legionProjectFileData === null ||
+    legionProjectFileData.exists === false ||
+    legionProjectFileData.truncated
       ? null
-      : parseT3ProjectFile(t3ProjectFileData.contents);
+      : parseLegionProjectFile(legionProjectFileData.contents);
   const projectSettings = resolveProjectSettings(
     serverConfig?.settings ?? DEFAULT_SERVER_SETTINGS,
     project?.id ?? null,
     project,
-    t3ProjectFile,
+    legionProjectFile,
   );
   const projectHasThreads = useProjectHasThreads(project);
   const defaultWorkspaceMode = isScratch
@@ -71,10 +76,10 @@ export function useNewTaskProjectDefaults(project: EnvironmentProject | null) {
         newProjectsRoot: serverConfig?.newProjectsRoot,
         projectHasThreads,
       });
-  // While t3.json loads, the environment default is provisional; t3.json may replace it.
+  // While legioncode.json loads, the environment default is provisional; legioncode.json may replace it.
   const defaultWorkspaceModeSettled =
     projectSettings.sources.defaultThreadEnvMode !== "environment" ||
-    (!t3ProjectFileQuery.isPending && !fileAccessPending);
+    (!legionProjectFileQuery.isPending && !fileAccessPending);
   return {
     serverConfig,
     isScratch,

@@ -1,4 +1,4 @@
-import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
+import type { EnvironmentId, ProjectId } from "@legioncode/contracts";
 
 interface FilterProject {
   readonly id: ProjectId;

@@ -1,5 +1,5 @@
-import { scopeThreadRef } from "@t3tools/client-runtime/environment";
-import { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { scopeThreadRef } from "@legioncode/client-runtime/environment";
+import { EnvironmentId, ThreadId } from "@legioncode/contracts";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
 
 import {

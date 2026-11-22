@@ -1,4 +1,4 @@
-import { cloudSpeechLanguages, effectiveSpeechLanguage } from "@t3tools/shared/speech";
+import { cloudSpeechLanguages, effectiveSpeechLanguage } from "@legioncode/shared/speech";
 import {
   requireCloudSpeechKey,
   transcribeCloudPcm,
@@ -10,10 +10,10 @@ import {
   type VoiceInputErrorCode,
   VoiceTranscriptionError,
   type VoiceTranscriptionOptions,
-} from "@t3tools/client-runtime/voice-input";
-import type { PreparedConnection } from "@t3tools/client-runtime/connection";
-import type { SpeechTranscriptionOptions, SpeechStreamText } from "@t3tools/contracts";
-import type { CloudSpeechModelId, CloudSpeechProvider } from "@t3tools/contracts";
+} from "@legioncode/client-runtime/voice-input";
+import type { PreparedConnection } from "@legioncode/client-runtime/connection";
+import type { SpeechTranscriptionOptions, SpeechStreamText } from "@legioncode/contracts";
+import type { CloudSpeechModelId, CloudSpeechProvider } from "@legioncode/contracts";
 import * as Schema from "effect/Schema";
 
 import { createBrowserPcmCapture } from "./browserPcmCapture";

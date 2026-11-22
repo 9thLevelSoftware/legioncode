@@ -1,8 +1,8 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { ProviderInstanceId } from "@t3tools/contracts";
-import { totalTokens } from "@t3tools/provider-core/server/usage";
-import * as HostProcess from "@t3tools/shared/HostProcess";
-import { SpawnExecutableResolution } from "@t3tools/shared/shell";
+import { ProviderInstanceId } from "@legioncode/contracts";
+import { totalTokens } from "@legioncode/provider-core/server/usage";
+import * as HostProcess from "@legioncode/shared/HostProcess";
+import { SpawnExecutableResolution } from "@legioncode/shared/shell";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";

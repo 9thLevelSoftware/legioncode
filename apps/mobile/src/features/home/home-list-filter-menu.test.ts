@@ -1,4 +1,4 @@
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { EnvironmentId } from "@legioncode/contracts";
 import { expect, it } from "vite-plus/test";
 
 import type { WorkspaceEnvironment } from "../../state/workspaceModel";

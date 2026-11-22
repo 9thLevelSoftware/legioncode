@@ -1,10 +1,10 @@
-import type { EnvironmentId, RunId, ThreadId } from "@t3tools/contracts";
+import type { EnvironmentId, RunId, ThreadId } from "@legioncode/contracts";
 import { msg } from "gt-react-native";
-import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";
+import { assistantCitationsToPlainText } from "@legioncode/shared/assistantCitations";
 import {
   isAttachmentOnlyBootstrapPrompt,
   replaceComposerContextReferences,
-} from "@t3tools/shared/composerContextReferences";
+} from "@legioncode/shared/composerContextReferences";
 
 export const REMOVE_QUEUED_MESSAGE_ACCESSIBILITY_LABEL = msg("Remove queued message");
 

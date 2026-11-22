@@ -5,7 +5,7 @@ import {
   EnvironmentId,
   type AuthMcpClientAccess,
   type ExecutionEnvironmentDescriptor,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -85,7 +85,9 @@ export const servePeer = <E, R>(
       Layer.provide(Sqlite.layerMemory),
       Layer.provideMerge(ServerSecretStore.layer),
       Layer.provideMerge(ServerEnvironment.layerIdentity),
-      Layer.provideMerge(ServerConfig.layerTest(process.cwd(), { prefix: "t3-peer-link-peer-" })),
+      Layer.provideMerge(
+        ServerConfig.layerTest(process.cwd(), { prefix: "legion-peer-link-peer-" }),
+      ),
       Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
       Layer.fresh,
       Layer.build,
@@ -94,7 +96,7 @@ export const servePeer = <E, R>(
       (httpEffect) =>
         Effect.gen(function* () {
           const request = yield* HttpServerRequest.HttpServerRequest;
-          if (request.url.startsWith("/.well-known/t3/environment")) {
+          if (request.url.startsWith("/.well-known/legioncode/environment")) {
             yield* Ref.update(probes, (count) => count + 1);
             if (yield* Ref.get(asleep)) {
               yield* Queue.offer(unanswered, undefined);
@@ -175,7 +177,7 @@ export const servePeer = <E, R>(
         .listSessions()
         .pipe(
           Effect.map((sessions) =>
-            sessions.filter((session) => session.client.label?.startsWith("T3 Code · ")),
+            sessions.filter((session) => session.client.label?.startsWith("LegionCode · ")),
           ),
         ),
     };
@@ -209,7 +211,7 @@ export const layerLinkingEnvironment = <E = never>(
         getDescriptor: Effect.succeed(descriptor),
       }),
     ),
-    Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "t3-peer-link-here-" })),
+    Layer.provide(ServerConfig.layerTest(process.cwd(), { prefix: "legion-peer-link-here-" })),
     Layer.provideMerge(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)),
     Layer.fresh,
   );

@@ -1,18 +1,18 @@
 import { T, msg, useGT } from "gt-react";
-import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { thrownErrorMessage } from "@legioncode/client-runtime/errors";
 import { m, type MessageResolver } from "~/i18n/messages";
 import {
   type OrchestrationV2LimitRecovery,
   type OrchestrationV2LimitRecoveryUpdate,
   type RunId,
-} from "@t3tools/contracts";
-import { type TimestampFormat } from "@t3tools/contracts/settings";
-import { deadlineStore } from "@t3tools/client-runtime/clock";
-import { limitRecoveryOwnsSnooze } from "@t3tools/client-runtime/state/thread-execution";
+} from "@legioncode/contracts";
+import { type TimestampFormat } from "@legioncode/contracts/settings";
+import { deadlineStore } from "@legioncode/client-runtime/clock";
+import { limitRecoveryOwnsSnooze } from "@legioncode/client-runtime/state/thread-execution";
 import {
   CHATGPT_USAGE_LIMIT_CODE,
   CHATGPT_WORKSPACE_USAGE_LIMIT_CODE,
-} from "@t3tools/shared/usageLimits";
+} from "@legioncode/shared/usageLimits";
 import { GaugeIcon } from "lucide-react";
 import { useState } from "react";
 import { useDeadlinePassed } from "../../hooks/useDeadline";

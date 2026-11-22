@@ -1,14 +1,14 @@
-import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { thrownErrorMessage } from "@legioncode/client-runtime/errors";
 import { m } from "~/i18n/messages";
-import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { scopeProjectRef, scopeThreadRef } from "@legioncode/client-runtime/environment";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
-import type { EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
-import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
-import { promptLinkAppPath } from "@t3tools/shared/promptLinks";
-import { readPairingAppLink, resolveRemotePairingTarget } from "@t3tools/shared/remote";
+} from "@legioncode/client-runtime/state/runtime";
+import type { EnvironmentId, ScopedThreadRef } from "@legioncode/contracts";
+import { sourceControlClients } from "@legioncode/client-runtime/source-control-clients";
+import { promptLinkAppPath } from "@legioncode/shared/promptLinks";
+import { readPairingAppLink, resolveRemotePairingTarget } from "@legioncode/shared/remote";
 import { useRouter } from "@tanstack/react-router";
 import * as Effect from "effect/Effect";
 import { AtomRegistry } from "effect/reactivity";
@@ -253,7 +253,7 @@ export function DesktopWebLinkCoordinator() {
     });
   });
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to desktop web link opens over the bridge and marks the renderer ready
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- subscribes to desktop web link opens over the bridge and marks the renderer ready
   useEffect(() => {
     if (!ready || webLinks === undefined) return;
     let subscribed = true;

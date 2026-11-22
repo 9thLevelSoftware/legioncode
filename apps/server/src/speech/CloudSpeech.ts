@@ -11,9 +11,9 @@ import {
   type CloudSpeechProvider,
   EnvironmentSpeechTranscriptionResult,
   type SpeechTranscriptionOptions,
-} from "@t3tools/contracts";
-import * as SecretResolver from "@t3tools/secret-provider-core/server/SecretResolver";
-import { cloudSpeechLanguages, effectiveSpeechLanguage } from "@t3tools/shared/speech";
+} from "@legioncode/contracts";
+import * as SecretResolver from "@legioncode/secret-provider-core/server/SecretResolver";
+import { cloudSpeechLanguages, effectiveSpeechLanguage } from "@legioncode/shared/speech";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -118,7 +118,7 @@ export class CloudSpeech extends Context.Service<
       model?: string | undefined,
     ) => Effect.Effect<string, CloudSpeechError | SpeechInvalidAudioError | ServerSettingsError>;
   }
->()("t3/speech/CloudSpeech") {}
+>()("legioncode/speech/CloudSpeech") {}
 
 export const layer = Layer.effect(
   CloudSpeech,

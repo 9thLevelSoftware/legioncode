@@ -3,18 +3,18 @@ import {
   type ProjectId,
   type ScopedThreadRef,
   type ThreadPullRequestLink,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   sourceControlClients,
   UNKNOWN_SOURCE_CONTROL_CLIENT,
-} from "@t3tools/client-runtime/source-control-clients";
+} from "@legioncode/client-runtime/source-control-clients";
 import {
   type PullRequestListLine,
   pullRequestListLines,
   resolveThreadPullRequestChains,
   visibleThreadPullRequests,
-} from "@t3tools/client-runtime/thread-pull-requests";
-import { canStartThreadPullRequestWatch } from "@t3tools/client-runtime/thread-pull-request-compatibility";
+} from "@legioncode/client-runtime/thread-pull-requests";
+import { canStartThreadPullRequestWatch } from "@legioncode/client-runtime/thread-pull-request-compatibility";
 import {
   ArrowUpRightIcon,
   EyeIcon,
@@ -32,7 +32,7 @@ import {
   encodePullRequestDragPayload,
 } from "~/components/chat/composerMentionDrag";
 import { writeTextToClipboard } from "~/hooks/useCopyToClipboard";
-import { findProjectForChangeRequest } from "@t3tools/client-runtime/change-request-links";
+import { findProjectForChangeRequest } from "@legioncode/client-runtime/change-request-links";
 import { pullRequestLinkPanelTarget, useOpenPrLink } from "~/lib/openPullRequestLink";
 import { useClientSettings } from "~/hooks/useSettings";
 import { usePrimaryEnvironmentId } from "~/state/environments";

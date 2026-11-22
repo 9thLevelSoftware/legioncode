@@ -1,6 +1,6 @@
-import { pullRequestFilterProjects } from "@t3tools/client-runtime/pull-request-project-filter";
-import type { EnvironmentProject } from "@t3tools/client-runtime/state/models";
-import type { EnvironmentId, ProjectId } from "@t3tools/contracts";
+import { pullRequestFilterProjects } from "@legioncode/client-runtime/pull-request-project-filter";
+import type { EnvironmentProject } from "@legioncode/client-runtime/state/models";
+import type { EnvironmentId, ProjectId } from "@legioncode/contracts";
 
 import type { IssuesSearch } from "./IssuesPage";
 

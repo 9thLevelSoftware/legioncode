@@ -5,7 +5,7 @@ import {
   DEFAULT_UNIFIED_SETTINGS,
   ProviderInstanceId,
   ServerSettings,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Duration from "effect/Duration";
 import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 import {

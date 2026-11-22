@@ -2,7 +2,7 @@ import * as NetAddress from "effect/net/NetAddress";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
-import { AgentScope } from "@t3tools/shared/AgentScope";
+import { AgentScope } from "@legioncode/shared/AgentScope";
 import {
   EnvironmentId,
   type ModelSelection,
@@ -21,7 +21,7 @@ import {
   RunId,
   ThreadId,
   TurnItemId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
@@ -40,8 +40,8 @@ import { HttpServer } from "effect/http";
 import { ProviderWorkspaceMissingError } from "../provider/Errors.ts";
 import * as ServerEnvironment from "../environment/ServerEnvironment.ts";
 import * as ProjectService from "../project/ProjectService.ts";
-import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
-import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
+import * as McpProviderSession from "@legioncode/provider-core/server/mcpSession";
+import * as McpProviderSessions from "@legioncode/provider-core/server/McpProviderSessions";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
@@ -51,7 +51,7 @@ import {
 } from "./Adapters/CodexAdapterV2.ts";
 import * as EventSink from "./EventSink.ts";
 import * as EventStore from "./EventStore.ts";
-import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import * as IdAllocator from "@legioncode/provider-core/server/IdAllocator";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
 import * as ProviderEventIngestor from "./ProviderEventIngestor.ts";
@@ -61,11 +61,11 @@ import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
 import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
 import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import * as CommandOutputHub from "./CommandOutputHub.ts";
-import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import * as ProviderAdapter from "@legioncode/provider-core/server/ProviderAdapter";
 import {
   makeProviderFailure,
   makeProviderRetryTurnItem,
-} from "@t3tools/provider-core/server/failure";
+} from "@legioncode/provider-core/server/failure";
 
 const layerTestDatabase = SqlitePersistence.layerMemory;
 const layerTestStores = Layer.merge(EventStore.layer, ProjectionStore.layer).pipe(
@@ -3411,7 +3411,7 @@ const openSessionWithBackgroundCommand = (fixtureName: string) =>
         completedAt: status === "completed" ? startedAt : null,
         updatedAt: startedAt,
         type: "dynamic_tool",
-        toolName: "mcp__t3-code__t3_worktree_handoff",
+        toolName: "mcp__legion_code__legion_worktree_handoff",
         input: {},
       }) satisfies OrchestrationV2TurnItem;
     const seededToolCalls = {
@@ -3614,7 +3614,7 @@ it.effect.each(["detach", "stream failure", "provider stop", "early close"] as c
         assert.equal(
           Exit.isFailure(consumed)
             ? (Cause.squash(consumed.cause) as ProviderAdapter.ProviderAdapterEventStreamError)
-                .raisedByT3
+                .raisedByLegion
             : undefined,
           Exit.isFailure(consumed) ? true : undefined,
         );

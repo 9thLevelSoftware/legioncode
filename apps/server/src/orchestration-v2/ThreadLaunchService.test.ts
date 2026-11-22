@@ -31,7 +31,7 @@ import {
   TextGenerationError,
   ServerSettingsError,
   VcsProcessExitError,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as DateTime from "effect/DateTime";
@@ -64,7 +64,7 @@ import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as CommandReceiptStore from "./CommandReceiptStore.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as EffectOutbox from "./EffectOutbox.ts";
-import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import * as IdAllocator from "@legioncode/provider-core/server/IdAllocator";
 import * as ProviderAdapterRegistry from "./ProviderAdapterRegistry.ts";
 import * as ThreadLaunch from "./ThreadLaunchService.ts";
 import * as GitVcsDriver from "../vcs/GitVcsDriver.ts";
@@ -72,7 +72,7 @@ import * as ThreadManagement from "./ThreadManagementService.ts";
 import * as ThreadTitleRegeneration from "./ThreadTitleRegenerationService.ts";
 import * as ProviderReplayHarness from "./testkit/ProviderReplayHarness.ts";
 import * as RemoteDelegation from "../peer/RemoteDelegation.ts";
-import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import type * as ProviderAdapter from "@legioncode/provider-core/server/ProviderAdapter";
 
 const projectId = ProjectId.make("project:launch-test");
 const otherProjectId = ProjectId.make("project:launch-other");
@@ -1137,7 +1137,7 @@ it.effect(
       );
       const projection = yield* preparationSettled(launched.threadId);
       assert.equal(projection.runs[0]?.status, "starting");
-      assert.match(projection.thread.branch!, /^t3\/[0-9a-f]{8}$/);
+      assert.match(projection.thread.branch!, /^legion\/[0-9a-f]{8}$/);
       assert.equal(harness.createWorktree.mock.calls[0]?.[0]?.newRefName, projection.thread.branch);
       assert.equal(harness.runSetup.mock.calls.length, 1);
       assert.equal(harness.renameBranch.mock.calls.length, 0);
@@ -2557,9 +2557,9 @@ it.effect("creates a strong provider-thread mapping for an imported native sessi
 
 it.effect("shared intake preserves durable attachment bytes after a lost launch result", () => {
   const harness = makeHarness();
-  const layerFiles = ServerConfig.layerTest(process.cwd(), { prefix: "t3-message-intake-" }).pipe(
-    Layer.provideMerge(DocumentText.layer.pipe(Layer.provideMerge(NodeServices.layer))),
-  );
+  const layerFiles = ServerConfig.layerTest(process.cwd(), {
+    prefix: "legion-message-intake-",
+  }).pipe(Layer.provideMerge(DocumentText.layer.pipe(Layer.provideMerge(NodeServices.layer))));
   return Effect.gen(function* () {
     const config = yield* ServerConfig.ServerConfig;
     const fs = yield* FileSystem.FileSystem;
@@ -2585,7 +2585,7 @@ it.effect("shared intake preserves durable attachment bytes after a lost launch 
       ...launchInput({ command: "intake-launch", thread: "intake-thread" }),
       initialMessage: {
         messageId: MessageId.make("intake-first"),
-        text: "First [file](t3-context://v1/file/intake-file)",
+        text: "First [file](legion-context://v1/file/intake-file)",
         context: {
           version: 1 as const,
           records: [
@@ -3292,10 +3292,10 @@ it.effect("leaves uncertain Git detection failures to workspace preparation", ()
 );
 
 it.effect.each([
-  { name: "is missing", baseRef: "t3/renamed", startFromOrigin: false, origin: true },
+  { name: "is missing", baseRef: "legion/renamed", startFromOrigin: false, origin: true },
   {
     name: "has no origin to come from",
-    baseRef: "t3/renamed",
+    baseRef: "legion/renamed",
     startFromOrigin: true,
     origin: false,
   },
@@ -3353,7 +3353,7 @@ it.effect("refuses a new worktree whose explicit branch already exists", () =>
     const git = yield* GitVcsDriver.GitVcsDriver;
     const directory = yield* fs.makeTempDirectoryScoped({ prefix: "launch-branch-exists-" });
     const cwd = `${directory}/repo`;
-    const temporaryBranch = "t3code/0b5e7a1c-3f2d-4e8a-9b6c-1d2e3f4a5b6c";
+    const temporaryBranch = "legioncode/0b5e7a1c-3f2d-4e8a-9b6c-1d2e3f4a5b6c";
     yield* fs.makeDirectory(cwd);
     const command = (args: string[]) => git.execute({ operation: "launch-test", cwd, args });
     yield* command(["init", "-b", "main"]);
@@ -3452,7 +3452,7 @@ it.effect.each([
 
 it.effect("replays an accepted send after the project disables the instance", () => {
   const harness = makeHarness();
-  const layerFiles = ServerConfig.layerTest(process.cwd(), { prefix: "t3-send-retry-" }).pipe(
+  const layerFiles = ServerConfig.layerTest(process.cwd(), { prefix: "legion-send-retry-" }).pipe(
     Layer.provideMerge(DocumentText.layer.pipe(Layer.provideMerge(NodeServices.layer))),
   );
   return Effect.gen(function* () {

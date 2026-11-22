@@ -1,6 +1,6 @@
 import { assert, it } from "@effect/vitest";
-import { ProviderDriverKind } from "@t3tools/contracts";
-import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import { ProviderDriverKind } from "@legioncode/contracts";
+import * as IdAllocator from "@legioncode/provider-core/server/IdAllocator";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as SqlClient from "effect/sql/SqlClient";

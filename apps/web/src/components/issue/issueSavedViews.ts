@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 import { msg } from "gt-react";
-import { SavedViewIdentity } from "@t3tools/client-runtime/saved-views";
+import { SavedViewIdentity } from "@legioncode/client-runtime/saved-views";
 
 import type { SavedView, SavedViewsKind } from "../SavedViewsMenu";
 import {
@@ -21,7 +21,7 @@ export function issueViewMatches(
 }
 
 export const ISSUE_SAVED_VIEWS = {
-  storageKey: "t3.issues.savedViews",
+  storageKey: "legion.issues.savedViews",
   schema: Schema.Array(
     Schema.Struct({ ...SavedViewIdentity.fields, preferences: IssueListPreferencesSchema }),
   ),

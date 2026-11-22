@@ -1,0 +1,19 @@
+DESCRIPTION
+  Approve the waiting Legion Connect device that shows this code.
+
+USAGE
+  legioncode auth connect-device approve [flags] <code>
+
+ARGUMENTS
+  code string    The code the device shows, such as `K7QM-2XFD`.
+
+FLAGS
+  --base-dir string    Explicit LegionCode data directory; runtime state is stored under userdata (equivalent to LEGIONCODE_HOME).
+  --dev-url string     Dev web URL to proxy/redirect to (equivalent to VITE_DEV_SERVER_URL).
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)

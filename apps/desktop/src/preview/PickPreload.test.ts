@@ -51,12 +51,12 @@ it("switches tools from the keyboard after a toolbar button is clicked", () => {
 
   region.focus();
   region.click();
-  expect(document.documentElement.getAttribute("data-t3code-annotation-tool")).toBe("marquee");
+  expect(document.documentElement.getAttribute("data-legioncode-annotation-tool")).toBe("marquee");
 
   region.dispatchEvent(new KeyboardEvent("keydown", { key: "v", bubbles: true, composed: true }));
 
   expect(
-    document.documentElement.getAttribute("data-t3code-annotation-tool"),
+    document.documentElement.getAttribute("data-legioncode-annotation-tool"),
     "V should switch to Select while focus is on a toolbar button",
   ).toBe("select");
 });
@@ -69,7 +69,7 @@ it("keeps the tool while typing a tool key in the comment", () => {
   comment.focus();
   comment.dispatchEvent(new KeyboardEvent("keydown", { key: "r", bubbles: true, composed: true }));
 
-  expect(document.documentElement.getAttribute("data-t3code-annotation-tool")).toBe("select");
+  expect(document.documentElement.getAttribute("data-legioncode-annotation-tool")).toBe("select");
 });
 
 it("keeps comment keystrokes away from the page's capture-phase shortcuts", () => {
@@ -202,14 +202,14 @@ it("uses the registered main-world element inspector when isolated React lookup 
     return: null,
   };
   registerMainWorldElementInspector((element) => {
-    element.setAttribute("data-t3code-pick-inspect", "tok-1");
+    element.setAttribute("data-legioncode-pick-inspect", "tok-1");
     try {
       const inspect = new Function(
-        `return ${buildMainWorldReactInspectScript("data-t3code-pick-inspect", "tok-1")}`,
+        `return ${buildMainWorldReactInspectScript("data-legioncode-pick-inspect", "tok-1")}`,
       );
       return Promise.resolve(inspect() as ReturnType<typeof Object> | null) as never;
     } finally {
-      element.removeAttribute("data-t3code-pick-inspect");
+      element.removeAttribute("data-legioncode-pick-inspect");
     }
   });
   using _rect = vi

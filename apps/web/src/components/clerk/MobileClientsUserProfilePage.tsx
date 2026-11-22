@@ -1,4 +1,4 @@
-import type { RelayClientDeviceRecord } from "@t3tools/contracts/relay";
+import type { RelayClientDeviceRecord } from "@legioncode/contracts/relay";
 import { T, useGT, useMessages } from "gt-react";
 import { SmartphoneIcon } from "lucide-react";
 
@@ -107,8 +107,8 @@ function EmptyMobileClients() {
         </EmptyTitle>
         <EmptyDescription>
           <T>
-            Install T3 Code on your phone and sign in to T3 Connect to get push notifications and
-            Live Activities.
+            Install LegionCode on your phone and sign in to Legion Connect to get push notifications
+            and Live Activities.
           </T>
         </EmptyDescription>
       </EmptyHeader>

@@ -1,4 +1,4 @@
-import { errorDisplayMessage } from "@t3tools/client-runtime/errors";
+import { errorDisplayMessage } from "@legioncode/client-runtime/errors";
 import * as Dialog from "../../components/ui/Dialog";
 import {
   StackActions,
@@ -6,26 +6,26 @@ import {
   type PartialState,
   type StackActionType,
 } from "@react-navigation/native";
-import { availableScratchWorkspaceRoot } from "@t3tools/client-runtime/operations/projects";
+import { availableScratchWorkspaceRoot } from "@legioncode/client-runtime/operations/projects";
 import {
   findPromptLinkProjects,
   findPromptLinkPullRequestThread,
   resolvePromptLinkModelSelection,
-} from "@t3tools/client-runtime/prompt-links";
+} from "@legioncode/client-runtime/prompt-links";
 import {
   executeAtomQuery,
   isAtomCommandInterrupted,
   runAtomCommand,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
-import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
-import type { EnvironmentId, ThreadId } from "@t3tools/contracts";
+} from "@legioncode/client-runtime/state/runtime";
+import type { EnvironmentProject } from "@legioncode/client-runtime/state/shell";
+import type { EnvironmentId, ThreadId } from "@legioncode/contracts";
 import type {
   LinkedPrompt,
   PromptLinkPullRequest,
   PromptLinkRepository,
-} from "@t3tools/shared/promptLinks";
-import { parseNewThreadLink } from "@t3tools/shared/promptLinksCopy";
+} from "@legioncode/shared/promptLinks";
+import { parseNewThreadLink } from "@legioncode/shared/promptLinksCopy";
 import { Atom, type AsyncResult } from "effect/reactivity";
 import { msg } from "gt-react-native";
 

@@ -3,9 +3,9 @@ import {
   fetchRemoteSessionState,
   RemoteEnvironmentAuthUndeclaredStatusError,
   type RemoteEnvironmentAuthError,
-} from "@t3tools/client-runtime/authorization";
-import { fetchRemoteEnvironmentDescriptor } from "@t3tools/client-runtime/environment";
-import { SshConnectionProfile, sshTargetKey } from "@t3tools/client-runtime/connection";
+} from "@legioncode/client-runtime/authorization";
+import { fetchRemoteEnvironmentDescriptor } from "@legioncode/client-runtime/environment";
+import { SshConnectionProfile, sshTargetKey } from "@legioncode/client-runtime/connection";
 import {
   EnvironmentAuthInvalidError,
   DesktopDiscoveredSshHostSchema,
@@ -25,9 +25,9 @@ import {
   AuthAccessTokenResult,
   AuthSessionState,
   type EnvironmentId,
-} from "@t3tools/contracts";
-import { SshHttpBridgeError } from "@t3tools/ssh/errors";
-import { resolveLoopbackSshHttpBaseUrl } from "@t3tools/ssh/tunnel";
+} from "@legioncode/contracts";
+import { SshHttpBridgeError } from "@legioncode/ssh/errors";
+import { resolveLoopbackSshHttpBaseUrl } from "@legioncode/ssh/tunnel";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";

@@ -5,7 +5,7 @@ import {
   AuthOrchestrationReadScope,
   AuthSessionId,
   AuthTerminalOperateScope,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as NodeNet from "node:net";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
@@ -49,7 +49,7 @@ const serveTunnel = (sessionInvalidated: Effect.Effect<void> = Effect.never) =>
         Layer.provide(PreviewTunnel.layer),
         Layer.provide(
           Layer.mock(SessionStore.SessionStore, {
-            cookieName: "t3_session",
+            cookieName: "legioncode_session",
             legacyCookieName: undefined,
             awaitInvalidation: () => sessionInvalidated,
           }),

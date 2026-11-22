@@ -1,7 +1,7 @@
 import { ANDROID_PLAY_STORE_URL, GITHUB_REPOSITORY_URL, IOS_APP_STORE_URL } from "./site";
 
-export const SITE_ORIGIN = "https://t3.codes";
-export const SITE_NAME = "T3 Code";
+export const SITE_ORIGIN = "https://legion.codes";
+export const SITE_NAME = "LegionCode";
 export const SITE_TAGLINE = "The open-source control plane for coding agents";
 
 // The canonical set of official properties. Search engines and AI answer engines read `sameAs`
@@ -24,10 +24,10 @@ export const absoluteUrl = (pathname: string): string => new URL(pathname, SITE_
 export const organizationJsonLd = (): JsonLd => ({
   "@type": "Organization",
   "@id": ORGANIZATION_ID,
-  name: "T3 Tools Inc",
+  name: "9th Level Software",
   url: SITE_ORIGIN,
   logo: absoluteUrl("/apple-touch-icon.png"),
-  sameAs: ["https://github.com/pingdotgg"],
+  sameAs: ["https://github.com/9thLevelSoftware"],
 });
 
 export const websiteJsonLd = (): JsonLd => ({

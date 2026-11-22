@@ -5,7 +5,7 @@ import * as NodePath from "node:path";
 
 import { desktopDir, resolveElectronLaunchCommand } from "./electron-launcher.mjs";
 
-// oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone desktop launcher script has no Effect runtime.
+// oxlint-disable-next-line legioncode/no-global-process-runtime -- Standalone desktop launcher script has no Effect runtime.
 const hostPlatform = NodeOS.platform();
 const repoRoot = NodePath.resolve(desktopDir, "..", "..");
 
@@ -18,12 +18,12 @@ function isFile(filePath) {
 }
 
 function resolveRustDesktopBinary() {
-  const legacyFlag = process.env.T3CODE_LEGACY_ELECTRON?.trim().toLowerCase();
+  const legacyFlag = process.env.LEGIONCODE_LEGACY_ELECTRON?.trim().toLowerCase();
   if (legacyFlag === "1" || legacyFlag === "true") {
     return undefined;
   }
 
-  const binaryName = hostPlatform === "win32" ? "t3-desktop.exe" : "t3-desktop";
+  const binaryName = hostPlatform === "win32" ? "legioncode-desktop.exe" : "legioncode-desktop";
   const candidates = [
     NodePath.join(repoRoot, "rust", "dist", "desktop", binaryName),
     NodePath.join(repoRoot, "rust", "target", "release", binaryName),

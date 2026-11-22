@@ -9,7 +9,7 @@ import type {
   IssueTrackerSummary,
   SourceControlProviderKind,
   ProjectId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 
 import { mergeIssueListPage } from "./state/issues.ts";
 import { sourceControlClients } from "./sourceControlClients.ts";

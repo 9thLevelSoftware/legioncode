@@ -1,0 +1,38 @@
+DESCRIPTION
+  Set up remote access and the LegionCode background service. Access flags skip the question, and routes not named keep their settings. Without a terminal, a needed restart runs without asking and stops running agent turns.
+
+USAGE
+  legioncode up [flags]
+
+FLAGS
+  --base-dir string    Explicit LegionCode data directory; runtime state is stored under userdata (equivalent to LEGIONCODE_HOME).
+  --connect            Allow access through Legion Connect with your Legion account. Turn off with --no-connect.
+  --lan                Allow LAN and tailnet connections. Anyone there can reach the port; a pairing code is the only lock. Turn off with --no-lan.
+  --yes                Ask nothing. Keep the access settings; a new machine gets Legion Connect. A restart stops running agent turns.
+  --headless           Sign in with a URL and code on any device. Automatic without a terminal or over SSH.
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+
+EXAMPLES
+  # Choose remote access.
+  legioncode up
+
+  # Turn on Legion Connect. Keep other settings.
+  legioncode up --connect
+
+  # Allow LAN access with pairing codes.
+  legioncode up --lan
+
+  # Stop LAN access.
+  legioncode up --no-lan
+
+  # Take the defaults with no questions.
+  legioncode up --yes
+
+  # Read the settings from a script.
+  legioncode status --json

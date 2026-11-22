@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
-import { parseScopedThreadKey } from "@t3tools/client-runtime/environment";
-import { resolveListedAncestorThreadRef } from "@t3tools/client-runtime/state/threads";
+import { parseScopedThreadKey } from "@legioncode/client-runtime/environment";
+import { resolveListedAncestorThreadRef } from "@legioncode/client-runtime/state/threads";
 
 import { scopedThreadKey } from "../../lib/scopedEntities";
 import { environmentThreadShells } from "../../state/threads";

@@ -2,21 +2,21 @@
 
 ## Purpose
 
-T3 exposes V2 orchestration through its app-owned MCP endpoint. A provider
+LegionCode exposes V2 orchestration through its app-owned MCP endpoint. A provider
 agent can use this endpoint to:
 
 - create an app-owned sub-agent on any supported provider instance;
 - wait for or poll the sub-agent's durable result;
 - cancel an active delegated task; and
-- create one or more ordinary top-level T3 threads;
+- create one or more ordinary top-level LegionCode threads;
 - list a project's threads and incrementally read any thread;
 - rename threads, regenerate titles, and link or unlink pull requests;
 - send or steer follow-up messages;
 - wait for or interrupt ordinary thread runs; and
 - schedule recurring work that runs without an active turn.
 
-These are T3 orchestration operations, not provider-native sub-agent APIs.
-Delegated tasks always create a T3 child thread and run. The child receives
+These are LegionCode orchestration operations, not provider-native sub-agent APIs.
+Delegated tasks always create a LegionCode child thread and run. The child receives
 only the supplied task prompt, plus an optional role instruction supplied in
 the same tool call. Parent conversation history is not copied into the child.
 
@@ -35,14 +35,14 @@ The orchestration tools share the existing authenticated HTTP MCP endpoint:
 http://127.0.0.1:<server-port>/mcp
 ```
 
-The provider-visible server key is `t3-code`. The endpoint registers both the
-preview toolkit and the orchestration toolkit.
+The default provider-visible server key is `legion-code` (Claude uses `legion_code`).
+The endpoint registers both the preview toolkit and the orchestration toolkit.
 
 Before `ProviderSessionManager` opens a new V2 provider session, it asks
 `McpSessionRegistry` for a credential scoped to:
 
-- the T3 environment;
-- the parent T3 thread;
+- the LegionCode environment;
+- the parent LegionCode thread;
 - the concrete provider instance; and
 - the provider session.
 
@@ -59,19 +59,19 @@ check the `orchestration` capability before reading or mutating state.
 
 ### Codex V2
 
-Codex gets T3's MCP server in each thread's `thread/start`, `thread/resume`,
+Codex gets LegionCode's MCP server in each thread's `thread/start`, `thread/resume`,
 and `thread/fork` config, with the provider-session token in an
 `Authorization` header. The same server is registered twice:
 
-- `t3-code`: every tool except `t3_thread_wait` and `delegate_task`.
-- `t3-code-direct`: only `t3_thread_wait` and `delegate_task`, with
+- `legion-code`: every tool except `legion_thread_wait` and `delegate_task`.
+- `legion-code-direct`: only `legion_thread_wait` and `delegate_task`, with
   `omit_tools_from = ["code_mode", "deferred"]`.
 
 Code Mode yields a script after about 30 seconds, so the model polls a blocking
-`t3_thread_wait` or `delegate_task` with `mode: "wait"`, resending its context
+`legion_thread_wait` or `delegate_task` with `mode: "wait"`, resending its context
 on each poll. The second entry makes both direct tool calls, like Codex's own
 wait tools. Codex reports calls as `<server>.<tool>`, so
-`packages/shared/src/t3McpToolPresentation.ts` must resolve both server names.
+`packages/shared/src/legionMcpToolPresentation.ts` must resolve both server names.
 Tool display and pending-work detection depend on it.
 
 ### Claude Agent SDK V2
@@ -81,7 +81,7 @@ Claude receives an HTTP MCP server in its query options:
 ```ts
 {
   mcpServers: {
-    "t3-code": {
+    "legion_code": {
       type: "http",
       url: "http://127.0.0.1:<port>/mcp",
       headers: {
@@ -91,7 +91,7 @@ Claude receives an HTTP MCP server in its query options:
   },
   allowedTools: [
     // existing allowed tools
-    "mcp__t3-code__*",
+    "mcp__legion_code__*",
   ],
 }
 ```
@@ -152,22 +152,22 @@ provider-specific extensions; those remain in flavors such as Grok.
 
 ### Pi V2
 
-T3 keeps a provider-session HTTP bridge even when Pi supports native MCP.
+LegionCode keeps a provider-session HTTP bridge even when Pi supports native MCP.
 `mcp.json` entries override native registrations, and native MCP's default
-60-second request timeout can interrupt long-running T3 tools. The bridge owns
+60-second request timeout can interrupt long-running LegionCode tools. The bridge owns
 the injected endpoint and credential and forwards Pi's cancellation signal.
 
-When a provider session credential exists, the adapter writes a T3-owned
+When a provider session credential exists, the adapter writes a LegionCode-owned
 extension into the server cache and spawns
-`pi --mode rpc --extension <cache>/pi-t3-mcp-extension.ts` with:
+`pi --mode rpc --extension <cache>/pi-legion-mcp-extension.ts` with:
 
 ```text
-T3_MCP_URL=http://127.0.0.1:<port>/mcp
-T3_MCP_BEARER_TOKEN=<provider-session-token>
+LEGION_MCP_URL=http://127.0.0.1:<port>/mcp
+LEGION_MCP_BEARER_TOKEN=<provider-session-token>
 ```
 
-The extension preserves public names under `mcp__t3-code__` for saved loadouts
-and tool selectors. Modern Pi also receives `mcp__t3_code__` aliases, Pi's own
+The extension preserves public names under `mcp__legion-code__` for saved loadouts
+and tool selectors. Modern Pi also receives `mcp__legion_code__` aliases, Pi's own
 name for the server, which reserve it against configured MCP servers. They are
 `model-only` and hide their own declarations, so the model can call them without
 added declarations, search results, or codemode entries. An alias follows its
@@ -178,12 +178,12 @@ available; optional tools are discovered through Pi's builtin `tool_search`.
 On older Pi or without builtin search, all tools remain directly available.
 The bridge calls the original MCP tool name over HTTP. Follow-up requests send
 `mcp-protocol-version: 2025-06-18`; Effect's MCP transport returns 400
-without it. The first turn of a session also receives the shared T3
+without it. The first turn of a session also receives the shared LegionCode
 orchestration instructions.
 
-Pi keeps ownership of native extension discovery. T3 does not replace Pi's
+Pi keeps ownership of native extension discovery. LegionCode does not replace Pi's
 `subagent` tool or reproduce Pi's package and project-trust loader. Durable
-delegation goes through the namespaced T3 MCP `delegate_task` tool and the
+delegation goes through the namespaced LegionCode MCP `delegate_task` tool and the
 shared orchestration child-thread lifecycle. When Pi's example `subagent`
 extension is installed, the adapter observes its documented `details.results`
 shape and projects task cards with no child thread id. Unknown result shapes
@@ -205,7 +205,7 @@ provider selection model-visible without allowing a request that cannot run.
 `OrchestratorToolkit` in
 [`toolkits/orchestrator/tools.ts`](../../apps/server/src/mcp/toolkits/orchestrator/tools.ts)
 is the authoritative list of orchestration tools. The sections below cover
-delegation and thread tools. `t3_thread_launch` is documented with them but
+delegation and thread tools. `legion_thread_launch` is documented with them but
 registered by the project toolkit in
 [`toolkits/project/tools.ts`](../../apps/server/src/mcp/toolkits/project/tools.ts).
 
@@ -232,7 +232,7 @@ any catalog model.
 
 ### `delegate_task`
 
-Creates a T3-owned child thread and immediately dispatches the supplied task
+Creates a LegionCode-owned child thread and immediately dispatches the supplied task
 prompt.
 
 The [shared contract](../../packages/contracts/src/orchestratorMcp.ts) is authoritative for
@@ -242,7 +242,7 @@ inputs and results, including target options and linked-environment fields.
 import type {
   OrchestratorMcpDelegateTaskInput as DelegateTaskInput,
   OrchestratorMcpDelegateTaskResult as DelegateTaskResult,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 ```
 
 For local delegation, provider, model, runtime mode, and interaction mode inherit
@@ -258,7 +258,7 @@ For local delegation, use `isolation: "worktree"` for a separate prepared checko
 the parent's commit; the default `"shared"` uses the parent's checkout. Uncommitted parent
 edits are not copied. A linked-environment target (`target.environmentId`) runs in the remote
 project's checkout and rejects worktree isolation. To launch an isolated thread there, use
-`t3_thread_launch` with `environmentId` and a worktree `workspaceStrategy`.
+`legion_thread_launch` with `environmentId` and a worktree `workspaceStrategy`.
 
 A provider runs a runtime mode it does not offer as `approval-required`, so a
 child would ask for approval on every command. `orchestrator_capabilities`
@@ -271,7 +271,7 @@ Each independent delegated review round uses a new `delegate_task` call with the
 original brief, prior findings, responses, and unresolved objections. Track each
 round by its own `taskId` and use a distinct `clientRequestId` per round, stable
 across retries of that round.
-A follow-up that needs the same child's conversation goes through `t3_thread_send`
+A follow-up that needs the same child's conversation goes through `legion_thread_send`
 on its `childThreadId`. After the original task completes, that follow-up runs as a
 fresh task in the child thread; it does not reopen the completed task or change its
 published result.
@@ -287,7 +287,7 @@ the timeout expires. A wait timeout does not cancel the child; the result sets
 do not wait on the task or poll it; continue other work, and end the turn when none is
 left. A pending blocking question also ends the wait with `hasPendingQuestion: true` and
 `waitTimedOut: false`.
-If `hasPendingQuestion`, pass `threadId=childThreadId` to `t3_pending_request` with
+If `hasPendingQuestion`, pass `threadId=childThreadId` to `legion_pending_request` with
 action `list`, `read` (with `requestId`), or `respond`, or ask the user; the task's completion still wakes this thread. A pending live approval for the
 task's own unfinished work also ends the wait. Its identity appears in `pendingApproval`;
 it grants no approval authority. Read the fresh full request in the child thread before
@@ -327,10 +327,10 @@ optional cancellation reason.
 
 ### `create_threads`
 
-Creates between one and twenty ordinary top-level T3 threads:
+Creates between one and twenty ordinary top-level LegionCode threads:
 
 ```ts
-import type { OrchestratorMcpCreateThreadsInput as CreateThreadsInput } from "@t3tools/contracts";
+import type { OrchestratorMcpCreateThreadsInput as CreateThreadsInput } from "@legioncode/contracts";
 ```
 
 Each entry independently resolves provider, model, and modes. The new threads
@@ -338,9 +338,9 @@ inherit the parent's project, branch, and worktree path, but they have no
 sub-agent lineage. Entries with a prompt immediately dispatch a run; entries
 without a prompt remain idle. `create_threads` is local-only: `target.environmentId` and
 `target.projectId` are ignored even though the shared target contract accepts them. Use
-`t3_thread_launch` with `environmentId` and `projectId` to select another environment or project.
+`legion_thread_launch` with `environmentId` and `projectId` to select another environment or project.
 
-### `t3_thread_launch`
+### `legion_thread_launch`
 
 Launches one ordinary top-level thread through the app's launch service. Use an
 explicit `workspaceStrategy` to create a new worktree (`worktree` with `baseRef`),
@@ -363,21 +363,21 @@ or a lost reply, resend the same request with the same key from the same
 provider session. This reuses any thread already created by that request. If the
 initial request had no key, check for the thread before launching again.
 
-### `t3_thread_list`
+### `legion_thread_list`
 
 Lists durable thread shells in one project, newest first: `projectId` when
 given, else the calling thread's project. Callers can filter by title, run
 status, and whether app-owned sub-agent threads are included. Results are
 bounded and offset-paginated. Deleted threads are never listed.
 
-### `t3_thread_read`
+### `legion_thread_read`
 
 Reads the durable state, recent runs, and visible timeline of any thread in
 the environment by thread ID. A deleted thread returns `thread_not_found`. The
 default `messages` view returns user messages, assistant
 messages, and proposed plans. The `activity` view also returns summarized tool,
 reasoning, checkpoint, handoff, and runtime-request items. Large item text is
-bounded and reports whether it was truncated. An agent in a T3 thread that
+bounded and reports whether it was truncated. An agent in a LegionCode thread that
 reads without a cursor gets the newest items, and `beforePosition=earlierPosition`
 reads older ones. Client callers (the CLI, linked environments, outside MCP
 clients) start at the oldest item instead, because the CLI and linked
@@ -395,21 +395,21 @@ Actor and ingress are separate so agent-authored user-role messages remain
 distinguishable from human-authored messages.
 
 Agents mention another thread by the `link` its result carries,
-`<t3-thread://v2/<environmentId>/<threadId>>`, so they never format an id or
+`<legion-thread://v2/<environmentId>/<threadId>>`, so they never format an id or
 write a title, which goes stale when the user renames the thread. The
 environment that owns the thread builds the link, so forwarded results and tasks
 delegated to a linked environment name that environment. Clients open only that
 environment's thread and show its current title; a link to a thread they do not
-know renders as a label that opens nothing. Older `t3-thread://v1/<threadId>`
+know renders as a label that opens nothing. Older `legion-thread://v1/<threadId>`
 links name no environment: clients resolve them in the message's environment,
 then by a unique match in another enabled environment. An outside OAuth client,
-one that is not a linked environment, cannot render `t3-thread://` links, so it
-gets the link Copy thread copies, `https://app.t3.codes/threads/<environmentId>/<threadId>`
-on the server's `T3CODE_HOSTED_APP_URL`, for threads in this environment. The
+one that is not a linked environment, cannot render `legion-thread://` links, so it
+gets the link Copy thread copies, `https://app.legion.codes/threads/<environmentId>/<threadId>`
+on the server's `LEGIONCODE_HOSTED_APP_URL`, for threads in this environment. The
 hosted app offers the desktop app, the mobile app, or itself.
 
 List and read results report `snoozed`, `snoozedUntil`, and `pinned`, and
-`t3_thread_list` filters on `snoozed`. The server's `isSnoozed` follows the
+`legion_thread_list` filters on `snoozed`. The server's `isSnoozed` follows the
 client's `effectiveSnoozed`, so agents and the sidebar agree: a snoozed thread
 wakes early only when it has a pending request or fails after snoozing. Completed
 runs, background wakes, and delegated completions keep it snoozed.
@@ -420,7 +420,7 @@ still waits on after its run completed. A subagent or `background_task` holds
 the thread. A command or monitor holds it only with `awaited: true`, since agents
 often leave a dev server running.
 
-### `t3_thread_update`
+### `legion_thread_update`
 
 Updates metadata for the calling thread or any other thread in the environment.
 The typed actions are `rename`, which requires `title`, and `regenerate_title`,
@@ -434,7 +434,7 @@ resultant title, title-regeneration marker, and linked pull request. Reusing a
 receipt. Thread list and read results expose the linked pull request, and thread
 detail also exposes an in-flight title regeneration.
 
-### `t3_thread_send`
+### `legion_thread_send`
 
 Sends a message to any ordinary or delegated thread in the environment:
 
@@ -454,14 +454,14 @@ The target runtime and interaction modes may not be broader than the caller's.
 Stable command and message IDs are derived from `clientRequestId` for
 idempotent retries.
 
-### `t3_thread_wait`
+### `legion_thread_wait`
 
 Waits for a selected run to become `completed`, `failed`, `cancelled`,
 `interrupted`, or `rolled_back`. Without `runId`, it pins the latest run at call
 time; an idle thread returns immediately. A timeout reports the latest durable
 status and does not cancel work.
 
-### `t3_thread_interrupt`
+### `legion_thread_interrupt`
 
 Interrupts a selected active run through the normal V2 `run.interrupt` command.
 Without `runId`, it selects the newest interruptible run. A terminal run is

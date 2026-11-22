@@ -1,11 +1,11 @@
-import { issueTrackerSummary } from "@t3tools/client-runtime/state/issue-trackers";
-import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import { issueTrackerSummary } from "@legioncode/client-runtime/state/issue-trackers";
+import { squashAtomCommandFailure } from "@legioncode/client-runtime/state/runtime";
 import type {
   EnvironmentId,
   IssueTrackerConnection,
   IssueTrackerConnectionList,
   ProjectId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import { AsyncResult } from "effect/reactivity";
 import { useNavigation } from "@react-navigation/native";
 import { useGT, useMessages } from "gt-react-native";

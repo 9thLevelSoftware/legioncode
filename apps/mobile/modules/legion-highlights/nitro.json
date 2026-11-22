@@ -1,0 +1,20 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": ["legionhighlights"],
+  "ios": {
+    "iosModuleName": "LegionHighlightsNative"
+  },
+  "android": {
+    "androidNamespace": ["legionhighlights"],
+    "androidCxxLibName": "legionhighlights"
+  },
+  "autolinking": {
+    "LegionHighlights": {
+      "all": {
+        "language": "c++",
+        "implementationClassName": "HybridLegionHighlights"
+      }
+    }
+  },
+  "ignorePaths": ["node_modules", "Vendor"]
+}

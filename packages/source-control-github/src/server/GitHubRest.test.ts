@@ -8,7 +8,7 @@ import * as NodeFSP from "node:fs/promises";
 import * as NodeOS from "node:os";
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- Keep the native socket path within the temporary directory.
 import * as NodePath from "node:path";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -16,7 +16,7 @@ import * as Redacted from "effect/Redacted";
 import * as TestClock from "effect/testing/TestClock";
 import * as Tracer from "effect/Tracer";
 import { ChildProcessSpawner } from "effect/process";
-import { VcsProcessTimeoutError } from "@t3tools/contracts";
+import { VcsProcessTimeoutError } from "@legioncode/contracts";
 import { HttpClient, HttpClientResponse, HttpClientRequest } from "effect/http";
 import { GraphQLClient } from "effect/graphql";
 
@@ -24,9 +24,9 @@ import * as GitHubRest from "./GitHubRest.ts";
 import * as GitHubRequestPolicy from "./GitHubRequestPolicy.ts";
 import * as GitHubCredentials from "./GitHubCredentials.ts";
 import * as GitHubQuota from "./GitHubQuota.ts";
-import * as SourceControlRateLimit from "@t3tools/source-control-core/server/SourceControlRateLimit";
-import type * as SourceControlHost from "@t3tools/source-control-core/server/SourceControlHost";
-import * as TestSourceControlHost from "@t3tools/source-control-testing/TestSourceControlHost";
+import * as SourceControlRateLimit from "@legioncode/source-control-core/server/SourceControlRateLimit";
+import type * as SourceControlHost from "@legioncode/source-control-core/server/SourceControlHost";
+import * as TestSourceControlHost from "@legioncode/source-control-testing/TestSourceControlHost";
 import * as GitHubAppSignIn from "./GitHubAppSignIn.ts";
 import * as GitHubHttpClient from "./GitHubHttpClient.ts";
 import * as GitHubGraphQlClient from "./gitHubGraphQlClient.ts";
@@ -274,7 +274,7 @@ describe("GitHubRest", () => {
             expect(request.headers).toMatchObject({
               host: apiHost,
               authorization: "Bearer placeholder",
-              "user-agent": "t3code",
+              "user-agent": "legioncode",
               "x-github-api-version": "2022-11-28",
             });
           }

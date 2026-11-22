@@ -1,7 +1,7 @@
 import * as NodeV8 from "node:v8";
 
-import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts/settings";
-import { SourceControlProviderKind } from "@t3tools/contracts";
+import { DEFAULT_SERVER_SETTINGS } from "@legioncode/contracts/settings";
+import { SourceControlProviderKind } from "@legioncode/contracts";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as KeyValueStore from "effect/persistence/KeyValueStore";
@@ -28,7 +28,7 @@ import {
   type ThreadPullRequestKey,
   type ThreadPullRequestLink,
   type ThreadPullRequestSnapshot,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import { assert, describe, it } from "@effect/vitest";
 import * as Cache from "effect/Cache";
 import * as Clock from "effect/Clock";
@@ -44,9 +44,9 @@ import * as Ref from "effect/Ref";
 import { ChildProcessSpawner } from "effect/process";
 import { TestClock } from "effect/testing";
 
-import { fakePullRequestProvider } from "@t3tools/source-control-testing/fakeSourceControlDriver";
-import * as SourceControlRateLimit from "@t3tools/source-control-core/server/SourceControlRateLimit";
-import type { SourceControlProvider } from "@t3tools/source-control-core/server/SourceControlProvider";
+import { fakePullRequestProvider } from "@legioncode/source-control-testing/fakeSourceControlDriver";
+import * as SourceControlRateLimit from "@legioncode/source-control-core/server/SourceControlRateLimit";
+import type { SourceControlProvider } from "@legioncode/source-control-core/server/SourceControlProvider";
 
 import * as GitManager from "../git/GitManager.ts";
 import * as ProcessRunner from "../processRunner.ts";

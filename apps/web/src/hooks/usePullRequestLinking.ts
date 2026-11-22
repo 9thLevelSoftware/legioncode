@@ -3,20 +3,20 @@ import {
   type EnvironmentId,
   type ScopedThreadRef,
   type ThreadPullRequestLink,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@legioncode/client-runtime/state/runtime";
 import {
   planThreadPullRequestMutation,
   threadPullRequestLinkMode,
-} from "@t3tools/client-runtime/thread-pull-request-compatibility";
+} from "@legioncode/client-runtime/thread-pull-request-compatibility";
 import {
   threadPullRequestKeysEqual,
   visibleThreadPullRequests,
-} from "@t3tools/client-runtime/thread-pull-requests";
-import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
+} from "@legioncode/client-runtime/thread-pull-requests";
+import { sourceControlClients } from "@legioncode/client-runtime/source-control-clients";
 import { useAtomValue } from "@effect/atom-react";
 import { Atom } from "effect/reactivity";
 import { msg } from "gt-react";

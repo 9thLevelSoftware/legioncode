@@ -1,5 +1,5 @@
 {
-  "name": "@t3tools/evals",
+  "name": "@legioncode/evals",
   "private": true,
   "type": "module",
   "scripts": {
@@ -15,9 +15,9 @@
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
-    "@t3tools/contracts": "workspace:*",
-    "@t3tools/provider-core": "workspace:*",
-    "@t3tools/shared": "workspace:*",
+    "@legioncode/contracts": "workspace:*",
+    "@legioncode/provider-core": "workspace:*",
+    "@legioncode/shared": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

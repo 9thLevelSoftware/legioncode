@@ -1,12 +1,12 @@
-import { collectComposerModelMentions } from "@t3tools/client-runtime/composer-model-mentions";
-import type { AssistantCitation } from "@t3tools/contracts";
-import { collectAssistantCitations } from "@t3tools/shared/assistantCitations";
-import { collectComposerContextReferences } from "@t3tools/shared/composerContextReferences";
+import { collectComposerModelMentions } from "@legioncode/client-runtime/composer-model-mentions";
+import type { AssistantCitation } from "@legioncode/contracts";
+import { collectAssistantCitations } from "@legioncode/shared/assistantCitations";
+import { collectComposerContextReferences } from "@legioncode/shared/composerContextReferences";
 import {
   collectComposerInlineTokens,
   composerMathRanges,
   type ComposerInlineToken,
-} from "@t3tools/shared/composerInlineTokens";
+} from "@legioncode/shared/composerInlineTokens";
 
 export type ComposerPromptSegment =
   | {

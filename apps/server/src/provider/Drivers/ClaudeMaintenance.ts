@@ -1,4 +1,4 @@
-import { ProviderDriverKind } from "@t3tools/contracts";
+import { ProviderDriverKind } from "@legioncode/contracts";
 import {
   makeCachedProviderMaintenanceResolution,
   makePackageManagedProviderMaintenanceResolver,
@@ -6,9 +6,9 @@ import {
   resolveProviderMaintenanceCapabilitiesEffect,
   type ProviderMaintenanceCapabilities,
   type ProviderMaintenanceResolverServices,
-} from "@t3tools/provider-core/server/maintenanceResolver";
-import * as HostProcess from "@t3tools/shared/HostProcess";
-import { fromLenientJson } from "@t3tools/shared/schemaJson";
+} from "@legioncode/provider-core/server/maintenanceResolver";
+import * as HostProcess from "@legioncode/shared/HostProcess";
+import { fromLenientJson } from "@legioncode/shared/schemaJson";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";

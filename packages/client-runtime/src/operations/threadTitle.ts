@@ -1,9 +1,9 @@
 import { mFallback, msg } from "gt-i18n";
 import type { MFunctionType } from "gt-i18n/types";
-import type { ChatAttachment } from "@t3tools/contracts";
-import { assistantCitationsToPlainText } from "@t3tools/shared/assistantCitations";
-import { replaceComposerContextReferences } from "@t3tools/shared/composerContextReferences";
-import { truncate } from "@t3tools/shared/String";
+import type { ChatAttachment } from "@legioncode/contracts";
+import { assistantCitationsToPlainText } from "@legioncode/shared/assistantCitations";
+import { replaceComposerContextReferences } from "@legioncode/shared/composerContextReferences";
+import { truncate } from "@legioncode/shared/String";
 
 import { collectComposerModelMentions } from "../composerModelMentions.ts";
 

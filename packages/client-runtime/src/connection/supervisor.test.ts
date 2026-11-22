@@ -3,9 +3,9 @@ import {
   EnvironmentId,
   type ServerConfig,
   type ServerConfigStreamEvent,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import { describe, expect, it } from "@effect/vitest";
-import { RelayClientTracer } from "@t3tools/shared/relayTracing";
+import { RelayClientTracer } from "@legioncode/shared/relayTracing";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -1610,7 +1610,7 @@ describe("EnvironmentSupervisor", () => {
   );
 
   it.effect(
-    "releases a direct t3-connect DPoP session on credentials-changed while keeping paired DPoP connected",
+    "releases a direct legion-connect DPoP session on credentials-changed while keeping paired DPoP connected",
     () =>
       Effect.gen(function* () {
         const cloudDpopEntry: ConnectionCatalogEntry = {
@@ -1619,7 +1619,7 @@ describe("EnvironmentSupervisor", () => {
             new BearerConnectionProfile({
               ...Option.getOrThrow(LAN_ROUTE.profile),
               learned: true,
-              authorization: "t3-connect",
+              authorization: "legion-connect",
             }),
           ),
           enabled: true,
@@ -1704,7 +1704,7 @@ describe("EnvironmentSupervisor", () => {
         const pathname = new URL(request.url).pathname;
         httpPaths.push(pathname);
         switch (pathname) {
-          case "/.well-known/t3/environment":
+          case "/.well-known/legioncode/environment":
             return Promise.resolve(
               Response.json({
                 environmentId: TARGET.environmentId,
@@ -1741,7 +1741,7 @@ describe("EnvironmentSupervisor", () => {
                   policy: "loopback-browser",
                   bootstrapMethods: ["one-time-token"],
                   sessionMethods: ["dpop-access-token"],
-                  sessionCookieName: "t3_session_test",
+                  sessionCookieName: "legioncode_session_test",
                 },
                 scopes: AuthStandardClientScopes,
               }),
@@ -2072,7 +2072,7 @@ describe("EnvironmentSupervisor routes", () => {
         prepare: (_attempt, target) => {
           attempted.push(target._tag);
           return target._tag === "RelayConnectionTarget"
-            ? Effect.fail(blocked("Sign in to T3 Connect."))
+            ? Effect.fail(blocked("Sign in to Legion Connect."))
             : Effect.succeed(preparedFor(target));
         },
       });
@@ -2117,7 +2117,7 @@ describe("EnvironmentSupervisor routes", () => {
     }).pipe(Effect.provide(TestClock.layer())),
   );
 
-  it.effect("skips a silent LAN route and connects over T3 Connect", () =>
+  it.effect("skips a silent LAN route and connects over Legion Connect", () =>
     Effect.gen(function* () {
       const harness = yield* makeHarness({
         checkRoute: (route) =>
@@ -2159,7 +2159,7 @@ describe("EnvironmentSupervisor routes", () => {
       const failures = [
         new ConnectionBlockedError({
           reason: "permission",
-          detail: "T3 Connect is not enabled on this machine.",
+          detail: "Legion Connect is not enabled on this machine.",
           hop: "tunnel",
           failureCause: "tunnel_not_enabled",
         }),
@@ -2344,7 +2344,7 @@ describe("EnvironmentSupervisor routes", () => {
         checkRoute: () => Effect.succeed("answered"),
         prepare: (_attempt, target) =>
           target._tag === "RelayConnectionTarget"
-            ? Effect.fail(blocked("Sign in to T3 Connect."))
+            ? Effect.fail(blocked("Sign in to Legion Connect."))
             : Effect.fail(transient("LAN socket refused.")),
       });
       const supervisor = yield* EnvironmentSupervisor.make(LAN_THEN_RELAY_ENTRY, {
@@ -2565,7 +2565,7 @@ describe("EnvironmentSupervisor routes", () => {
   );
 
   it.effect.each(["initial", "late", "withdrawn", "withdrawn-upgrade", "omitted"] as const)(
-    "learns the %s direct endpoint over T3 Connect",
+    "learns the %s direct endpoint over Legion Connect",
     (discovery) =>
       Effect.gen(function* () {
         const relayEntry: ConnectionCatalogEntry =
@@ -2582,7 +2582,7 @@ describe("EnvironmentSupervisor routes", () => {
                         }
                       : {}),
                     learned: true,
-                    authorization: "t3-connect",
+                    authorization: "legion-connect",
                   }),
                 ),
                 alternateRoutes: [{ target: RELAY_TARGET, profile: Option.none() }],

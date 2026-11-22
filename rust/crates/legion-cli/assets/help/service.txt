@@ -1,0 +1,19 @@
+DESCRIPTION
+  Manage the LegionCode background service.
+
+USAGE
+  legioncode service <subcommand> [flags]
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)
+
+SUBCOMMANDS
+  install      Install LegionCode as a background service for this user. `legioncode up` also chooses how your other devices reach it.
+  restart      Restart the background service. Picks up a version installed by `legioncode update` that was not restarted at the time.
+  uninstall    Stop and remove the LegionCode background service.
+  status       Show whether the LegionCode background service is installed.
+  protect      Protect the LegionCode server from agents under memory pressure (Linux with systemd). Asks for sudo.

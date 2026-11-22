@@ -1,12 +1,12 @@
-import { fileBasename } from "@t3tools/shared/path";
-import { fileLinkLabel } from "@t3tools/shared/fileLinks";
+import { fileBasename } from "@legioncode/shared/path";
+import { fileLinkLabel } from "@legioncode/shared/fileLinks";
 import {
   inlineCodeFilePathCandidate,
   normalizeMarkdownLinkDestination,
   parseMarkdownFileLink,
-} from "@t3tools/shared/markdownLinks";
-import { parseThreadLinkHref } from "@t3tools/shared/threadLinks";
-import { videoMimeType } from "@t3tools/shared/video";
+} from "@legioncode/shared/markdownLinks";
+import { parseThreadLinkHref } from "@legioncode/shared/threadLinks";
+import { videoMimeType } from "@legioncode/shared/video";
 
 import type { MARKDOWN_FILE_ICON_SOURCES } from "./markdownFileIcons.generated";
 

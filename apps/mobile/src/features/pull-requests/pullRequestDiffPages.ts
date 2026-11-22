@@ -1,7 +1,7 @@
-import { orderDiffFilesForReview } from "@t3tools/client-runtime/diff-file-order";
-import type { ChangeRequestTerminology } from "@t3tools/client-runtime/source-control-clients";
+import { orderDiffFilesForReview } from "@legioncode/client-runtime/diff-file-order";
+import type { ChangeRequestTerminology } from "@legioncode/client-runtime/source-control-clients";
 import { changeRequestTermKind } from "../../lib/changeRequestTerm";
-import type { PullRequestDiffResult } from "@t3tools/contracts";
+import type { PullRequestDiffResult } from "@legioncode/contracts";
 import { msg } from "gt-react-native";
 
 import { m, type MessageResolver } from "../../i18n/messages";

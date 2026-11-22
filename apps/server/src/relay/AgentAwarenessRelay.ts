@@ -7,21 +7,21 @@ import {
   type Project,
   type RuntimeRequestId,
   type ThreadId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   type RelayAgentActivityPublishProofPayload,
   type RelayAgentActivityState,
-} from "@t3tools/contracts/relay";
+} from "@legioncode/contracts/relay";
 import {
   type SubagentRequestAwareness,
   projectThreadAwarenessV2,
   subagentAwaitsUser,
   turnItemCanChangeUserWait,
-} from "@t3tools/shared/agentAwareness";
-import { turnItemUpdateCanEndBackgroundWork } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
-import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
-import { withRelayClientTracing } from "@t3tools/shared/relayTracing";
-import { normalizeRelayIssuer, RELAY_ACTIVITY_PUBLISH_TYP } from "@t3tools/shared/relayJwt";
+} from "@legioncode/shared/agentAwareness";
+import { turnItemUpdateCanEndBackgroundWork } from "@legioncode/shared/orchestrationV2PendingBackgroundWork";
+import { makeDrainableWorker } from "@legioncode/shared/DrainableWorker";
+import { withRelayClientTracing } from "@legioncode/shared/relayTracing";
+import { normalizeRelayIssuer, RELAY_ACTIVITY_PUBLISH_TYP } from "@legioncode/shared/relayJwt";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -59,7 +59,7 @@ export class AgentAwarenessRelay extends Context.Service<
     readonly requestCatchUp: () => Effect.Effect<void>;
     readonly start: () => Effect.Effect<void, never, Scope.Scope>;
   }
->()("t3/relay/AgentAwarenessRelay") {}
+>()("legioncode/relay/AgentAwarenessRelay") {}
 
 function eventThreadId(event: OrchestrationV2DomainEvent): ThreadId {
   return event.threadId;
@@ -267,7 +267,7 @@ const makePublishProof = Effect.fn("makePublishProof")(function* (input: {
   const now = yield* DateTime.now;
   const expiresAt = DateTime.add(now, { minutes: 5 });
   const payload = {
-    iss: `t3-env:${input.environmentId}`,
+    iss: `legioncode-env:${input.environmentId}`,
     aud: normalizeRelayIssuer(input.relayIssuer),
     sub: input.environmentId,
     jti: input.jti,
@@ -886,7 +886,7 @@ export const make = Effect.gen(function* () {
   });
 
   // Many environments never link, so while unlinked the retry backs off from 5
-  // s to 60 s. A linked environment keeps the 5 s retry, because `t3 connect
+  // s to 60 s. A linked environment keeps the 5 s retry, because `legioncode connect
   // publish` can turn publishing on from another process. Keep this untraced:
   // an unlinked environment can retry for the lifetime of the process.
   const publishActiveThreadsWhenConfigured = Effect.fnUntraced(function* (
@@ -944,11 +944,13 @@ export const make = Effect.gen(function* () {
       switch (startupState) {
         case "waiting-for-link":
           yield* Effect.logInfo(
-            "agent activity publishing standby; waiting for T3 Connect link reconciliation",
+            "agent activity publishing standby; waiting for Legion Connect link reconciliation",
           );
           break;
         case "disabled":
-          yield* Effect.logInfo("agent activity publishing disabled by T3 Connect configuration");
+          yield* Effect.logInfo(
+            "agent activity publishing disabled by Legion Connect configuration",
+          );
           break;
         case "enabled":
           yield* Effect.logInfo("agent activity publishing enabled", {

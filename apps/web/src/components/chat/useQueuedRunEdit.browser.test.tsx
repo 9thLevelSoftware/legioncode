@@ -1,4 +1,4 @@
-import type { ThreadStructure } from "@t3tools/client-runtime/state/shell";
+import type { ThreadStructure } from "@legioncode/client-runtime/state/shell";
 import {
   EnvironmentId,
   ChatAttachmentId,
@@ -8,14 +8,14 @@ import {
   TurnItemId,
   type PreviewAnnotationPayload,
   type ScopedThreadRef,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import { useImperativeHandle, type RefObject } from "react";
 import { describe, expect, it, vi } from "vite-plus/test";
 import {
   ATTACHMENT_ONLY_BOOTSTRAP_PROMPT,
   threadContextRecord,
   toKindScopedComposerContextId,
-} from "@t3tools/shared/composerContextReferences";
+} from "@legioncode/shared/composerContextReferences";
 import { toastManager } from "../ui/toast";
 
 import { act, render } from "../../../test/render";

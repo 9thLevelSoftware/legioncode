@@ -1,9 +1,9 @@
-import { resolveQueuedEditExit } from "@t3tools/client-runtime/queued-run-edit";
+import { resolveQueuedEditExit } from "@legioncode/client-runtime/queued-run-edit";
 import type {
   ChatAttachment,
   EnvironmentId,
   OrchestrationMessageContext,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   composerDraftHasUserContent,
   useComposerDraftStore,

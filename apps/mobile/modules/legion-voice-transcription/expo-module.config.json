@@ -1,0 +1,10 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["LegionVoiceTranscriptionModule"],
+    "podspecPath": "ios/LegionVoiceTranscription.podspec"
+  },
+  "android": {
+    "modules": ["dev.legioncode.voicetranscription.LegionVoiceTranscriptionModule"]
+  }
+}

@@ -12,12 +12,12 @@ import {
   connectionRoutes,
   isLearned,
   pendingRouteOrder,
-} from "@t3tools/client-runtime/connection";
-import { type EnvironmentId, sessionGrantsScope } from "@t3tools/contracts";
+} from "@legioncode/client-runtime/connection";
+import { type EnvironmentId, sessionGrantsScope } from "@legioncode/contracts";
 import {
   AUTH_SCOPE_OPTIONS,
   sessionPermissionsUnavailableMessage,
-} from "@t3tools/shared/authScopeOptions";
+} from "@legioncode/shared/authScopeOptions";
 import { AsyncResult } from "effect/reactivity";
 import * as Option from "effect/Option";
 import { useState } from "react";

@@ -5,8 +5,8 @@ import * as Tracer from "effect/Tracer";
 import { assert, it } from "@effect/vitest";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { CommandId, type Project, ProjectId, ProviderInstanceId } from "@t3tools/contracts";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import { CommandId, type Project, ProjectId, ProviderInstanceId } from "@legioncode/contracts";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -25,7 +25,7 @@ import {
   orchestrationCommandsTotal,
 } from "../observability/Metrics.ts";
 import * as EventSink from "../orchestration-v2/EventSink.ts";
-import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import * as IdAllocator from "@legioncode/provider-core/server/IdAllocator";
 import * as LegacyV1ThreadImporter from "../orchestration-v2/legacy/LegacyV1ThreadImporter.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
 import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
@@ -39,7 +39,7 @@ import * as ProjectEnrichmentService from "./ProjectEnrichmentService.ts";
 import * as ProjectFaviconResolver from "./ProjectFaviconResolver.ts";
 import * as ProjectService from "./ProjectService.ts";
 import * as RepositoryIdentityResolver from "./RepositoryIdentityResolver.ts";
-import * as T3ProjectFileLoader from "./T3ProjectFileLoader.ts";
+import * as LegionProjectFileLoader from "./LegionProjectFileLoader.ts";
 
 const layerWorkspacePaths = Layer.succeed(WorkspacePaths.WorkspacePaths, {
   normalizeWorkspaceRoot: (workspaceRoot) => Effect.succeed(workspaceRoot.replace(/\/$/, "")),
@@ -51,11 +51,11 @@ const layerMetadata = Layer.merge(
   Layer.succeed(RepositoryIdentityResolver.RepositoryIdentityResolver, {
     resolve: (workspaceRoot) =>
       Effect.succeed({
-        canonicalKey: `github.com/t3tools/${workspaceRoot.split("/").at(-1)}`,
+        canonicalKey: `github.com/legioncode/${workspaceRoot.split("/").at(-1)}`,
         locator: {
           source: "git-remote" as const,
           remoteName: "origin",
-          remoteUrl: `git@github.com:t3tools/${workspaceRoot.split("/").at(-1)}.git`,
+          remoteUrl: `git@github.com:legioncode/${workspaceRoot.split("/").at(-1)}.git`,
         },
         rootPath: workspaceRoot,
       }),
@@ -67,7 +67,7 @@ const layerMetadata = Layer.merge(
 );
 
 class EnrichmentCompletions extends Context.Service<EnrichmentCompletions, Queue.Queue<void>>()(
-  "t3/project/ProjectService.test/EnrichmentCompletions",
+  "legioncode/project/ProjectService.test/EnrichmentCompletions",
 ) {}
 
 const layerEnrichmentCompletions = Layer.effectContext(
@@ -266,7 +266,10 @@ it.layer(layerTest)("ProjectService", (it) => {
         projectId,
         (project) => project.repositoryIdentity !== null && project.faviconPath !== null,
       );
-      assert.equal(hydratedCreated?.repositoryIdentity?.canonicalKey, "github.com/t3tools/project");
+      assert.equal(
+        hydratedCreated?.repositoryIdentity?.canonicalKey,
+        "github.com/legioncode/project",
+      );
       assert.equal(hydratedCreated?.faviconPath, "/work/project/favicon.svg");
 
       const updated = yield* service.update({
@@ -800,7 +803,7 @@ it.effect("resolves a restored icon immediately after reselecting its saved path
       }),
       ProjectFaviconResolver.layer.pipe(
         Layer.provide(layerWorkspacePaths),
-        Layer.provide(T3ProjectFileLoader.layer),
+        Layer.provide(LegionProjectFileLoader.layer),
         Layer.provide(NodeServices.layer),
       ),
     );

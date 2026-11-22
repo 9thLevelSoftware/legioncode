@@ -1,4 +1,4 @@
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import {
   buildEnvironmentCaptureCommand,
   extractEnvironmentValues,
@@ -10,7 +10,7 @@ import {
   resolveWindowsEnvironment,
   setWindowsPath,
   WindowsShellEnvironment,
-} from "@t3tools/shared/shell";
+} from "@legioncode/shared/shell";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -248,7 +248,7 @@ export const expandHomePath = Effect.fn(function* (input: string) {
 export const resolveBaseDir = Effect.fn(function* (raw: string | undefined) {
   const { join, resolve } = yield* Path.Path;
   if (!raw || raw.trim().length === 0) {
-    return join(yield* HostProcess.HomeDirectory, ".t3");
+    return join(yield* HostProcess.HomeDirectory, ".legioncode");
   }
   return resolve(yield* expandHomePath(raw.trim()));
 });

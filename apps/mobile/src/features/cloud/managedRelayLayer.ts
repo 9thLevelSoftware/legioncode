@@ -1,5 +1,5 @@
-import { DpopProof, ManagedRelay } from "@t3tools/client-runtime/relay";
-import { RelayMobileClientId } from "@t3tools/contracts/relay";
+import { DpopProof, ManagedRelay } from "@legioncode/client-runtime/relay";
+import { RelayMobileClientId } from "@legioncode/contracts/relay";
 import * as Layer from "effect/Layer";
 
 import { loadOrCreateProofKey } from "./dpop";

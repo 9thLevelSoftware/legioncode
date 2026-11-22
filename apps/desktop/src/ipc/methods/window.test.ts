@@ -1,10 +1,10 @@
 import { assert, describe, it } from "@effect/vitest";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import type { ManagedPolicyLimits } from "@t3tools/contracts";
-import { EDITORS, REMOTE_CAPABLE_EDITOR_IDS } from "@t3tools/contracts";
-import { resolveEditorCommand } from "@t3tools/shared/editor";
-import * as HostProcess from "@t3tools/shared/HostProcess";
-import { ManagedPolicyFileError } from "@t3tools/shared/managedPolicyFile";
+import type { ManagedPolicyLimits } from "@legioncode/contracts";
+import { EDITORS, REMOTE_CAPABLE_EDITOR_IDS } from "@legioncode/contracts";
+import { resolveEditorCommand } from "@legioncode/shared/editor";
+import * as HostProcess from "@legioncode/shared/HostProcess";
+import { ManagedPolicyFileError } from "@legioncode/shared/managedPolicyFile";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Effect from "effect/Effect";
@@ -275,7 +275,7 @@ describe("installRelayTelemetryEnabled", () => {
 
   it.effect("reads the desktop host opt-out before returning the renderer policy", () =>
     Effect.gen(function* () {
-      assert.deepEqual(yield* relayTelemetryEnabled({ T3CODE_TELEMETRY_ENABLED: "false" }), {
+      assert.deepEqual(yield* relayTelemetryEnabled({ LEGIONCODE_TELEMETRY_ENABLED: "false" }), {
         beforeDiscovery: false,
         afterDiscovery: false,
       });
@@ -285,7 +285,7 @@ describe("installRelayTelemetryEnabled", () => {
         afterDiscovery: true,
       });
       assert.deepEqual(
-        yield* relayTelemetryEnabled({}, undefined, { T3CODE_TELEMETRY_ENABLED: "false" }),
+        yield* relayTelemetryEnabled({}, undefined, { LEGIONCODE_TELEMETRY_ENABLED: "false" }),
         { beforeDiscovery: null, afterDiscovery: false },
       );
     }),
@@ -524,7 +524,7 @@ it.effect.skipIf(HostProcess.Platform.defaultValue() === "win32")(
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const home = yield* fs.makeTempDirectoryScoped({ prefix: "t3-remote-editors-" });
+      const home = yield* fs.makeTempDirectoryScoped({ prefix: "legioncode-remote-editors-" });
       for (const app of ["Cursor", "Visual Studio Code", "WebStorm"]) {
         const executable = path.join(
           home,
@@ -556,7 +556,7 @@ describe("probeRemoteEditors PATH scan", () => {
   const makeFakePath = Effect.fnUntraced(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
-    const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-probe-path-" });
+    const root = yield* fs.makeTempDirectoryScoped({ prefix: "legioncode-probe-path-" });
     const dirs = ["a", "b", "c", "d"].map((name) => path.join(root, name));
     for (const dir of dirs) yield* fs.makeDirectory(dir, { recursive: true });
     // Launchers in different PATH directories, deliberately not in REMOTE_CAPABLE_EDITOR_IDS order.

@@ -8,8 +8,8 @@ import type {
   SettingSource,
   ToolCall,
 } from "@cursor/sdk";
-import { formatReadToolLabel, formatSearchToolLabel } from "@t3tools/shared/toolActivity";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import { formatReadToolLabel, formatSearchToolLabel } from "@legioncode/shared/toolActivity";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import {
   isOrchestrationV2WorkActive,
   defaultInstanceIdForDriver,
@@ -30,7 +30,7 @@ import {
   type ServerProviderModel,
   type ServerProviderSkill,
   type ThreadId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -43,10 +43,10 @@ import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
-import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
-import { mcpToolPresentation } from "@t3tools/provider-core/server/mcpToolPresentation";
-import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
-import * as McpProviderSession from "@t3tools/provider-core/server/mcpSession";
+import * as ProviderHost from "@legioncode/provider-core/server/ProviderHost";
+import { mcpToolPresentation } from "@legioncode/provider-core/server/mcpToolPresentation";
+import * as McpProviderSessions from "@legioncode/provider-core/server/McpProviderSessions";
+import * as McpProviderSession from "@legioncode/provider-core/server/mcpSession";
 import { CursorTransportFailure } from "./transportFailure.ts";
 import { cursorContextWindowTokens, cursorSdkModelSelection } from "./sdkModel.ts";
 import {
@@ -57,21 +57,21 @@ import {
   rewriteCursorSkillMentions,
 } from "./skills.ts";
 import { cursorWorkspaceMcpServers } from "./workspaceMcpServers.ts";
-import { t3OrchestrationPrompt } from "@t3tools/provider-core/server/orchestrationInstructions";
-import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
-import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
-import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
-import { turnScopedSelectionTransition } from "@t3tools/provider-core/server/selectionTransition";
+import { legionOrchestrationPrompt } from "@legioncode/provider-core/server/orchestrationInstructions";
+import { buildRuntimeInstructions } from "@legioncode/provider-core/server/runtimeInstructions";
+import * as IdAllocator from "@legioncode/provider-core/server/IdAllocator";
+import { makeProviderFailure } from "@legioncode/provider-core/server/failure";
+import { turnScopedSelectionTransition } from "@legioncode/provider-core/server/selectionTransition";
 import {
   isProviderNativeImageAttachment,
   providerMessageTextWithAttachmentPaths,
-} from "@t3tools/provider-core/server/attachmentPrompt";
-import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+} from "@legioncode/provider-core/server/attachmentPrompt";
+import * as ProviderAdapter from "@legioncode/provider-core/server/ProviderAdapter";
 import {
   makeSubagentChildThread,
   makeSubagentConversationArtifacts,
   subagentThreadTitle,
-} from "@t3tools/provider-core/server/subagentProjection";
+} from "@legioncode/provider-core/server/subagentProjection";
 import * as CursorAgentSdk from "./CursorAgentSdk.ts";
 import { isCursorSdkError } from "./sdk.ts";
 export { cursorSdkModelSelection } from "./sdkModel.ts";
@@ -216,7 +216,7 @@ export function cursorMcpServers(
     return undefined;
   }
   return {
-    "t3-code": {
+    "legion-code": {
       type: "http",
       url: session.endpoint,
       headers: {
@@ -318,7 +318,7 @@ export function makeCursorAgentOptions(input: {
   const mcpServers = cursorMcpServers(input.mcpSession);
   return {
     model: cursorSdkModelSelection(input.modelSelection, input.models),
-    name: `T3 Code ${input.threadId}`,
+    name: `LegionCode ${input.threadId}`,
     mode: input.runtimePolicy.interactionMode === "plan" ? "plan" : "agent",
     ...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
     local: {
@@ -2626,7 +2626,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
           if (rawText.trim() === "/compress" && turnInput.message.attachments.length === 0) {
             return { message: "/compress", prompt: undefined };
           }
-          const newText = t3OrchestrationPrompt({
+          const newText = legionOrchestrationPrompt({
             prompt: yield* providerMessageTextWithAttachmentPaths({
               text: yield* resolveCursorSkillText(
                 rawText,
@@ -2636,7 +2636,7 @@ export const makeCursorAdapterV2 = Effect.fn("makeCursorAdapterV2")(function* (
               resolveAttachmentPath: host.resolveAttachmentPath,
               resolveExtractedTextPath: host.resolveExtractedTextPath,
             }),
-            hasT3Mcp: mcpServers !== undefined,
+            hasLegionMcp: mcpServers !== undefined,
             hasDeviceTools,
             orchestrationDelivered: delivered.orchestration,
             deviceInstructionsDelivered: delivered.device,

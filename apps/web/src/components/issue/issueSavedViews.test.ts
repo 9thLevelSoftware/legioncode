@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { EnvironmentId, ProjectId } from "@t3tools/contracts";
+import { EnvironmentId, ProjectId } from "@legioncode/contracts";
 
 import { issueViewMatches } from "./issueSavedViews";
 

@@ -4,14 +4,14 @@ import {
   type AuthSessionState,
   type ExecutionEnvironmentCapabilities,
   type ServerProvider,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   CLI_RELEASES_PAGE_URL,
   cliReleaseChannelOf,
   cliReleaseIndexPageUrl,
   newestCliReleaseVersion,
-} from "@t3tools/shared/cliRelease";
-import { compareSemverVersions } from "@t3tools/shared/semver";
+} from "@legioncode/shared/cliRelease";
+import { compareSemverVersions } from "@legioncode/shared/semver";
 import { msg } from "gt-react-native";
 import * as Schema from "effect/Schema";
 

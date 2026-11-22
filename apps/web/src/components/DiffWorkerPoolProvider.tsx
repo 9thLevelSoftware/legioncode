@@ -10,7 +10,7 @@ import { PREFERRED_HIGHLIGHTER } from "../lib/syntaxHighlighting";
 
 export class DiffWorkerError extends Schema.TaggedError<DiffWorkerError>()("DiffWorkerError", {
   operation: Schema.Literals(["create-worker", "get-render-options", "set-render-options"]),
-  themeName: Schema.Literals(["pierre-dark", "t3-light"]),
+  themeName: Schema.Literals(["pierre-dark", "legion-light"]),
   cause: Schema.Defect(),
 }) {
   override get message(): string {
@@ -95,7 +95,7 @@ function DiffWorkerReady({ children }: { children?: ReactNode }) {
     ? readyPool === workerPool || workerPool.isInitialized() || !workerPool.isWorkingPool()
     : typeof window === "undefined";
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- initializes the diff worker pool and marks it ready when its async startup settles
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- initializes the diff worker pool and marks it ready when its async startup settles
   useEffect(() => {
     if (ready || !workerPool) return;
 

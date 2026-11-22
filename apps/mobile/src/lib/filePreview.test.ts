@@ -18,7 +18,7 @@ import {
 } from "../features/threads/ThreadMarkdownVideo";
 import { AudioFilePreview } from "../features/files/AudioFilePreview";
 import { MediaVideoPlayer } from "../components/MediaVideoPlayer";
-import { EnvironmentId, MessageId, ThreadId } from "@t3tools/contracts";
+import { EnvironmentId, MessageId, ThreadId } from "@legioncode/contracts";
 import { acquireAudioSession, activateAudioSession, releaseAudioSession } from "./audioSession";
 import { ThreadFeed } from "../features/threads/ThreadFeed";
 import type { ThreadFeedEntry } from "./threadActivity";
@@ -164,8 +164,8 @@ vi.mock("../features/threads/ThreadMarkdownVideo", async (importOriginal) => {
   };
 });
 
-vi.mock("@t3tools/client-runtime/state/runtime", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@t3tools/client-runtime/state/runtime")>()),
+vi.mock("@legioncode/client-runtime/state/runtime", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@legioncode/client-runtime/state/runtime")>()),
   executeAtomQuery: (...args: unknown[]) => audio.query(...args),
 }));
 vi.mock("../state/projects", () => ({

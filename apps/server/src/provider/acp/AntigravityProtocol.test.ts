@@ -18,8 +18,8 @@ import {
 import {
   mergeToolCallState,
   parseSessionUpdateEvent,
-} from "@t3tools/provider-acp/server/runtimeModel";
-import { acpToolCallDiffPatch } from "@t3tools/provider-acp/server/adapter";
+} from "@legioncode/provider-acp/server/runtimeModel";
+import { acpToolCallDiffPatch } from "@legioncode/provider-acp/server/adapter";
 
 const isSessionNotification = Schema.is(AcpWireSchema.SessionNotification);
 
@@ -585,7 +585,7 @@ describe("Antigravity served reads", () => {
       },
     }).update;
 
-  it("credits a read T3 served before the agent announced it", () => {
+  it("credits a read LegionCode served before the agent announced it", () => {
     const reads = makeAntigravityReadRepair();
     reads.attempted("/repo/a.ts", true);
     const announced = reads.repair({

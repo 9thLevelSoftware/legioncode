@@ -10,7 +10,7 @@ import type {
   EnvironmentId,
   EnvironmentSpeechModel,
   EnvironmentSpeechStatus,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { CircleAlertIcon, MicIcon, RefreshCwIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -23,7 +23,7 @@ import {
   preferredMicrophoneId,
 } from "../../speech/microphoneOrder";
 import { useEnvironment } from "../../state/environments";
-import { AuthSettingsWriteScope } from "@t3tools/contracts";
+import { AuthSettingsWriteScope } from "@legioncode/contracts";
 import { useEnvironmentScope } from "../../state/session";
 import { languageLabel } from "../settings/SpeechLanguageSelect";
 import { Button } from "../ui/button";
@@ -69,7 +69,7 @@ export function VoiceInputSetup(props: {
     }
     setLoadingMicrophones(false);
   });
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to native microphone changes while the device setup step is visible
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- subscribes to native microphone changes while the device setup step is visible
   useEffect(() => {
     if (!props.open || props.step !== 1) return;
     queueMicrotask(() => void refreshMicrophones());

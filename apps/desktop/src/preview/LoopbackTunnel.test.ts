@@ -1,9 +1,9 @@
-import { SshConnectionProfile, SshConnectionTarget } from "@t3tools/client-runtime/connection";
-import { ConnectionCatalogDocument } from "@t3tools/client-runtime/platform";
+import { SshConnectionProfile, SshConnectionTarget } from "@legioncode/client-runtime/connection";
+import { ConnectionCatalogDocument } from "@legioncode/client-runtime/platform";
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem";
 import * as NodeWS from "@effect/platform-node/NodeWS";
-import { EnvironmentId } from "@t3tools/contracts";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import { EnvironmentId } from "@legioncode/contracts";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import { expect, it, vi } from "@effect/vitest";
 import * as NodeNet from "node:net";
 import * as Context from "effect/Context";
@@ -521,7 +521,7 @@ it.effect.each([
 ])("decides a forward's machine only on proof: $case", ({ refused }) =>
   Effect.gen(function* () {
     const endpoint = yield* listenRefusingEndpoint(
-      refused ? { "x-t3-tunnel-port-refused": "1" } : {},
+      refused ? { "x-legioncode-tunnel-port-refused": "1" } : {},
     );
     const remotePort = yield* unusedPort;
     const tunnel = yield* makeTunnel(`ws://127.0.0.1:${addressPort(endpoint)}/api/preview/tunnel`);

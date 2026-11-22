@@ -1,11 +1,11 @@
-import { isWorkspaceImagePreviewPath } from "@t3tools/shared/mediaPreview";
-import { COMPUTER_USE_TOOL_SOURCE, dynamicToolSurface } from "@t3tools/shared/toolActivity";
+import { isWorkspaceImagePreviewPath } from "@legioncode/shared/mediaPreview";
+import { COMPUTER_USE_TOOL_SOURCE, dynamicToolSurface } from "@legioncode/shared/toolActivity";
 import type {
   ToolActivityIcon,
   ToolActivityNativeAppReference,
   ToolActivitySource,
   ToolActivitySurface,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 
 export interface ExtractedToolActivityPresentation {
   readonly viewedImagePath?: string;

@@ -1,5 +1,5 @@
 import { useIsFocused, useNavigation, type StaticScreenProps } from "@react-navigation/native";
-import { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { EnvironmentId, ThreadId } from "@legioncode/contracts";
 import { useGT } from "gt-react-native";
 import { type ReactNode } from "react";
 import { View } from "react-native";

@@ -6,7 +6,7 @@ import * as Path from "effect/Path";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import { runMigrations } from "../src/persistence/Migrations.ts";
-import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
+import * as NodeSqliteClient from "@legioncode/shared/nodeSqliteClient";
 import { runMigrateDevDb } from "./migrate-dev-db.ts";
 
 const withDatabase = <A, E, R>(
@@ -457,7 +457,7 @@ it.layer(NodeServices.layer)("migrate-dev-db", (it) => {
       const sourceDir = yield* fs.makeTempDirectoryScoped({ prefix: "migrate-dev-db-peer-" });
       const destDir = yield* fs.makeTempDirectoryScoped({ prefix: "migrate-dev-db-peer-dest-" });
       const source = yield* createFixtureSource(sourceDir, 67);
-      // Mirrors a real ~/.t3 seed written by a build whose 68-70 differ from main's.
+      // Mirrors a real ~/.legioncode seed written by a build whose 68-70 differ from main's.
       yield* withDatabase(
         source,
         Effect.gen(function* () {

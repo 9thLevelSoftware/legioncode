@@ -14,11 +14,11 @@
       (() => {
         const LIGHT_BACKGROUND = "#ffffff";
         const DARK_BACKGROUND = "#000000";
-        const CUSTOM_THEMES_STORAGE_KEY = "t3code:themes:v1";
-        const ENVIRONMENT_THEMES_STORAGE_KEY = "t3code:environment-themes:v1";
-        const THEME_FOLLOW_SYSTEM_STORAGE_KEY = "t3code:theme-follow-system";
-        const THEME_APPEARANCE_MODE_STORAGE_KEY = "t3code:theme-appearance-mode";
-        const THEME_HALVES_STORAGE_KEY = "t3code:theme-halves:v1";
+        const CUSTOM_THEMES_STORAGE_KEY = "legioncode:themes:v1";
+        const ENVIRONMENT_THEMES_STORAGE_KEY = "legioncode:environment-themes:v1";
+        const THEME_FOLLOW_SYSTEM_STORAGE_KEY = "legioncode:theme-follow-system";
+        const THEME_APPEARANCE_MODE_STORAGE_KEY = "legioncode:theme-appearance-mode";
+        const THEME_HALVES_STORAGE_KEY = "legioncode:theme-halves:v1";
         const SPLASH_COLORS = {
           light: {
             background: "#ffffff",
@@ -52,7 +52,7 @@
         // Keep this small boot-time copy in sync with the built-in palettes so
         // the selected theme is visible before the app has mounted.
         const BUILT_IN_THEME_PALETTES = {
-          "t3-chat": {
+          "legion-chat": {
             light: {
               background: "oklch(0.982446 0.010114 325.653)",
               foreground: "oklch(0.325698 0.116116 325.037)",
@@ -133,16 +133,11 @@
           "system",
           "light",
           "dark",
-          "t3-chat",
+          "legion-chat",
           "grove",
           "ocean",
           "ember",
           "iris",
-          "t3-chat-dark",
-          "t3-grove",
-          "t3-ocean",
-          "t3-ember",
-          "t3-iris",
         ];
         const setThemeColor = (color) => {
           for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
@@ -219,19 +214,9 @@
         };
 
         try {
-          const storedTheme = window.localStorage.getItem("t3code:theme");
+          const storedTheme = window.localStorage.getItem("legioncode:theme");
           const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-          const LEGACY_THEME_IDS = {
-            "t3-chat-dark": "t3-chat",
-            "t3-grove": "grove",
-            "t3-ocean": "ocean",
-            "t3-ember": "ember",
-            "t3-iris": "iris",
-          };
-          const isLegacyT3ChatDark = storedTheme === "t3-chat-dark";
-          const themeId =
-            storedTheme === null ? "" : (LEGACY_THEME_IDS[storedTheme] ?? storedTheme);
-          const legacyMode = isLegacyT3ChatDark ? "dark" : null;
+          const themeId = storedTheme ?? "";
           const builtInModes = BUILT_IN_THEME_MODES[themeId] ?? null;
           const customTheme = builtInModes ? null : findCustomTheme(themeId);
           const themeModes =
@@ -254,8 +239,7 @@
             THEME_APPEARANCE_MODE_STORAGE_KEY,
           );
           const storedFollowSystem = window.localStorage.getItem(THEME_FOLLOW_SYSTEM_STORAGE_KEY);
-          const preferenceMode =
-            theme === "light" || theme === "dark" ? theme : (legacyMode ?? baseAppearance);
+          const preferenceMode = theme === "light" || theme === "dark" ? theme : baseAppearance;
           const appearanceMode = isThemePreferenceMode(storedAppearanceMode)
             ? storedAppearanceMode
             : storedFollowSystem === "true"
@@ -277,7 +261,7 @@
             );
             const candidate = isRecord(halvesRaw) ? halvesRaw[wantedMode] : null;
             if (typeof candidate === "string") {
-              const halfId = LEGACY_THEME_IDS[candidate] ?? candidate;
+              const halfId = candidate;
               const halfBuiltIn = BUILT_IN_THEME_MODES[halfId] ?? null;
               const halfCustom = halfBuiltIn ? null : findCustomTheme(halfId);
               const halfModes =
@@ -681,13 +665,13 @@
       if (desktopDisplayName) document.title = desktopDisplayName;
     </script>
     <!-- vite.config.ts stamps the web build's channel into this title. -->
-    <title>T3 Code</title>
+    <title>LegionCode</title>
   </head>
   <body>
     <div id="root">
       <div id="boot-shell">
-        <div id="boot-shell-card" aria-label="T3 Code splash screen">
-          <img id="boot-shell-logo" src="/apple-touch-icon.png" alt="T3 Code" />
+        <div id="boot-shell-card" aria-label="LegionCode splash screen">
+          <img id="boot-shell-logo" src="/apple-touch-icon.png" alt="LegionCode" />
         </div>
       </div>
     </div>

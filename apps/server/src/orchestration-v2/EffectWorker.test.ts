@@ -19,7 +19,7 @@ import {
   VcsProcessExitError,
   type OrchestrationV2DomainEvent,
   type OrchestrationV2ThreadProjection,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Cause from "effect/Cause";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
@@ -34,7 +34,7 @@ import * as SqlError from "effect/sql/SqlError";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 
-import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import * as IdAllocator from "@legioncode/provider-core/server/IdAllocator";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as CheckpointCaptureService from "./CheckpointCaptureService.ts";
 import * as CheckpointRollbackService from "./CheckpointRollbackService.ts";

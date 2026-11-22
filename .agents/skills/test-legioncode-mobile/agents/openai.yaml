@@ -1,0 +1,4 @@
+interface:
+  display_name: "Test LegionCode Mobile"
+  short_description: "Test iOS and Android in LegionCode's Device panel"
+  default_prompt: "Use $test-legioncode-mobile to verify the affected native mobile flow through LegionCode's Device panel and AgentDevice."

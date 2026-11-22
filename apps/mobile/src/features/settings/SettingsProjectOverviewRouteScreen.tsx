@@ -1,21 +1,21 @@
-import { errorDisplayMessage } from "@t3tools/client-runtime/errors";
+import { errorDisplayMessage } from "@legioncode/client-runtime/errors";
 import { T, useGT } from "gt-react-native";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { AppText as Text, AppTextInput } from "../../components/ui/AppText";
 import { Button } from "../../components/ui/Button";
 import { ProjectFavicon } from "../../components/ProjectFavicon";
 import * as Dialog from "../../components/ui/Dialog";
-import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
-import { planProjectRemoval } from "@t3tools/client-runtime/state/projects";
+import { AuthOrchestrationOperateScope } from "@legioncode/contracts";
+import { planProjectRemoval } from "@legioncode/client-runtime/state/projects";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@legioncode/client-runtime/state/runtime";
 import {
   deriveProjectGroupLabel,
   type ProjectGroup,
-} from "@t3tools/client-runtime/state/project-grouping";
-import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
+} from "@legioncode/client-runtime/state/project-grouping";
+import type { EnvironmentProject } from "@legioncode/client-runtime/state/shell";
 import { useNavigation } from "@react-navigation/native";
 import { useRef, useState } from "react";
 import { Platform, Pressable, View } from "react-native";
@@ -335,7 +335,7 @@ function ProjectOverviewContent(props: {
           size={48}
         />
         <View className="min-w-0 flex-1">
-          <Text className="text-xl font-t3-semibold text-foreground" numberOfLines={2}>
+          <Text className="text-xl font-legion-semibold text-foreground" numberOfLines={2}>
             {displayName}
           </Text>
           <Text className="text-sm text-foreground-muted">
@@ -348,7 +348,7 @@ function ProjectOverviewContent(props: {
 
       <SettingsSection title={gt("Project")}>
         <View className="gap-3 p-4">
-          <Text className="text-sm font-t3-medium text-foreground-muted">
+          <Text className="text-sm font-legion-medium text-foreground-muted">
             <T>Name</T>
           </Text>
           <View className="flex-row items-center gap-3">
@@ -488,7 +488,7 @@ function RemoveCheckoutAction(props: {
       onPress={props.onPress}
       className="self-start rounded-full border border-border bg-card px-3 py-1.5 disabled:opacity-40"
     >
-      <Text className="font-t3-medium text-xs text-danger-foreground">
+      <Text className="font-legion-medium text-xs text-danger-foreground">
         <T>Remove checkout</T>
       </Text>
     </Pressable>

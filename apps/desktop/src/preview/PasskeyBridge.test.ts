@@ -174,7 +174,7 @@ describe("installPasskeyBridge", () => {
     function FakeAssertionResponse() {}
     const create = vi.fn(async () => ({ success: false, error: "NotAllowedError" }));
     const get = vi.fn(async () => ({ success: true, data: assertionData }));
-    const bridgeKey = "__t3TestPasskeyBridge";
+    const bridgeKey = "__legioncodeTestPasskeyBridge";
     const sandbox: Record<string, unknown> = {
       CredentialsContainer: FakeCredentialsContainer,
       PublicKeyCredential: FakePublicKeyCredential,

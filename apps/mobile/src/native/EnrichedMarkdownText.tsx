@@ -1,9 +1,9 @@
-import { decodeComposerContextFragment } from "@t3tools/shared/composerContextClipboard";
+import { decodeComposerContextFragment } from "@legioncode/shared/composerContextClipboard";
 import {
   collectComposerContextReferences,
   formatComposerContextHref,
   formatComposerContextReference,
-} from "@t3tools/shared/composerContextReferences";
+} from "@legioncode/shared/composerContextReferences";
 import {
   markdownForNativeRendering,
   markdownWithFileEmbeds,
@@ -368,9 +368,9 @@ export function MobileEnrichedMarkdownText(props: SelectableMarkdownTextProps) {
     return {
       linkTextByUrl,
       htmlAttributes: {
-        "data-t3-context-fragment": encodeURIComponent(props.contextClipboardFragment!),
+        "data-legion-context-fragment": encodeURIComponent(props.contextClipboardFragment!),
       },
-      mimeTypes: { "app.t3.context-fragment": props.contextClipboardFragment! },
+      mimeTypes: { "dev.legioncode.context-fragment": props.contextClipboardFragment! },
     };
   }, [props.contextClipboardFragment, props.markdown]);
   const { fontScale } = useWindowDimensions();

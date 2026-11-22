@@ -18,6 +18,9 @@ pub struct HttpProject {
     pub title: String,
     /// Absolute workspace root directory path.
     pub workspace_root: String,
+    /// Canonical git repository identity descriptor (`null` until enriched).
+    #[serde(default)]
+    pub repository_identity: Option<Value>,
     /// Whether the title was explicitly customized by the user.
     pub has_custom_title: bool,
     /// Optional default model selection JSON object.
@@ -69,6 +72,7 @@ impl From<ProjectRecord> for HttpProject {
             id: r.id,
             title: r.title,
             workspace_root: r.workspace_root,
+            repository_identity: None,
             has_custom_title: r.has_custom_title,
             default_model_selection,
             default_thread_env_mode: r.default_thread_env_mode,
@@ -91,10 +95,12 @@ pub(crate) struct ProjectMutateRequest {
     #[serde(rename = "type")]
     pub op_type: Option<String>,
     pub action: Option<String>,
+    pub command_id: Option<String>,
     pub project_id: Option<String>,
     pub id: Option<String>,
     pub title: Option<String>,
     pub workspace_root: Option<String>,
+    pub create_workspace_root_if_missing: Option<bool>,
     pub scripts: Option<Value>,
     #[serde(default)]
     pub default_model_selection: PatchValue<Value>,

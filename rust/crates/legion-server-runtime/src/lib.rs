@@ -13,6 +13,7 @@ mod http_api_routes;
 pub mod http_auth;
 pub mod http_auth_admin;
 pub mod http_auth_guard;
+mod http_env;
 pub mod http_integrations;
 pub mod http_integrations_scm;
 pub mod http_mcp_signin;
@@ -62,6 +63,7 @@ pub use git_checkpoints::{
 pub use http_api::{RuntimeHttpState, runtime_api_router, runtime_full_router};
 pub use http_auth::{AuthenticatedPrincipal, authenticate_headers};
 pub use http_auth_guard::{authorize_request, authorize_scopes};
+pub use http_env::assets::SignedHttpUrl;
 pub use http_mcp_signin::{McpOAuthFlowConfig, McpSignInRegistry};
 pub use http_peer_relay_client::{
     relay_peer_thread_history, relay_peer_thread_item, relay_peer_thread_stream,

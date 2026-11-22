@@ -17,7 +17,7 @@ use serde_json::json;
 
 use crate::error::ServerRuntimeError;
 use crate::http_api::RuntimeHttpState;
-use crate::http_auth_guard::{authorize_request, parse_authorized_json};
+use crate::http_auth_guard::{authorize_request, authorize_scopes, parse_authorized_json};
 use crate::http_projects_models::{
     HttpProject, HttpProjectSnapshot, ProjectMutateRequest, apply_extra_fields,
 };
@@ -25,7 +25,7 @@ use crate::http_projects_read::{
     apply_saved_project_settings, apply_saved_project_settings_snapshot,
 };
 use crate::outbox_state::utc_now_iso;
-use legion_contracts::permissions::EnvironmentScope;
+use legion_contracts::permissions::{EnvironmentScope, required_scopes_for_project_mutation};
 
 /// `GET /api/projects` — return all non-deleted projects after `BUG-03` credential check.
 pub(crate) async fn handle_get_projects(
@@ -53,7 +53,7 @@ pub(crate) async fn handle_mutate_project(
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<Response, ServerRuntimeError> {
-    let (_principal, req): (_, ProjectMutateRequest) = parse_authorized_json(
+    let (principal, req): (_, ProjectMutateRequest) = parse_authorized_json(
         &state,
         &headers,
         &[EnvironmentScope::OrchestrationOperate],
@@ -66,6 +66,10 @@ pub(crate) async fn handle_mutate_project(
         .as_deref()
         .or(req.action.as_deref())
         .map_or("", str::trim);
+    let required_scopes = required_scopes_for_project_mutation(op, req.scripts.as_ref())
+        .map_err(|err| ServerRuntimeError::BadRequest(err.to_string()))?;
+    authorize_scopes(&principal, &required_scopes, true)?;
+    let is_v2_command = req.command_id.is_some();
 
     let conn = state
         .db()
@@ -90,8 +94,8 @@ pub(crate) async fn handle_mutate_project(
         }
         "project.delete" | "delete" => {
             let target = resolve_target(&req)?;
-            let _ = soft_delete_project(&*conn, &target, req.force.unwrap_or(false))?;
-            None
+            let deleted = soft_delete_project(&*conn, &target, req.force.unwrap_or(false))?;
+            is_v2_command.then(|| HttpProject::from(deleted.project))
         }
         other => {
             return Err(ServerRuntimeError::BadRequest(format!(
@@ -101,6 +105,9 @@ pub(crate) async fn handle_mutate_project(
     };
 
     let project = project.map(|p| apply_saved_project_settings(&state, p));
+    if is_v2_command && let Some(project_val) = project {
+        return Ok((StatusCode::OK, Json(project_val)).into_response());
+    }
     let snapshot = apply_saved_project_settings_snapshot(&state, build_snapshot(&conn)?);
     Ok((
         StatusCode::OK,
@@ -134,6 +141,11 @@ fn apply_create(
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .ok_or_else(|| ServerRuntimeError::BadRequest("missing workspaceRoot".to_owned()))?;
+    if req.create_workspace_root_if_missing == Some(true) && !std::path::Path::new(ws).exists() {
+        std::fs::create_dir_all(ws).map_err(|err| {
+            ServerRuntimeError::BadRequest(format!("failed to create workspaceRoot `{ws}`: {err}"))
+        })?;
+    }
     let mut input = CreateProjectInput::new(ws).with_now_iso(now_iso);
     if let Some(id) = req.project_id.as_deref().or(req.id.as_deref()) {
         input = input.with_project_id(id);

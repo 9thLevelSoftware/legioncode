@@ -1,12 +1,10 @@
 //! Authentication endpoints (`/api/auth/pair`, `/oauth/token`) and `BUG-03` credential guard.
 
-use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::Json;
-use axum::body::Bytes;
 use axum::extract::State;
-use axum::http::header::{AUTHORIZATION, CACHE_CONTROL, CONTENT_TYPE, COOKIE, PRAGMA, SET_COOKIE};
+use axum::http::header::{AUTHORIZATION, CACHE_CONTROL, COOKIE, PRAGMA, SET_COOKIE};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use legion_persistence::pairing_tokens::{
@@ -57,23 +55,6 @@ struct PairSuccessResponse {
     expires_in: i64,
 }
 
-#[derive(Debug, Deserialize)]
-struct OAuthTokenRequest {
-    grant_type: Option<String>,
-    subject_token: Option<String>,
-    token: Option<String>,
-    client_label: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-struct OAuthTokenResponse {
-    access_token: String,
-    issued_token_type: &'static str,
-    token_type: &'static str,
-    expires_in: i64,
-    scope: String,
-}
-
 pub(crate) fn now_unix_ms() -> i64 {
     let ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -97,22 +78,33 @@ pub fn authenticate_headers(
         .get(COOKIE)
         .and_then(|v| v.to_str().ok())
         .map(str::to_owned);
-    let primary_cookie = cookie_hdr
-        .as_deref()
-        .and_then(|raw| extract_cookie_value(raw, &state.cookie_name));
-    let dev_cookie = cookie_hdr
-        .as_deref()
-        .and_then(|raw| extract_cookie_value(raw, "legioncode_dev_auth"));
+    let primary_cookie = cookie_hdr.as_deref().and_then(|raw| {
+        extract_cookie_value(raw, &state.cookie_name)
+            .or_else(|| extract_cookie_by_prefix(raw, "legioncode_session_"))
+    });
+    let legacy_cookie = cookie_hdr.as_deref().and_then(|raw| {
+        (state.cookie_name != "legioncode_session")
+            .then(|| extract_cookie_value(raw, "legioncode_session"))
+            .flatten()
+    });
+    let dev_cookie = cookie_hdr.as_deref().and_then(|raw| {
+        extract_cookie_value(raw, "legioncode_dev_auth")
+            .or_else(|| extract_cookie_by_prefix(raw, "legioncode_dev_session_"))
+    });
 
     let selected = match CredentialPrecedence::select(&RequestCredentials {
         authorization: auth_hdr.as_deref(),
         primary_cookie: primary_cookie.as_deref(),
-        legacy_cookie: None,
+        legacy_cookie: legacy_cookie.as_deref(),
         dev_cookie: dev_cookie.as_deref(),
     }) {
         Ok(sel) => sel,
         Err(err) => {
-            if auth_hdr.is_some() || primary_cookie.is_some() || dev_cookie.is_some() {
+            if auth_hdr.is_some()
+                || primary_cookie.is_some()
+                || legacy_cookie.is_some()
+                || dev_cookie.is_some()
+            {
                 return Err(ServerRuntimeError::Unauthorized(err.to_string()));
             }
             if !state.require_auth {
@@ -185,43 +177,6 @@ pub(crate) async fn handle_pair(
     ))
 }
 
-/// `POST /oauth/token` — OAuth 2.0 RFC 8693 token exchange accepting JSON or form-urlencoded.
-pub(crate) async fn handle_oauth_token(
-    State(state): State<std::sync::Arc<RuntimeHttpState>>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Result<Response, ServerRuntimeError> {
-    let req = parse_oauth_body(&headers, &body)?;
-    if let Some(ref grant) = req.grant_type
-        && grant != "urn:ietf:params:oauth:grant-type:token-exchange"
-        && grant != "pairing_token"
-    {
-        return Err(ServerRuntimeError::BadRequest(format!(
-            "unsupported grant_type `{grant}`"
-        )));
-    }
-    let presented = req
-        .subject_token
-        .or(req.token)
-        .map(|s| s.trim().to_owned())
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| ServerRuntimeError::Unauthorized("missing subject_token".to_owned()))?;
-    let exchanged = exchange_token(&state, &presented, req.client_label.as_deref())?;
-    let payload = OAuthTokenResponse {
-        access_token: exchanged.token.clone(),
-        issued_token_type: "urn:ietf:params:oauth:token-type:access_token",
-        token_type: "Bearer",
-        expires_in: 3600,
-        scope: exchanged.scopes.join(" "),
-    };
-    Ok(build_session_response(
-        StatusCode::OK,
-        &payload,
-        &state.cookie_name,
-        &exchanged.token,
-    ))
-}
-
 fn exchange_token(
     state: &RuntimeHttpState,
     presented: &str,
@@ -253,33 +208,21 @@ fn build_session_response<T: Serialize>(
     resp
 }
 
-fn parse_oauth_body(
-    headers: &HeaderMap,
-    body: &[u8],
-) -> Result<OAuthTokenRequest, ServerRuntimeError> {
-    let is_json = headers
-        .get(CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(|ct| ct.to_ascii_lowercase().contains("application/json"));
-    if is_json || body.first().copied() == Some(b'{') {
-        return serde_json::from_slice(body).map_err(Into::into);
+fn extract_cookie_by_prefix(cookie_header: &str, prefix: &str) -> Option<String> {
+    for part in cookie_header.split(';') {
+        let trimmed = part.trim();
+        let Some((name, value)) = trimmed.split_once('=') else {
+            continue;
+        };
+        let val = value.trim();
+        if name.trim().starts_with(prefix) && !val.is_empty() {
+            return Some(val.to_owned());
+        }
     }
-    let text = std::str::from_utf8(body)
-        .map_err(|_| ServerRuntimeError::BadRequest("invalid UTF-8 form body".to_owned()))?;
-    let mut map: HashMap<String, String> = HashMap::new();
-    for pair in text.split('&').filter(|p| !p.is_empty()) {
-        let (k, v) = pair.split_once('=').unwrap_or((pair, ""));
-        map.insert(percent_decode_form(k)?, percent_decode_form(v)?);
-    }
-    Ok(OAuthTokenRequest {
-        grant_type: map.remove("grant_type"),
-        subject_token: map.remove("subject_token"),
-        token: map.remove("token"),
-        client_label: map.remove("client_label"),
-    })
+    None
 }
 
-fn percent_decode_form(raw: &str) -> Result<String, ServerRuntimeError> {
+pub(crate) fn percent_decode_form(raw: &str) -> Result<String, ServerRuntimeError> {
     let plus_replaced = raw.replace('+', " ");
     let bytes = plus_replaced.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());

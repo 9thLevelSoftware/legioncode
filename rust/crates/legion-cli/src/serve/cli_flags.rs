@@ -48,6 +48,7 @@ pub(crate) struct ParsedServerCli {
     pub(crate) auto_bootstrap: bool,
     pub(crate) tailscale_serve: bool,
     pub(crate) tailscale_serve_port: u16,
+    pub(crate) dev_url: Option<String>,
 }
 
 pub(crate) fn parse_server_cli_args(
@@ -61,16 +62,13 @@ pub(crate) fn parse_server_cli_args(
         let arg = &rest[idx];
         if !apply_server_flag(kind, rest, &mut idx, arg, &mut state)? {
             if arg.starts_with('-') {
-                return Err(fail_with_command_help(
-                    kind.help_path(),
+                return flag_err(
+                    kind,
                     &format!("Unrecognized flag: {arg} in command {}", kind.cmd_label()),
-                ));
+                );
             }
             if state.cwd_arg.is_some() {
-                return Err(fail_with_command_help(
-                    kind.help_path(),
-                    &format!("Unexpected argument: {arg}"),
-                ));
+                return flag_err(kind, &format!("Unexpected argument: {arg}"));
             }
             state.cwd_arg = Some(arg.clone());
         }
@@ -92,6 +90,7 @@ struct FlagAcc {
     auto_bootstrap: Option<bool>,
     tailscale_serve: Option<bool>,
     tailscale_serve_port: Option<u16>,
+    dev_url: Option<String>,
     cwd_arg: Option<String>,
 }
 
@@ -123,6 +122,8 @@ fn apply_valued_server_flag(
 ) -> Result<bool, i32> {
     if let Some(val) = read_opt_flag(kind, rest, idx, "base-dir")? {
         acc.base_dir = Some(val);
+    } else if let Some(val) = read_opt_flag(kind, rest, idx, "home-dir")? {
+        acc.base_dir = Some(val);
     } else if let Some(val) = read_opt_flag(kind, rest, idx, "host")? {
         acc.host = Some(val);
     } else if let Some(val) = read_opt_flag(kind, rest, idx, "static-dir")? {
@@ -135,37 +136,42 @@ fn apply_valued_server_flag(
         acc.mode = Some(match val.as_str() {
             "web" => ServeMode::Web,
             "desktop" => ServeMode::Desktop,
-            _ => {
-                return Err(fail_with_command_help(
-                    kind.help_path(),
-                    &format!(
-                        "Invalid value for flag --mode: \"{val}\". Expected: \"web\" | \"desktop\""
-                    ),
-                ));
-            }
+            _ => return bad_val(kind, "--mode", &val, "Expected: \"web\" | \"desktop\""),
         });
     } else if let Some(val) = read_opt_flag(kind, rest, idx, "dev-url")? {
         if !val.starts_with("http://") && !val.starts_with("https://") {
-            return Err(fail_with_command_help(
-                kind.help_path(),
-                &format!(
-                    "Invalid value for flag --dev-url: \"{val}\". Expected an http:// or https:// URL."
-                ),
-            ));
+            return bad_val(
+                kind,
+                "--dev-url",
+                &val,
+                "Expected an http:// or https:// URL.",
+            );
         }
+        acc.dev_url = Some(val.trim().trim_end_matches('/').to_owned());
     } else if let Some(val) = read_opt_flag(kind, rest, idx, "bootstrap-fd")? {
         if val.trim().parse::<u32>().is_err() {
-            return Err(fail_with_command_help(
-                kind.help_path(),
-                &format!(
-                    "Invalid value for flag --bootstrap-fd: \"{val}\". Expected a non-negative integer."
-                ),
-            ));
+            return bad_val(
+                kind,
+                "--bootstrap-fd",
+                &val,
+                "Expected a non-negative integer.",
+            );
         }
     } else {
         return Ok(false);
     }
     Ok(true)
+}
+
+fn flag_err<T>(kind: ServerEntryKind, msg: &str) -> Result<T, i32> {
+    Err(fail_with_command_help(kind.help_path(), msg))
+}
+
+fn bad_val<T>(kind: ServerEntryKind, flag: &str, val: &str, exp: &str) -> Result<T, i32> {
+    Err(fail_with_command_help(
+        kind.help_path(),
+        &format!("Invalid value for flag {flag}: \"{val}\". {exp}"),
+    ))
 }
 
 fn read_opt_flag(
@@ -174,23 +180,17 @@ fn read_opt_flag(
     idx: &mut usize,
     name: &str,
 ) -> Result<Option<String>, i32> {
-    take_flag_value(rest, idx, name).map_err(|()| {
-        fail_with_command_help(
-            kind.help_path(),
-            &format!("Missing value for flag --{name}"),
-        )
-    })
+    match take_flag_value(rest, idx, name) {
+        Ok(v) => Ok(v),
+        Err(()) => flag_err(kind, &format!("Missing value for flag --{name}")),
+    }
 }
 
 fn parse_port_value(kind: ServerEntryKind, flag: &str, raw: &str) -> Result<u16, i32> {
-    raw.trim().parse::<u16>().map_err(|_| {
-        fail_with_command_help(
-            kind.help_path(),
-            &format!(
-                "Invalid value for flag {flag}: \"{raw}\". Expected an integer between 0 and 65535."
-            ),
-        )
-    })
+    match raw.trim().parse::<u16>() {
+        Ok(port) => Ok(port),
+        Err(_) => bad_val(kind, flag, raw, "Expected an integer between 0 and 65535."),
+    }
 }
 
 fn build_parsed_config(kind: ServerEntryKind, acc: FlagAcc) -> Result<ParsedServerCli, i32> {
@@ -206,7 +206,16 @@ fn build_parsed_config(kind: ServerEntryKind, acc: FlagAcc) -> Result<ParsedServ
     }
 
     let (base_dir, base_dir_is_explicit) = resolve_base_dir(acc.base_dir.as_deref());
-    let mode = acc.mode.or_else(resolve_env_mode).unwrap_or(ServeMode::Web);
+    let mode = acc
+        .mode
+        .or_else(
+            || match resolve_env_nonempty("LEGIONCODE_MODE").as_deref() {
+                Some("web") => Some(ServeMode::Web),
+                Some("desktop") => Some(ServeMode::Desktop),
+                _ => None,
+            },
+        )
+        .unwrap_or(ServeMode::Web);
     let port = acc
         .port
         .or_else(|| {
@@ -218,10 +227,8 @@ fn build_parsed_config(kind: ServerEntryKind, acc: FlagAcc) -> Result<ParsedServ
     let host = acc
         .host
         .or_else(|| legion_contracts::brand::ACTIVE_BRAND.read_env("HOST"));
-    let lan = acc
-        .lan
-        .or_else(|| resolve_env_bool("LEGIONCODE_LAN"))
-        .unwrap_or(false);
+    let env_b = |v: Option<bool>, k| v.or_else(|| resolve_env_bool(k)).unwrap_or(false);
+    let lan = env_b(acc.lan, "LEGIONCODE_LAN");
     let no_browser = match kind {
         ServerEntryKind::Serve => true,
         ServerEntryKind::Root | ServerEntryKind::Start => acc
@@ -250,18 +257,23 @@ fn build_parsed_config(kind: ServerEntryKind, acc: FlagAcc) -> Result<ParsedServ
         )));
     }
     let auto_bootstrap = kind.allow_auto_bootstrap()
-        && acc
-            .auto_bootstrap
-            .or_else(|| resolve_env_bool("LEGIONCODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD"))
-            .unwrap_or(false);
-    let tailscale_serve = acc
-        .tailscale_serve
-        .or_else(|| resolve_env_bool("LEGIONCODE_TAILSCALE_SERVE"))
-        .unwrap_or(false);
+        && env_b(
+            acc.auto_bootstrap,
+            "LEGIONCODE_AUTO_BOOTSTRAP_PROJECT_FROM_CWD",
+        );
+    let tailscale_serve = env_b(acc.tailscale_serve, "LEGIONCODE_TAILSCALE_SERVE");
     let tailscale_serve_port = acc
         .tailscale_serve_port
-        .or_else(|| resolve_env_u16("LEGIONCODE_TAILSCALE_SERVE_PORT"))
+        .or_else(|| {
+            resolve_env_nonempty("LEGIONCODE_TAILSCALE_SERVE_PORT")?
+                .parse()
+                .ok()
+        })
         .unwrap_or(DEFAULT_TAILSCALE_SERVE_PORT);
+    let dev_url = acc
+        .dev_url
+        .or_else(|| resolve_env_nonempty("VITE_DEV_SERVER_URL"))
+        .map(|u| u.trim_end_matches('/').to_owned());
 
     Ok(ParsedServerCli {
         config: ServeConfig {
@@ -278,30 +290,22 @@ fn build_parsed_config(kind: ServerEntryKind, acc: FlagAcc) -> Result<ParsedServ
         auto_bootstrap,
         tailscale_serve,
         tailscale_serve_port,
+        dev_url,
     })
 }
 
 fn is_explicit_path_syntax(value: &str) -> bool {
-    let has_drive = value.len() >= 2
-        && value.as_bytes()[0].is_ascii_alphabetic()
-        && value.as_bytes()[1] == b':';
-    value == "."
-        || value == ".."
-        || value == "~"
-        || value.contains('/')
-        || value.contains('\\')
-        || (cfg!(windows) && has_drive)
+    let b = value.as_bytes();
+    matches!(value, "." | ".." | "~")
+        || value.contains(['/', '\\'])
+        || (cfg!(windows) && b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':')
 }
 
 fn resolve_env_nonempty(name: &str) -> Option<String> {
     env::var(name)
         .ok()
-        .map(|val| val.trim().to_owned())
-        .filter(|val| !val.is_empty())
-}
-
-fn resolve_env_u16(name: &str) -> Option<u16> {
-    resolve_env_nonempty(name)?.parse::<u16>().ok()
+        .map(|v| v.trim().to_owned())
+        .filter(|v| !v.is_empty())
 }
 
 fn resolve_env_bool(name: &str) -> Option<bool> {
@@ -312,10 +316,32 @@ fn resolve_env_bool(name: &str) -> Option<bool> {
     }
 }
 
-fn resolve_env_mode() -> Option<ServeMode> {
-    match resolve_env_nonempty("LEGIONCODE_MODE")?.as_str() {
-        "web" => Some(ServeMode::Web),
-        "desktop" => Some(ServeMode::Desktop),
-        _ => None,
+#[cfg(test)]
+mod tests {
+    use super::{ServerEntryKind, parse_server_cli_args};
+
+    #[test]
+    fn parses_home_dir_dev_url_and_serve_auto_bootstrap() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let temp = tempfile::tempdir()?;
+        let home = temp.path().join("custom-home");
+        let run = |k, s: String| {
+            parse_server_cli_args(k, &s.split('|').map(str::to_owned).collect::<Vec<_>>())
+        };
+        let p = run(ServerEntryKind::Root, format!("--home-dir={}|--dev-url=http://127.0.0.1:5173/|--auto-bootstrap-project-from-cwd|--no-browser", home.display())).map_err(|c| format!("exit {c}"))?;
+        assert!(
+            p.config.base_dir == home
+                && p.config.base_dir_is_explicit
+                && p.auto_bootstrap
+                && p.config.no_browser
+        );
+        assert_eq!(p.dev_url.as_deref(), Some("http://127.0.0.1:5173"));
+        let s = run(
+            ServerEntryKind::Serve,
+            format!("--home-dir={}|--port|0", home.display()),
+        )
+        .map_err(|c| format!("exit {c}"))?;
+        assert!(!s.auto_bootstrap && s.config.no_browser);
+        Ok(())
     }
 }

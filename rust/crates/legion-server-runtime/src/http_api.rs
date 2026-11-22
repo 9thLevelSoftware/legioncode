@@ -1,7 +1,7 @@
 //! Shared [`RuntimeHttpState`] and composable Axum routers for `legioncode serve`.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex as StdMutex};
 
 use axum::Router;
@@ -12,6 +12,17 @@ use rusqlite::Connection;
 
 use crate::error::ServerRuntimeError;
 use crate::http_api_routes::build_runtime_api_router;
+use crate::http_auth::{AuthenticatedPrincipal, now_unix_ms};
+use crate::http_env::assets::{
+    SignedHttpUrl, build_signed_asset_url, build_signed_attachment_upload_url,
+};
+use crate::http_env::auth_support::{WsTicketStore, derive_scoped_session_cookie_name};
+use crate::http_env::connect::ConnectRuntimeState;
+use crate::http_env::cors::{
+    generate_signing_secret, resolve_dev_allowed_origins, resolve_initial_auth_policy,
+    resolve_initial_dev_url,
+};
+use crate::http_env::voice_state::VoiceRuntimeState;
 use crate::http_mcp_signin::McpSignInRegistry;
 use crate::http_projects_read::ProjectSettingsOverride;
 use crate::preview_browser::PreviewBrowserRuntime;
@@ -57,6 +68,15 @@ pub struct RuntimeHttpState {
     pub project_settings_overrides: Arc<StdMutex<BTreeMap<String, ProjectSettingsOverride>>>,
     access_logs: Arc<StdMutex<Vec<String>>>,
     trace_write_lock: Arc<StdMutex<()>>,
+    pub(crate) dev_url: Option<String>,
+    pub(crate) dev_allowed_origins: Vec<String>,
+    pub(crate) server_port: Option<u16>,
+    pub(crate) auth_policy: String,
+    pub(crate) attachments_dir: PathBuf,
+    pub(crate) signed_asset_secret: [u8; 32],
+    pub(crate) ws_tickets: Arc<WsTicketStore>,
+    pub(crate) voice_state: Arc<StdMutex<VoiceRuntimeState>>,
+    pub(crate) connect_state: Arc<StdMutex<ConnectRuntimeState>>,
 }
 
 impl RuntimeHttpState {
@@ -64,6 +84,7 @@ impl RuntimeHttpState {
     pub fn new(db: Arc<StdMutex<Connection>>, logs_dir: impl Into<PathBuf>) -> Self {
         let logs = logs_dir.into();
         let secrets = logs.join("secrets");
+        let attachments_dir = logs.parent().unwrap_or(logs.as_path()).join("attachments");
         Self {
             db,
             cookie_name: "legioncode_session".to_owned(),
@@ -84,6 +105,15 @@ impl RuntimeHttpState {
             project_settings_overrides: Arc::new(StdMutex::new(BTreeMap::new())),
             access_logs: Arc::new(StdMutex::new(Vec::new())),
             trace_write_lock: Arc::new(StdMutex::new(())),
+            dev_url: resolve_initial_dev_url(),
+            dev_allowed_origins: resolve_dev_allowed_origins(),
+            server_port: None,
+            auth_policy: resolve_initial_auth_policy(),
+            attachments_dir,
+            signed_asset_secret: generate_signing_secret(),
+            ws_tickets: Arc::new(WsTicketStore::default()),
+            voice_state: Arc::new(StdMutex::new(VoiceRuntimeState::default())),
+            connect_state: Arc::new(StdMutex::new(ConnectRuntimeState::default())),
         }
     }
 
@@ -228,6 +258,63 @@ impl RuntimeHttpState {
     /// Returns recorded redacted HTTP access log lines (`#40133`).
     pub fn access_logs(&self) -> Vec<String> {
         self.access_logs.lock().ok().map_or_default(|g| g.clone())
+    }
+
+    /// Configures an explicit Vite dev URL admitted by browser CORS and OAuth redirects.
+    #[must_use]
+    pub fn with_dev_url(mut self, url: Option<String>) -> Self {
+        self.dev_url = url.map(|s| s.trim().trim_end_matches('/').to_owned());
+        self
+    }
+
+    /// Records the bound server port and derives the port-scoped session cookie name.
+    #[must_use]
+    pub fn with_port(mut self, port: u16) -> Self {
+        self.server_port = Some(port);
+        self.cookie_name =
+            derive_scoped_session_cookie_name(port, &self.logs_dir.to_string_lossy());
+        self
+    }
+
+    /// Overrides the advertised `ServerAuthDescriptor` policy string.
+    #[must_use]
+    pub fn with_auth_policy(mut self, policy: impl Into<String>) -> Self {
+        self.auth_policy = policy.into();
+        self
+    }
+
+    /// Atomically verifies and consumes a single-use WebSocket ticket minted by `/api/auth/websocket-ticket`.
+    pub fn consume_ws_ticket(
+        &self,
+        ticket: &str,
+        expected_use: Option<&str>,
+    ) -> Option<AuthenticatedPrincipal> {
+        self.ws_tickets.consume(ticket, expected_use, now_unix_ms())
+    }
+
+    /// Creates a short-lived HMAC-signed `/api/assets/...` URL for `path`.
+    pub fn create_signed_asset_url(
+        &self,
+        path: &Path,
+        filename: Option<&str>,
+        ttl_ms: Option<i64>,
+    ) -> Result<SignedHttpUrl, ServerRuntimeError> {
+        build_signed_asset_url(&self.signed_asset_secret, path, filename, ttl_ms)
+    }
+
+    /// Creates a short-lived HMAC-signed `/api/attachments/upload/...` URL for `attachment_id`.
+    pub fn create_attachment_upload_url(
+        &self,
+        attachment_id: &str,
+        max_bytes: Option<u64>,
+        ttl_ms: Option<i64>,
+    ) -> Result<SignedHttpUrl, ServerRuntimeError> {
+        build_signed_attachment_upload_url(
+            &self.signed_asset_secret,
+            attachment_id,
+            max_bytes,
+            ttl_ms,
+        )
     }
 }
 

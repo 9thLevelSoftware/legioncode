@@ -8,10 +8,7 @@ use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use legion_contracts::permissions::EnvironmentScope;
-use legion_persistence::auth_connect_devices::{
-    ConnectApproveOutcome, ConnectRevokeOutcome, approve_connect_device_by_code,
-    list_connect_devices, revoke_connect_device_by_code,
-};
+use legion_persistence::auth_connect_devices::list_connect_devices;
 use legion_persistence::auth_mutations::{
     IssueSessionInput, issue_scoped_session, parse_cli_duration_ms, revoke_pairing_link,
     revoke_session,
@@ -46,12 +43,6 @@ pub(crate) struct CreateSessionRequest {
     ttl: Option<String>,
     label: Option<String>,
     subject: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct ConnectDeviceCodeRequest {
-    code: String,
 }
 
 /// `GET /api/auth/pairing` — list active unconsumed pairing links (`AccessRead`).
@@ -216,98 +207,6 @@ pub(crate) async fn handle_list_connect_devices(
         Json(json!({ "waiting": waiting, "trusted": trusted })),
     )
         .into_response())
-}
-
-/// `POST /api/auth/connect-devices/approve` — approve a waiting Connect device (`AccessWrite`).
-pub(crate) async fn handle_approve_connect_device(
-    State(state): State<Arc<RuntimeHttpState>>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Result<Response, ServerRuntimeError> {
-    let (_principal, req): (_, ConnectDeviceCodeRequest) = parse_authorized_json(
-        &state,
-        &headers,
-        &[EnvironmentScope::AccessWrite],
-        true,
-        &body,
-    )?;
-    let outcome = {
-        let conn = state
-            .db()
-            .lock()
-            .map_err(|_| ServerRuntimeError::Persistence("db mutex poisoned".to_owned()))?;
-        approve_connect_device_by_code(&conn, &req.code)?
-    };
-    match outcome {
-        ConnectApproveOutcome::Approved {
-            pairing_link_id,
-            proof_key_thumbprint,
-            verification_code,
-        } => Ok((
-            StatusCode::OK,
-            Json(json!({
-                "approved": true,
-                "pairingLinkId": pairing_link_id,
-                "proofKeyThumbprint": proof_key_thumbprint,
-                "verificationCode": verification_code,
-            })),
-        )
-            .into_response()),
-        ConnectApproveOutcome::NotFound => Err(ServerRuntimeError::NotFound(format!(
-            "no waiting Connect device matching `{}`",
-            req.code
-        ))),
-        ConnectApproveOutcome::Ambiguous { match_count } => {
-            Err(ServerRuntimeError::Conflict(format!(
-                "verification code `{}` matched {match_count} waiting devices",
-                req.code
-            )))
-        }
-    }
-}
-
-/// `POST /api/auth/connect-devices/revoke` — revoke a trusted Connect device (`AccessWrite`).
-pub(crate) async fn handle_revoke_connect_device(
-    State(state): State<Arc<RuntimeHttpState>>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Result<Response, ServerRuntimeError> {
-    let (_principal, req): (_, ConnectDeviceCodeRequest) = parse_authorized_json(
-        &state,
-        &headers,
-        &[EnvironmentScope::AccessWrite],
-        true,
-        &body,
-    )?;
-    let outcome = {
-        let conn = state
-            .db()
-            .lock()
-            .map_err(|_| ServerRuntimeError::Persistence("db mutex poisoned".to_owned()))?;
-        revoke_connect_device_by_code(&conn, &req.code)?
-    };
-    match outcome {
-        ConnectRevokeOutcome::Revoked {
-            proof_key_thumbprint,
-        } => Ok((
-            StatusCode::OK,
-            Json(json!({
-                "revoked": true,
-                "proofKeyThumbprint": proof_key_thumbprint,
-            })),
-        )
-            .into_response()),
-        ConnectRevokeOutcome::NotFound => Err(ServerRuntimeError::NotFound(format!(
-            "no trusted Connect device matching `{}`",
-            req.code
-        ))),
-        ConnectRevokeOutcome::Ambiguous { match_count } => {
-            Err(ServerRuntimeError::Conflict(format!(
-                "verification code `{}` matched {match_count} trusted devices",
-                req.code
-            )))
-        }
-    }
 }
 
 fn resolve_pairing_ttl_ms(

@@ -204,7 +204,7 @@ run_switch() {
       echo "  unset $name"
     done
     echo "Mobile FFI sync: pnpm --filter @legioncode/mobile sync:rust-ffi"
-    echo "Worker staging : pnpm --filter legioncode-relay stage:rust && pnpm --filter @legioncode/task-cache stage:rust"
+    echo "Worker staging : pnpm --filter @legioncode/relay stage:rust && pnpm --filter @legioncode/task-cache stage:rust"
 
     if [[ "$apply" == "true" ]]; then
       cd "$REPO_ROOT"

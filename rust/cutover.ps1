@@ -199,7 +199,7 @@ function Invoke-Switch {
       Write-Host "  Remove-Item Env:$name -ErrorAction SilentlyContinue"
     }
     Write-Host "Mobile FFI sync: pnpm --filter @legioncode/mobile sync:rust-ffi"
-    Write-Host "Worker staging : pnpm --filter legioncode-relay stage:rust && pnpm --filter @legioncode/task-cache stage:rust"
+    Write-Host "Worker staging : pnpm --filter @legioncode/relay stage:rust && pnpm --filter @legioncode/task-cache stage:rust"
 
     if ($Apply) {
       Push-Location $RepoRoot

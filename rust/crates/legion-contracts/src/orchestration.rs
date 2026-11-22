@@ -116,5 +116,5 @@ pub use stream::{StreamItem, ThreadProjection};
 pub use wire_command::{
     ProjectCreateWireCommand, ProjectUpdateWireCommand, ProjectWireCommand, ThreadEnvMode,
     WireClientCommand, decode_wire_client_command, decode_wire_orchestration_command,
-    sha256_digest,
+    default_wire_provider_capabilities, sha256_digest,
 };

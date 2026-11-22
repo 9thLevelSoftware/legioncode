@@ -229,9 +229,20 @@ impl EventSubscriber {
 }
 
 /// Fan-out publisher delivering [`PersistedEvent`] batches strictly after outermost commit (`BUG-01`).
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct EventPubSub {
     subscribers: Mutex<Vec<UnboundedSender<PersistedEvent>>>,
+    seq_tx: tokio::sync::watch::Sender<i64>,
+}
+
+impl Default for EventPubSub {
+    fn default() -> Self {
+        let (seq_tx, _) = tokio::sync::watch::channel(0);
+        Self {
+            subscribers: Mutex::new(Vec::new()),
+            seq_tx,
+        }
+    }
 }
 
 impl EventPubSub {
@@ -251,7 +262,25 @@ impl EventPubSub {
         EventSubscriber { rx }
     }
 
+    /// Subscribes to monotonically increasing sequence updates (covering thread and project mutations).
+    pub fn subscribe_sequences(&self) -> tokio::sync::watch::Receiver<i64> {
+        self.seq_tx.subscribe()
+    }
+
+    /// Bumps the monotonic sequence signal when an external mutation commits to `orchestration_events`.
+    pub fn notify_external_sequence(&self, seq: i64) {
+        self.seq_tx.send_if_modified(|cur| {
+            if seq > *cur {
+                *cur = seq;
+                true
+            } else {
+                false
+            }
+        });
+    }
+
     pub(crate) fn publish_batch(&self, events: &[PersistedEvent]) {
+        let max_seq = events.iter().map(|ev| ev.sequence).max();
         let mut subs = self
             .subscribers
             .lock()
@@ -264,5 +293,9 @@ impl EventPubSub {
             }
             true
         });
+        drop(subs);
+        if let Some(seq) = max_seq {
+            self.notify_external_sequence(seq);
+        }
     }
 }

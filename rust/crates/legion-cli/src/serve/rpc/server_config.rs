@@ -42,12 +42,7 @@ async fn get_config(state: &Arc<AppState>) -> RpcExit {
     RpcExit::Success {
         value: json!({
             "environment": state.descriptor,
-            "auth": {
-                "policy": "loopback-browser",
-                "bootstrapMethods": ["one-time-token"],
-                "sessionMethods": ["browser-session-cookie", "bearer-access-token", "dpop-access-token"],
-                "sessionCookieName": "legioncode_session",
-            },
+            "auth": state.runtime_http.auth_descriptor_json(),
             "cwd": cwd,
             "keybindingsConfigPath": state.paths.keybindings_config_path.to_string_lossy(),
             "keybindings": keybindings,
@@ -56,14 +51,16 @@ async fn get_config(state: &Arc<AppState>) -> RpcExit {
             "availableEditors": available_editors,
             "observability": {
                 "logsDirectoryPath": state.paths.logs_dir.to_string_lossy(),
-                "serverLogPath": state.paths.server_trace_path.to_string_lossy(),
-                "traceFilePath": state.paths.server_trace_path.to_string_lossy(),
+                "localTracingEnabled": true,
+                "otlpTracesEnabled": false,
+                "otlpMetricsEnabled": false,
+                "otlpLogsEnabled": false,
             },
             "settings": settings,
             "shellThreadFamilies": true,
             "shellOlderSettled": true,
             "threadSnapshotPagination": true,
-            "usageLimitSources": [],
+            "serverTime": utc_now_iso(),
         }),
     }
 }

@@ -86,30 +86,15 @@ async fn stream_server_config(ctx: &StreamContext) -> RpcExit {
 
 async fn build_server_config(ctx: &StreamContext) -> Value {
     let state = &ctx.state;
-    let providers = state
-        .runtime_http
-        .probe_service()
-        .discover_local_providers()
-        .await;
+    let providers = crate::serve::rpc::server_config::build_server_providers_list(state).await;
     let cwd = std::env::current_dir().map_or_else(|_| ".".to_owned(), |p| p.display().to_string());
     let kb_path = state.paths.keybindings_config_path.display().to_string();
     let (keybindings, issues) = load_keybindings(&state.paths.keybindings_config_path);
     let settings = load_settings_json(&state.paths.settings_path);
-    let auth_policy = if state.runtime_http.require_auth {
-        "loopback-browser"
-    } else {
-        "unsafe-no-auth"
-    };
 
     json!({
         "environment": state.descriptor,
-        "auth": {
-            "policy": auth_policy,
-            "bootstrapMethods": ["one-time-token"],
-            "sessionMethods": ["browser-session-cookie", "bearer-access-token"],
-            "sessionCookieName": state.runtime_http.cookie_name,
-            "serverUpdateScope": "environment:maintain",
-        },
+        "auth": state.runtime_http.auth_descriptor_json(),
         "cwd": non_empty_str(&cwd, "."),
         "keybindingsConfigPath": non_empty_str(&kb_path, "keybindings.json"),
         "keybindings": keybindings,
@@ -183,51 +168,25 @@ fn file_mtime(path: &Path) -> Option<SystemTime> {
 }
 
 fn load_settings_json(path: &Path) -> Value {
-    let Ok(raw) = std::fs::read_to_string(path) else {
-        return json!({});
-    };
-    let Ok(mut val) = serde_json::from_str::<Value>(&raw) else {
-        return json!({});
-    };
-    if let Some(obj) = val.as_object_mut() {
-        if let Some(speech) = obj
-            .get_mut("cloudSpeechCredentials")
-            .and_then(Value::as_object_mut)
-        {
-            for v in speech.values_mut() {
-                if let Some(s) = v.as_str()
-                    && !s.is_empty()
-                {
-                    *v = Value::String(String::new());
-                }
+    let mut val =
+        crate::serve::rpc::server_settings::read_settings_json(path).unwrap_or_else(|_| json!({}));
+    if let Some(speech) = val
+        .get_mut("cloudSpeechCredentials")
+        .and_then(Value::as_object_mut)
+    {
+        for v in speech.values_mut() {
+            if let Some(s) = v.as_str()
+                && !s.is_empty()
+            {
+                *v = Value::String(String::new());
             }
         }
-        return Value::Object(obj.clone());
     }
-    json!({})
+    val
 }
 
 fn load_keybindings(path: &Path) -> (Vec<Value>, Vec<Value>) {
-    let Ok(raw) = std::fs::read_to_string(path) else {
-        return (Vec::new(), Vec::new());
-    };
-    match serde_json::from_str::<Value>(&raw) {
-        Ok(Value::Array(items)) => (items, Vec::new()),
-        Ok(_) => (
-            Vec::new(),
-            vec![json!({
-                "kind": "keybindings.malformed-config",
-                "message": "Expected a JSON array of keybinding rules",
-            })],
-        ),
-        Err(err) => (
-            Vec::new(),
-            vec![json!({
-                "kind": "keybindings.malformed-config",
-                "message": err.to_string(),
-            })],
-        ),
-    }
+    crate::serve::rpc::server_settings::read_keybindings_with_issues(path)
 }
 
 fn detect_available_editors() -> Vec<&'static str> {

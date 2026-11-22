@@ -6,6 +6,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use legion_persistence::CancellationToken;
 use legion_persistence::pairing_tokens::{
     ADMINISTRATIVE_CLIENT_SCOPES, IssuePairingTokenInput, issue_pairing_token,
 };
@@ -17,7 +18,7 @@ use legion_shared::qr_code::build_pairing_url;
 
 use super::cli_flags::{ServerEntryKind, parse_server_cli_args};
 use super::config::ServeMode;
-use super::{UNIT_SERVE, spawn_server, wait_for_shutdown};
+use super::{UNIT_SERVE, spawn_server_with_dev_url};
 use crate::fallback::{delegate_to_node, unit_forced_original};
 
 /// Runs `legioncode`, `legioncode start`, or `legioncode serve` natively without implicit Node delegation.
@@ -62,7 +63,7 @@ pub(crate) async fn run_entry(
         .tailscale_serve
         .then_some(parsed.tailscale_serve_port);
 
-    let server = match spawn_server(parsed.config).await {
+    let server = match spawn_server_with_dev_url(parsed.config, dev_url.clone()).await {
         Ok(srv) => srv,
         Err(err) => {
             eprintln!("{err}");
@@ -185,4 +186,30 @@ fn open_browser_best_effort(url: &str) {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn();
+}
+
+pub(super) async fn wait_for_shutdown(fence: &CancellationToken) {
+    #[cfg(unix)]
+    {
+        let mut sigterm =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).ok();
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            () = async {
+                if let Some(ref mut term) = sigterm {
+                    term.recv().await;
+                } else {
+                    std::future::pending::<()>().await;
+                }
+            } => {}
+            () = fence.cancelled() => {}
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => {}
+            () = fence.cancelled() => {}
+        }
+    }
 }

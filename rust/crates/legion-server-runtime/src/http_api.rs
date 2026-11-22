@@ -283,6 +283,12 @@ impl RuntimeHttpState {
         self
     }
 
+    /// Returns the wire `ServerAuthDescriptor` JSON value matching `/api/auth/session`.
+    pub fn auth_descriptor_json(&self) -> serde_json::Value {
+        serde_json::to_value(crate::http_env::auth_support::build_auth_descriptor(self))
+            .unwrap_or(serde_json::Value::Null)
+    }
+
     /// Atomically verifies and consumes a single-use WebSocket ticket minted by `/api/auth/websocket-ticket`.
     pub fn consume_ws_ticket(
         &self,

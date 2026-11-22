@@ -1,14 +1,6 @@
 //! Modular Safe Rust WebSocket RPC dispatchers covering every unary method in
 //! `WS_METHODS` and `ORCHESTRATION_V2_WS_METHODS` (`@legioncode/contracts`).
 
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "Dispatched by ws_mcp after Stage B p2b-ws-stream integration."
-    )
-)]
-
 mod agent_sessions;
 mod assets_attachments;
 mod fs_browse;
@@ -33,9 +25,9 @@ mod scm_issues;
 mod scm_prs;
 mod scm_prs_actions;
 mod scm_prs_issues;
-mod server_config;
+pub(crate) mod server_config;
 mod server_ops;
-mod server_settings;
+pub(crate) mod server_settings;
 mod server_telemetry;
 mod server_updates;
 mod tasks_sessions_mcp;

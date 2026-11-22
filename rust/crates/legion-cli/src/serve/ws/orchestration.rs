@@ -59,60 +59,13 @@ async fn stream_shell(ctx: &StreamContext, payload: Value) -> RpcExit {
     };
     let env_id = ctx.state.descriptor.environment_id.as_str();
     let mut sub = ctx.state.orchestrator.sink().pubsub().subscribe();
+    let mut seq_rx = ctx.state.orchestrator.sink().pubsub().subscribe_sequences();
 
-    let (initial_items, mut cursor, halt_after_emit) = {
-        let Ok(conn) = ctx.state.orchestrator.sink().db().lock() else {
-            return rpc_fail("OrchestrationV2GetShellSnapshotError", "db mutex poisoned");
+    let (initial_items, mut cursor, halt_after_emit) =
+        match load_initial_shell_items(ctx, &input, env_id, options) {
+            Ok(loaded) => loaded,
+            Err(exit) => return exit,
         };
-        if let Some(after_seq) = input.after_sequence {
-            match build_wire_shell_patch_from_events(&conn, after_seq, env_id, None) {
-                Ok(patch)
-                    if matches!(patch.as_slice(), [WireShellStreamEvent::SnapshotRequired]) =>
-                {
-                    if input.http_snapshot_fallback == Some(true) {
-                        (
-                            vec![WireShellStreamEvent::SnapshotRequired],
-                            after_seq,
-                            true,
-                        )
-                    } else {
-                        match build_full_shell_snapshot_item(&conn, env_id, options) {
-                            Ok((snap_ev, seq)) => (
-                                vec![snap_ev, WireShellStreamEvent::Synchronized],
-                                seq,
-                                false,
-                            ),
-                            Err(err) => {
-                                return rpc_fail("OrchestrationV2GetShellSnapshotError", &err);
-                            }
-                        }
-                    }
-                }
-                Ok(patch) => {
-                    let max_seq = patch
-                        .iter()
-                        .filter_map(shell_event_sequence)
-                        .max()
-                        .unwrap_or(after_seq);
-                    let mut items = patch;
-                    items.push(WireShellStreamEvent::Synchronized);
-                    (items, max_seq, false)
-                }
-                Err(err) => {
-                    return rpc_fail("OrchestrationV2GetShellSnapshotError", &err.to_string());
-                }
-            }
-        } else {
-            match build_full_shell_snapshot_item(&conn, env_id, options) {
-                Ok((snap_ev, seq)) => (
-                    vec![snap_ev, WireShellStreamEvent::Synchronized],
-                    seq,
-                    false,
-                ),
-                Err(err) => return rpc_fail("OrchestrationV2GetShellSnapshotError", &err),
-            }
-        }
-    };
 
     for item in initial_items {
         let Ok(val) = serde_json::to_value(&item) else {
@@ -130,16 +83,29 @@ async fn stream_shell(ctx: &StreamContext, payload: Value) -> RpcExit {
     }
 
     let ready = sub.drain_ready();
-    let max_ready = ready.iter().map(|ev| ev.sequence).max().unwrap_or(cursor);
+    let max_ready = ready
+        .iter()
+        .map(|ev| ev.sequence)
+        .fold(*seq_rx.borrow_and_update(), i64::max);
     if max_ready > cursor && !emit_shell_patch(ctx, &mut cursor, max_ready, env_id).await {
         return RpcExit::Success { value: Value::Null };
     }
 
-    while let Some(ev) = sub.recv().await {
-        let mut max_seq = ev.sequence;
-        for extra in sub.drain_ready() {
-            max_seq = max_seq.max(extra.sequence);
-        }
+    loop {
+        let max_seq = tokio::select! {
+            ev = sub.recv() => {
+                let Some(ev) = ev else { break; };
+                sub.drain_ready()
+                    .into_iter()
+                    .fold(ev.sequence, |acc, extra| acc.max(extra.sequence))
+            }
+            changed = seq_rx.changed() => {
+                if changed.is_err() {
+                    break;
+                }
+                *seq_rx.borrow_and_update()
+            }
+        };
         if max_seq <= cursor {
             continue;
         }
@@ -148,6 +114,56 @@ async fn stream_shell(ctx: &StreamContext, payload: Value) -> RpcExit {
         }
     }
     RpcExit::Success { value: Value::Null }
+}
+
+fn load_initial_shell_items(
+    ctx: &StreamContext,
+    input: &SubscribeShellInput,
+    env_id: &str,
+    options: WireShellOptions,
+) -> Result<(Vec<WireShellStreamEvent>, i64, bool), RpcExit> {
+    let conn = ctx
+        .state
+        .orchestrator
+        .sink()
+        .db()
+        .lock()
+        .map_err(|_| rpc_fail("OrchestrationV2GetShellSnapshotError", "db mutex poisoned"))?;
+    let Some(after_seq) = input.after_sequence else {
+        let (snap_ev, seq) = build_full_shell_snapshot_item(&conn, env_id, options)
+            .map_err(|err| rpc_fail("OrchestrationV2GetShellSnapshotError", &err))?;
+        return Ok((
+            vec![snap_ev, WireShellStreamEvent::Synchronized],
+            seq,
+            false,
+        ));
+    };
+    let patch = build_wire_shell_patch_from_events(&conn, after_seq, env_id, None)
+        .map_err(|err| rpc_fail("OrchestrationV2GetShellSnapshotError", &err.to_string()))?;
+    if matches!(patch.as_slice(), [WireShellStreamEvent::SnapshotRequired]) {
+        if input.http_snapshot_fallback == Some(true) {
+            return Ok((
+                vec![WireShellStreamEvent::SnapshotRequired],
+                after_seq,
+                true,
+            ));
+        }
+        let (snap_ev, seq) = build_full_shell_snapshot_item(&conn, env_id, options)
+            .map_err(|err| rpc_fail("OrchestrationV2GetShellSnapshotError", &err))?;
+        return Ok((
+            vec![snap_ev, WireShellStreamEvent::Synchronized],
+            seq,
+            false,
+        ));
+    }
+    let max_seq = patch
+        .iter()
+        .filter_map(shell_event_sequence)
+        .max()
+        .unwrap_or(after_seq);
+    let mut items = patch;
+    items.push(WireShellStreamEvent::Synchronized);
+    Ok((items, max_seq, false))
 }
 
 fn build_full_shell_snapshot_item(

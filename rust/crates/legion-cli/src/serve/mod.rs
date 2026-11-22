@@ -160,6 +160,14 @@ impl Drop for RunningServer {
 
 /// Starts the Safe Rust HTTP/WebSocket/MCP server and returns a [`RunningServer`] handle.
 pub async fn spawn_server(config: ServeConfig) -> Result<RunningServer, ServeError> {
+    spawn_server_with_dev_url(config, None).await
+}
+
+/// Starts the Safe Rust HTTP/WebSocket/MCP server with an explicit Vite `--dev-url` override.
+pub async fn spawn_server_with_dev_url(
+    config: ServeConfig,
+    dev_url: Option<String>,
+) -> Result<RunningServer, ServeError> {
     let paths = ServerDerivedPaths::derive(&config.base_dir, false, config.base_dir_is_explicit);
     ensure_server_directories(&paths)?;
     let env_id_raw = ensure_environment_id(&paths.environment_id_path)?;
@@ -202,21 +210,20 @@ pub async fn spawn_server(config: ServeConfig) -> Result<RunningServer, ServeErr
     }
     let published = owner_lock.publish(runtime_state)?;
 
-    let outbox_executor = RuntimeOutboxExecutor::new(Arc::clone(&orchestrator));
-    let outbox_worker =
-        orchestrator.spawn_outbox_worker(outbox_executor, OutboxWorkerOptions::default());
-    let terminal_runtime = Arc::new(TerminalRuntime::default());
-    let dev_auth_token = legion_contracts::brand::ACTIVE_BRAND
-        .read_env("DEV_AUTH_TOKEN")
-        .map(|v| v.trim().to_owned());
-    let runtime_http = Arc::new(
-        RuntimeHttpState::new(Arc::clone(orchestrator.sink().db()), paths.logs_dir.clone())
-            .with_static_dir(config.static_dir.clone())
-            .with_dev_auth_token(dev_auth_token)
-            .with_orchestrator(Arc::clone(&orchestrator))
-            .with_terminal_runtime(Arc::clone(&terminal_runtime)),
+    let outbox_worker = orchestrator.spawn_outbox_worker(
+        RuntimeOutboxExecutor::new(Arc::clone(&orchestrator)),
+        OutboxWorkerOptions::default(),
     );
-
+    let terminal_runtime = Arc::new(TerminalRuntime::default());
+    let runtime_http = build_runtime_http_state(
+        &config,
+        &paths,
+        bind_host,
+        local_addr.port(),
+        &orchestrator,
+        &terminal_runtime,
+        dev_url,
+    );
     let state = Arc::new(AppState {
         descriptor,
         orchestrator: Arc::clone(&orchestrator),
@@ -227,25 +234,19 @@ pub async fn spawn_server(config: ServeConfig) -> Result<RunningServer, ServeErr
         live_clients: Mutex::new(HashSet::new()),
         output_windows: Mutex::new(OutputWindowRegistry::new()),
     });
-
     let router = build_server_router(state, runtime_http, config.static_dir);
-
-    let nodelay_listener = listener.tap_io(|stream| {
-        let _ = stream.set_nodelay(true);
+    let nodelay_listener = listener.tap_io(|s| {
+        let _ = s.set_nodelay(true);
     });
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
     let fence_wait = fence.clone();
     let task = tokio::spawn(async move {
         axum::serve(nodelay_listener, router)
             .with_graceful_shutdown(async move {
-                tokio::select! {
-                    _ = shutdown_rx => {}
-                    () = fence_wait.cancelled() => {}
-                }
+                tokio::select! { _ = shutdown_rx => {} () = fence_wait.cancelled() => {} }
             })
             .await
     });
-
     Ok(RunningServer {
         addr: local_addr,
         origin: published.origin,
@@ -259,6 +260,39 @@ pub async fn spawn_server(config: ServeConfig) -> Result<RunningServer, ServeErr
         shutdown_tx: Some(shutdown_tx),
         task: Some(task),
     })
+}
+
+fn build_runtime_http_state(
+    config: &ServeConfig,
+    paths: &ServerDerivedPaths,
+    bind_host: &str,
+    port: u16,
+    orchestrator: &Arc<Orchestrator>,
+    terminal_runtime: &Arc<TerminalRuntime>,
+    dev_url: Option<String>,
+) -> Arc<RuntimeHttpState> {
+    let dev_auth_token = legion_contracts::brand::ACTIVE_BRAND
+        .read_env("DEV_AUTH_TOKEN")
+        .map(|v| v.trim().to_owned());
+    let auth_policy = if config.mode == ServeMode::Desktop {
+        "desktop-managed-local"
+    } else if config.lan || !matches!(bind_host, "127.0.0.1" | "localhost" | "::1") {
+        "remote-reachable"
+    } else {
+        "loopback-browser"
+    };
+    let mut rt =
+        RuntimeHttpState::new(Arc::clone(orchestrator.sink().db()), paths.logs_dir.clone())
+            .with_static_dir(config.static_dir.clone())
+            .with_dev_auth_token(dev_auth_token)
+            .with_port(port)
+            .with_auth_policy(auth_policy)
+            .with_orchestrator(Arc::clone(orchestrator))
+            .with_terminal_runtime(Arc::clone(terminal_runtime));
+    if dev_url.is_some() {
+        rt = rt.with_dev_url(dev_url);
+    }
+    Arc::new(rt)
 }
 
 fn build_server_router(
@@ -294,30 +328,4 @@ async fn handle_environment(
 /// CLI runner for `legioncode serve`, handling flags natively and honoring `RUST_ANYTHING_UNIT_SERVE=original`.
 pub async fn run(args: &[String]) -> i32 {
     cli_entry::run_entry(cli_flags::ServerEntryKind::Serve, args, args).await
-}
-
-async fn wait_for_shutdown(fence: &CancellationToken) {
-    #[cfg(unix)]
-    {
-        let mut sigterm =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).ok();
-        tokio::select! {
-            _ = tokio::signal::ctrl_c() => {}
-            () = async {
-                if let Some(ref mut term) = sigterm {
-                    term.recv().await;
-                } else {
-                    std::future::pending::<()>().await;
-                }
-            } => {}
-            () = fence.cancelled() => {}
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        tokio::select! {
-            _ = tokio::signal::ctrl_c() => {}
-            () = fence.cancelled() => {}
-        }
-    }
 }

@@ -90,7 +90,17 @@ pub(super) fn authenticate_ws_upgrade(
     query: &WsQueryParams,
 ) -> Result<WsPrincipal, WsUpgradeRejection> {
     if let Some(ref ticket) = query.ticket {
-        return verify_token_credential(state, ticket)
+        let trimmed = ticket.trim();
+        if let Some(principal) = state
+            .runtime_http
+            .consume_ws_ticket(trimmed, Some("rpc"))
+            .or_else(|| state.runtime_http.consume_ws_ticket(trimmed, None))
+        {
+            return Ok(WsPrincipal {
+                session_id: principal.session_id,
+            });
+        }
+        return verify_token_credential(state, trimmed)
             .ok_or_else(|| unauthorized("invalid or expired WebSocket ticket"));
     }
 
@@ -101,7 +111,9 @@ pub(super) fn authenticate_ws_upgrade(
     let has_auth_hdr = headers.contains_key(AUTHORIZATION);
     let has_named_cookie = extract_cookie_value(cookie_raw, &state.runtime_http.cookie_name)
         .is_some()
-        || extract_cookie_value(cookie_raw, DEV_AUTH_COOKIE_NAME).is_some();
+        || extract_cookie_value(cookie_raw, "legioncode_session").is_some()
+        || extract_cookie_value(cookie_raw, DEV_AUTH_COOKIE_NAME).is_some()
+        || find_prefixed_cookie(cookie_raw, "legioncode_dev_session_").is_some();
 
     if has_auth_hdr || has_named_cookie {
         return authenticate_headers(&state.runtime_http, headers)
@@ -111,7 +123,7 @@ pub(super) fn authenticate_ws_upgrade(
             .map_err(|_| unauthorized("invalid WebSocket credentials"));
     }
 
-    if let Some(prefixed_token) = find_prefixed_session_cookie(cookie_raw) {
+    if let Some(prefixed_token) = find_prefixed_cookie(cookie_raw, SESSION_COOKIE_PREFIX) {
         return verify_token_credential(state, &prefixed_token)
             .ok_or_else(|| unauthorized("invalid session cookie"));
     }
@@ -165,13 +177,13 @@ fn unauthorized(msg: &str) -> WsUpgradeRejection {
     }
 }
 
-fn find_prefixed_session_cookie(cookie_header: &str) -> Option<String> {
+fn find_prefixed_cookie(cookie_header: &str, prefix: &str) -> Option<String> {
     for segment in cookie_header.split(';') {
         let trimmed = segment.trim();
         let Some((name, val)) = trimmed.split_once('=') else {
             continue;
         };
-        if name.trim().starts_with(SESSION_COOKIE_PREFIX) {
+        if name.trim().starts_with(prefix) {
             let value = val.trim();
             if !value.is_empty() {
                 return Some(value.to_owned());

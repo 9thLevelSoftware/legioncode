@@ -299,6 +299,12 @@ fn normalize_checkpoint_revert(obj: &Map<String, Value>) -> Value {
     Value::Object(out)
 }
 
+/// Returns the default structured `OrchestrationV2ProviderCapabilities` JSON object.
+pub fn default_wire_provider_capabilities() -> Value {
+    serde_json::from_str(include_str!("default_wire_provider_capabilities.json"))
+        .unwrap_or(Value::Null)
+}
+
 /// Computes raw 32-byte SHA-256 digest of `bytes`.
 pub fn sha256_digest(bytes: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();

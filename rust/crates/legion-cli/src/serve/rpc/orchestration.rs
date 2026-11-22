@@ -7,7 +7,6 @@ use legion_orchestrator::projections::{
     query_wire_shell_http_snapshot_with_options, query_wire_thread_detail,
 };
 use legion_protocol::rpc_codec::RpcExit;
-use rusqlite::Connection;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -148,15 +147,6 @@ fn get_thread_projection(state: &AppState, payload: Value) -> RpcExit {
         })
     })
     .unwrap_or_else(|e| e)
-}
-
-pub(crate) fn current_head_sequence(conn: &Connection) -> i64 {
-    conn.query_row(
-        "SELECT COALESCE(MAX(sequence), 0) FROM orchestration_events",
-        [],
-        |r| r.get::<_, i64>(0),
-    )
-    .unwrap_or(0)
 }
 
 pub(crate) fn shell_err(msg: &str) -> RpcExit {

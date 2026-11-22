@@ -156,35 +156,7 @@ pub(crate) fn read_settings_json(path: &Path) -> Result<Value, String> {
 }
 
 fn default_server_settings() -> Value {
-    json!({
-        "favorites": null,
-        "providerModelPreferences": null,
-        "worktreeCleanup": null,
-        "storageCleanup": {
-            "worktreeKeepWhen": "uncommitted-changes",
-            "worktreeAfterDays": null,
-            "worktreeSettledAfterDays": null,
-            "worktreeOnMerge": false,
-            "worktreeOnDelete": false,
-            "worktreeUnchanged": false,
-            "browserArtifactsAfterDays": null,
-            "logsAfterDays": null,
-        },
-        "worktreesDirectory": "",
-        "fastWorktreeCheckout": false,
-        "previousWorktreesDirectories": [],
-        "responseStreamingMode": "paragraph",
-        "enableProviderUpdateChecks": true,
-        "continueThreadsAfterServerUpdate": true,
-        "keepAwakeWhileAgentsWork": true,
-        "requireConnectDeviceApproval": false,
-        "enableAgentBrowserAccess": true,
-        "cloudSpeechCredentials": { "openai": "", "xai": "", "openrouter": "" },
-        "providerInstances": {},
-        "providers": {},
-        "projectOverrides": {},
-        "defaultTheme": "system",
-    })
+    serde_json::from_str(include_str!("default_server_settings.json")).unwrap_or_else(|_| json!({}))
 }
 
 fn read_raw_keybindings(path: &Path) -> Result<Vec<RawKeybindingRule>, String> {

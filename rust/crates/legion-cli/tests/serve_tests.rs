@@ -14,7 +14,7 @@ use legion_contracts::orchestration::{
     OrchestrationCommand, ProviderInteractionMode, ThreadCreateCommand,
 };
 use legion_contracts::policy::RuntimeMode;
-use legion_orchestrator::projections::ShellSnapshot;
+use legion_orchestrator::projections::WireShellHttpSnapshot;
 use legion_persistence::ownership::{OwnershipError, SERVER_EXIT_CODE_STATE_DIR_OWNED};
 use legion_protocol::rpc_codec::{
     ClientRpcFrame, RpcExit, RpcId, ServerRpcFrame, decode_server_frames, encode_client_frame,
@@ -168,9 +168,9 @@ async fn verify_ws_rpc_roundtrip(server: &RunningServer) -> TestResult {
     else {
         return Err("expected Success Exit for getShellSnapshot".into());
     };
-    let snap: ShellSnapshot = serde_json::from_value(snap_val.clone())?;
+    let snap: WireShellHttpSnapshot = serde_json::from_value(snap_val.clone())?;
     assert_eq!(snap.threads.len(), 1);
-    assert_eq!(snap.threads[0].thread.id.as_str(), "thread-ws-1");
+    assert_eq!(snap.threads[0].id, "thread-ws-1");
     Ok(())
 }
 
@@ -231,7 +231,7 @@ async fn verify_ws_frame_parts(server: &RunningServer) -> TestResult {
     else {
         return Err("expected Success Exit from reassembled frameParts".into());
     };
-    let fp_snap: ShellSnapshot = serde_json::from_value(fp_val.clone())?;
+    let fp_snap: WireShellHttpSnapshot = serde_json::from_value(fp_val.clone())?;
     assert_eq!(fp_snap.threads.len(), 2);
     Ok(())
 }

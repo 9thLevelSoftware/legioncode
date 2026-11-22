@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 
+use legion_contracts::orchestration::default_wire_provider_capabilities;
 use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::Value;
 
@@ -182,6 +183,20 @@ fn collect_thread_rows(
             );
         }
     }
+    let mut nodes = query_json_rows(
+        conn,
+        "SELECT payload_json FROM orchestration_v2_projection_nodes WHERE thread_id = ?1 ORDER BY COALESCE(started_at, ''), node_id ASC",
+        thread_id,
+    )?;
+    normalize_legacy_nodes(&mut nodes);
+    let mut provider_sessions = query_json_rows(
+        conn,
+        "SELECT s.payload_json FROM orchestration_v2_projection_provider_session_bindings b
+             JOIN orchestration_v2_projection_provider_sessions s ON s.provider_session_id = b.provider_session_id
+             WHERE b.thread_id = ?1 ORDER BY s.updated_at ASC, s.provider_session_id ASC",
+        thread_id,
+    )?;
+    normalize_legacy_provider_sessions(&mut provider_sessions);
     Ok(ThreadProjectionRows {
         runs,
         attempts: query_json_rows(
@@ -189,23 +204,13 @@ fn collect_thread_rows(
             "SELECT payload_json FROM orchestration_v2_projection_run_attempts WHERE thread_id = ?1 ORDER BY attempt_ordinal ASC, attempt_id ASC",
             thread_id,
         )?,
-        nodes: query_json_rows(
-            conn,
-            "SELECT payload_json FROM orchestration_v2_projection_nodes WHERE thread_id = ?1 ORDER BY COALESCE(started_at, ''), node_id ASC",
-            thread_id,
-        )?,
+        nodes,
         subagents: query_json_rows(
             conn,
             "SELECT payload_json FROM orchestration_v2_projection_subagents WHERE thread_id = ?1 ORDER BY COALESCE(started_at, ''), subagent_id ASC",
             thread_id,
         )?,
-        provider_sessions: query_json_rows(
-            conn,
-            "SELECT s.payload_json FROM orchestration_v2_projection_provider_session_bindings b
-             JOIN orchestration_v2_projection_provider_sessions s ON s.provider_session_id = b.provider_session_id
-             WHERE b.thread_id = ?1 ORDER BY s.updated_at ASC, s.provider_session_id ASC",
-            thread_id,
-        )?,
+        provider_sessions,
         provider_threads: query_json_rows(
             conn,
             "SELECT payload_json FROM orchestration_v2_projection_provider_threads WHERE thread_id = ?1 ORDER BY updated_at ASC, provider_thread_id ASC",
@@ -257,6 +262,32 @@ fn collect_thread_rows(
             thread_id,
         )?,
     })
+}
+
+fn normalize_legacy_nodes(nodes: &mut [Value]) {
+    for node in nodes {
+        if let Some(obj) = node.as_object_mut()
+            && obj.get("kind").and_then(Value::as_str) == Some("root_run")
+        {
+            obj.insert("kind".to_owned(), Value::String("root_turn".to_owned()));
+        }
+    }
+}
+
+fn normalize_legacy_provider_sessions(sessions: &mut [Value]) {
+    for session in sessions {
+        if let Some(obj) = session.as_object_mut()
+            && obj
+                .get("capabilities")
+                .and_then(Value::as_object)
+                .is_none_or(|caps| !caps.contains_key("sessions"))
+        {
+            obj.insert(
+                "capabilities".to_owned(),
+                default_wire_provider_capabilities(),
+            );
+        }
+    }
 }
 
 fn query_json_rows(

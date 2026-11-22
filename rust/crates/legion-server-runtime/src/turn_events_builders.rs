@@ -4,9 +4,8 @@ use legion_contracts::ids::TurnItemId;
 use legion_contracts::orchestration::{
     ConversationMessage, CreationSource, DomainEvent, DomainEventPayload, ExecutionNode,
     OrchestrationActor, ProviderSession, ProviderThread, ProviderTurn, TurnItem, TurnItemBase,
-    TurnItemKind, TurnItemStatus,
+    TurnItemKind, TurnItemStatus, default_wire_provider_capabilities,
 };
-use serde_json::json;
 
 use crate::error::ServerRuntimeError;
 use crate::turn_events::TurnEmitContext;
@@ -118,7 +117,7 @@ impl TurnEmitContext {
             status: status.to_owned(),
             cwd: ".".to_owned(),
             model: Some(model.to_owned()),
-            capabilities: json!({}),
+            capabilities: default_wire_provider_capabilities(),
             extension_statuses: Vec::new(),
             created_at: created_at.to_owned(),
             updated_at: updated_at.to_owned(),
@@ -191,7 +190,7 @@ impl TurnEmitContext {
             run_id: Some(self.run_id.clone()),
             parent_node_id: None,
             root_node_id: self.root_node_id.clone(),
-            kind: "root_run".to_owned(),
+            kind: "root_turn".to_owned(),
             status: status.to_owned(),
             counts_for_run: true,
             provider_thread_id: Some(self.provider_thread_id.clone()),

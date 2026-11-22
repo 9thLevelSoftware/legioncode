@@ -16,9 +16,7 @@ use rusqlite::{Connection, params};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use super::{
-    AppState, orchestration::current_head_sequence, rpc_fail_obj, utc_now_iso, with_db_mut,
-};
+use super::{AppState, rpc_fail_obj, utc_now_iso, with_db_mut};
 
 pub(crate) async fn dispatch_command(state: &Arc<AppState>, payload: Value) -> RpcExit {
     let command_id = payload
@@ -73,6 +71,7 @@ fn dispatch_project_command(
             }))
         })?;
         let target_id = project_cmd_target(&cmd);
+        let deleted = matches!(cmd, ProjectWireCommand::Delete { .. });
         let res = match cmd {
             ProjectWireCommand::Create(c) => {
                 if c.create_workspace_root_if_missing == Some(true) {
@@ -112,12 +111,65 @@ fn dispatch_project_command(
                 "message": err.to_string(),
             })));
         }
-        let seq = current_head_sequence(conn);
+        let seq = append_project_shell_event(conn, &target_id, deleted, command_id, &now_iso)
+            .map_err(|err| {
+                rpc_fail_obj(json!({
+                    "_tag": "ProjectMutationError",
+                    "commandId": command_id,
+                    "projectId": target_id,
+                    "message": err.to_string(),
+                }))
+            })?;
+        state
+            .orchestrator
+            .sink()
+            .pubsub()
+            .notify_external_sequence(seq);
         Ok(RpcExit::Success {
             value: json!({ "sequence": seq }),
         })
     })
     .unwrap_or_else(|e| e)
+}
+
+fn append_project_shell_event(
+    conn: &Connection,
+    project_id: &str,
+    deleted: bool,
+    command_id: &str,
+    now_iso: &str,
+) -> Result<i64, rusqlite::Error> {
+    let max_ver: i64 = conn.query_row(
+        "SELECT COALESCE(MAX(stream_version), 0)
+         FROM orchestration_events
+         WHERE aggregate_kind = 'project' AND stream_id = ?1",
+        [project_id],
+        |row| row.get(0),
+    )?;
+    let event_type = if deleted {
+        "project.deleted"
+    } else {
+        "project.updated"
+    };
+    let event_id = Uuid::new_v4().to_string();
+    conn.query_row(
+        "INSERT INTO orchestration_events (
+           event_id, aggregate_kind, stream_id, stream_version, event_type,
+           occurred_at, command_id, causation_event_id, correlation_id,
+           actor_kind, payload_json, metadata_json, application_event_version
+         )
+         VALUES (?1, 'project', ?2, ?3, ?4, ?5, ?6, NULL, NULL, 'client', '{}', '{}', 1)
+         RETURNING sequence",
+        params![
+            event_id,
+            project_id,
+            max_ver + 1,
+            event_type,
+            now_iso,
+            command_id
+        ],
+        |row| row.get(0),
+    )
 }
 
 fn project_cmd_target(cmd: &ProjectWireCommand) -> String {

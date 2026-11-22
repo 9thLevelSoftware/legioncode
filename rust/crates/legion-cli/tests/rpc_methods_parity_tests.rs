@@ -146,6 +146,17 @@ async fn terminal_rpc_returns_snapshot_supports_clear_and_optional_close_id() ->
 
     let RpcExit::Success { .. } = call_ws(
         &mut ws,
+        "t-clear",
+        "terminal.clear",
+        json!({ "threadId": "thread-t1", "terminalId": "term-a" }),
+    )
+    .await?
+    else {
+        return Err("expected terminal.clear Success".into());
+    };
+
+    let RpcExit::Success { .. } = call_ws(
+        &mut ws,
         "t-close",
         "terminal.close",
         json!({ "threadId": "thread-t1" }),

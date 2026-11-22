@@ -21,15 +21,12 @@ missing_errors_doc = "allow"
 missing_panics_doc = "allow"
 
 [workspace.dependencies]
-anyhow = "1"
 axum = { version = "0.8", features = ["ws"] }
 base64 = "0.22"
-clap = { version = "4", features = ["derive"] }
 futures-util = "0.3"
 hex = "0.4"
 http = "1"
 indexmap = { version = "2", features = ["serde"] }
-js-sys = "0.3.105"
 p256 = { version = "0.13", features = ["ecdsa"] }
 proptest = "1"
 quick-xml = "0.42"

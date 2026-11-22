@@ -28,7 +28,6 @@ t3-remote = { path = "../t3-remote" }
 t3-scm = { path = "../t3-scm" }
 t3-shared = { path = "../t3-shared" }
 t3-speech = { path = "../t3-speech" }
-t3-surfaces = { path = "../t3-surfaces" }
 t3-terminal-vt = { path = "../t3-terminal-vt" }
 tempfile = { workspace = true }
 thiserror = { workspace = true }

@@ -137,7 +137,7 @@ function GuestLinksRow() {
           <Link to="/settings/access" className="underline underline-offset-2">
             Sharing & access
           </Link>
-          . Turning it off stops every guest link.
+          . Turning it off stops guest links.
         </T>
       }
       control={

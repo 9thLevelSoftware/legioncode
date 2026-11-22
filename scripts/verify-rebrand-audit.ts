@@ -21,6 +21,7 @@ export interface RebrandAuditFinding {
 }
 
 const EXCLUDED_PREFIXES = [
+  ".legion-cli/",
   ".repos/",
   "third-party-licenses/",
   "patches/",
@@ -28,7 +29,12 @@ const EXCLUDED_PREFIXES = [
   "native/libghostty-vt/",
 ] as const;
 
-const EXCLUDED_EXACT = new Set(["pnpm-lock.yaml", "scripts/verify-rebrand-audit.ts"]);
+const EXCLUDED_EXACT = new Set([
+  "pnpm-lock.yaml",
+  "scripts/verify-rebrand-audit.ts",
+  // Verbatim third-party tweets linking to original x.com posts.
+  "apps/marketing/src/lib/tweets.ts",
+]);
 
 const MOBILE_VENDOR_PATTERN = /^apps\/mobile\/modules\/[^/]+\/Vendor\//u;
 

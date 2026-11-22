@@ -23,6 +23,7 @@ const legacy = {
 } as const;
 
 it("excludes third-party, vendor, lockfile, and self paths", () => {
+  assert.isTrue(isExcludedAuditPath(".legion-cli/CONTEXT.md"));
   assert.isTrue(isExcludedAuditPath(".repos/effect/README.md"));
   assert.isTrue(isExcludedAuditPath("third-party-licenses/LICENSE"));
   assert.isTrue(isExcludedAuditPath("patches/foo.patch"));
@@ -31,6 +32,7 @@ it("excludes third-party, vendor, lockfile, and self paths", () => {
   assert.isTrue(isExcludedAuditPath("native/libghostty-vt/build.zig"));
   assert.isTrue(isExcludedAuditPath("pnpm-lock.yaml"));
   assert.isTrue(isExcludedAuditPath("scripts/verify-rebrand-audit.ts"));
+  assert.isTrue(isExcludedAuditPath("apps/marketing/src/lib/tweets.ts"));
   assert.isFalse(isExcludedAuditPath("apps/server/src/index.ts"));
 });
 

@@ -526,7 +526,9 @@ const resolveIconComposerTool = Effect.fn("iconExport.resolveIconComposerTool")(
 });
 
 const parseComposerColor = (
-  fill: { readonly solid?: string; readonly "automatic-gradient"?: string } | undefined,
+  fill:
+    | { readonly solid?: string | undefined; readonly "automatic-gradient"?: string | undefined }
+    | undefined,
 ): { readonly r: number; readonly g: number; readonly b: number; readonly alpha: number } => {
   const raw = fill?.solid ?? fill?.["automatic-gradient"];
   const match = raw
@@ -1034,10 +1036,10 @@ const resolveSelectedBackend = Effect.fn("iconExport.resolveSelectedBackend")(fu
     return Option.some(yield* resolveIconComposerTool());
   }
   return yield* resolveIconComposerTool().pipe(
-    Effect.map(Option.some),
+    Effect.asSome,
     Effect.catchTags({
       IconExportToolResolutionError: (error) =>
-        error.reason === "not-found" ? Effect.succeed(Option.none()) : Effect.fail(error),
+        error.reason === "not-found" ? Effect.succeedNone : Effect.fail(error),
     }),
   );
 });

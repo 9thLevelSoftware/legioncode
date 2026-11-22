@@ -25,7 +25,6 @@ export function StandalonePageHeader({
       <div className="flex items-baseline justify-between gap-3 text-muted-foreground">
         <span className="flex items-center gap-1.5" role="img" aria-label="LegionCode">
           <LegionWordmark className="h-3.5 w-auto shrink-0 text-foreground" aria-hidden />
-          {/* oxlint-disable-next-line legioncode/no-untranslated-copy -- product wordmark */}
           <span className="text-lg font-medium tracking-tight">LegionCode</span>
         </span>
         {context ? <span className="text-sm">{context}</span> : null}

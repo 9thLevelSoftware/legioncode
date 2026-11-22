@@ -436,24 +436,24 @@ importers:
       '@effect/platform-node':
         specifier: 4.1.2
         version: 4.1.2(bufferutil@4.1.0)(effect@4.1.3)(redis@6.2.1)(utf-8-validate@6.0.6)
+      '@legioncode/client-runtime':
+        specifier: workspace:*
+        version: link:../../packages/client-runtime
+      '@legioncode/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@legioncode/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@legioncode/ssh':
+        specifier: workspace:*
+        version: link:../../packages/ssh
+      '@legioncode/tailscale':
+        specifier: workspace:*
+        version: link:../../packages/tailscale
       '@napi-rs/keyring':
         specifier: ^1.3.0
         version: 1.3.0
-      '@t3tools/client-runtime':
-        specifier: workspace:*
-        version: link:../../packages/client-runtime
-      '@t3tools/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@t3tools/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
-      '@t3tools/ssh':
-        specifier: workspace:*
-        version: link:../../packages/ssh
-      '@t3tools/tailscale':
-        specifier: workspace:*
-        version: link:../../packages/tailscale
       dbus-next:
         specifier: 0.10.2
         version: 0.10.2(patch_hash=cfff57561b0ee59b5addb3b2e6c6f20906e967507a530ab67e8db8108e520ba4)
@@ -521,7 +521,7 @@ importers:
       '@fontsource-variable/inter':
         specifier: ^5.3.0
         version: 5.3.0
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       astro:
@@ -576,6 +576,27 @@ importers:
       '@legendapp/list':
         specifier: 3.7.3
         version: 3.7.3(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0)
+      '@legioncode/client-runtime':
+        specifier: workspace:*
+        version: link:../../packages/client-runtime
+      '@legioncode/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@legioncode/mobile-highlights-native':
+        specifier: file:./modules/legion-highlights
+        version: file:apps/mobile/modules/legion-highlights(react-native-nitro-modules@0.37.2(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0))
+      '@legioncode/mobile-review-diff-native':
+        specifier: file:./modules/legion-review-diff
+        version: file:apps/mobile/modules/legion-review-diff
+      '@legioncode/mobile-source-text':
+        specifier: file:./modules/legion-source-text
+        version: file:apps/mobile/modules/legion-source-text(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0)
+      '@legioncode/mobile-terminal-native':
+        specifier: file:./modules/legion-terminal
+        version: file:apps/mobile/modules/legion-terminal
+      '@legioncode/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@material/material-color-utilities':
         specifier: 0.3.0
         version: 0.3.0
@@ -600,27 +621,6 @@ importers:
       '@react-navigation/native-stack':
         specifier: 7.21.0
         version: 7.21.0(patch_hash=990d575444c4af2ce8218b3b7a8280fe244c03abbdb32b822a2e862f791dbf42)(80a27ad2d896d41b044f138b2bcfd285)
-      '@t3tools/client-runtime':
-        specifier: workspace:*
-        version: link:../../packages/client-runtime
-      '@t3tools/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@t3tools/mobile-highlights-native':
-        specifier: file:./modules/t3-highlights
-        version: file:apps/mobile/modules/t3-highlights(react-native-nitro-modules@0.37.2(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0))
-      '@t3tools/mobile-review-diff-native':
-        specifier: file:./modules/t3-review-diff
-        version: file:apps/mobile/modules/t3-review-diff
-      '@t3tools/mobile-source-text':
-        specifier: file:./modules/t3-source-text
-        version: file:apps/mobile/modules/t3-source-text(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0)
-      '@t3tools/mobile-terminal-native':
-        specifier: file:./modules/t3-terminal
-        version: file:apps/mobile/modules/t3-terminal
-      '@t3tools/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@tabler/icons-react-native':
         specifier: ^3.44.0
         version: 3.44.0(react-native-svg@15.16.1(patch_hash=7f94d240fc19418233c96f9a637dfd248846446657476c204f3614fd2847900e)(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0))(react@19.3.0)
@@ -763,8 +763,8 @@ importers:
         specifier: 0.88.1
         version: 0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6)
       react-native-enriched-markdown:
-        specifier: file:deps/react-native-enriched-markdown-1.2.0-t3.18-16db4c75.tgz
-        version: file:apps/mobile/deps/react-native-enriched-markdown-1.2.0-t3.18-16db4c75.tgz(katex@0.16.47)(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0)
+        specifier: file:deps/react-native-enriched-markdown-1.2.0-legioncode.18-16db4c75.tgz
+        version: file:apps/mobile/deps/react-native-enriched-markdown-1.2.0-legioncode.18-16db4c75.tgz(katex@0.16.47)(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0)
       react-native-gesture-handler:
         specifier: 3.5.0
         version: 3.5.0(patch_hash=171379dd378f8f11e9187876dec2116e5cbf5f21cef6576cdde6956518324f98)(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0)
@@ -871,72 +871,72 @@ importers:
       '@ff-labs/fff-node':
         specifier: 0.11.0
         version: 0.11.0(patch_hash=93f62a76399b435a76588b2bef237db0a1e85880c1ac0d0759c416e9cc579252)
+      '@legioncode/issue-tracker-linear':
+        specifier: workspace:*
+        version: link:../../packages/issue-tracker-linear
+      '@legioncode/provider-acp':
+        specifier: workspace:*
+        version: link:../../packages/provider-acp
+      '@legioncode/provider-acp-registry':
+        specifier: workspace:*
+        version: link:../../packages/provider-acp-registry
+      '@legioncode/provider-core':
+        specifier: workspace:*
+        version: link:../../packages/provider-core
+      '@legioncode/provider-cursor':
+        specifier: workspace:*
+        version: link:../../packages/provider-cursor
+      '@legioncode/provider-fx':
+        specifier: workspace:*
+        version: link:../../packages/provider-fx
+      '@legioncode/provider-grok':
+        specifier: workspace:*
+        version: link:../../packages/provider-grok
+      '@legioncode/provider-kiro':
+        specifier: workspace:*
+        version: link:../../packages/provider-kiro
+      '@legioncode/provider-muse':
+        specifier: workspace:*
+        version: link:../../packages/provider-muse
+      '@legioncode/provider-opencode':
+        specifier: workspace:*
+        version: link:../../packages/provider-opencode
+      '@legioncode/provider-pi':
+        specifier: workspace:*
+        version: link:../../packages/provider-pi
+      '@legioncode/source-control-azure-devops':
+        specifier: workspace:*
+        version: link:../../packages/source-control-azure-devops
+      '@legioncode/source-control-bitbucket':
+        specifier: workspace:*
+        version: link:../../packages/source-control-bitbucket
+      '@legioncode/source-control-core':
+        specifier: workspace:*
+        version: link:../../packages/source-control-core
+      '@legioncode/source-control-cursor-origin':
+        specifier: workspace:*
+        version: link:../../packages/source-control-cursor-origin
+      '@legioncode/source-control-definitions':
+        specifier: workspace:*
+        version: link:../../packages/source-control-definitions
+      '@legioncode/source-control-forgejo':
+        specifier: workspace:*
+        version: link:../../packages/source-control-forgejo
+      '@legioncode/source-control-gitcafe':
+        specifier: workspace:*
+        version: link:../../packages/source-control-gitcafe
+      '@legioncode/source-control-github':
+        specifier: workspace:*
+        version: link:../../packages/source-control-github
+      '@legioncode/source-control-gitlab':
+        specifier: workspace:*
+        version: link:../../packages/source-control-gitlab
       '@muse-code/sdk':
         specifier: 1.4.6
         version: 1.4.6(patch_hash=7b495b607fc5d76b444c7c4d58821e839726a30e6f3c53564f0d59f2d5b42101)(@types/node@24.12.4)
       '@napi-rs/keyring':
         specifier: ^1.3.0
         version: 1.3.0
-      '@t3tools/issue-tracker-linear':
-        specifier: workspace:*
-        version: link:../../packages/issue-tracker-linear
-      '@t3tools/provider-acp':
-        specifier: workspace:*
-        version: link:../../packages/provider-acp
-      '@t3tools/provider-acp-registry':
-        specifier: workspace:*
-        version: link:../../packages/provider-acp-registry
-      '@t3tools/provider-core':
-        specifier: workspace:*
-        version: link:../../packages/provider-core
-      '@t3tools/provider-cursor':
-        specifier: workspace:*
-        version: link:../../packages/provider-cursor
-      '@t3tools/provider-fx':
-        specifier: workspace:*
-        version: link:../../packages/provider-fx
-      '@t3tools/provider-grok':
-        specifier: workspace:*
-        version: link:../../packages/provider-grok
-      '@t3tools/provider-kiro':
-        specifier: workspace:*
-        version: link:../../packages/provider-kiro
-      '@t3tools/provider-muse':
-        specifier: workspace:*
-        version: link:../../packages/provider-muse
-      '@t3tools/provider-opencode':
-        specifier: workspace:*
-        version: link:../../packages/provider-opencode
-      '@t3tools/provider-pi':
-        specifier: workspace:*
-        version: link:../../packages/provider-pi
-      '@t3tools/source-control-azure-devops':
-        specifier: workspace:*
-        version: link:../../packages/source-control-azure-devops
-      '@t3tools/source-control-bitbucket':
-        specifier: workspace:*
-        version: link:../../packages/source-control-bitbucket
-      '@t3tools/source-control-core':
-        specifier: workspace:*
-        version: link:../../packages/source-control-core
-      '@t3tools/source-control-cursor-origin':
-        specifier: workspace:*
-        version: link:../../packages/source-control-cursor-origin
-      '@t3tools/source-control-definitions':
-        specifier: workspace:*
-        version: link:../../packages/source-control-definitions
-      '@t3tools/source-control-forgejo':
-        specifier: workspace:*
-        version: link:../../packages/source-control-forgejo
-      '@t3tools/source-control-gitcafe':
-        specifier: workspace:*
-        version: link:../../packages/source-control-gitcafe
-      '@t3tools/source-control-github':
-        specifier: workspace:*
-        version: link:../../packages/source-control-github
-      '@t3tools/source-control-gitlab':
-        specifier: workspace:*
-        version: link:../../packages/source-control-gitlab
       character-entities:
         specifier: 2.0.2
         version: 2.0.2
@@ -992,39 +992,39 @@ importers:
       '@handy-computer/models':
         specifier: 0.2.3
         version: 0.2.3
+      '@legioncode/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@legioncode/provider-testing':
+        specifier: workspace:*
+        version: link:../../packages/provider-testing
+      '@legioncode/secret-provider-core':
+        specifier: workspace:*
+        version: link:../../packages/secret-provider-core
+      '@legioncode/secret-provider-definitions':
+        specifier: workspace:*
+        version: link:../../packages/secret-provider-definitions
+      '@legioncode/secret-provider-onepassword':
+        specifier: workspace:*
+        version: link:../../packages/secret-provider-onepassword
+      '@legioncode/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@legioncode/source-control-testing':
+        specifier: workspace:*
+        version: link:../../packages/source-control-testing
+      '@legioncode/ssh':
+        specifier: workspace:*
+        version: link:../../packages/ssh
+      '@legioncode/tailscale':
+        specifier: workspace:*
+        version: link:../../packages/tailscale
+      '@legioncode/web':
+        specifier: workspace:*
+        version: link:../web
       '@opencode-ai/sdk':
         specifier: ^1.3.15
         version: 1.15.13
-      '@t3tools/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@t3tools/provider-testing':
-        specifier: workspace:*
-        version: link:../../packages/provider-testing
-      '@t3tools/secret-provider-core':
-        specifier: workspace:*
-        version: link:../../packages/secret-provider-core
-      '@t3tools/secret-provider-definitions':
-        specifier: workspace:*
-        version: link:../../packages/secret-provider-definitions
-      '@t3tools/secret-provider-onepassword':
-        specifier: workspace:*
-        version: link:../../packages/secret-provider-onepassword
-      '@t3tools/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
-      '@t3tools/source-control-testing':
-        specifier: workspace:*
-        version: link:../../packages/source-control-testing
-      '@t3tools/ssh':
-        specifier: workspace:*
-        version: link:../../packages/ssh
-      '@t3tools/tailscale':
-        specifier: workspace:*
-        version: link:../../packages/tailscale
-      '@t3tools/web':
-        specifier: workspace:*
-        version: link:../web
       '@types/node':
         specifier: 24.12.4
         version: 24.12.4
@@ -1100,6 +1100,24 @@ importers:
       '@legendapp/list':
         specifier: 3.7.3
         version: 3.7.3(react-dom@19.3.0(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0)
+      '@legioncode/client-runtime':
+        specifier: workspace:*
+        version: link:../../packages/client-runtime
+      '@legioncode/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@legioncode/provider-core':
+        specifier: workspace:*
+        version: link:../../packages/provider-core
+      '@legioncode/secret-provider-definitions':
+        specifier: workspace:*
+        version: link:../../packages/secret-provider-definitions
+      '@legioncode/secret-provider-onepassword':
+        specifier: workspace:*
+        version: link:../../packages/secret-provider-onepassword
+      '@legioncode/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@noble/hashes':
         specifier: 'catalog:'
         version: 1.8.0
@@ -1109,24 +1127,6 @@ importers:
       '@pierre/trees':
         specifier: 1.0.0-beta.6
         version: 1.0.0-beta.6(@pierre/theme@2.0.0)(@shikijs/themes@4.2.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(shiki@4.2.0)
-      '@t3tools/client-runtime':
-        specifier: workspace:*
-        version: link:../../packages/client-runtime
-      '@t3tools/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@t3tools/provider-core':
-        specifier: workspace:*
-        version: link:../../packages/provider-core
-      '@t3tools/secret-provider-definitions':
-        specifier: workspace:*
-        version: link:../../packages/secret-provider-definitions
-      '@t3tools/secret-provider-onepassword':
-        specifier: workspace:*
-        version: link:../../packages/secret-provider-onepassword
-      '@t3tools/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@tanstack/react-pacer':
         specifier: ^0.19.4
         version: 0.19.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -1362,13 +1362,13 @@ importers:
       '@effect/platform-node':
         specifier: 4.1.2
         version: 4.1.2(bufferutil@4.1.0)(effect@4.1.3)(redis@6.2.1)(utf-8-validate@6.0.6)
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../packages/contracts
-      '@t3tools/provider-core':
+      '@legioncode/provider-core':
         specifier: workspace:*
         version: link:../packages/provider-core
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../packages/shared
       effect:
@@ -1411,21 +1411,21 @@ importers:
       '@effect/sql-sqlite-do':
         specifier: 'catalog:'
         version: 4.1.2(effect@4.1.3)
+      '@legioncode/client-runtime':
+        specifier: workspace:*
+        version: link:../../packages/client-runtime
+      '@legioncode/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@legioncode/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@noble/curves':
         specifier: 'catalog:'
         version: 1.9.1
       '@noble/hashes':
         specifier: 'catalog:'
         version: 1.8.0
-      '@t3tools/client-runtime':
-        specifier: workspace:*
-        version: link:../../packages/client-runtime
-      '@t3tools/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@t3tools/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       alchemy:
         specifier: 2.0.0-beta.85
         version: 2.0.0-beta.85(patch_hash=07cc8c7e14b3b9af143ddd40a059f117c27e55139fbf20bd5dde2eb30509cedd)(@effect/platform-bun@4.1.2(bufferutil@4.1.0)(effect@4.1.3)(utf-8-validate@6.0.6))(@effect/platform-node@4.1.2(bufferutil@4.1.0)(effect@4.1.3)(redis@6.2.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(@voidzero-dev/vite-plus-core@1.4.0(@types/node@24.12.4)(@volar/typescript@2.4.28(typescript@6.0.3))(esbuild@0.28.2)(jiti@2.7.0)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(yaml@2.9.0))(effect@4.1.3)(react-devtools-core@6.1.5(bufferutil@4.1.0)(utf-8-validate@6.0.6))(ws@8.22.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))
@@ -1498,7 +1498,7 @@ importers:
         specifier: 1.4.0
         version: 1.4.0(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
 
-  oxlint-plugin-t3code:
+  oxlint-plugin-legioncode:
     dependencies:
       '@oxlint/plugins':
         specifier: ^1.63.0
@@ -1519,54 +1519,54 @@ importers:
 
   packages/client-runtime:
     dependencies:
+      '@legioncode/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@legioncode/issue-tracker-linear':
+        specifier: workspace:*
+        version: link:../issue-tracker-linear
+      '@legioncode/provider-acp-registry':
+        specifier: workspace:*
+        version: link:../provider-acp-registry
+      '@legioncode/provider-core':
+        specifier: workspace:*
+        version: link:../provider-core
+      '@legioncode/provider-cursor':
+        specifier: workspace:*
+        version: link:../provider-cursor
+      '@legioncode/provider-fx':
+        specifier: workspace:*
+        version: link:../provider-fx
+      '@legioncode/provider-grok':
+        specifier: workspace:*
+        version: link:../provider-grok
+      '@legioncode/provider-kiro':
+        specifier: workspace:*
+        version: link:../provider-kiro
+      '@legioncode/provider-muse':
+        specifier: workspace:*
+        version: link:../provider-muse
+      '@legioncode/provider-opencode':
+        specifier: workspace:*
+        version: link:../provider-opencode
+      '@legioncode/provider-pi':
+        specifier: workspace:*
+        version: link:../provider-pi
+      '@legioncode/secret-provider-definitions':
+        specifier: workspace:*
+        version: link:../secret-provider-definitions
+      '@legioncode/shared':
+        specifier: workspace:*
+        version: link:../shared
+      '@legioncode/source-control-core':
+        specifier: workspace:*
+        version: link:../source-control-core
+      '@legioncode/source-control-definitions':
+        specifier: workspace:*
+        version: link:../source-control-definitions
       '@pierre/diffs':
         specifier: 1.7.0-beta.4
         version: 1.7.0-beta.4(patch_hash=b24b206d14c79de95be10322b96490b82e41cc13c8a02c7378aaf8e03623431b)(@shikijs/themes@4.2.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@t3tools/contracts':
-        specifier: workspace:*
-        version: link:../contracts
-      '@t3tools/issue-tracker-linear':
-        specifier: workspace:*
-        version: link:../issue-tracker-linear
-      '@t3tools/provider-acp-registry':
-        specifier: workspace:*
-        version: link:../provider-acp-registry
-      '@t3tools/provider-core':
-        specifier: workspace:*
-        version: link:../provider-core
-      '@t3tools/provider-cursor':
-        specifier: workspace:*
-        version: link:../provider-cursor
-      '@t3tools/provider-fx':
-        specifier: workspace:*
-        version: link:../provider-fx
-      '@t3tools/provider-grok':
-        specifier: workspace:*
-        version: link:../provider-grok
-      '@t3tools/provider-kiro':
-        specifier: workspace:*
-        version: link:../provider-kiro
-      '@t3tools/provider-muse':
-        specifier: workspace:*
-        version: link:../provider-muse
-      '@t3tools/provider-opencode':
-        specifier: workspace:*
-        version: link:../provider-opencode
-      '@t3tools/provider-pi':
-        specifier: workspace:*
-        version: link:../provider-pi
-      '@t3tools/secret-provider-definitions':
-        specifier: workspace:*
-        version: link:../secret-provider-definitions
-      '@t3tools/shared':
-        specifier: workspace:*
-        version: link:../shared
-      '@t3tools/source-control-core':
-        specifier: workspace:*
-        version: link:../source-control-core
-      '@t3tools/source-control-definitions':
-        specifier: workspace:*
-        version: link:../source-control-definitions
       effect:
         specifier: 4.1.3
         version: 4.1.3
@@ -1664,10 +1664,10 @@ importers:
 
   packages/issue-tracker-linear:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/source-control-core':
+      '@legioncode/source-control-core':
         specifier: workspace:*
         version: link:../source-control-core
       effect:
@@ -1689,13 +1689,13 @@ importers:
 
   packages/provider-acp:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/provider-core':
+      '@legioncode/provider-core':
         specifier: workspace:*
         version: link:../provider-core
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
       diff:
@@ -1723,21 +1723,21 @@ importers:
 
   packages/provider-acp-registry:
     dependencies:
+      '@legioncode/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@legioncode/provider-acp':
+        specifier: workspace:*
+        version: link:../provider-acp
+      '@legioncode/provider-core':
+        specifier: workspace:*
+        version: link:../provider-core
+      '@legioncode/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@noble/hashes':
         specifier: 'catalog:'
         version: 1.8.0
-      '@t3tools/contracts':
-        specifier: workspace:*
-        version: link:../contracts
-      '@t3tools/provider-acp':
-        specifier: workspace:*
-        version: link:../provider-acp
-      '@t3tools/provider-core':
-        specifier: workspace:*
-        version: link:../provider-core
-      '@t3tools/shared':
-        specifier: workspace:*
-        version: link:../shared
       effect:
         specifier: 4.1.3
         version: 4.1.3
@@ -1748,7 +1748,7 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
-      '@t3tools/provider-testing':
+      '@legioncode/provider-testing':
         specifier: workspace:*
         version: link:../provider-testing
       '@types/node':
@@ -1763,10 +1763,10 @@ importers:
 
   packages/provider-core:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
       effect:
@@ -1791,13 +1791,13 @@ importers:
       '@cursor/sdk':
         specifier: 1.3.1
         version: 1.3.1(patch_hash=8dc0d68c1a2d0cd08a609f7820d8c3c3d1393da8044ff33fd10f4ded750e8718)(zod@4.6.7)
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/provider-core':
+      '@legioncode/provider-core':
         specifier: workspace:*
         version: link:../provider-core
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
       effect:
@@ -1816,7 +1816,7 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
-      '@t3tools/provider-testing':
+      '@legioncode/provider-testing':
         specifier: workspace:*
         version: link:../provider-testing
       '@types/node':
@@ -1828,16 +1828,16 @@ importers:
 
   packages/provider-fx:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/provider-acp':
+      '@legioncode/provider-acp':
         specifier: workspace:*
         version: link:../provider-acp
-      '@t3tools/provider-core':
+      '@legioncode/provider-core':
         specifier: workspace:*
         version: link:../provider-core
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
       effect:
@@ -1850,7 +1850,7 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
-      '@t3tools/provider-testing':
+      '@legioncode/provider-testing':
         specifier: workspace:*
         version: link:../provider-testing
       '@types/node':
@@ -1865,16 +1865,16 @@ importers:
 
   packages/provider-grok:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/provider-acp':
+      '@legioncode/provider-acp':
         specifier: workspace:*
         version: link:../provider-acp
-      '@t3tools/provider-core':
+      '@legioncode/provider-core':
         specifier: workspace:*
         version: link:../provider-core
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
       effect:
@@ -1887,7 +1887,7 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
-      '@t3tools/provider-testing':
+      '@legioncode/provider-testing':
         specifier: workspace:*
         version: link:../provider-testing
       '@types/node':
@@ -1902,16 +1902,16 @@ importers:
 
   packages/provider-kiro:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/provider-acp':
+      '@legioncode/provider-acp':
         specifier: workspace:*
         version: link:../provider-acp
-      '@t3tools/provider-core':
+      '@legioncode/provider-core':
         specifier: workspace:*
         version: link:../provider-core
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
       effect:
@@ -1924,7 +1924,7 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
-      '@t3tools/provider-testing':
+      '@legioncode/provider-testing':
         specifier: workspace:*
         version: link:../provider-testing
       '@types/node':
@@ -1939,18 +1939,18 @@ importers:
 
   packages/provider-muse:
     dependencies:
+      '@legioncode/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@legioncode/provider-core':
+        specifier: workspace:*
+        version: link:../provider-core
+      '@legioncode/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@muse-code/sdk':
         specifier: 1.4.6
         version: 1.4.6(patch_hash=7b495b607fc5d76b444c7c4d58821e839726a30e6f3c53564f0d59f2d5b42101)(@types/node@24.12.4)
-      '@t3tools/contracts':
-        specifier: workspace:*
-        version: link:../contracts
-      '@t3tools/provider-core':
-        specifier: workspace:*
-        version: link:../provider-core
-      '@t3tools/shared':
-        specifier: workspace:*
-        version: link:../shared
       effect:
         specifier: 4.1.3
         version: 4.1.3
@@ -1961,7 +1961,7 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
-      '@t3tools/provider-testing':
+      '@legioncode/provider-testing':
         specifier: workspace:*
         version: link:../provider-testing
       '@types/node':
@@ -1973,6 +1973,15 @@ importers:
 
   packages/provider-opencode:
     dependencies:
+      '@legioncode/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@legioncode/provider-core':
+        specifier: workspace:*
+        version: link:../provider-core
+      '@legioncode/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@opencode-ai/sdk':
         specifier: ^1.3.15
         version: 1.15.13
@@ -1985,15 +1994,6 @@ importers:
       '@opencode/schema':
         specifier: 2.0.28
         version: 2.0.28
-      '@t3tools/contracts':
-        specifier: workspace:*
-        version: link:../contracts
-      '@t3tools/provider-core':
-        specifier: workspace:*
-        version: link:../provider-core
-      '@t3tools/shared':
-        specifier: workspace:*
-        version: link:../shared
       effect:
         specifier: 4.1.3
         version: 4.1.3
@@ -2004,7 +2004,7 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
-      '@t3tools/provider-testing':
+      '@legioncode/provider-testing':
         specifier: workspace:*
         version: link:../provider-testing
       '@types/node':
@@ -2016,13 +2016,13 @@ importers:
 
   packages/provider-pi:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/provider-core':
+      '@legioncode/provider-core':
         specifier: workspace:*
         version: link:../provider-core
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
       effect:
@@ -2035,7 +2035,7 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
-      '@t3tools/provider-testing':
+      '@legioncode/provider-testing':
         specifier: workspace:*
         version: link:../provider-testing
       '@types/node':
@@ -2050,13 +2050,13 @@ importers:
       '@effect/platform-node':
         specifier: 4.1.2
         version: 4.1.2(bufferutil@4.1.0)(effect@4.1.3)(redis@6.2.1)(utf-8-validate@6.0.6)
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/provider-core':
+      '@legioncode/provider-core':
         specifier: workspace:*
         version: link:../provider-core
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
       effect:
@@ -2075,7 +2075,7 @@ importers:
 
   packages/secret-provider-core:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
       effect:
@@ -2097,25 +2097,25 @@ importers:
 
   packages/secret-provider-definitions:
     dependencies:
-      '@t3tools/secret-provider-core':
+      '@legioncode/secret-provider-core':
         specifier: workspace:*
         version: link:../secret-provider-core
-      '@t3tools/secret-provider-onepassword':
+      '@legioncode/secret-provider-onepassword':
         specifier: workspace:*
         version: link:../secret-provider-onepassword
 
   packages/secret-provider-onepassword:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/provider-core':
+      '@legioncode/provider-core':
         specifier: workspace:*
         version: link:../provider-core
-      '@t3tools/secret-provider-core':
+      '@legioncode/secret-provider-core':
         specifier: workspace:*
         version: link:../secret-provider-core
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
       effect:
@@ -2137,15 +2137,15 @@ importers:
 
   packages/shared:
     dependencies:
+      '@legioncode/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       '@noble/curves':
         specifier: 'catalog:'
         version: 1.9.1
       '@noble/hashes':
         specifier: 'catalog:'
         version: 1.8.0
-      '@t3tools/contracts':
-        specifier: workspace:*
-        version: link:../contracts
       effect:
         specifier: 4.1.3
         version: 4.1.3
@@ -2225,13 +2225,13 @@ importers:
 
   packages/source-control-azure-devops:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
-      '@t3tools/source-control-core':
+      '@legioncode/source-control-core':
         specifier: workspace:*
         version: link:../source-control-core
       diff:
@@ -2247,7 +2247,7 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
-      '@t3tools/source-control-testing':
+      '@legioncode/source-control-testing':
         specifier: workspace:*
         version: link:../source-control-testing
       '@types/node':
@@ -2259,16 +2259,16 @@ importers:
 
   packages/source-control-bitbucket:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/provider-core':
+      '@legioncode/provider-core':
         specifier: workspace:*
         version: link:../provider-core
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
-      '@t3tools/source-control-core':
+      '@legioncode/source-control-core':
         specifier: workspace:*
         version: link:../source-control-core
       effect:
@@ -2281,7 +2281,7 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
-      '@t3tools/source-control-testing':
+      '@legioncode/source-control-testing':
         specifier: workspace:*
         version: link:../source-control-testing
       '@types/node':
@@ -2293,10 +2293,10 @@ importers:
 
   packages/source-control-core:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
       effect:
@@ -2318,16 +2318,16 @@ importers:
       '@effect/platform-node':
         specifier: 4.1.2
         version: 4.1.2(bufferutil@4.1.0)(effect@4.1.3)(redis@6.2.1)(utf-8-validate@6.0.6)
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/provider-core':
+      '@legioncode/provider-core':
         specifier: workspace:*
         version: link:../provider-core
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
-      '@t3tools/source-control-core':
+      '@legioncode/source-control-core':
         specifier: workspace:*
         version: link:../source-control-core
       effect:
@@ -2346,43 +2346,43 @@ importers:
 
   packages/source-control-definitions:
     dependencies:
-      '@t3tools/source-control-azure-devops':
+      '@legioncode/source-control-azure-devops':
         specifier: workspace:*
         version: link:../source-control-azure-devops
-      '@t3tools/source-control-bitbucket':
+      '@legioncode/source-control-bitbucket':
         specifier: workspace:*
         version: link:../source-control-bitbucket
-      '@t3tools/source-control-core':
+      '@legioncode/source-control-core':
         specifier: workspace:*
         version: link:../source-control-core
-      '@t3tools/source-control-cursor-origin':
+      '@legioncode/source-control-cursor-origin':
         specifier: workspace:*
         version: link:../source-control-cursor-origin
-      '@t3tools/source-control-forgejo':
+      '@legioncode/source-control-forgejo':
         specifier: workspace:*
         version: link:../source-control-forgejo
-      '@t3tools/source-control-gitcafe':
+      '@legioncode/source-control-gitcafe':
         specifier: workspace:*
         version: link:../source-control-gitcafe
-      '@t3tools/source-control-github':
+      '@legioncode/source-control-github':
         specifier: workspace:*
         version: link:../source-control-github
-      '@t3tools/source-control-gitlab':
+      '@legioncode/source-control-gitlab':
         specifier: workspace:*
         version: link:../source-control-gitlab
 
   packages/source-control-forgejo:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/provider-core':
+      '@legioncode/provider-core':
         specifier: workspace:*
         version: link:../provider-core
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
-      '@t3tools/source-control-core':
+      '@legioncode/source-control-core':
         specifier: workspace:*
         version: link:../source-control-core
       effect:
@@ -2395,7 +2395,7 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
-      '@t3tools/source-control-testing':
+      '@legioncode/source-control-testing':
         specifier: workspace:*
         version: link:../source-control-testing
       '@types/node':
@@ -2407,16 +2407,16 @@ importers:
 
   packages/source-control-gitcafe:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/provider-core':
+      '@legioncode/provider-core':
         specifier: workspace:*
         version: link:../provider-core
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
-      '@t3tools/source-control-core':
+      '@legioncode/source-control-core':
         specifier: workspace:*
         version: link:../source-control-core
       effect:
@@ -2426,7 +2426,7 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
-      '@t3tools/source-control-testing':
+      '@legioncode/source-control-testing':
         specifier: workspace:*
         version: link:../source-control-testing
       '@types/node':
@@ -2441,16 +2441,16 @@ importers:
       '@effect/platform-node':
         specifier: 4.1.2
         version: 4.1.2(bufferutil@4.1.0)(effect@4.1.3)(redis@6.2.1)(utf-8-validate@6.0.6)
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/provider-core':
+      '@legioncode/provider-core':
         specifier: workspace:*
         version: link:../provider-core
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
-      '@t3tools/source-control-core':
+      '@legioncode/source-control-core':
         specifier: workspace:*
         version: link:../source-control-core
       effect:
@@ -2466,7 +2466,7 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
-      '@t3tools/source-control-testing':
+      '@legioncode/source-control-testing':
         specifier: workspace:*
         version: link:../source-control-testing
       '@types/node':
@@ -2478,13 +2478,13 @@ importers:
 
   packages/source-control-gitlab:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
-      '@t3tools/source-control-core':
+      '@legioncode/source-control-core':
         specifier: workspace:*
         version: link:../source-control-core
       effect:
@@ -2497,7 +2497,7 @@ importers:
       '@effect/vitest':
         specifier: 4.1.2
         version: 4.1.2(patch_hash=299510b71c36537a832a67e9d160a5f112a5f326a29e95c41cb45fc8234e47c7)(@astrojs/compiler-rs@0.5.1)(@types/node@24.12.4)(@vitest/browser-playwright@5.0.5)(@vitest/ui@5.0.5)(@volar/typescript@2.4.28(typescript@6.0.3))(bufferutil@4.1.0)(effect@4.1.3)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@30.1.0(@noble/hashes@1.8.0))(playwright@1.64.1)(terser@5.48.0)(typescript@6.0.3)(unrun@0.2.39)(utf-8-validate@6.0.6)(yaml@2.9.0)
-      '@t3tools/source-control-testing':
+      '@legioncode/source-control-testing':
         specifier: workspace:*
         version: link:../source-control-testing
       '@types/node':
@@ -2512,13 +2512,13 @@ importers:
       '@effect/platform-node':
         specifier: 4.1.2
         version: 4.1.2(bufferutil@4.1.0)(effect@4.1.3)(redis@6.2.1)(utf-8-validate@6.0.6)
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
-      '@t3tools/source-control-core':
+      '@legioncode/source-control-core':
         specifier: workspace:*
         version: link:../source-control-core
       effect:
@@ -2531,10 +2531,10 @@ importers:
 
   packages/ssh:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
       effect:
@@ -2556,10 +2556,10 @@ importers:
 
   packages/tailscale:
     dependencies:
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../shared
       effect:
@@ -2593,13 +2593,13 @@ importers:
       '@electron/osx-sign':
         specifier: 2.7.0
         version: 2.7.0
-      '@t3tools/contracts':
+      '@legioncode/contracts':
         specifier: workspace:*
         version: link:../packages/contracts
-      '@t3tools/shared':
+      '@legioncode/shared':
         specifier: workspace:*
         version: link:../packages/shared
-      '@t3tools/tailscale':
+      '@legioncode/tailscale':
         specifier: workspace:*
         version: link:../packages/tailscale
       agent-device:
@@ -4987,6 +4987,23 @@ packages:
       react-native:
         optional: true
 
+  '@legioncode/mobile-highlights-native@file:apps/mobile/modules/legion-highlights':
+    resolution: {directory: apps/mobile/modules/legion-highlights, type: directory}
+    peerDependencies:
+      react-native-nitro-modules: '*'
+
+  '@legioncode/mobile-review-diff-native@file:apps/mobile/modules/legion-review-diff':
+    resolution: {directory: apps/mobile/modules/legion-review-diff, type: directory}
+
+  '@legioncode/mobile-source-text@file:apps/mobile/modules/legion-source-text':
+    resolution: {directory: apps/mobile/modules/legion-source-text, type: directory}
+    peerDependencies:
+      react: '*'
+      react-native: '*'
+
+  '@legioncode/mobile-terminal-native@file:apps/mobile/modules/legion-terminal':
+    resolution: {directory: apps/mobile/modules/legion-terminal, type: directory}
+
   '@libsql/client@0.17.3':
     resolution: {integrity: sha512-HXk9wiAoJbKFbyBH4O+aEhN6ir5ERXuXvwE5OD2eR4/5RUa3Pw/8L9zrnVdU+iNJitRvisPWaIwmhkO3bH7giA==}
 
@@ -6921,23 +6938,6 @@ packages:
   '@szmarczak/http-timer@4.0.6':
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
     engines: {node: '>=10'}
-
-  '@t3tools/mobile-highlights-native@file:apps/mobile/modules/t3-highlights':
-    resolution: {directory: apps/mobile/modules/t3-highlights, type: directory}
-    peerDependencies:
-      react-native-nitro-modules: '*'
-
-  '@t3tools/mobile-review-diff-native@file:apps/mobile/modules/t3-review-diff':
-    resolution: {directory: apps/mobile/modules/t3-review-diff, type: directory}
-
-  '@t3tools/mobile-source-text@file:apps/mobile/modules/t3-source-text':
-    resolution: {directory: apps/mobile/modules/t3-source-text, type: directory}
-    peerDependencies:
-      react: '*'
-      react-native: '*'
-
-  '@t3tools/mobile-terminal-native@file:apps/mobile/modules/t3-terminal':
-    resolution: {directory: apps/mobile/modules/t3-terminal, type: directory}
 
   '@tabler/icons-react-native@3.44.0':
     resolution: {integrity: sha512-/Ppp68bpl9vQQsI/c+YiDC9dnLq4JUo0YI5qP72OQMC1WmCaRzdYn3CU79q01M2L3MfXO9a8WctWN8ay1Odkow==}
@@ -11608,9 +11608,9 @@ packages:
       '@types/react': '>=18'
       react: '>=18'
 
-  react-native-enriched-markdown@file:apps/mobile/deps/react-native-enriched-markdown-1.2.0-t3.18-16db4c75.tgz:
-    resolution: {integrity: sha512-TdP2nTxn8W4jPJ5EU+9Ctgf6aOncENP/kMa9aEZpJDmWNLXkxPpcugHMWyZJt2o5WDYE4SPi0V6zV6mOl3+8cA==, tarball: file:apps/mobile/deps/react-native-enriched-markdown-1.2.0-t3.18-16db4c75.tgz}
-    version: 1.2.0-t3.18
+  react-native-enriched-markdown@file:apps/mobile/deps/react-native-enriched-markdown-1.2.0-legioncode.18-16db4c75.tgz:
+    resolution: {integrity: sha512-wgYUc+zEcILwMl1MHfutZo5XFfURIAeD6au8sw0D5JLJ6nZgWPBJfKu3qfHIUHLzlO/zZ5tYjwCWqor6z8++Rw==, tarball: file:apps/mobile/deps/react-native-enriched-markdown-1.2.0-legioncode.18-16db4c75.tgz}
+    version: 1.2.0-legioncode.18
     peerDependencies:
       katex: '>=0.16.0'
       react: '*'
@@ -15629,6 +15629,19 @@ snapshots:
       react-dom: 19.3.0(react@19.3.0)
       react-native: 0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6)
 
+  '@legioncode/mobile-highlights-native@file:apps/mobile/modules/legion-highlights(react-native-nitro-modules@0.37.2(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0))':
+    dependencies:
+      react-native-nitro-modules: 0.37.2(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0)
+
+  '@legioncode/mobile-review-diff-native@file:apps/mobile/modules/legion-review-diff': {}
+
+  '@legioncode/mobile-source-text@file:apps/mobile/modules/legion-source-text(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0)':
+    dependencies:
+      react: 19.3.0
+      react-native: 0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6)
+
+  '@legioncode/mobile-terminal-native@file:apps/mobile/modules/legion-terminal': {}
+
   '@libsql/client@0.17.3(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:
       '@libsql/core': 0.17.3
@@ -16958,19 +16971,6 @@ snapshots:
   '@szmarczak/http-timer@4.0.6':
     dependencies:
       defer-to-connect: 2.0.1
-
-  '@t3tools/mobile-highlights-native@file:apps/mobile/modules/t3-highlights(react-native-nitro-modules@0.37.2(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0))':
-    dependencies:
-      react-native-nitro-modules: 0.37.2(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0)
-
-  '@t3tools/mobile-review-diff-native@file:apps/mobile/modules/t3-review-diff': {}
-
-  '@t3tools/mobile-source-text@file:apps/mobile/modules/t3-source-text(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0)':
-    dependencies:
-      react: 19.3.0
-      react-native: 0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6)
-
-  '@t3tools/mobile-terminal-native@file:apps/mobile/modules/t3-terminal': {}
 
   '@tabler/icons-react-native@3.44.0(react-native-svg@15.16.1(patch_hash=7f94d240fc19418233c96f9a637dfd248846446657476c204f3614fd2847900e)(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0))(react@19.3.0)':
     dependencies:
@@ -22539,7 +22539,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  react-native-enriched-markdown@file:apps/mobile/deps/react-native-enriched-markdown-1.2.0-t3.18-16db4c75.tgz(katex@0.16.47)(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0):
+  react-native-enriched-markdown@file:apps/mobile/deps/react-native-enriched-markdown-1.2.0-legioncode.18-16db4c75.tgz(katex@0.16.47)(react-native@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(react@19.3.0):
     dependencies:
       react: 19.3.0
       react-native: 0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@8.1.1))(bufferutil@4.1.0)(supports-color@8.1.1)(utf-8-validate@6.0.6))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(supports-color@8.1.1)(utf-8-validate@6.0.6)

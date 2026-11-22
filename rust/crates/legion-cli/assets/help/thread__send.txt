@@ -1,0 +1,22 @@
+DESCRIPTION
+  Send a message to a thread. A busy thread gets it as its next turn; nothing is interrupted.
+
+USAGE
+  legioncode thread send [flags] <thread> <message>
+
+ARGUMENTS
+  thread string     Thread id.
+  message string    Message for the agent, or - to read it from stdin.
+
+FLAGS
+  --base-dir string         Explicit LegionCode data directory; runtime state is stored under userdata (equivalent to LEGIONCODE_HOME).
+  --output-schema string    File holding a JSON Schema. The agent must return data matching it; --wait --json prints it as `output`.
+  --wait                    Wait for the agent to finish and print its reply. Exits 1 if the run fails and 2 if it waits for an answer.
+  --json                    Print JSON instead of text.
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)

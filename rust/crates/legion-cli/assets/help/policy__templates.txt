@@ -1,0 +1,18 @@
+DESCRIPTION
+  Write the Windows Group Policy template and a macOS configuration profile.
+
+USAGE
+  legioncode policy templates [flags] <directory>
+
+ARGUMENTS
+  directory string    Directory to write the templates to.
+
+FLAGS
+  --policy string    Policy file to put in the macOS profile. Default: a small sample.
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)

@@ -1,0 +1,17 @@
+DESCRIPTION
+  List a project's threads, newest first.
+
+USAGE
+  legioncode thread list [flags]
+
+FLAGS
+  --base-dir string    Explicit LegionCode data directory; runtime state is stored under userdata (equivalent to LEGIONCODE_HOME).
+  --project string     Project id or a path inside the project. Defaults to this directory.
+  --json               Print JSON instead of text.
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)

@@ -47,52 +47,52 @@ function Show-Usage {
 }
 
 function Show-Status {
-  $cliEnv = $env:T3CODE_LEGACY_NODE
-  $cliMode = if (Test-TruthyEnv $cliEnv) { "legacy (T3CODE_LEGACY_NODE=$cliEnv)" } else { "rust" }
+  $cliEnv = $env:LEGIONCODE_LEGACY_NODE
+  $cliMode = if (Test-TruthyEnv $cliEnv) { "legacy (LEGIONCODE_LEGACY_NODE=$cliEnv)" } else { "rust" }
   $cliBin = Resolve-ExistingPath @(
-    $env:T3CODE_RUST_BIN,
-    (Join-Path $RustRoot "dist\bin\t3$ExeExt"),
-    (Join-Path $RustRoot "target\release\t3$ExeExt")
+    $env:LEGIONCODE_RUST_BIN,
+    (Join-Path $RustRoot "dist\bin\legioncode$ExeExt"),
+    (Join-Path $RustRoot "target\release\legioncode$ExeExt")
   )
-  $serverDistExe = Resolve-ExistingPath @((Join-Path $RepoRoot "apps\server\dist-exe\t3$ExeExt"))
+  $serverDistExe = Resolve-ExistingPath @((Join-Path $RepoRoot "apps\server\dist-exe\legioncode$ExeExt"))
   $rustWebApp = Resolve-ExistingPath @((Join-Path $RustRoot "dist\web-app\index.html"))
 
-  $desktopEnv = $env:T3CODE_LEGACY_ELECTRON
-  $desktopMode = if (Test-TruthyEnv $desktopEnv) { "legacy (T3CODE_LEGACY_ELECTRON=$desktopEnv)" } else { "rust" }
+  $desktopEnv = $env:LEGIONCODE_LEGACY_ELECTRON
+  $desktopMode = if (Test-TruthyEnv $desktopEnv) { "legacy (LEGIONCODE_LEGACY_ELECTRON=$desktopEnv)" } else { "rust" }
   $desktopBin = Resolve-ExistingPath @(
-    (Join-Path $RustRoot "dist\desktop\t3-desktop$ExeExt"),
-    (Join-Path $RustRoot "target\release\t3-desktop$ExeExt")
+    (Join-Path $RustRoot "dist\desktop\legioncode-desktop$ExeExt"),
+    (Join-Path $RustRoot "target\release\legioncode-desktop$ExeExt")
   )
 
-  $webEnv = $env:T3CODE_LEGACY_WEB
-  $webMode = if (Test-TruthyEnv $webEnv) { "legacy (T3CODE_LEGACY_WEB=$webEnv)" } else { "rust" }
-  $wasmNode = Resolve-ExistingPath @((Join-Path $RustRoot "dist\wasm-nodejs\t3_wasm_ffi.js"))
-  $wasmWeb = Resolve-ExistingPath @((Join-Path $RustRoot "dist\wasm-web\t3_wasm_ffi.js"))
+  $webEnv = $env:LEGIONCODE_LEGACY_WEB
+  $webMode = if (Test-TruthyEnv $webEnv) { "legacy (LEGIONCODE_LEGACY_WEB=$webEnv)" } else { "rust" }
+  $wasmNode = Resolve-ExistingPath @((Join-Path $RustRoot "dist\wasm-nodejs\legion_wasm_ffi.js"))
+  $wasmWeb = Resolve-ExistingPath @((Join-Path $RustRoot "dist\wasm-web\legion_wasm_ffi.js"))
 
   $mobileScript = Resolve-ExistingPath @((Join-Path $RepoRoot "apps\mobile\scripts\sync-rust-mobile-ffi.mjs"))
   $mobileFiles = @(
-    "dist\mobile\include\t3_mobile_ffi.h",
-    "dist\mobile\swift\T3MobileCore.swift",
-    "dist\mobile\kotlin\T3MobileCore.kt",
-    "dist\mobile\android\T3MobileBridge.kt",
+    "dist\mobile\include\legion_mobile_ffi.h",
+    "dist\mobile\swift\LegionMobileCore.swift",
+    "dist\mobile\kotlin\LegionMobileCore.kt",
+    "dist\mobile\android\LegionMobileBridge.kt",
     "dist\mobile\apple\Package.swift"
   )
   $mobileReady = ($mobileFiles | Where-Object { -not (Test-Path -LiteralPath (Join-Path $RustRoot $_) -PathType Leaf) }).Count -eq 0
 
-  $workerEnv = $env:T3CODE_LEGACY_WORKER
-  $workerMode = if (Test-TruthyEnv $workerEnv) { "legacy (T3CODE_LEGACY_WORKER=$workerEnv)" } else { "rust" }
+  $workerEnv = $env:LEGIONCODE_LEGACY_WORKER
+  $workerMode = if (Test-TruthyEnv $workerEnv) { "legacy (LEGIONCODE_LEGACY_WORKER=$workerEnv)" } else { "rust" }
   $workerFiles = @(
     "dist\cloudflare-workers\worker.mjs",
     "dist\cloudflare-workers\worker_runtime.mjs",
     "dist\cloudflare-workers\wrangler.toml",
-    "dist\cloudflare-workers\t3_wasm_ffi.js",
-    "dist\cloudflare-workers\t3_wasm_ffi_bg.wasm"
+    "dist\cloudflare-workers\legion_wasm_ffi.js",
+    "dist\cloudflare-workers\legion_wasm_ffi_bg.wasm"
   )
   $workerDistReady = ($workerFiles | Where-Object { -not (Test-Path -LiteralPath (Join-Path $RustRoot $_) -PathType Leaf) }).Count -eq 0
   $relayStaged = Test-Path -LiteralPath (Join-Path $RepoRoot "infra\relay\dist\rust-worker\worker.mjs") -PathType Leaf
   $taskCacheStaged = Test-Path -LiteralPath (Join-Path $RepoRoot "infra\task-cache\dist\rust-worker\worker.mjs") -PathType Leaf
 
-  Write-Host "T3 Code Rust Cutover Status ($RepoRoot)"
+  Write-Host "LegionCode Rust Cutover Status ($RepoRoot)"
   Write-Host "------------------------------------------------------------"
   Write-Host ("CLI / Server       : {0}" -f $cliMode)
   Write-Host ("  Rust binary      : {0}" -f ($cliBin ?? "missing"))
@@ -128,9 +128,9 @@ function Invoke-Verify {
   Push-Location $RepoRoot
   try {
     $cliBin = Resolve-ExistingPath @(
-      $env:T3CODE_RUST_BIN,
-      (Join-Path $RustRoot "dist\bin\t3$ExeExt"),
-      (Join-Path $RustRoot "target\release\t3$ExeExt")
+      $env:LEGIONCODE_RUST_BIN,
+      (Join-Path $RustRoot "dist\bin\legioncode$ExeExt"),
+      (Join-Path $RustRoot "target\release\legioncode$ExeExt")
     )
     if ($cliBin) {
       Invoke-Checked "Rust CLI --version" $cliBin @("--version")
@@ -149,8 +149,8 @@ function Invoke-Verify {
     Invoke-Checked "Vitest cutover tests" "vp" (@("test", "run") + $testFiles)
 
     $desktopBin = Resolve-ExistingPath @(
-      (Join-Path $RustRoot "dist\desktop\t3-desktop$ExeExt"),
-      (Join-Path $RustRoot "target\release\t3-desktop$ExeExt")
+      (Join-Path $RustRoot "dist\desktop\legioncode-desktop$ExeExt"),
+      (Join-Path $RustRoot "target\release\legioncode-desktop$ExeExt")
     )
     $startElectron = Join-Path $RepoRoot "apps\desktop\scripts\start-electron.mjs"
     if ($desktopBin -and (Test-Path -LiteralPath $startElectron -PathType Leaf)) {
@@ -183,10 +183,10 @@ function Invoke-Switch {
   }
 
   $vars = @(
-    "T3CODE_LEGACY_NODE",
-    "T3CODE_LEGACY_ELECTRON",
-    "T3CODE_LEGACY_WEB",
-    "T3CODE_LEGACY_WORKER"
+    "LEGIONCODE_LEGACY_NODE",
+    "LEGIONCODE_LEGACY_ELECTRON",
+    "LEGIONCODE_LEGACY_WEB",
+    "LEGIONCODE_LEGACY_WORKER"
   )
 
   if ($normalized -eq "rust") {
@@ -198,8 +198,8 @@ function Invoke-Switch {
     foreach ($name in $vars) {
       Write-Host "  Remove-Item Env:$name -ErrorAction SilentlyContinue"
     }
-    Write-Host "Mobile FFI sync: pnpm --filter @t3tools/mobile sync:rust-ffi"
-    Write-Host "Worker staging : pnpm --filter t3code-relay stage:rust && pnpm --filter @t3tools/task-cache stage:rust"
+    Write-Host "Mobile FFI sync: pnpm --filter @legioncode/mobile sync:rust-ffi"
+    Write-Host "Worker staging : pnpm --filter legioncode-relay stage:rust && pnpm --filter @legioncode/task-cache stage:rust"
 
     if ($Apply) {
       Push-Location $RepoRoot
@@ -233,7 +233,7 @@ if ([string]::IsNullOrWhiteSpace($Command)) {
     exit 0
   }
 
-  Write-Host "T3 Code Cutover Controller"
+  Write-Host "LegionCode Cutover Controller"
   Write-Host "  1) status"
   Write-Host "  2) verify"
   Write-Host "  3) switch rust"

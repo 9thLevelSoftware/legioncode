@@ -46,31 +46,31 @@ show_status() {
   ext="$(exe_suffix)"
 
   local cli_mode="rust"
-  if is_truthy "${T3CODE_LEGACY_NODE:-}"; then
-    cli_mode="legacy (T3CODE_LEGACY_NODE=${T3CODE_LEGACY_NODE})"
+  if is_truthy "${LEGIONCODE_LEGACY_NODE:-}"; then
+    cli_mode="legacy (LEGIONCODE_LEGACY_NODE=${LEGIONCODE_LEGACY_NODE})"
   fi
   local cli_bin="missing"
-  cli_bin="$(resolve_file "${T3CODE_RUST_BIN:-}" "$SCRIPT_DIR/dist/bin/t3${ext}" "$SCRIPT_DIR/target/release/t3${ext}")" || cli_bin="missing"
+  cli_bin="$(resolve_file "${LEGIONCODE_RUST_BIN:-}" "$SCRIPT_DIR/dist/bin/legioncode${ext}" "$SCRIPT_DIR/target/release/legioncode${ext}")" || cli_bin="missing"
   local dist_exe="missing"
-  dist_exe="$(resolve_file "$REPO_ROOT/apps/server/dist-exe/t3${ext}")" || dist_exe="missing"
+  dist_exe="$(resolve_file "$REPO_ROOT/apps/server/dist-exe/legioncode${ext}")" || dist_exe="missing"
   local rust_web="missing"
   rust_web="$(resolve_file "$SCRIPT_DIR/dist/web-app/index.html")" || rust_web="missing"
 
   local desktop_mode="rust"
-  if is_truthy "${T3CODE_LEGACY_ELECTRON:-}"; then
-    desktop_mode="legacy (T3CODE_LEGACY_ELECTRON=${T3CODE_LEGACY_ELECTRON})"
+  if is_truthy "${LEGIONCODE_LEGACY_ELECTRON:-}"; then
+    desktop_mode="legacy (LEGIONCODE_LEGACY_ELECTRON=${LEGIONCODE_LEGACY_ELECTRON})"
   fi
   local desktop_bin="missing"
-  desktop_bin="$(resolve_file "$SCRIPT_DIR/dist/desktop/t3-desktop${ext}" "$SCRIPT_DIR/target/release/t3-desktop${ext}")" || desktop_bin="missing"
+  desktop_bin="$(resolve_file "$SCRIPT_DIR/dist/desktop/legioncode-desktop${ext}" "$SCRIPT_DIR/target/release/legioncode-desktop${ext}")" || desktop_bin="missing"
 
   local web_mode="rust"
-  if is_truthy "${T3CODE_LEGACY_WEB:-}"; then
-    web_mode="legacy (T3CODE_LEGACY_WEB=${T3CODE_LEGACY_WEB})"
+  if is_truthy "${LEGIONCODE_LEGACY_WEB:-}"; then
+    web_mode="legacy (LEGIONCODE_LEGACY_WEB=${LEGIONCODE_LEGACY_WEB})"
   fi
   local wasm_node="missing"
-  wasm_node="$(resolve_file "$SCRIPT_DIR/dist/wasm-nodejs/t3_wasm_ffi.js")" || wasm_node="missing"
+  wasm_node="$(resolve_file "$SCRIPT_DIR/dist/wasm-nodejs/legion_wasm_ffi.js")" || wasm_node="missing"
   local wasm_web="missing"
-  wasm_web="$(resolve_file "$SCRIPT_DIR/dist/wasm-web/t3_wasm_ffi.js")" || wasm_web="missing"
+  wasm_web="$(resolve_file "$SCRIPT_DIR/dist/wasm-web/legion_wasm_ffi.js")" || wasm_web="missing"
 
   local mobile_script="pending"
   if [[ -f "$REPO_ROOT/apps/mobile/scripts/sync-rust-mobile-ffi.mjs" ]]; then
@@ -79,10 +79,10 @@ show_status() {
   local mobile_ready="complete (5/5)"
   local rel
   for rel in \
-    "dist/mobile/include/t3_mobile_ffi.h" \
-    "dist/mobile/swift/T3MobileCore.swift" \
-    "dist/mobile/kotlin/T3MobileCore.kt" \
-    "dist/mobile/android/T3MobileBridge.kt" \
+    "dist/mobile/include/legion_mobile_ffi.h" \
+    "dist/mobile/swift/LegionMobileCore.swift" \
+    "dist/mobile/kotlin/LegionMobileCore.kt" \
+    "dist/mobile/android/LegionMobileBridge.kt" \
     "dist/mobile/apple/Package.swift"; do
     if [[ ! -f "$SCRIPT_DIR/$rel" ]]; then
       mobile_ready="incomplete"
@@ -91,16 +91,16 @@ show_status() {
   done
 
   local worker_mode="rust"
-  if is_truthy "${T3CODE_LEGACY_WORKER:-}"; then
-    worker_mode="legacy (T3CODE_LEGACY_WORKER=${T3CODE_LEGACY_WORKER})"
+  if is_truthy "${LEGIONCODE_LEGACY_WORKER:-}"; then
+    worker_mode="legacy (LEGIONCODE_LEGACY_WORKER=${LEGIONCODE_LEGACY_WORKER})"
   fi
   local worker_ready="complete (5/5)"
   for rel in \
     "dist/cloudflare-workers/worker.mjs" \
     "dist/cloudflare-workers/worker_runtime.mjs" \
     "dist/cloudflare-workers/wrangler.toml" \
-    "dist/cloudflare-workers/t3_wasm_ffi.js" \
-    "dist/cloudflare-workers/t3_wasm_ffi_bg.wasm"; do
+    "dist/cloudflare-workers/legion_wasm_ffi.js" \
+    "dist/cloudflare-workers/legion_wasm_ffi_bg.wasm"; do
     if [[ ! -f "$SCRIPT_DIR/$rel" ]]; then
       worker_ready="incomplete"
       break
@@ -111,7 +111,7 @@ show_status() {
   local task_cache_staged="no (run stage:rust)"
   [[ -f "$REPO_ROOT/infra/task-cache/dist/rust-worker/worker.mjs" ]] && task_cache_staged="yes"
 
-  printf 'T3 Code Rust Cutover Status (%s)\n' "$REPO_ROOT"
+  printf 'LegionCode Rust Cutover Status (%s)\n' "$REPO_ROOT"
   printf '%s\n' '------------------------------------------------------------'
   printf 'CLI / Server       : %s\n' "$cli_mode"
   printf '  Rust binary      : %s\n' "$cli_bin"
@@ -136,7 +136,7 @@ run_verify() {
   cd "$REPO_ROOT"
 
   local cli_bin=""
-  if cli_bin="$(resolve_file "${T3CODE_RUST_BIN:-}" "$SCRIPT_DIR/dist/bin/t3${ext}" "$SCRIPT_DIR/target/release/t3${ext}")"; then
+  if cli_bin="$(resolve_file "${LEGIONCODE_RUST_BIN:-}" "$SCRIPT_DIR/dist/bin/legioncode${ext}" "$SCRIPT_DIR/target/release/legioncode${ext}")"; then
     echo "[verify] Rust CLI --version..."
     "$cli_bin" --version
   else
@@ -154,7 +154,7 @@ run_verify() {
   vp test run "${test_files[@]}"
 
   local desktop_bin=""
-  if desktop_bin="$(resolve_file "$SCRIPT_DIR/dist/desktop/t3-desktop${ext}" "$SCRIPT_DIR/target/release/t3-desktop${ext}")" \
+  if desktop_bin="$(resolve_file "$SCRIPT_DIR/dist/desktop/legioncode-desktop${ext}" "$SCRIPT_DIR/target/release/legioncode-desktop${ext}")" \
     && [[ -f "$REPO_ROOT/apps/desktop/scripts/start-electron.mjs" ]]; then
     echo "[verify] Desktop Rust --self-check..."
     node "$REPO_ROOT/apps/desktop/scripts/start-electron.mjs" --self-check
@@ -187,10 +187,10 @@ run_switch() {
   fi
 
   local -a vars=(
-    "T3CODE_LEGACY_NODE"
-    "T3CODE_LEGACY_ELECTRON"
-    "T3CODE_LEGACY_WEB"
-    "T3CODE_LEGACY_WORKER"
+    "LEGIONCODE_LEGACY_NODE"
+    "LEGIONCODE_LEGACY_ELECTRON"
+    "LEGIONCODE_LEGACY_WEB"
+    "LEGIONCODE_LEGACY_WORKER"
   )
 
   if [[ "$normalized" == "rust" ]]; then
@@ -203,8 +203,8 @@ run_switch() {
     for name in "${vars[@]}"; do
       echo "  unset $name"
     done
-    echo "Mobile FFI sync: pnpm --filter @t3tools/mobile sync:rust-ffi"
-    echo "Worker staging : pnpm --filter t3code-relay stage:rust && pnpm --filter @t3tools/task-cache stage:rust"
+    echo "Mobile FFI sync: pnpm --filter @legioncode/mobile sync:rust-ffi"
+    echo "Worker staging : pnpm --filter legioncode-relay stage:rust && pnpm --filter @legioncode/task-cache stage:rust"
 
     if [[ "$apply" == "true" ]]; then
       cd "$REPO_ROOT"
@@ -245,7 +245,7 @@ if [[ -z "$cmd" ]]; then
     show_status
     exit 0
   fi
-  echo "T3 Code Cutover Controller"
+  echo "LegionCode Cutover Controller"
   echo "  1) status"
   echo "  2) verify"
   echo "  3) switch rust"

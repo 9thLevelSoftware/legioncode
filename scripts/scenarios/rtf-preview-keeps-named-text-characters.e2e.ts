@@ -1,6 +1,6 @@
 import { expect } from "e2e";
 
-import { test, WEB } from "./t3.ts";
+import { test, WEB } from "./legioncode.ts";
 
 // Java's RTFEditorKit writing "Account<em space>Name<en space>Jean<nonbreaking hyphen>Luc".
 const JDK_RTF = String.raw`{\rtf1\ansi
@@ -13,10 +13,14 @@ Account\emspace Name\enspace Jean\_ Luc\par
 test(
   "An RTF preview keeps the spaces and hyphens written as named control words",
   WEB,
-  async ({ t3, app, screen, browser }) => {
-    const project = await t3.project("demo", { "contacts.rtf": JDK_RTF });
-    const thread = await t3.thread({ project, title: "Review contacts", messages: ["Start"] });
-    await t3.open(thread);
+  async ({ legioncode, app, screen, browser }) => {
+    const project = await legioncode.project("demo", { "contacts.rtf": JDK_RTF });
+    const thread = await legioncode.thread({
+      project,
+      title: "Review contacts",
+      messages: ["Start"],
+    });
+    await legioncode.open(thread);
     await expect(screen.getByText("fixture turn complete", { exact: false })).toBeVisible();
 
     await browser.keyboard.press("Control+p");

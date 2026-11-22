@@ -15,9 +15,9 @@ import * as Stream from "effect/Stream";
 import { Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-import * as HostProcess from "@t3tools/shared/HostProcess";
-import { fromYaml } from "@t3tools/shared/schemaYaml";
-import { resolveSpawnCommand } from "@t3tools/shared/shell";
+import * as HostProcess from "@legioncode/shared/HostProcess";
+import { fromYaml } from "@legioncode/shared/schemaYaml";
+import { resolveSpawnCommand } from "@legioncode/shared/shell";
 import rootPackageJson from "../package.json" with { type: "json" };
 import serverPackageJson from "../apps/server/package.json" with { type: "json" };
 
@@ -92,12 +92,12 @@ export class CliArchiveInputMissingError extends Schema.TaggedError<CliArchiveIn
 
 const NODE_SEA_BLOB_MARKER = Buffer.from("NODE_SEA_BLOB", "utf8");
 
-/** Identifies standalone Rust `t3` executables when legacy Node mode is not forced. */
+/** Identifies standalone Rust `legioncode` executables when legacy Node mode is not forced. */
 export function isStandaloneRustExecutable(
   bytes: Uint8Array,
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-  const legacyNode = env.T3CODE_LEGACY_NODE?.trim().toLowerCase();
+  const legacyNode = env.LEGIONCODE_LEGACY_NODE?.trim().toLowerCase();
   if (legacyNode === "1" || legacyNode === "true") {
     return false;
   }
@@ -112,7 +112,7 @@ export function cliArchivePlatformKey(platform: BuildPlatform, arch: BuildArch):
 }
 
 export function cliArchiveStem(version: string, platform: BuildPlatform, arch: BuildArch): string {
-  return `t3-${version}-${cliArchivePlatformKey(platform, arch)}`;
+  return `legioncode-${version}-${cliArchivePlatformKey(platform, arch)}`;
 }
 
 export function cliArchiveFileName(version: string, platform: BuildPlatform, arch: BuildArch) {
@@ -185,7 +185,7 @@ const stageRuntimeExternals = Effect.fn("stageRuntimeExternals")(function* (inpu
   yield* fs.writeFileString(
     path.join(input.stageDir, "package.json"),
     `${yield* encodeJsonString({
-      name: "t3-runtime",
+      name: "legioncode-runtime",
       version: input.version,
       private: true,
       packageManager: rootPackageJson.packageManager,
@@ -277,7 +277,7 @@ const stageWebClient = Effect.fn("stageWebClient")(function* (source: string, ta
   }
 });
 
-/** Node links libatomic.so.1, which Ubuntu server and container images lack, so t3 carries its own. */
+/** Node links libatomic.so.1, which Ubuntu server and container images lack, so legioncode carries its own. */
 const bundleLinuxLibatomic = Effect.fn("bundleLinuxLibatomic")(function* (input: {
   readonly repoRoot: string;
   readonly contentDir: string;
@@ -341,7 +341,7 @@ const bundleLinuxLibatomic = Effect.fn("bundleLinuxLibatomic")(function* (input:
 });
 
 const MacSigningConfig = Config.all({
-  identity: Config.String("T3CODE_CLI_MAC_SIGN_IDENTITY").pipe(Config.option),
+  identity: Config.String("LEGIONCODE_CLI_MAC_SIGN_IDENTITY").pipe(Config.option),
   appleApiKey: Config.String("APPLE_API_KEY").pipe(Config.option),
   appleApiKeyId: Config.String("APPLE_API_KEY_ID").pipe(Config.option),
   appleApiIssuer: Config.String("APPLE_API_ISSUER").pipe(Config.option),
@@ -424,7 +424,7 @@ const requireAccepted = Effect.fn("requireAccepted")(function* (
       status: submission.status ?? "without a status",
     });
   }
-  yield* Effect.log(`[cli-archive] Notarized t3 (${submission.id}).`);
+  yield* Effect.log(`[cli-archive] Notarized legioncode (${submission.id}).`);
 });
 
 /** Apple Silicon requires signed binaries; notarization's hardened runtime also requires every native addon signed. */
@@ -448,7 +448,7 @@ export const signMacArchiveContents = Effect.fn("signMacArchiveContents")(functi
         entry.endsWith(".node") ||
         entry.endsWith(".dylib") ||
         entry.endsWith("spawn-helper") ||
-        entry.endsWith("t3-resource-monitor"),
+        entry.endsWith("legioncode-resource-monitor"),
     )
     .map((entry) => path.join(input.contentDir, entry));
 
@@ -466,7 +466,7 @@ export const signMacArchiveContents = Effect.fn("signMacArchiveContents")(functi
     );
   }
   if (identity === "-") {
-    yield* Effect.log("[cli-archive] Signed ad hoc (no T3CODE_CLI_MAC_SIGN_IDENTITY).");
+    yield* Effect.log("[cli-archive] Signed ad hoc (no LEGIONCODE_CLI_MAC_SIGN_IDENTITY).");
     return;
   }
   if (Option.isNone(credentials)) {
@@ -476,7 +476,7 @@ export const signMacArchiveContents = Effect.fn("signMacArchiveContents")(functi
     return;
   }
   // notarytool requires an archive; bare executables rely on online tickets because they cannot be stapled.
-  const notarizeZip = path.join(path.dirname(input.executablePath), ".notarize-t3.zip");
+  const notarizeZip = path.join(path.dirname(input.executablePath), ".notarize-legioncode.zip");
   yield* runCommand(
     ChildProcess.make("ditto", ["-c", "-k", "--keepParent", input.executablePath, notarizeZip]),
     "ditto (notarization zip)",
@@ -492,7 +492,7 @@ export const signMacArchiveContents = Effect.fn("signMacArchiveContents")(functi
   // The ticket lives with Apple, not in the archive, so the archive bytes are final before approval.
   yield* fs.writeFileString(deferred, submission.id);
   yield* Effect.log(
-    `[cli-archive] Submitted t3 for notarization (${submission.id}). Run await-notarization before publishing.`,
+    `[cli-archive] Submitted legioncode for notarization (${submission.id}). Run await-notarization before publishing.`,
   );
 });
 
@@ -506,7 +506,7 @@ export const awaitCliNotarization = Effect.fn("awaitCliNotarization")(function* 
   if (Option.isNone(credentials)) {
     if (submitted) {
       return yield* new CliArchiveInputMissingError({
-        inputPath: "T3CODE_CLI_MAC_SIGN_IDENTITY and APPLE_API_KEY*",
+        inputPath: "LEGIONCODE_CLI_MAC_SIGN_IDENTITY and APPLE_API_KEY*",
         hint: `${submissionFile} names a submission, but its credentials are not set.`,
       });
     }
@@ -578,7 +578,7 @@ const signWindowsExecutable = Effect.fn("signWindowsExecutable")(function* (
   yield* stripStaleAuthenticodeEntry(executablePath);
   if ((yield* HostProcess.Platform) !== "win32") {
     yield* signWithJsign(executablePath);
-    yield* Effect.log("[cli-archive] Signed t3.exe (Azure Trusted Signing via jsign).");
+    yield* Effect.log("[cli-archive] Signed legioncode.exe (Azure Trusted Signing via jsign).");
     return;
   }
   const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
@@ -595,9 +595,9 @@ const signWindowsExecutable = Effect.fn("signWindowsExecutable")(function* (
   ].join(" ");
   yield* runCommand(
     ChildProcess.make("pwsh", ["-NoProfile", "-NonInteractive", "-Command", script]),
-    "Invoke-TrustedSigning t3.exe",
+    "Invoke-TrustedSigning legioncode.exe",
   );
-  yield* Effect.log("[cli-archive] Signed t3.exe (Azure Trusted Signing).");
+  yield* Effect.log("[cli-archive] Signed legioncode.exe (Azure Trusted Signing).");
 });
 
 const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
@@ -612,13 +612,13 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
   const path = yield* Path.Path;
   const repoRoot = yield* RepoRoot;
   const serverDir = path.join(repoRoot, "apps/server");
-  const executableName = input.platform === "win" ? "t3.exe" : "t3";
+  const executableName = input.platform === "win" ? "legioncode.exe" : "legioncode";
   // tsdown suffixes cross-built executables; prefer the exact target over the plain host build.
   const targetKey = `${input.platform === "mac" ? "darwin" : input.platform}-${input.arch}`;
   const targetExecutable = path.join(
     serverDir,
     "dist-exe",
-    `t3-${targetKey}${input.platform === "win" ? ".exe" : ""}`,
+    `legioncode-${targetKey}${input.platform === "win" ? ".exe" : ""}`,
   );
   // The unsuffixed executable is valid only for the host platform and architecture.
   const hostPlatform = yield* HostProcess.Platform;
@@ -648,7 +648,10 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
     (yield* fs.exists(path.join(rustWebClient, "index.html")))
       ? rustWebClient
       : serverWebClient;
-  yield* requireInput(path.join(webClient, "index.html"), "Run `vp run --filter t3 build` first.");
+  yield* requireInput(
+    path.join(webClient, "index.html"),
+    "Run `vp run --filter legioncode build` first.",
+  );
 
   const hasResourceMonitor = yield* fs.exists(resourceMonitorDir);
   if (!standaloneRust && !hasResourceMonitor) {
@@ -659,7 +662,7 @@ const buildCliArchive = Effect.fn("buildCliArchive")(function* (input: {
   }
 
   const stem = cliArchiveStem(input.version, input.platform, input.arch);
-  const stageRoot = yield* fs.makeTempDirectoryScoped({ prefix: "t3-cli-archive-" });
+  const stageRoot = yield* fs.makeTempDirectoryScoped({ prefix: "legioncode-cli-archive-" });
   const contentDir = path.join(stageRoot, stem);
   yield* fs.makeDirectory(contentDir, { recursive: true });
 
@@ -769,7 +772,7 @@ const command = Command.make(
   },
   (input) => buildCliArchive(input).pipe(Effect.scoped),
 ).pipe(
-  Command.withDescription("Package the t3 single-executable into a per-platform archive."),
+  Command.withDescription("Package the legioncode single-executable into a per-platform archive."),
   Command.withSubcommands([
     Command.make(
       "await-notarization",

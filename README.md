@@ -43,13 +43,13 @@ It works with Claude Code, Codex, Cursor, OpenCode, Grok Build, Antigravity, Kir
 
 [Download LegionCode](https://legion.codes/download) for macOS, Windows, or Linux. You can also use a package manager:
 
-| Platform       | Command                                                                         |
-| -------------- | ------------------------------------------------------------------------------- |
-| macOS          | `brew install --cask legioncode`                                                |
+| Platform       | Command                                                                           |
+| -------------- | --------------------------------------------------------------------------------- |
+| macOS          | `brew install --cask legioncode`                                                  |
 | Windows        | `winget install 9thLevelSoftware.LegionCode` or `scoop install extras/legioncode` |
-| Arch Linux     | `yay -S legioncode-bin`                                                         |
-| Nix            | `nix profile add github:NixOS/nixpkgs/nixos-unstable#legioncode`                |
-| Debian, Ubuntu | `.deb` from [Releases](https://github.com/9thLevelSoftware/legioncode/releases) |
+| Arch Linux     | `yay -S legioncode-bin`                                                           |
+| Nix            | `nix profile add github:NixOS/nixpkgs/nixos-unstable#legioncode`                  |
+| Debian, Ubuntu | `.deb` from [Releases](https://github.com/9thLevelSoftware/legioncode/releases)   |
 
 ### Command line
 

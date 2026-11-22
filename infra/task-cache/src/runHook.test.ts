@@ -248,9 +248,9 @@ it("installs without masking .profile and configures CI through bash", async () 
     expect(await NodeFSP.readFile(NodePath.join(home, ".profile"), "utf8")).not.toContain(
       "legioncode-task-cache/env",
     );
-    expect(await NodeFSP.readdir(NodePath.join(home, ".config/legioncode-task-cache"))).not.toContain(
-      "credentials.json",
-    );
+    expect(
+      await NodeFSP.readdir(NodePath.join(home, ".config/legioncode-task-cache")),
+    ).not.toContain("credentials.json");
     const remaining = await run(
       [
         process.execPath,

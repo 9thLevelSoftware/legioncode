@@ -854,7 +854,9 @@ export const makeDeviceTools = Effect.fn("evaluateMcpToolUse.makeDeviceTools")(f
       .join("\n");
     // McpServer turns a defect into this text; here a defect is a bug in the eval's world.
     if (text === "Tool execution failed due to an internal server error.") {
-      return yield* Effect.die(new Error(`${name} hit a defect in LegionCode or the eval's world.`));
+      return yield* Effect.die(
+        new Error(`${name} hit a defect in LegionCode or the eval's world.`),
+      );
     }
     const opened = result.structuredContent;
     if (name === "device_open" && !result.isError && isOpened(opened)) {

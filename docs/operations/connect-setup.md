@@ -79,11 +79,11 @@ persistence and system-browser callback delivery.
 
 Clerk's native Android SDK uses `clerk://<applicationId>.callback`. In the Clerk instance selected by the app's publishable key, add each supported package to **Native applications > Allowlist for mobile SSO redirect**:
 
-| Variant     | Callback                                    |
-| ----------- | ------------------------------------------- |
-| Development | `clerk://dev.legioncode.dev.callback`       |
-| Preview     | `clerk://dev.legioncode.preview.callback`   |
-| Production  | `clerk://dev.legioncode.callback`           |
+| Variant     | Callback                                  |
+| ----------- | ----------------------------------------- |
+| Development | `clerk://dev.legioncode.dev.callback`     |
+| Preview     | `clerk://dev.legioncode.preview.callback` |
+| Production  | `clerk://dev.legioncode.callback`         |
 
 Preserve existing entries. These callbacks are separate from the `legioncode-dev` / `legioncode-preview` / `legioncode` navigation schemes. A private development build using the production Clerk key still needs its development callback allowed by that instance's administrator; rebuilding the same package does not change the allowlist.
 

@@ -642,7 +642,11 @@ const template = {
   tools: [
     { name: "mcp__host__term_Bash", input_schema: { type: "object" } },
     { name: "mcp__host__clown_ToolSearch", input_schema: { type: "object" } },
-    { name: "mcp__legion-code__retired_tool", input_schema: { type: "object" }, defer_loading: true },
+    {
+      name: "mcp__legion-code__retired_tool",
+      input_schema: { type: "object" },
+      defer_loading: true,
+    },
   ],
 };
 
@@ -1307,7 +1311,10 @@ it.effect("saves a new secret file for each request and tells the shell simulato
     const first = yield* request("a", "file");
     const second = yield* request("b", "file");
     const ref = yield* request("c", "secretRef");
-    assert.match(first.file, /^\/home\/user\/\.legioncode\/userdata\/secrets\/files\/[0-9a-f]{32}$/);
+    assert.match(
+      first.file,
+      /^\/home\/user\/\.legioncode\/userdata\/secrets\/files\/[0-9a-f]{32}$/,
+    );
     assert.notEqual(first.file, second.file);
     assert.match(ref.secretRef, /^secret-ref:[0-9a-f]{32}$/);
     assert.notInclude([first.file, second.file], ref.secretRef.slice("secret-ref:".length));
@@ -1369,70 +1376,78 @@ it.effect("saves a pasted value with no card where request_secret takes one", ()
       return;
     }
     assert.equal(result.status, "saved");
-    assert.match(result.file, /^\/home\/user\/\.legioncode\/userdata\/secrets\/files\/[0-9a-f]{32}$/);
+    assert.match(
+      result.file,
+      /^\/home\/user\/\.legioncode\/userdata\/secrets\/files\/[0-9a-f]{32}$/,
+    );
     assert.notInclude(JSON.stringify(result), "482916");
     assert.deepEqual(sample.secretFiles, [result.file]);
   }).pipe(Effect.provide(FetchHttpClient.layer)),
 );
 
-it.effect("fails preview calls with LegionCode's errors when browser access is off or a mock is one", () =>
-  Effect.gen(function* () {
-    const base = buildBase(template, { model: "claude-sonnet-5-5", keepUserInstructions: false });
-    const config = {
-      apiKey: "",
-      model: "claude-sonnet-5-5",
-      effort: "high",
-      maxSteps: 6,
-      shellModel: "claude-haiku-5-5",
-    } as const;
-    const answer = (id: string, tool: string) => {
-      const sample = makeSample(browserCase(id), base);
-      sample.tools.push({ name: `mcp__legion-code__${tool}` });
-      return answerToolCall(sample, config, {
-        type: "tool_use",
-        id: tool,
-        name: `mcp__legion-code__${tool}`,
-        input: {},
-      });
-    };
-    const off = new PreviewAutomationUnavailableError({
-      capability: "preview",
-      environmentId: EnvironmentId.make("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"),
-    }).message;
-    for (const tool of ["preview_status", "preview_open", "legion_preview_list"])
-      assert.deepInclude(yield* answer("br-guard-browser-access-off", tool), {
+it.effect(
+  "fails preview calls with LegionCode's errors when browser access is off or a mock is one",
+  () =>
+    Effect.gen(function* () {
+      const base = buildBase(template, { model: "claude-sonnet-5-5", keepUserInstructions: false });
+      const config = {
+        apiKey: "",
+        model: "claude-sonnet-5-5",
+        effort: "high",
+        maxSteps: 6,
+        shellModel: "claude-haiku-5-5",
+      } as const;
+      const answer = (id: string, tool: string) => {
+        const sample = makeSample(browserCase(id), base);
+        sample.tools.push({ name: `mcp__legion-code__${tool}` });
+        return answerToolCall(sample, config, {
+          type: "tool_use",
+          id: tool,
+          name: `mcp__legion-code__${tool}`,
+          input: {},
+        });
+      };
+      const off = new PreviewAutomationUnavailableError({
+        capability: "preview",
+        environmentId: EnvironmentId.make("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"),
+      }).message;
+      for (const tool of ["preview_status", "preview_open", "legion_preview_list"])
+        assert.deepInclude(yield* answer("br-guard-browser-access-off", tool), {
+          is_error: true,
+          content: off,
+        });
+      assert.notInclude(
+        legionSystemAppend("claude-sonnet-5-5", true, false),
+        "## LegionCode browser",
+      );
+      const unsupported = "br-guard-preview-open-unsupported";
+      assert.deepInclude(yield* answer(unsupported, "preview_open"), {
         is_error: true,
-        content: off,
+        content: "Preview automation client desktop-1 does not support open.",
       });
-    assert.notInclude(legionSystemAppend("claude-sonnet-5-5", true, false), "## LegionCode browser");
-    const unsupported = "br-guard-preview-open-unsupported";
-    assert.deepInclude(yield* answer(unsupported, "preview_open"), {
-      is_error: true,
-      content: "Preview automation client desktop-1 does not support open.",
-    });
-    const status = yield* answer(unsupported, "preview_status");
-    assert.isUndefined(status.is_error);
-    assert.include(String(status.content), '"available":false');
-    // A sequence mock answers each call with its next result, then repeats the last.
-    const flow = makeSample(browserCase("br-flow-qa-missing-cli"), base);
-    flow.tools.push({ name: "mcp__legion-code__preview_snapshot" });
-    const titles: Array<string> = [];
-    for (let i = 0; i < 4; i++) {
-      const result = yield* answerToolCall(flow, config, {
-        type: "tool_use",
-        id: `snapshot-${i}`,
-        name: "mcp__legion-code__preview_snapshot",
-        input: {},
-      });
-      titles.push(String(/"title":"([^"]+)"/.exec(String(result.content))?.[1]));
-    }
-    assert.deepEqual(titles, [
-      "Subscription · Acme",
-      "Top up · Acme",
-      "Acme · Stripe Checkout",
-      "Acme · Stripe Checkout",
-    ]);
-  }).pipe(Effect.provide(FetchHttpClient.layer)),
+      const status = yield* answer(unsupported, "preview_status");
+      assert.isUndefined(status.is_error);
+      assert.include(String(status.content), '"available":false');
+      // A sequence mock answers each call with its next result, then repeats the last.
+      const flow = makeSample(browserCase("br-flow-qa-missing-cli"), base);
+      flow.tools.push({ name: "mcp__legion-code__preview_snapshot" });
+      const titles: Array<string> = [];
+      for (let i = 0; i < 4; i++) {
+        const result = yield* answerToolCall(flow, config, {
+          type: "tool_use",
+          id: `snapshot-${i}`,
+          name: "mcp__legion-code__preview_snapshot",
+          input: {},
+        });
+        titles.push(String(/"title":"([^"]+)"/.exec(String(result.content))?.[1]));
+      }
+      assert.deepEqual(titles, [
+        "Subscription · Acme",
+        "Top up · Acme",
+        "Acme · Stripe Checkout",
+        "Acme · Stripe Checkout",
+      ]);
+    }).pipe(Effect.provide(FetchHttpClient.layer)),
 );
 
 const deviceCases = () =>
@@ -1500,7 +1515,8 @@ it.effect("seeds LegionCode's error for a prior background wait whose IDs match 
       assert.equal(sample.priorErrors.has(wait), isError, id);
       const blocks = buildMessages(sample).flatMap((message) => message.content);
       const waitUse = blocks.find(
-        (block) => block.type === "tool_use" && String(block.name).endsWith("legion_background_wait"),
+        (block) =>
+          block.type === "tool_use" && String(block.name).endsWith("legion_background_wait"),
       );
       const replayed = blocks.find(
         (block) => block.type === "tool_result" && block.tool_use_id === waitUse?.id,
@@ -1545,7 +1561,8 @@ it.effect("builds the secrets cases, each citing a finding and grading secret ha
   }).pipe(Effect.scoped, Effect.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer))),
 );
 
-const SECRET_FILE = "/home/user/.legioncode/userdata/secrets/files/8e8853a6ac5e3bc4374d75066b9b4311";
+const SECRET_FILE =
+  "/home/user/.legioncode/userdata/secrets/files/8e8853a6ac5e3bc4374d75066b9b4311";
 it.each([
   // Smoke: the email field filled in the same command as the password from the file.
   [
@@ -2359,7 +2376,10 @@ it("shares failed device attempts across tools and launcher steps, resetting onl
     failed: true,
     input:
       tool === "Bash"
-        ? { command: "/home/user/.legioncode/device/bin/agent-device snapshot -i --session legion-eval" }
+        ? {
+            command:
+              "/home/user/.legioncode/device/bin/agent-device snapshot -i --session legion-eval",
+          }
         : {},
   });
   const calls = [
@@ -2429,7 +2449,10 @@ it("keeps the shared recovery budget when a case is decoded and graded", () => {
     step,
     tool,
     failed: true,
-    input: tool === "Bash" ? { command: "/home/user/.legioncode/device/bin/agent-device snapshot -i" } : {},
+    input:
+      tool === "Bash"
+        ? { command: "/home/user/.legioncode/device/bin/agent-device snapshot -i" }
+        : {},
   }));
   const run = { calls, text: "Canvas is blocked: daemon unavailable.", stopReason: "end_turn" };
   assert.isTrue(
@@ -3016,7 +3039,11 @@ it("does not credit a capture attempt on a different host", () => {
 });
 
 it.each([
-  ["LegionCode's result names the remote device", { hostId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }, true],
+  [
+    "LegionCode's result names the remote device",
+    { hostId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
+    true,
+  ],
   ["LegionCode's result names a local device", { hostId: "local" }, false],
   ["failed attempt uses the matching open session", undefined, true],
 ] as const)(
@@ -4376,7 +4403,8 @@ it("fleet OWN-01 allows contention discovery but forbids reusing the occupied se
           step: 4,
           tool: "Bash",
           input: {
-            command: "agent-device --session legioncode-a062c547ef0b6bf8ee839b67 screenshot /tmp/a.png",
+            command:
+              "agent-device --session legioncode-a062c547ef0b6bf8ee839b67 screenshot /tmp/a.png",
           },
           failed: false,
         },
@@ -4933,7 +4961,9 @@ it.each(["bound", "shared"])("R12 CAP-01 rejects unattributable recovery mutatio
   const c = deviceCases().find((c) => c.id === "CAP-01")!;
   const good = { ...fleetTrace(c.id), finalText: "Verified Settings." };
   const launcher =
-    form === "bound" ? good.launchers![0]! : "/home/user/.legioncode/userdata/device/bin/agent-device";
+    form === "bound"
+      ? good.launchers![0]!
+      : "/home/user/.legioncode/userdata/device/bin/agent-device";
   const command = `mkdir -p /tmp/proof && ${launcher} screenshot /tmp/proof/recovered.png; ls -l /tmp/proof; file /tmp/proof/recovered.png`;
   const output =
     "Screenshot saved: /tmp/proof/recovered.png\n/tmp/proof/recovered.png: PNG image data, 1080 x 2400";

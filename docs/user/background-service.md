@@ -144,12 +144,12 @@ with sudo; running LegionCode as root creates a separate installation and Connec
 identity. Without administrator access, run `legioncode serve` in a terminal and keep
 that session open.
 
-| Status problem                          | Next step                                                                                                                        |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `linger-unavailable`                    | Run `loginctl show-user "$(id -un)" --property=Linger` and check that systemd-logind is available.                               |
-| `user-manager-unavailable`              | Run `systemctl --user status` in a login session for the service user; check your distribution's systemd user-session support.   |
-| `service-disabled` or `service-stopped` | Read the log and, on Linux, `systemctl --user status legioncode.service`, then use the repair command printed by LegionCode.     |
-| `restart-pending`                       | A newer version is installed but the service still runs the previous one. Run `legioncode service restart`.                      |
+| Status problem                          | Next step                                                                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `linger-unavailable`                    | Run `loginctl show-user "$(id -un)" --property=Linger` and check that systemd-logind is available.                             |
+| `user-manager-unavailable`              | Run `systemctl --user status` in a login session for the service user; check your distribution's systemd user-session support. |
+| `service-disabled` or `service-stopped` | Read the log and, on Linux, `systemctl --user status legioncode.service`, then use the repair command printed by LegionCode.   |
+| `restart-pending`                       | A newer version is installed but the service still runs the previous one. Run `legioncode service restart`.                    |
 
 On macOS, check **System Settings → General → Login Items** if the service no
 longer starts at login. If agent work cannot access Desktop, Documents, or

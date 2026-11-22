@@ -46,11 +46,11 @@ Every user on the machine can read the policy, so do not put credentials in it.
 
 Use one of these per machine:
 
-| OS      | Native policy                                                                                            | Policy file                                           |
-| ------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| macOS   | Configuration profile for `dev.legioncode`                                                               | `/Library/Application Support/LegionCode/policy.json` |
+| OS      | Native policy                                                                                               | Policy file                                           |
+| ------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| macOS   | Configuration profile for `dev.legioncode`                                                                  | `/Library/Application Support/LegionCode/policy.json` |
 | Windows | Group Policy template, or a `Policy` JSON value (both under `HKLM\SOFTWARE\Policies\LegionCode\LegionCode`) | `C:\Program Files\LegionCode\policy.json`             |
-| Linux   |                                                                                                          | `/etc/legioncode/policy.json`                         |
+| Linux   |                                                                                                             | `/etc/legioncode/policy.json`                         |
 
 LegionCode does not merge sources. If a machine has both a native policy and a policy file, LegionCode
 refuses to start until you remove one.

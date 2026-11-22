@@ -21,7 +21,10 @@ const RUNS_EVERYTHING = [
 // Includes cross-package reads absent from package.json dependencies.
 const EXTRA_OWNERS = [
   // Vite configs and tsconfigs of these apps import scripts/lib directly.
-  [/^scripts\/lib\//, ["@legioncode/desktop", "@legioncode/mobile", "@legioncode/web", "legioncode"]],
+  [
+    /^scripts\/lib\//,
+    ["@legioncode/desktop", "@legioncode/mobile", "@legioncode/web", "legioncode"],
+  ],
   // scripts/build-desktop-artifact.ts reads the GNOME extension manifest.
   [/^apps\/desktop\/gnome-extension\//, ["@legioncode/scripts"]],
   [/^native\/browser-secret\//, ["@legioncode/desktop"]],
@@ -183,7 +186,8 @@ function decide(files, packages, full) {
     affected: [...affected].sort(),
     outputs: {
       typecheck: affected.size > 0,
-      build: has("@legioncode/desktop") || has("legioncode") || has("@legioncode/web") || desktopLaunch,
+      build:
+        has("@legioncode/desktop") || has("legioncode") || has("@legioncode/web") || desktopLaunch,
       desktop_launch: desktopLaunch,
       test: tested.length > 0,
       // Empty means every package the Test job covers.

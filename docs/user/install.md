@@ -270,8 +270,8 @@ default is already longer keeps its default. Providers with several phases can
 take longer than one deadline in total. Values must be whole milliseconds no
 greater than 2147483647; unset or invalid values keep the defaults.
 
-| Provider            | Environment variable                         |
-| ------------------- | -------------------------------------------- |
+| Provider            | Environment variable                       |
+| ------------------- | ------------------------------------------ |
 | Codex               | `LEGIONCODE_CODEX_PROBE_TIMEOUT_MS`        |
 | Claude              | `LEGIONCODE_CLAUDE_PROBE_TIMEOUT_MS`       |
 | Cursor              | `LEGIONCODE_CURSOR_PROBE_TIMEOUT_MS`       |

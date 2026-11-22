@@ -34,7 +34,9 @@ export const threadTitleEvaluationCases = [
     source: "https://github.com/9thLevelSoftware/legioncode/pull/10462",
     request: "Review the reset credit routing change.",
     previousTitle: "Review PR 10462",
-    messages: [{ role: "user", text: "Review https://github.com/9thLevelSoftware/legioncode/pull/10462" }],
+    messages: [
+      { role: "user", text: "Review https://github.com/9thLevelSoftware/legioncode/pull/10462" },
+    ],
     rubric: "Name reset credit routing. Distinguish it from displaying credit balances.",
   },
   {

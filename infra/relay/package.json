@@ -21,11 +21,11 @@
     "@distilled.cloud/cloudflare": "catalog:",
     "@effect/sql-pg": "catalog:",
     "@effect/sql-sqlite-do": "catalog:",
-    "@noble/curves": "catalog:",
-    "@noble/hashes": "catalog:",
     "@legioncode/client-runtime": "workspace:*",
     "@legioncode/contracts": "workspace:*",
     "@legioncode/shared": "workspace:*",
+    "@noble/curves": "catalog:",
+    "@noble/hashes": "catalog:",
     "alchemy": "catalog:",
     "drizzle-orm": "1.0.0-rc.5",
     "effect": "catalog:"

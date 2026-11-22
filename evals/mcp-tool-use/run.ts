@@ -612,7 +612,10 @@ export const legionSubagentContext = async (model: Model, device = true, browser
  */
 const legionContextReport = (model: Model) => {
   const size = (chars: number) => `${chars} chars (~${Math.round(chars / 4)} tokens)`;
-  const descriptions = legionTools.reduce((sum, tool) => sum + valueText(tool.description).length, 0);
+  const descriptions = legionTools.reduce(
+    (sum, tool) => sum + valueText(tool.description).length,
+    0,
+  );
   const schemas = JSON.stringify(legionTools).length;
   return [
     `- LegionCode context: system text ${size((isCodex(model) ? JSON.stringify(buildCodexAdditionalContext({ model }, { browser: true, device: true })) : legionSystemAppend(model)).length)}`,
@@ -2063,7 +2066,12 @@ export const answerToolCall = Effect.fn("evaluateMcpToolUse.answerToolCall")(fun
     const result = yield* sample.devices.call(name, input, failure);
     return result.isError ? failed(result.text) : toolResult(call.id, result.text);
   }
-  if (sample.backgroundWait && isLegionName(call.name) && name === "legion_background_wait" && fromWorld) {
+  if (
+    sample.backgroundWait &&
+    isLegionName(call.name) &&
+    name === "legion_background_wait" &&
+    fromWorld
+  ) {
     const result = yield* sample.backgroundWait(input);
     return result.isError ? failed(result.text) : toolResult(call.id, result.text);
   }

@@ -206,10 +206,7 @@ async function drainTelemetry(
     // Bound disk use while offline. Unsent events retry on the next invocation.
     for (const file of files.slice(0, Math.max(0, files.length - 2000)))
       NodeFS.rmSync(NodePath.join(queue, file), { force: true });
-    const credentialsFile = NodePath.join(
-      home,
-      ".config/legioncode-task-cache/credentials.json",
-    );
+    const credentialsFile = NodePath.join(home, ".config/legioncode-task-cache/credentials.json");
     const credentials = NodeFS.existsSync(credentialsFile)
       ? JSON.parse(NodeFS.readFileSync(credentialsFile, "utf8"))
       : {};

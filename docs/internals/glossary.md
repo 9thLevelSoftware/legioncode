@@ -5,17 +5,17 @@ Terms whose meaning matters across LegionCode. Architecture and lifecycle constr
 
 ## Workspace and conversation
 
-| Term           | Meaning                                                                                           |
-| -------------- | ------------------------------------------------------------------------------------------------- |
-| Environment    | One running server and the machine, credentials, workspace access, and state it owns.             |
-| Client         | A web, desktop, or mobile UI connected to an environment. The desktop app can also host a server. |
-| Project        | An environment-local workspace record rooted at a directory.                                      |
-| Workspace root | The project's base filesystem directory on the environment.                                       |
-| Worktree       | A separate Git checkout a thread can use instead of the project's main checkout.                  |
-| Thread         | The durable conversation and work history for a project. It survives provider process exits.      |
-| Turn           | One user-to-agent cycle, a V2 run. Provider work can end before checkpoint and diff work settles. |
-| Activity       | A non-message timeline item, such as a tool action, approval, or failure.                         |
-| LegionCode home | The base data directory. Runtime state normally lives under its `userdata` directory.            |
+| Term            | Meaning                                                                                           |
+| --------------- | ------------------------------------------------------------------------------------------------- |
+| Environment     | One running server and the machine, credentials, workspace access, and state it owns.             |
+| Client          | A web, desktop, or mobile UI connected to an environment. The desktop app can also host a server. |
+| Project         | An environment-local workspace record rooted at a directory.                                      |
+| Workspace root  | The project's base filesystem directory on the environment.                                       |
+| Worktree        | A separate Git checkout a thread can use instead of the project's main checkout.                  |
+| Thread          | The durable conversation and work history for a project. It survives provider process exits.      |
+| Turn            | One user-to-agent cycle, a V2 run. Provider work can end before checkpoint and diff work settles. |
+| Activity        | A non-message timeline item, such as a tool action, approval, or failure.                         |
+| LegionCode home | The base data directory. Runtime state normally lives under its `userdata` directory.             |
 
 ## Orchestration
 
@@ -56,11 +56,11 @@ Terms whose meaning matters across LegionCode. Architecture and lifecycle constr
 
 ## Composer context
 
-| Term                 | Meaning                                                                                                                             |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Context record       | The typed payload behind a composer chip, keyed by `contextId` in `message.context.records`. It never holds bytes.                  |
+| Term                 | Meaning                                                                                                                                 |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Context record       | The typed payload behind a composer chip, keyed by `contextId` in `message.context.records`. It never holds bytes.                      |
 | Context reference    | One occurrence of a record in message text: `[label](legion-context://v1/<kind>/<contextId>)`. Several references can share one record. |
-| Attachment binding   | The link from an image or file record to its server-owned attachment. Its attachment ID can change without changing `contextId`.    |
-| Attachment inventory | The ordered image records shown as thumbnails above the prose, including images with no inline references.                          |
+| Attachment binding   | The link from an image or file record to its server-owned attachment. Its attachment ID can change without changing `contextId`.        |
+| Attachment inventory | The ordered image records shown as thumbnails above the prose, including images with no inline references.                              |
 
 See [composer context references](./composer-context-references.md) for the contract and lifecycle.

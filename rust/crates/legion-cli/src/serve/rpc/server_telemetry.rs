@@ -8,7 +8,7 @@ use legion_remote::trace::{DEFAULT_TRACE_MAX_FILES, summarize_trace_files};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use super::{AppState, parse_optional_payload, rpc_fail, utc_now_iso};
+use super::{AppState, parse_optional_payload, rpc_fail, rpc_fail_obj, utc_now_iso};
 
 pub(crate) fn dispatch(state: &AppState, tag: &str, payload: Value) -> RpcExit {
     match tag {
@@ -18,20 +18,17 @@ pub(crate) fn dispatch(state: &AppState, tag: &str, payload: Value) -> RpcExit {
         "server.getProcessResourceHistory" => get_process_resource_history(payload),
         "server.getResourceTelemetryHistory" => get_resource_telemetry_history(payload),
         "server.retryResourceTelemetry" => retry_resource_telemetry(),
-        "server.updateServer" | "server.commitDesktopUpdate" => RpcExit::Success {
-            value: json!({
-                "updated": false,
-                "previousVersion": env!("CARGO_PKG_VERSION"),
-                "currentVersion": env!("CARGO_PKG_VERSION"),
-                "detail": "No update required on standalone Rust runtime.",
-            }),
-        },
+        "server.updateServer" | "server.commitDesktopUpdate" => rpc_fail_obj(json!({
+            "_tag": "ServerSelfUpdateError",
+            "reason": "Self-update is not supported on this standalone Rust build.",
+        })),
         "server.updateServerWithProgress" => RpcExit::Success {
             value: json!({
                 "type": "complete",
-                "updated": false,
-                "previousVersion": env!("CARGO_PKG_VERSION"),
-                "currentVersion": env!("CARGO_PKG_VERSION"),
+                "result": {
+                    "targetVersion": env!("CARGO_PKG_VERSION"),
+                    "method": "standalone",
+                },
             }),
         },
         _ => rpc_fail(
@@ -55,15 +52,32 @@ fn get_trace_diagnostics(state: &AppState, payload: Value) -> RpcExit {
     let trace_path = &state.paths.server_trace_path;
     let max_files = req.max_files.unwrap_or(DEFAULT_TRACE_MAX_FILES);
     let summary = summarize_trace_files(trace_path, max_files, None).ok();
+    let count = summary
+        .as_ref()
+        .map_or(0, |s| s.span_count + s.skipped_line_count);
+    let parse_err = summary.as_ref().map_or(0, |s| s.skipped_line_count);
+    let path_str = trace_path.to_string_lossy().into_owned();
     RpcExit::Success {
         value: json!({
+            "traceFilePath": path_str,
+            "scannedFilePaths": [],
             "readAt": utc_now_iso(),
-            "traceFilePath": trace_path.to_string_lossy(),
-            "totalLineCount": summary.as_ref().map_or(0, |s| s.span_count + s.skipped_line_count),
-            "spanCount": summary.as_ref().map_or(0, |s| s.span_count),
-            "skippedLineCount": summary.as_ref().map_or(0, |s| s.skipped_line_count),
-            "topSpans": [],
-            "recentFailures": [],
+            "recordCount": count,
+            "parseErrorCount": parse_err,
+            "firstSpanAt": { "_tag": "None" },
+            "lastSpanAt": { "_tag": "None" },
+            "failureCount": 0,
+            "interruptionCount": 0,
+            "slowSpanThresholdMs": 1000,
+            "slowSpanCount": 0,
+            "logLevelCounts": {},
+            "topSpansByCount": [],
+            "slowestSpans": [],
+            "commonFailures": [],
+            "latestFailures": [],
+            "latestWarningAndErrorLogs": [],
+            "partialFailure": { "_tag": "None" },
+            "error": { "_tag": "None" },
         }),
     }
 }
@@ -107,6 +121,7 @@ fn get_process_diagnostics() -> RpcExit {
             "totalRssBytes": rss,
             "totalCpuPercent": cpu,
             "processes": [],
+            "error": { "_tag": "None" },
         }),
     }
 }
@@ -131,7 +146,8 @@ fn get_host_resources() -> RpcExit {
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 struct ProcessHistoryPayload {
-    pid: Option<u32>,
+    window_ms: Option<u64>,
+    bucket_ms: Option<u64>,
 }
 
 fn get_process_resource_history(payload: Value) -> RpcExit {
@@ -142,8 +158,14 @@ fn get_process_resource_history(payload: Value) -> RpcExit {
     RpcExit::Success {
         value: json!({
             "readAt": utc_now_iso(),
-            "pid": req.pid.unwrap_or_else(std::process::id),
-            "samples": [],
+            "windowMs": req.window_ms.unwrap_or(300_000),
+            "bucketMs": req.bucket_ms.unwrap_or(5_000),
+            "sampleIntervalMs": 1000,
+            "retainedSampleCount": 0,
+            "totalCpuSecondsApprox": 0.0,
+            "buckets": [],
+            "topProcesses": [],
+            "error": { "_tag": "None" },
         }),
     }
 }
@@ -191,11 +213,21 @@ pub(crate) fn empty_telemetry_snapshot(now: &str) -> Value {
             "stale": false,
             "updatedAt": now,
         },
-        "speedLimitPercent": null,
+        "speedLimitPercent": { "_tag": "None" },
         "attribution": { "readAt": now, "entries": [] },
         "health": {
-            "native": { "status": "healthy" },
-            "desktop": { "status": "unavailable" },
+            "native": {
+                "status": "healthy",
+                "lastSampleAt": { "_tag": "None" },
+                "lastError": { "_tag": "None" },
+            },
+            "desktop": {
+                "status": "unavailable",
+                "lastSampleAt": { "_tag": "None" },
+                "lastError": { "_tag": "None" },
+            },
+            "sidecarVersion": { "_tag": "None" },
+            "sidecarPid": { "_tag": "None" },
             "restartCount": 0,
             "collectionDurationMicros": 0,
             "scannedProcessCount": 0,

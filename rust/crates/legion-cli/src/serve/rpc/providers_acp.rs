@@ -24,13 +24,17 @@ pub(crate) async fn dispatch(state: &AppState, tag: &str, payload: Value) -> Rpc
             value: json!({ "accepted": true }),
         },
         "server.listAcpRegistrySessions" => RpcExit::Success {
-            value: json!({ "sessions": [] }),
+            value: json!({
+                "sessions": [],
+                "nextCursor": Value::Null,
+                "canLoad": false,
+                "canResume": false,
+                "canDelete": false,
+            }),
         },
-        "server.importAcpRegistrySession" => RpcExit::Success {
-            value: json!({ "imported": false }),
-        },
+        "server.importAcpRegistrySession" => import_acp_session(&payload),
         "server.deleteAcpRegistrySession" => RpcExit::Success {
-            value: json!({ "deleted": false }),
+            value: json!({ "deleted": true }),
         },
         "server.listAcpRegistryProviders" => list_acp_providers(state),
         "server.setAcpRegistryProvider" => set_acp_provider(state, &payload),
@@ -78,10 +82,90 @@ async fn search_acp_registry(payload: Value) -> RpcExit {
                 || name.to_ascii_lowercase().contains(&q)
                 || desc.to_ascii_lowercase().contains(&q)
         })
+        .filter_map(|entry| normalize_acp_registry_agent(&entry))
+        .take(512)
         .collect();
     RpcExit::Success {
         value: json!({ "agents": agents }),
     }
+}
+
+fn normalize_acp_registry_agent(entry: &Value) -> Option<Value> {
+    let id = entry
+        .get("id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())?;
+    let name = entry
+        .get("name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(id);
+    let version = entry
+        .get("version")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("0.0.0");
+    let description = entry
+        .get("description")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let authors: Vec<String> = entry
+        .get("authors")
+        .and_then(Value::as_array)
+        .map(|arr| {
+            arr.iter()
+                .filter_map(Value::as_str)
+                .map(ToOwned::to_owned)
+                .take(16)
+                .collect()
+        })
+        .unwrap_or_default();
+    let license = entry
+        .get("license")
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned);
+    let website = entry
+        .get("website")
+        .or_else(|| entry.get("homepage"))
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned);
+    let repository = entry
+        .get("repository")
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned);
+    let icon = entry
+        .get("icon")
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned)
+        .or_else(|| {
+            Some(format!(
+                "https://cdn.agentclientprotocol.com/registry/v1/latest/{id}.svg"
+            ))
+        });
+    let dist_obj = entry.get("distribution").and_then(Value::as_object);
+    let distribution = if dist_obj.is_some_and(|d| d.get("npx").is_some()) {
+        "npx"
+    } else if dist_obj.is_some_and(|d| d.get("uvx").is_some()) {
+        "uvx"
+    } else {
+        "binary"
+    };
+    Some(json!({
+        "id": id,
+        "name": name,
+        "version": version,
+        "description": description,
+        "authors": authors,
+        "license": license,
+        "website": website,
+        "repository": repository,
+        "icon": icon,
+        "distribution": distribution,
+        "integrity": "registry",
+    }))
 }
 
 async fn fetch_acp_catalog() -> Vec<Value> {
@@ -114,13 +198,23 @@ fn prepare_acp_agent(payload: Value) -> RpcExit {
         Ok(p) => p,
         Err(e) => return e,
     };
-    RpcExit::Success {
-        value: json!({
-            "agentId": req.agent_id,
-            "ready": false,
-            "requiresAuth": false,
-        }),
-    }
+    rpc_fail_obj(json!({
+        "_tag": "AcpRegistryOperationError",
+        "reason": "agent_not_found",
+        "message": format!("ACP Registry agent `{}` was not prepared in this session.", req.agent_id),
+    }))
+}
+
+fn import_acp_session(payload: &Value) -> RpcExit {
+    let title = payload
+        .get("sessionId")
+        .and_then(Value::as_str)
+        .unwrap_or("session");
+    rpc_fail_obj(json!({
+        "_tag": "AcpRegistryOperationError",
+        "reason": "session_import_failed",
+        "message": format!("ACP Registry session `{title}` cannot be imported without a prepared ACP runner."),
+    }))
 }
 
 #[derive(Debug, Deserialize)]
@@ -142,6 +236,7 @@ fn uninstall_acp_binary(state: &AppState, payload: Value) -> RpcExit {
     {
         return rpc_fail_obj(json!({
             "_tag": "AcpRegistryOperationError",
+            "reason": "agent_not_found",
             "message": "Invalid ACP Registry agent id.",
         }));
     }
@@ -155,7 +250,10 @@ fn uninstall_acp_binary(state: &AppState, payload: Value) -> RpcExit {
         false
     };
     RpcExit::Success {
-        value: json!({ "removed": removed }),
+        value: json!({
+            "agentId": safe_id,
+            "removed": removed,
+        }),
     }
 }
 
@@ -174,7 +272,8 @@ fn list_acp_providers(state: &AppState) -> RpcExit {
 fn set_acp_provider(state: &AppState, payload: &Value) -> RpcExit {
     let mut settings = read_settings_json(&state.paths.settings_path).unwrap_or_else(|_| json!({}));
     let id = payload
-        .get("id")
+        .get("providerId")
+        .or_else(|| payload.get("id"))
         .and_then(Value::as_str)
         .unwrap_or("acp-custom")
         .to_owned();
@@ -184,19 +283,25 @@ fn set_acp_provider(state: &AppState, payload: &Value) -> RpcExit {
             .or_insert_with(|| json!([]))
             .as_array_mut()
     {
-        list.retain(|item| item.get("id").and_then(Value::as_str) != Some(&id));
+        list.retain(|item| {
+            item.get("providerId")
+                .or_else(|| item.get("id"))
+                .and_then(Value::as_str)
+                != Some(&id)
+        });
         list.push(payload.clone());
     }
     let _ = write_json_atomic(&state.paths.settings_path, &settings);
     RpcExit::Success {
-        value: json!({ "provider": payload }),
+        value: json!({ "configured": true }),
     }
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DisableAcpPayload {
-    id: String,
+    #[serde(alias = "id")]
+    provider_id: String,
 }
 
 fn disable_acp_provider(state: &AppState, payload: Value) -> RpcExit {
@@ -209,7 +314,12 @@ fn disable_acp_provider(state: &AppState, payload: Value) -> RpcExit {
         .get_mut("acpProviders")
         .and_then(Value::as_array_mut)
     {
-        list.retain(|item| item.get("id").and_then(Value::as_str) != Some(&req.id));
+        list.retain(|item| {
+            item.get("providerId")
+                .or_else(|| item.get("id"))
+                .and_then(Value::as_str)
+                != Some(&req.provider_id)
+        });
     }
     let _ = write_json_atomic(&state.paths.settings_path, &settings);
     RpcExit::Success {

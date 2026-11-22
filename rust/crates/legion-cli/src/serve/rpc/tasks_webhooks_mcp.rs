@@ -66,7 +66,7 @@ fn list_webhook_deliveries(state: &AppState, payload: Value) -> RpcExit {
         ensure_tasks_schema(conn)?;
         let mut stmt = conn
             .prepare(
-                "SELECT delivery_id, task_id, received_at, method, query, outcome, signature_verified, error
+                "SELECT delivery_id, task_id, received_at, method, body_bytes, outcome, signature_verified, error
                  FROM scheduled_task_webhook_deliveries
                  WHERE task_id = ?1 ORDER BY received_at DESC LIMIT ?2",
             )
@@ -74,13 +74,15 @@ fn list_webhook_deliveries(state: &AppState, payload: Value) -> RpcExit {
         let deliveries: Vec<Value> = stmt
             .query_map(params![req.task_id, limit], |r| {
                 Ok(json!({
-                    "deliveryId": r.get::<_, String>(0)?,
+                    "id": r.get::<_, String>(0)?,
                     "taskId": r.get::<_, String>(1)?,
                     "receivedAt": r.get::<_, String>(2)?,
                     "method": r.get::<_, String>(3)?,
-                    "query": r.get::<_, String>(4)?,
+                    "contentType": Value::Null,
+                    "bodyBytes": r.get::<_, i64>(4).unwrap_or(0),
                     "outcome": r.get::<_, String>(5)?,
                     "signatureVerified": r.get::<_, i64>(6)? != 0,
+                    "missingFields": [],
                     "error": r.get::<_, Option<String>>(7)?,
                 }))
             })
@@ -96,6 +98,7 @@ fn list_webhook_deliveries(state: &AppState, payload: Value) -> RpcExit {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GetDeliveryPayload {
+    #[serde(alias = "id")]
     task_id: String,
     delivery_id: String,
 }
@@ -118,10 +121,11 @@ fn get_webhook_delivery(state: &AppState, payload: Value) -> RpcExit {
                     let headers: Value =
                         serde_json::from_str(&headers_str).unwrap_or_else(|_| json!({}));
                     Ok(json!({
-                        "deliveryId": r.get::<_, String>(0)?,
+                        "id": r.get::<_, String>(0)?,
                         "taskId": r.get::<_, String>(1)?,
                         "receivedAt": r.get::<_, String>(2)?,
                         "method": r.get::<_, String>(3)?,
+                        "contentType": Value::Null,
                         "query": r.get::<_, String>(4)?,
                         "headers": headers,
                         "body": r.get::<_, String>(6)?,
@@ -129,6 +133,7 @@ fn get_webhook_delivery(state: &AppState, payload: Value) -> RpcExit {
                         "bodyTruncated": r.get::<_, i64>(8)? != 0,
                         "outcome": r.get::<_, String>(9)?,
                         "signatureVerified": r.get::<_, i64>(10)? != 0,
+                        "missingFields": [],
                         "renderedPrompt": r.get::<_, Option<String>>(11)?,
                         "error": r.get::<_, Option<String>>(12)?,
                     }))
@@ -136,8 +141,11 @@ fn get_webhook_delivery(state: &AppState, payload: Value) -> RpcExit {
             )
             .optional()
             .map_err(|e| task_err(&e.to_string()))?;
+        let Some(delivery) = row else {
+            return Err(task_err("Scheduled task webhook delivery not found."));
+        };
         Ok(RpcExit::Success {
-            value: json!({ "delivery": row }),
+            value: json!({ "delivery": delivery }),
         })
     })
     .unwrap_or_else(|e| e)
@@ -257,14 +265,14 @@ pub(crate) fn read_task_row(conn: &Connection, task_id: &str) -> Result<Option<V
             let ms_raw: String = r.get(8)?;
             Ok(json!({
                 "id": r.get::<_, String>(0)?,
-                "taskId": r.get::<_, String>(0)?,
                 "title": r.get::<_, String>(1)?,
                 "prompt": r.get::<_, String>(2)?,
                 "enabled": r.get::<_, i64>(3)? != 0,
                 "schedule": serde_json::from_str::<Value>(&sched_raw).unwrap_or_else(|_| json!({})),
                 "projectId": r.get::<_, String>(5)?,
                 "threadId": r.get::<_, Option<String>>(6)?,
-                "workspaceStrategy": serde_json::from_str::<Value>(&ws_raw).unwrap_or_else(|_| json!({})),
+                "threadMode": r.get::<_, String>(21)?,
+                "workspaceStrategy": serde_json::from_str::<Value>(&ws_raw).unwrap_or_else(|_| json!({ "type": "root", "branch": null })),
                 "modelSelection": serde_json::from_str::<Value>(&ms_raw).unwrap_or_else(|_| json!({})),
                 "runtimeMode": r.get::<_, String>(9)?,
                 "interactionMode": r.get::<_, String>(10)?,
@@ -277,8 +285,6 @@ pub(crate) fn read_task_row(conn: &Connection, task_id: &str) -> Result<Option<V
                 "lastRunStatus": r.get::<_, String>(17)?,
                 "lastRunError": r.get::<_, Option<String>>(18)?,
                 "runCount": r.get::<_, i64>(19)?,
-                "webhookToken": r.get::<_, Option<String>>(20)?,
-                "threadMode": r.get::<_, String>(21)?,
             }))
         },
     )

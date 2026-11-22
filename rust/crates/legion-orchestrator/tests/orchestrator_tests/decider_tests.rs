@@ -87,7 +87,7 @@ async fn snooze_and_settle_support_reverse_states() -> TestResult {
             .resulting_thread
             .as_ref()
             .and_then(|t| t.settled_override.as_deref()),
-        Some("unsettled")
+        Some("active")
     );
     Ok(())
 }

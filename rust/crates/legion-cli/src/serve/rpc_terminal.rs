@@ -186,9 +186,7 @@ fn write_session(runtime: &TerminalRuntime, payload: Value) -> RpcExit {
         .filter(|s| !s.is_empty())
         .unwrap_or("default");
     match runtime.terminal_write(&req.thread_id, terminal_id, &req.data, req.as_paste) {
-        Ok(()) => RpcExit::Success {
-            value: json!({ "ok": true }),
-        },
+        Ok(()) => RpcExit::Success { value: Value::Null },
         Err(err) => rpc_fail("TerminalWriteError", &err.to_string()),
     }
 }
@@ -215,9 +213,7 @@ fn resize_session(runtime: &TerminalRuntime, payload: Value) -> RpcExit {
         .filter(|s| !s.is_empty())
         .unwrap_or("default");
     match runtime.terminal_resize(&req.thread_id, terminal_id, req.cols, req.rows) {
-        Ok(()) => RpcExit::Success {
-            value: json!({ "ok": true }),
-        },
+        Ok(()) => RpcExit::Success { value: Value::Null },
         Err(err) => rpc_fail("TerminalResizeError", &err.to_string()),
     }
 }
@@ -242,18 +238,14 @@ fn clear_session(runtime: &TerminalRuntime, payload: Value) -> RpcExit {
         .filter(|s| !s.is_empty())
     {
         return match runtime.terminal_clear(&req.thread_id, tid) {
-            Ok(()) => RpcExit::Success {
-                value: json!({ "ok": true }),
-            },
+            Ok(()) => RpcExit::Success { value: Value::Null },
             Err(err) => rpc_fail("TerminalError", &err.to_string()),
         };
     }
     let summaries = runtime.list_summaries(Some(&req.thread_id));
     if summaries.is_empty() {
         return match runtime.terminal_clear(&req.thread_id, "default") {
-            Ok(()) => RpcExit::Success {
-                value: json!({ "ok": true }),
-            },
+            Ok(()) => RpcExit::Success { value: Value::Null },
             Err(err) => rpc_fail("TerminalError", &err.to_string()),
         };
     }
@@ -262,9 +254,7 @@ fn clear_session(runtime: &TerminalRuntime, payload: Value) -> RpcExit {
             return rpc_fail("TerminalError", &err.to_string());
         }
     }
-    RpcExit::Success {
-        value: json!({ "ok": true }),
-    }
+    RpcExit::Success { value: Value::Null }
 }
 
 fn close_session(runtime: &TerminalRuntime, payload: Value) -> RpcExit {
@@ -279,9 +269,7 @@ fn close_session(runtime: &TerminalRuntime, payload: Value) -> RpcExit {
         .filter(|s| !s.is_empty())
     {
         return match runtime.terminal_close(&req.thread_id, tid) {
-            Ok(()) => RpcExit::Success {
-                value: json!({ "ok": true }),
-            },
+            Ok(()) => RpcExit::Success { value: Value::Null },
             Err(err) => rpc_fail("TerminalCloseError", &err.to_string()),
         };
     }
@@ -291,9 +279,7 @@ fn close_session(runtime: &TerminalRuntime, payload: Value) -> RpcExit {
             return rpc_fail("TerminalCloseError", &err.to_string());
         }
     }
-    RpcExit::Success {
-        value: json!({ "ok": true }),
-    }
+    RpcExit::Success { value: Value::Null }
 }
 
 fn snapshot_or_stateless(runtime: &TerminalRuntime, payload: Value) -> RpcExit {

@@ -3,8 +3,9 @@
 
 mod agent_sessions;
 mod assets_attachments;
+mod assets_paths;
 mod fs_browse;
-mod git_actions;
+pub(crate) mod git_actions;
 mod mcp_apps;
 mod orchestration;
 mod orchestration_commands;
@@ -13,7 +14,7 @@ mod orchestration_launch;
 mod orchestration_queries;
 mod orchestration_search;
 mod peers_secrets_share;
-mod preview_device_peers;
+pub(crate) mod preview_device_peers;
 mod projects_create;
 mod projects_files;
 mod projects_fs;

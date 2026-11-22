@@ -12,17 +12,25 @@ use tokio::process::Command;
 use super::projects_fs::base_dir_from_state;
 use super::server_config::build_server_providers_list;
 use super::server_settings::{deep_merge_json, read_settings_json, write_json_atomic};
-use super::{AppState, parse_payload, rpc_fail, rpc_fail_obj, utc_now_iso, with_db};
+use super::{AppState, parse_payload, rpc_fail, rpc_fail_obj, utc_now_iso};
 
 pub(crate) async fn dispatch(state: &Arc<AppState>, tag: &str, payload: Value) -> RpcExit {
     match tag {
         "server.refreshProviders" => refresh_providers(state).await,
         "server.updateProvider" => update_provider(state, payload).await,
-        "server.getUsageSummary" | "server.refreshUsageRates" => get_usage_summary(state),
-        "provider.uploadFeedback" => RpcExit::Success {
-            value: json!({ "accepted": true }),
+        "server.getUsageSummary" => get_usage_summary(&payload),
+        "server.refreshUsageRates" => RpcExit::Success {
+            value: json!({
+                "status": "unavailable",
+                "source": "unavailable",
+                "fetchedAt": Value::Null,
+                "knownModels": 0,
+            }),
         },
-        "provider.consumeResetCredit" => consume_reset_credit(state, payload).await,
+        "provider.uploadFeedback" => RpcExit::Success {
+            value: json!({ "feedbackId": format!("fb-{}", uuid::Uuid::new_v4()) }),
+        },
+        "provider.consumeResetCredit" => consume_reset_credit(payload),
         "provider.auth.start"
         | "provider.auth.respond"
         | "provider.auth.complete"
@@ -49,14 +57,13 @@ async fn refresh_providers(state: &AppState) -> RpcExit {
     }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
 struct UpdateProviderPayload {
-    #[serde(alias = "provider", alias = "id")]
-    instance_id: String,
-    #[serde(default)]
+    instance_id: Option<String>,
+    provider: Option<String>,
+    id: Option<String>,
     patch: Value,
-    #[serde(default)]
     config: Option<Value>,
 }
 
@@ -65,12 +72,20 @@ async fn update_provider(state: &AppState, payload: Value) -> RpcExit {
         Ok(p) => p,
         Err(e) => return e,
     };
+    let instance_id = req
+        .instance_id
+        .or(req.provider)
+        .or(req.id)
+        .map(|s| s.trim().to_owned())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "devReplay".to_owned());
     let mut settings: Value = match read_settings_json(&state.paths.settings_path) {
         Ok(s) => s,
         Err(msg) => {
             return rpc_fail_obj(json!({
                 "_tag": "ServerProviderUpdateError",
-                "message": msg,
+                "provider": instance_id,
+                "reason": msg,
             }));
         }
     };
@@ -81,134 +96,68 @@ async fn update_provider(state: &AppState, payload: Value) -> RpcExit {
     if let Some(root) = settings.as_object_mut() {
         let instances = root.entry("providerInstances").or_insert_with(|| json!({}));
         if let Some(map) = instances.as_object_mut() {
+            let driver_slug = legion_providers::drivers::normalize_driver_slug(&instance_id);
             let entry = map
-                .entry(&req.instance_id)
-                .or_insert_with(|| json!({ "config": {} }));
-            deep_merge_json(entry, &patch);
+                .entry(&instance_id)
+                .or_insert_with(|| json!({ "driver": driver_slug, "config": {} }));
+            if !entry.is_object() {
+                *entry = json!({ "driver": driver_slug, "config": {} });
+            }
+            if patch.is_object() {
+                deep_merge_json(entry, &patch);
+            }
         }
     }
     if let Err(msg) = write_json_atomic(&state.paths.settings_path, &settings) {
         return rpc_fail_obj(json!({
             "_tag": "ServerProviderUpdateError",
-            "message": msg,
+            "provider": instance_id,
+            "reason": msg,
         }));
     }
     let providers = build_server_providers_list(state).await;
-    let updated = providers
-        .into_iter()
-        .find(|p| {
-            p.get("instanceId")
-                .or_else(|| p.get("driver"))
-                .or_else(|| p.get("id"))
-                .and_then(Value::as_str)
-                == Some(&req.instance_id)
-        })
-        .unwrap_or_else(|| {
-            json!({
-                "instanceId": req.instance_id,
-                "driver": req.instance_id,
-                "supportedRuntimeModes": ["approval-required"],
-                "enabled": true,
-                "installed": false,
-                "status": "error",
-                "checkedAt": utc_now_iso(),
-                "auth": { "status": "unknown" },
-                "models": [],
-            })
-        });
     RpcExit::Success {
-        value: json!({ "provider": updated }),
+        value: json!({ "providers": providers }),
     }
 }
 
-fn get_usage_summary(state: &AppState) -> RpcExit {
-    let updated_at = utc_now_iso();
-    with_db(state, |conn| {
-        let total_runs: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM orchestration_v2_projection_runs",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap_or(0);
-        let input_tokens: i64 = conn
-            .query_row(
-                "SELECT COALESCE(SUM(CAST(json_extract(payload_json, '$.usage.inputTokens') AS INTEGER)), 0)
-                 FROM orchestration_v2_projection_runs",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap_or(0);
-        let output_tokens: i64 = conn
-            .query_row(
-                "SELECT COALESCE(SUM(CAST(json_extract(payload_json, '$.usage.outputTokens') AS INTEGER)), 0)
-                 FROM orchestration_v2_projection_runs",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap_or(0);
-        Ok(RpcExit::Success {
-            value: json!({
-                "updatedAt": updated_at,
-                "totalCostUsd": 0.0,
-                "totalRuns": total_runs,
-                "totals": {
-                    "inputTokens": input_tokens,
-                    "outputTokens": output_tokens,
-                    "cachedInputTokens": 0,
-                    "costUsd": 0.0,
-                },
-                "providers": [],
-                "byModel": [],
-                "byDay": [],
-                "sources": [],
-            }),
-        })
-    })
-    .unwrap_or_else(|e| e)
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ConsumeCreditPayload {
-    instance_id: String,
-    #[serde(default)]
-    credit_id: Option<String>,
-}
-
-async fn consume_reset_credit(state: &AppState, payload: Value) -> RpcExit {
-    let req: ConsumeCreditPayload = match parse_payload(payload) {
-        Ok(p) => p,
-        Err(e) => return e,
-    };
-    let providers = build_server_providers_list(state).await;
-    let provider = providers
-        .into_iter()
-        .find(|p| {
-            p.get("instanceId")
-                .or_else(|| p.get("driver"))
-                .or_else(|| p.get("id"))
-                .and_then(Value::as_str)
-                == Some(&req.instance_id)
-        })
-        .unwrap_or_else(|| {
-            json!({
-                "instanceId": req.instance_id,
-                "driver": req.instance_id,
-                "supportedRuntimeModes": ["approval-required"],
-                "enabled": true,
-                "installed": false,
-                "status": "error",
-                "checkedAt": utc_now_iso(),
-                "auth": { "status": "unknown" },
-                "models": [],
-            })
-        });
+fn get_usage_summary(payload: &Value) -> RpcExit {
+    let since_day = payload
+        .get("sinceDay")
+        .and_then(Value::as_str)
+        .unwrap_or("2026-01-01");
+    let until_day = payload
+        .get("untilDay")
+        .and_then(Value::as_str)
+        .unwrap_or("2026-12-31");
+    let time_zone = payload
+        .get("timeZone")
+        .and_then(Value::as_str)
+        .unwrap_or("UTC");
     RpcExit::Success {
         value: json!({
-            "consumed": false,
-            "creditId": req.credit_id,
-            "provider": provider,
+            "contractVersion": 6,
+            "readAt": utc_now_iso(),
+            "timeZone": time_zone,
+            "sinceDay": since_day,
+            "untilDay": until_day,
+            "buckets": [],
+            "sources": [],
+            "pricing": {
+                "status": "unavailable",
+                "source": "unavailable",
+                "fetchedAt": Value::Null,
+                "knownModels": 0,
+            },
+            "scanDurationMs": 0,
+        }),
+    }
+}
+
+fn consume_reset_credit(_payload: Value) -> RpcExit {
+    RpcExit::Success {
+        value: json!({
+            "outcome": "noCredit",
         }),
     }
 }
@@ -217,27 +166,37 @@ fn auth_state_response(payload: &Value) -> RpcExit {
     let instance_id = payload
         .get("instanceId")
         .and_then(Value::as_str)
-        .unwrap_or("claude");
+        .unwrap_or("codex");
     RpcExit::Success {
         value: json!({
             "instanceId": instance_id,
-            "status": "idle",
+            "phase": "idle",
+            "flowId": Value::Null,
+            "authorizationUrl": Value::Null,
+            "expiresAt": Value::Null,
+            "message": Value::Null,
             "methods": [],
-            "updatedAt": utc_now_iso(),
         }),
     }
 }
 
 fn install_state_response(payload: &Value) -> RpcExit {
-    let instance_id = payload
-        .get("instanceId")
+    let driver = payload
+        .get("driver")
+        .or_else(|| payload.get("instanceId"))
         .and_then(Value::as_str)
-        .unwrap_or("claude");
+        .unwrap_or("codex");
     RpcExit::Success {
         value: json!({
-            "instanceId": instance_id,
-            "status": "idle",
-            "updatedAt": utc_now_iso(),
+            "driver": driver,
+            "operationId": Value::Null,
+            "phase": "idle",
+            "downloadedBytes": 0,
+            "totalBytes": Value::Null,
+            "version": Value::Null,
+            "installedVersion": Value::Null,
+            "canRemove": false,
+            "message": Value::Null,
         }),
     }
 }

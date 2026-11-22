@@ -337,5 +337,5 @@ pub(crate) async fn stop_workflow(state: &Arc<AppState>, payload: Value) -> RpcE
         });
         let _ = state.orchestrator.dispatch_now(&stop_cmd).await;
     }
-    RpcExit::Success { value: json!({}) }
+    RpcExit::Success { value: Value::Null }
 }

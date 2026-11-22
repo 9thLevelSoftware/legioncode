@@ -51,7 +51,7 @@ pub(crate) fn peer_links_list(state: &AppState) -> RpcExit {
 pub(crate) fn peer_links_link(payload: &Value) -> RpcExit {
     let url = payload.get("url").and_then(Value::as_str).unwrap_or("");
     peer_err(
-        "pairing_unavailable",
+        "unreachable",
         &format!("Interactive peer pairing via URL `{url}` requires pairing code."),
     )
 }
@@ -115,7 +115,7 @@ pub(crate) fn answer_secret_request(state: &AppState, payload: Value) -> RpcExit
         let _ = (reference.is_null(), &req.turn_item_id);
     }
     let _ = &req.thread_id;
-    RpcExit::Success { value: json!({}) }
+    RpcExit::Success { value: Value::Null }
 }
 
 #[derive(Debug, Default, Deserialize)]

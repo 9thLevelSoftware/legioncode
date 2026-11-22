@@ -82,7 +82,11 @@ pub async fn execute_non_acp_http_turn(
     input: &NonAcpHttpTurnInput,
 ) -> Result<(), ServerRuntimeError> {
     let client = reqwest::Client::new();
-    let driver = ProviderDriverKind::new("grok")
+    let driver_slug = match driver_cfg {
+        NonAcpHttpDriver::OpenCode { .. } => "opencode",
+        NonAcpHttpDriver::Grok { .. } => "grok",
+    };
+    let driver = ProviderDriverKind::new(driver_slug)
         .map_err(|e| ServerRuntimeError::Persistence(e.to_string()))?;
     let session_id = ProviderSessionId::new(format!("psess-{}", input.run.id.as_str()))
         .map_err(|e| ServerRuntimeError::Persistence(e.to_string()))?;

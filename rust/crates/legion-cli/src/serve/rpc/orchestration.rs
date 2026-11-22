@@ -100,8 +100,10 @@ fn get_archived_shell_snapshot(state: &AppState, payload: Value) -> RpcExit {
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 struct OlderSettledPayload {
-    cursor: Option<WireOlderSettledCursor>,
+    #[serde(alias = "cursor")]
+    before: Option<WireOlderSettledCursor>,
     project_id: Option<String>,
+    project_ids: Option<Vec<String>>,
     limit: Option<usize>,
 }
 
@@ -110,14 +112,28 @@ fn get_older_settled_threads(state: &AppState, payload: Value) -> RpcExit {
         Ok(p) => p,
         Err(e) => return e,
     };
+    let single_project = req.project_id.as_deref().or_else(|| {
+        req.project_ids
+            .as_deref()
+            .filter(|ids| ids.len() == 1)
+            .and_then(|ids| ids.first().map(String::as_str))
+    });
     with_db(state, |conn| {
-        let page = list_wire_older_settled_threads(
+        let mut page = list_wire_older_settled_threads(
             conn,
-            req.project_id.as_deref(),
-            req.cursor.as_ref(),
+            single_project,
+            req.before.as_ref(),
             req.limit.unwrap_or(50),
         )
         .map_err(|err| shell_err(&err.to_string()))?;
+        if let Some(ref ids) = req.project_ids
+            && ids.len() > 1
+        {
+            page.threads
+                .retain(|t| ids.iter().any(|p| p == &t.project_id));
+            page.counts
+                .retain(|c| ids.iter().any(|p| p == &c.project_id));
+        }
         Ok(RpcExit::Success { value: json!(page) })
     })
     .unwrap_or_else(|e| e)

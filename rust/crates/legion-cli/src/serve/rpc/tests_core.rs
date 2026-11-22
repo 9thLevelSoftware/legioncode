@@ -175,7 +175,7 @@ async fn projects_fs_read_write_and_search_work() {
         .await,
         "projects.mutate",
     );
-    assert_eq!(created["projects"].as_array().expect("projects").len(), 1);
+    assert!(created["id"].is_string());
 
     let entries = assert_ok(
         dispatch(&state, "projects.listEntries", json!({ "cwd": repo_str })).await,
@@ -206,11 +206,11 @@ async fn projects_fs_read_write_and_search_work() {
         "projects.listIgnoredFiles",
     );
     assert!(
-        ignored["paths"]
+        ignored["files"]
             .as_array()
-            .expect("ignored paths")
+            .expect("ignored files")
             .iter()
-            .any(|p| p == "ignored.log")
+            .any(|f| f["path"] == "ignored.log")
     );
 
     let _ = assert_ok(
@@ -240,7 +240,7 @@ async fn projects_fs_read_write_and_search_work() {
             json!({ "cwd": repo_str, "relativePath": ".git/config" }),
         )
         .await,
-        "WorkspaceFilePathEscapeError",
+        "ProjectReadFileError",
         "escape .git",
     );
 

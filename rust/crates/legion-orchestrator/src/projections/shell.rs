@@ -150,7 +150,10 @@ fn load_all_shell_threads(
             .and_then(|o| o.as_ref())
             .and_then(|ts| Some((parse_iso_millis(ts)?, now_ms?)))
             .is_some_and(|(until_ms, cur_ms)| until_ms > cur_ms);
-        let explicitly_unsettled = thread.settled_override.as_deref() == Some("unsettled");
+        let explicitly_unsettled = matches!(
+            thread.settled_override.as_deref(),
+            Some("active" | "unsettled")
+        );
         let settled = thread.settled_override.as_deref() == Some("settled")
             || thread.settled_at.is_some()
             || (!explicitly_unsettled

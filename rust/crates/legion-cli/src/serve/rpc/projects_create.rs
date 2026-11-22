@@ -15,7 +15,7 @@ use serde_json::{Value, json};
 use tokio::process::Command;
 use uuid::Uuid;
 
-use super::projects_fs::{base_dir_from_state, project_to_wire};
+use super::projects_fs::base_dir_from_state;
 use super::{AppState, parse_payload, rpc_fail, rpc_fail_obj, with_db, with_db_mut};
 
 #[derive(Debug, Deserialize)]
@@ -43,8 +43,9 @@ pub(crate) async fn create_new(state: &Arc<AppState>, payload: Value) -> RpcExit
     let target_dir = parent_dir.join(&folder_name);
     if let Err(err) = fs::create_dir_all(&target_dir) {
         return rpc_fail_obj(json!({
-            "_tag": "NamedProjectFolderError",
-            "folder": target_dir.to_string_lossy(),
+            "_tag": "OrchestrationDispatchCommandError",
+            "commandId": "cmd-create-project",
+            "commandType": "project.create",
             "message": err.to_string(),
         }));
     }
@@ -60,7 +61,7 @@ pub(crate) async fn create_new(state: &Arc<AppState>, payload: Value) -> RpcExit
     let project_id = format!("project-{}", Uuid::new_v4());
     with_db_mut(state, |conn| {
         ensure_project_store_schema(conn)
-            .map_err(|e| rpc_fail("NamedProjectCreateError", &e.to_string()))?;
+            .map_err(|e| rpc_fail("OrchestrationDispatchCommandError", &e.to_string()))?;
         let record = create_project(
             conn,
             &CreateProjectInput::new(&root_str)
@@ -69,13 +70,17 @@ pub(crate) async fn create_new(state: &Arc<AppState>, payload: Value) -> RpcExit
         )
         .map_err(|e| {
             rpc_fail_obj(json!({
-                "_tag": "NamedProjectCreateError",
-                "workspaceRoot": root_str,
+                "_tag": "OrchestrationDispatchCommandError",
+                "commandId": "cmd-create-project",
+                "commandType": "project.create",
                 "message": e.to_string(),
             }))
         })?;
         Ok(RpcExit::Success {
-            value: json!({ "project": project_to_wire(&record) }),
+            value: json!({
+                "projectId": record.id,
+                "workspaceRoot": record.workspace_root,
+            }),
         })
     })
     .unwrap_or_else(|e| e)
@@ -85,7 +90,8 @@ pub(crate) async fn create_new(state: &Arc<AppState>, payload: Value) -> RpcExit
 #[serde(rename_all = "camelCase")]
 struct CreateFromThreadPayload {
     thread_id: String,
-    name: String,
+    #[serde(default)]
+    name: Option<String>,
     directory: Option<String>,
 }
 
@@ -94,23 +100,49 @@ pub(crate) async fn create_from_thread(state: &Arc<AppState>, payload: Value) ->
         Ok(p) => p,
         Err(e) => return e,
     };
-    let created = create_new(
-        state,
-        json!({ "name": req.name, "directory": req.directory }),
-    )
-    .await;
-    if let RpcExit::Success { ref value } = created
-        && let Some(project_id) = value.pointer("/project/id").and_then(Value::as_str)
-    {
-        let _ = with_db(state, |conn| {
-            let _ = conn.execute(
-                "UPDATE orchestration_v2_projection_threads SET project_id = ?1 WHERE thread_id = ?2",
-                params![project_id, req.thread_id],
-            );
-            Ok(())
-        });
+    let name = req
+        .name
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map_or_else(
+            || {
+                with_db(state, |conn| {
+                    Ok(conn
+                        .query_row(
+                            "SELECT title FROM orchestration_v2_projection_threads WHERE thread_id = ?1",
+                            params![req.thread_id],
+                            |r| r.get::<_, String>(0),
+                        )
+                        .ok())
+                })
+                .ok()
+                .flatten()
+                .map(|s| s.trim().to_owned())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "Project".to_owned())
+            },
+            str::to_owned,
+        );
+    let created = create_new(state, json!({ "name": name, "directory": req.directory })).await;
+    match created {
+        RpcExit::Success { value } => {
+            if let Some(project_id) = value.get("projectId").and_then(Value::as_str) {
+                let _ = with_db(state, |conn| {
+                    let _ = conn.execute(
+                        "UPDATE orchestration_v2_projection_threads SET project_id = ?1 WHERE thread_id = ?2",
+                        params![project_id, req.thread_id],
+                    );
+                    Ok(())
+                });
+                return RpcExit::Success {
+                    value: json!({ "projectId": project_id }),
+                };
+            }
+            RpcExit::Success { value }
+        }
+        other @ RpcExit::Failure { .. } => other,
     }
-    created
 }
 
 fn sanitize_folder_name(raw: &str) -> String {

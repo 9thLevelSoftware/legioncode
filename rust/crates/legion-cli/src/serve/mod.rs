@@ -9,6 +9,7 @@ pub(crate) mod rpc;
 mod rpc_terminal;
 pub mod rpc_wave_d;
 pub mod rpc_wave_h;
+mod startup_repair;
 pub mod surface_routes;
 pub mod voice_ws;
 pub mod ws_mcp;
@@ -183,6 +184,7 @@ pub async fn spawn_server_with_dev_url(
     let database_migration = u32::try_from(migration_head).ok();
 
     let orchestrator = Arc::new(Orchestrator::from_sqlite_store(store));
+    startup_repair::repair_startup_state(&orchestrator);
     let descriptor = build_descriptor(environment_id.clone(), &config.cwd, database_migration);
 
     let bind_host = config
@@ -205,15 +207,17 @@ pub async fn spawn_server_with_dev_url(
 
     let mut runtime_state =
         PersistedServerRuntimeState::for_current_process(local_addr.port(), config.host.as_deref());
+    runtime_state.dev_url.clone_from(&dev_url);
     if config.lan && config.host.is_none() {
         runtime_state.private_network_only = Some(true);
     }
     let published = owner_lock.publish(runtime_state)?;
 
-    let outbox_worker = orchestrator.spawn_outbox_worker(
-        RuntimeOutboxExecutor::new(Arc::clone(&orchestrator)),
-        OutboxWorkerOptions::default(),
-    );
+    let outbox_executor = RuntimeOutboxExecutor::new(Arc::clone(&orchestrator));
+    outbox_executor.set_settings_path(paths.settings_path.clone());
+    outbox_executor.set_secrets_dir(paths.secrets_dir.clone());
+    let outbox_worker =
+        orchestrator.spawn_outbox_worker(outbox_executor, OutboxWorkerOptions::default());
     let terminal_runtime = Arc::new(TerminalRuntime::default());
     let runtime_http = build_runtime_http_state(
         &config,

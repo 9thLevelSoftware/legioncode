@@ -24,6 +24,8 @@ pub struct AcpDriverSpec {
     pub env_overrides: BTreeMap<String, String>,
     /// Hide console window on Windows (`CREATE_NO_WINDOW`).
     pub windows_no_window: bool,
+    /// Optional driver slug (`"antigravity"`, `"kiro"`, `"fx"`, etc.).
+    pub driver_slug: Option<String>,
 }
 
 impl AcpDriverSpec {
@@ -34,7 +36,15 @@ impl AcpDriverSpec {
             args: Vec::new(),
             env_overrides: BTreeMap::new(),
             windows_no_window: true,
+            driver_slug: None,
         }
+    }
+
+    /// Assign an explicit provider driver slug for emitted domain events.
+    #[must_use]
+    pub fn with_driver(mut self, slug: impl Into<String>) -> Self {
+        self.driver_slug = Some(slug.into());
+        self
     }
 
     /// Append CLI arguments.

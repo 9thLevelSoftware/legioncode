@@ -16,23 +16,22 @@ pub(crate) async fn dispatch(state: &Arc<AppState>, method: &str, payload: Value
         "generateReviewGuide" => generate_review_guide(payload),
         "diffFileContents" => diff_file_contents(payload),
         "filesViewed" => get_files_viewed(state, payload),
-        "changeBreakdown" => RpcExit::Success {
-            value: json!({ "groups": [] }),
-        },
         "setFilesViewed" => set_files_viewed(state, payload),
         "runAction" => run_action(payload).await,
         "update" => update_pr(payload).await,
         "comment" | "replyToThread" => comment_pr(payload).await,
-        "updateComment"
+        "changeBreakdown"
+        | "updateComment"
+        | "submitReview"
         | "setThreadResolution"
         | "setReaction"
         | "invalidate"
         | "reportState"
         | "subscribeLinkedThreadRefreshes"
         | "requestReviewers"
-        | "setLabels" => RpcExit::Success { value: json!({}) },
+        | "setLabels" => RpcExit::Success { value: Value::Null },
         "reviewerCandidates" | "labelCandidates" => RpcExit::Success {
-            value: json!({ "items": [] }),
+            value: json!({ "candidates": [], "truncated": false }),
         },
         _ => rpc_fail(
             "UnsupportedRpcMethod",
@@ -84,23 +83,11 @@ fn generate_review_guide(payload: Value) -> RpcExit {
     }
 }
 
-#[derive(Debug, Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct PrDiffFilePayload {
-    path: Option<String>,
-}
-
-fn diff_file_contents(payload: Value) -> RpcExit {
-    let req: PrDiffFilePayload = match parse_optional_payload(payload) {
-        Ok(p) => p,
-        Err(e) => return e,
-    };
+fn diff_file_contents(_payload: Value) -> RpcExit {
     RpcExit::Success {
         value: json!({
-            "path": req.path.unwrap_or_default(),
-            "oldContents": Value::Null,
-            "newContents": Value::Null,
-            "binary": false,
+            "oldContents": "",
+            "newContents": "",
         }),
     }
 }
@@ -118,7 +105,7 @@ fn get_files_viewed(state: &AppState, payload: Value) -> RpcExit {
     with_db(state, |conn| {
         let mut stmt = conn
             .prepare(
-                "SELECT path, revision, viewed_at FROM pull_request_files_viewed
+                "SELECT path FROM pull_request_files_viewed
                  WHERE provider = ?1 AND host = ?2 AND repository = ?3 AND number = ?4 AND viewer = ?5",
             )
             .map_err(|e| pr_err(&e.to_string()))?;
@@ -126,17 +113,25 @@ fn get_files_viewed(state: &AppState, payload: Value) -> RpcExit {
             .query_map(params![provider, host, repo, num, viewer], |r| {
                 Ok(json!({
                     "path": r.get::<_, String>(0)?,
-                    "revision": r.get::<_, Option<String>>(1)?,
-                    "viewedAt": r.get::<_, String>(2)?,
+                    "state": "viewed",
                 }))
             })
             .and_then(Iterator::collect)
             .unwrap_or_default();
         Ok(RpcExit::Success {
-            value: json!({ "files": files }),
+            value: json!({ "files": files, "truncated": false }),
         })
     })
     .unwrap_or_else(|e| e)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FileViewedEntry {
+    path: String,
+    viewed: bool,
+    #[serde(default)]
+    revision: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -151,8 +146,12 @@ struct SetFilesViewedPayload {
     number: u64,
     #[serde(default)]
     viewer: Option<String>,
+    #[serde(default)]
+    files: Vec<FileViewedEntry>,
+    #[serde(default)]
     paths: Vec<String>,
-    viewed: bool,
+    #[serde(default)]
+    viewed: Option<bool>,
     #[serde(default)]
     revision: Option<String>,
 }
@@ -168,26 +167,39 @@ fn set_files_viewed(state: &AppState, payload: Value) -> RpcExit {
     let viewer = req.viewer.as_deref().unwrap_or("default");
     let num = i64::try_from(req.number).unwrap_or(0);
     let now = utc_now_iso();
+    let entries: Vec<FileViewedEntry> = if req.files.is_empty() {
+        let v = req.viewed.unwrap_or(true);
+        req.paths
+            .into_iter()
+            .map(|p| FileViewedEntry {
+                path: p,
+                viewed: v,
+                revision: req.revision.clone(),
+            })
+            .collect()
+    } else {
+        req.files
+    };
     with_db(state, |conn| {
-        for p in &req.paths {
-            if req.viewed {
+        for entry in &entries {
+            if entry.viewed {
                 let _ = conn.execute(
                     "INSERT INTO pull_request_files_viewed
                        (provider, host, repository, number, viewer, path, revision, viewed_at)
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
                      ON CONFLICT(provider, host, repository, number, viewer, path)
                      DO UPDATE SET revision = excluded.revision, viewed_at = excluded.viewed_at",
-                    params![provider, host, repo, num, viewer, p, req.revision, now],
+                    params![provider, host, repo, num, viewer, entry.path, entry.revision, now],
                 );
             } else {
                 let _ = conn.execute(
                     "DELETE FROM pull_request_files_viewed
                      WHERE provider = ?1 AND host = ?2 AND repository = ?3 AND number = ?4 AND viewer = ?5 AND path = ?6",
-                    params![provider, host, repo, num, viewer, p],
+                    params![provider, host, repo, num, viewer, entry.path],
                 );
             }
         }
-        Ok(RpcExit::Success { value: json!({}) })
+        Ok(RpcExit::Success { value: Value::Null })
     })
     .unwrap_or_else(|e| e)
 }
@@ -214,9 +226,7 @@ async fn run_action(payload: Value) -> RpcExit {
         other => Err(format!("Unsupported PR action `{other}`")),
     };
     match res {
-        Ok(_) => RpcExit::Success {
-            value: json!({ "ok": true }),
-        },
+        Ok(_) => RpcExit::Success { value: Value::Null },
         Err(err) => pr_err(&err),
     }
 }
@@ -244,9 +254,7 @@ async fn update_pr(payload: Value) -> RpcExit {
         args.extend(["--body", b]);
     }
     match run_gh_text(req.cwd.as_deref(), &args).await {
-        Ok(_) => RpcExit::Success {
-            value: json!({ "updated": true }),
-        },
+        Ok(_) => RpcExit::Success { value: Value::Null },
         Err(err) => pr_err(&err),
     }
 }
@@ -271,9 +279,7 @@ async fn comment_pr(payload: Value) -> RpcExit {
     )
     .await
     {
-        Ok(_) => RpcExit::Success {
-            value: json!({ "posted": true }),
-        },
+        Ok(_) => RpcExit::Success { value: Value::Null },
         Err(err) => pr_err(&err),
     }
 }

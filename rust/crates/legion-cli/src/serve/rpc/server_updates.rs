@@ -22,7 +22,8 @@ pub(super) async fn dispatch(tag: &str, payload: Value) -> RpcExit {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CheckOtlpPayload {
-    endpoint: String,
+    #[serde(alias = "endpoint")]
+    url: String,
 }
 
 async fn check_otlp_endpoint(payload: Value) -> RpcExit {
@@ -30,13 +31,12 @@ async fn check_otlp_endpoint(payload: Value) -> RpcExit {
         Ok(p) => p,
         Err(e) => return e,
     };
-    let trimmed = req.endpoint.trim();
+    let trimmed = req.url.trim();
     if !(trimmed.starts_with("http://") || trimmed.starts_with("https://")) {
         return RpcExit::Success {
             value: json!({
-                "ok": false,
-                "status": "invalid",
-                "message": "OTLP endpoint must use http:// or https://",
+                "_tag": "Unreachable",
+                "timedOut": false,
             }),
         };
     }
@@ -45,18 +45,31 @@ async fn check_otlp_endpoint(payload: Value) -> RpcExit {
         .build()
     else {
         return RpcExit::Success {
-            value: json!({ "ok": false, "message": "HTTP client build failed." }),
+            value: json!({
+                "_tag": "Unreachable",
+                "timedOut": false,
+            }),
         };
     };
+    let started = std::time::Instant::now();
     match http.post(trimmed).json(&json!({})).send().await {
+        Ok(resp) if resp.status().is_success() => RpcExit::Success {
+            value: json!({
+                "_tag": "Accepted",
+                "latencyMs": u64::try_from(started.elapsed().as_millis()).unwrap_or(0),
+            }),
+        },
         Ok(resp) => RpcExit::Success {
             value: json!({
-                "ok": resp.status().is_success(),
-                "statusCode": resp.status().as_u16(),
+                "_tag": "Rejected",
+                "status": resp.status().as_u16(),
             }),
         },
         Err(err) => RpcExit::Success {
-            value: json!({ "ok": false, "message": err.to_string() }),
+            value: json!({
+                "_tag": "Unreachable",
+                "timedOut": err.is_timeout(),
+            }),
         },
     }
 }
@@ -83,7 +96,7 @@ fn signal_process(payload: Value) -> RpcExit {
             "pid": req.pid,
             "signal": req.signal,
             "signaled": false,
-            "message": msg,
+            "message": { "_tag": "Some", "value": msg },
         }),
     }
 }
@@ -93,13 +106,8 @@ fn report_client_activity(payload: Value) -> RpcExit {
         Ok(p) => p,
         Err(e) => return e,
     };
-    let now = utc_now_iso();
-    RpcExit::Success {
-        value: json!({
-            "hostPower": server_telemetry::empty_telemetry_snapshot(&now)["power"],
-            "leases": [],
-        }),
-    }
+    let _ = server_telemetry::empty_telemetry_snapshot(&utc_now_iso());
+    RpcExit::Success { value: Value::Null }
 }
 
 async fn get_npm_release(payload: Value) -> RpcExit {
@@ -132,7 +140,6 @@ async fn get_npm_release(payload: Value) -> RpcExit {
     RpcExit::Success {
         value: json!({
             "version": version,
-            "publishedAt": pkg.get("time").cloned().unwrap_or(Value::Null),
         }),
     }
 }

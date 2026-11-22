@@ -5,6 +5,7 @@ pub mod acp_protocol_io;
 pub mod acp_registry;
 pub mod acp_subprocess;
 pub mod device_hub;
+mod driver_resolver;
 pub mod error;
 pub mod git_checkpoints;
 pub mod git_checkpoints_cli;

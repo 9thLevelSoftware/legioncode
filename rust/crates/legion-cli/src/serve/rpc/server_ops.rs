@@ -120,23 +120,12 @@ fn reclaim_database_space(state: &AppState) -> RpcExit {
                 }))
             })
     }) {
-        Ok(()) => RpcExit::Success { value: json!({}) },
+        Ok(()) => RpcExit::Success { value: Value::Null },
         Err(e) => e,
     }
 }
 
-#[derive(Debug, Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct DiscoverSourceControlPayload {
-    cwd: Option<String>,
-}
-
-async fn discover_source_control(payload: Value) -> RpcExit {
-    let req: DiscoverSourceControlPayload = match parse_optional_payload(payload) {
-        Ok(p) => p,
-        Err(e) => return e,
-    };
-    let mut hosts = Vec::new();
+async fn discover_source_control(_payload: Value) -> RpcExit {
     let gh_ok = Command::new("gh")
         .args(["auth", "status"])
         .env("GIT_TERMINAL_PROMPT", "0")
@@ -145,30 +134,38 @@ async fn discover_source_control(payload: Value) -> RpcExit {
         .status()
         .await
         .is_ok_and(|s| s.success());
-    if gh_ok {
-        hosts.push(json!({
-            "provider": "github",
-            "hostname": "github.com",
-            "authenticated": true,
-        }));
-    }
-    let remote_url = if let Some(cwd) = req.cwd.as_deref().filter(|s| Path::new(s).is_dir()) {
-        Command::new("git")
-            .current_dir(cwd)
-            .args(["remote", "get-url", "origin"])
-            .env("GIT_TERMINAL_PROMPT", "0")
-            .output()
-            .await
-            .ok()
-            .filter(|o| o.status.success())
-            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
-    } else {
-        None
-    };
+    let git_ok = Command::new("git")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await
+        .is_ok_and(|s| s.success());
     RpcExit::Success {
         value: json!({
-            "hosts": hosts,
-            "remoteUrl": remote_url,
+            "versionControlSystems": [{
+                "kind": "git",
+                "implemented": true,
+                "label": "Git",
+                "status": if git_ok { "available" } else { "missing" },
+                "version": { "_tag": "None" },
+                "installHint": "Install Git from https://git-scm.com/downloads",
+                "detail": { "_tag": "None" },
+            }],
+            "sourceControlProviders": [{
+                "kind": "github",
+                "label": "GitHub",
+                "status": if gh_ok { "available" } else { "missing" },
+                "version": { "_tag": "None" },
+                "installHint": "Install GitHub CLI (gh) and run `gh auth login`",
+                "detail": { "_tag": "None" },
+                "auth": {
+                    "status": if gh_ok { "authenticated" } else { "unauthenticated" },
+                    "account": { "_tag": "None" },
+                    "host": { "_tag": "Some", "value": "github.com" },
+                    "detail": { "_tag": "None" },
+                },
+            }],
         }),
     }
 }
@@ -176,8 +173,8 @@ async fn discover_source_control(payload: Value) -> RpcExit {
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 struct CheckSecretSourcePayload {
+    source: Option<Value>,
     reference: Option<Value>,
-    provider: Option<String>,
     value: Option<String>,
 }
 
@@ -186,25 +183,30 @@ fn check_secret_source(state: &AppState, payload: Value) -> RpcExit {
         Ok(p) => p,
         Err(e) => return e,
     };
-    if let Some(ref_val) = req.reference
-        && let Ok(parsed) = serde_json::from_value::<SecretRef>(
-            ref_val
-                .get("value")
-                .cloned()
-                .unwrap_or_else(|| json!(req.value.unwrap_or_default())),
-        )
+    let candidate = req
+        .source
+        .or(req.reference)
+        .unwrap_or_else(|| json!({ "value": req.value.unwrap_or_default() }));
+    if let Ok(parsed) =
+        serde_json::from_value::<SecretRef>(candidate.get("value").cloned().unwrap_or(candidate))
     {
+        if parsed.vault().is_empty() {
+            return RpcExit::Success {
+                value: json!({ "_tag": "Failed", "detail": "Secret vault identifier is empty." }),
+            };
+        }
         return RpcExit::Success {
-            value: json!({
-                "ok": !parsed.vault().is_empty(),
-                "provider": req.provider.unwrap_or_else(|| "onepassword".to_owned()),
-            }),
+            value: json!({ "_tag": "Resolved" }),
         };
     }
     let _ = fs::create_dir_all(&state.paths.secrets_dir);
-    let ok = FileSecretStore::new(&state.paths.secrets_dir).is_ok();
-    RpcExit::Success {
-        value: json!({ "ok": ok, "provider": req.provider }),
+    match FileSecretStore::new(&state.paths.secrets_dir) {
+        Ok(_) => RpcExit::Success {
+            value: json!({ "_tag": "Resolved" }),
+        },
+        Err(err) => RpcExit::Success {
+            value: json!({ "_tag": "Failed", "detail": err.to_string() }),
+        },
     }
 }
 
@@ -227,12 +229,13 @@ fn prepare_triage(state: &AppState) -> RpcExit {
     }) {
         Ok(session) => RpcExit::Success {
             value: json!({
-                "sessionDir": session.session_dir.to_string_lossy(),
-                "contextFilePath": session.context_file_path.to_string_lossy(),
-                "promptFilePath": session.prompt_file_path.to_string_lossy(),
+                "prompt": format!("Review triage context in `{}`.", session.prompt_file_path.display()),
             }),
         },
-        Err(err) => rpc_fail_obj(json!({ "_tag": "TriageError", "message": err.to_string() })),
+        Err(err) => rpc_fail_obj(json!({
+            "_tag": "ServerPrepareTriageError",
+            "cause": err.to_string(),
+        })),
     }
 }
 
@@ -242,9 +245,8 @@ fn list_text_generator_models() -> RpcExit {
         .filter(|spec| spec.supports_text_generation)
         .map(|spec| {
             json!({
-                "driver": spec.slug,
-                "label": spec.display_name,
-                "supportsTextGeneration": true,
+                "id": spec.slug,
+                "name": spec.display_name,
             })
         })
         .collect();

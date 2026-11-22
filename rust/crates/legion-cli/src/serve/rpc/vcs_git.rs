@@ -63,6 +63,7 @@ pub(crate) fn git_err(op: &str, cwd: &str, detail: &str) -> RpcExit {
     rpc_fail_obj(json!({
         "_tag": "GitCommandError",
         "operation": op,
+        "command": op,
         "cwd": cwd,
         "detail": detail,
         "message": format!("{op} failed: {detail}"),
@@ -81,16 +82,24 @@ async fn vcs_pull(payload: Value) -> RpcExit {
         Err(e) => return e,
     };
     let cwd = Path::new(&req.cwd);
-    let branch = current_branch(cwd).await.unwrap_or_default();
+    let branch = current_branch(cwd)
+        .await
+        .unwrap_or_else(|| "HEAD".to_owned());
     match run_git_cmd(cwd, &["pull", "--ff-only"]).await {
-        Ok(stdout) => RpcExit::Success {
-            value: json!({
-                "branch": branch,
-                "upstreamBranch": Value::Null,
-                "pulled": true,
-                "output": stdout.trim(),
-            }),
-        },
+        Ok(stdout) => {
+            let status = if stdout.contains("Already up to date") {
+                "skipped_up_to_date"
+            } else {
+                "pulled"
+            };
+            RpcExit::Success {
+                value: json!({
+                    "status": status,
+                    "refName": branch,
+                    "upstreamRef": Value::Null,
+                }),
+            }
+        }
         Err((op, detail)) => git_err(&op, &req.cwd, &detail),
     }
 }
@@ -109,9 +118,9 @@ async fn vcs_refresh_status(payload: Value) -> RpcExit {
         return RpcExit::Success {
             value: json!({
                 "isRepo": false,
-                "hasOriginRemote": false,
-                "isDefaultBranch": false,
-                "branch": Value::Null,
+                "hasPrimaryRemote": false,
+                "isDefaultRef": false,
+                "refName": Value::Null,
                 "hasWorkingTreeChanges": false,
                 "workingTree": { "files": [], "insertions": 0, "deletions": 0 },
                 "hasUpstream": false,
@@ -150,9 +159,9 @@ async fn vcs_refresh_status(payload: Value) -> RpcExit {
     RpcExit::Success {
         value: json!({
             "isRepo": true,
-            "hasOriginRemote": has_origin,
-            "isDefaultBranch": is_default,
-            "branch": branch,
+            "hasPrimaryRemote": has_origin,
+            "isDefaultRef": is_default,
+            "refName": branch,
             "hasWorkingTreeChanges": !files.is_empty(),
             "workingTree": { "files": files, "insertions": 0, "deletions": 0 },
             "hasUpstream": has_upstream,
@@ -169,12 +178,10 @@ async fn collect_status_files(cwd: &Path) -> Vec<Value> {
         .unwrap_or_default();
     let mut files = Vec::new();
     for entry in status_out.split('\0').filter(|s| s.len() >= 4) {
-        let code = &entry[..2];
         let path = entry[3..].trim();
         if !path.is_empty() {
             files.push(json!({
                 "path": path,
-                "status": code.trim(),
                 "insertions": 0,
                 "deletions": 0,
             }));
@@ -188,10 +195,8 @@ async fn vcs_refresh_branch(payload: Value) -> RpcExit {
         Ok(p) => p,
         Err(e) => return e,
     };
-    let branch = current_branch(Path::new(&req.cwd)).await;
-    RpcExit::Success {
-        value: json!({ "branch": branch }),
-    }
+    let _ = current_branch(Path::new(&req.cwd)).await;
+    RpcExit::Success { value: Value::Null }
 }
 
 async fn vcs_list_refs(payload: Value) -> RpcExit {
@@ -200,7 +205,19 @@ async fn vcs_list_refs(payload: Value) -> RpcExit {
         Err(e) => return e,
     };
     let cwd = Path::new(&req.cwd);
-    let current = current_branch(cwd).await;
+    let is_repo = cwd.is_dir()
+        && run_git_cmd(cwd, &["rev-parse", "--is-inside-work-tree"])
+            .await
+            .is_ok();
+    let has_remote = is_repo
+        && run_git_cmd(cwd, &["remote", "get-url", "origin"])
+            .await
+            .is_ok();
+    let current = if is_repo {
+        current_branch(cwd).await
+    } else {
+        None
+    };
     let Ok(out) = run_git_cmd(
         cwd,
         &[
@@ -213,10 +230,16 @@ async fn vcs_list_refs(payload: Value) -> RpcExit {
     .await
     else {
         return RpcExit::Success {
-            value: json!({ "branches": [], "tags": [] }),
+            value: json!({
+                "refs": [],
+                "isRepo": is_repo,
+                "hasPrimaryRemote": has_remote,
+                "nextCursor": Value::Null,
+                "totalCount": 0,
+            }),
         };
     };
-    let mut branches = Vec::new();
+    let mut refs = Vec::new();
     for line in out.lines() {
         let mut cols = line.split('\t');
         let short = cols.next().unwrap_or("").trim();
@@ -228,15 +251,23 @@ async fn vcs_list_refs(payload: Value) -> RpcExit {
         let is_remote = full.starts_with("refs/remotes/");
         let is_current = !is_remote && (head_marker == "*" || current.as_deref() == Some(short));
         let is_default = matches!(short, "main" | "master");
-        branches.push(json!({
+        refs.push(json!({
             "name": short,
             "current": is_current,
             "isDefault": is_default,
             "isRemote": is_remote,
+            "worktreePath": Value::Null,
         }));
     }
+    let total = refs.len();
     RpcExit::Success {
-        value: json!({ "branches": branches, "tags": [] }),
+        value: json!({
+            "refs": refs,
+            "isRepo": is_repo,
+            "hasPrimaryRemote": has_remote,
+            "nextCursor": Value::Null,
+            "totalCount": total,
+        }),
     }
 }
 
@@ -244,7 +275,10 @@ async fn vcs_list_refs(payload: Value) -> RpcExit {
 #[serde(rename_all = "camelCase")]
 struct CreateRefPayload {
     cwd: String,
-    branch: String,
+    #[serde(alias = "branch")]
+    ref_name: String,
+    #[serde(default)]
+    switch_ref: Option<bool>,
 }
 
 async fn vcs_create_ref(payload: Value) -> RpcExit {
@@ -252,9 +286,14 @@ async fn vcs_create_ref(payload: Value) -> RpcExit {
         Ok(p) => p,
         Err(e) => return e,
     };
-    match run_git_cmd(Path::new(&req.cwd), &["branch", &req.branch]).await {
+    let args: Vec<&str> = if req.switch_ref.unwrap_or(false) {
+        vec!["checkout", "-b", &req.ref_name]
+    } else {
+        vec!["branch", &req.ref_name]
+    };
+    match run_git_cmd(Path::new(&req.cwd), &args).await {
         Ok(_) => RpcExit::Success {
-            value: json!({ "branch": req.branch }),
+            value: json!({ "refName": req.ref_name }),
         },
         Err((op, detail)) => git_err(&op, &req.cwd, &detail),
     }
@@ -265,9 +304,9 @@ async fn vcs_switch_ref(payload: Value) -> RpcExit {
         Ok(p) => p,
         Err(e) => return e,
     };
-    match run_git_cmd(Path::new(&req.cwd), &["checkout", &req.branch]).await {
+    match run_git_cmd(Path::new(&req.cwd), &["checkout", &req.ref_name]).await {
         Ok(_) => RpcExit::Success {
-            value: json!({ "branch": req.branch }),
+            value: json!({ "refName": req.ref_name }),
         },
         Err((op, detail)) => git_err(&op, &req.cwd, &detail),
     }
@@ -279,7 +318,7 @@ async fn vcs_init(payload: Value) -> RpcExit {
         Err(e) => return e,
     };
     match run_git_cmd(Path::new(&req.cwd), &["init"]).await {
-        Ok(_) => RpcExit::Success { value: json!({}) },
+        Ok(_) => RpcExit::Success { value: Value::Null },
         Err((op, detail)) => git_err(&op, &req.cwd, &detail),
     }
 }

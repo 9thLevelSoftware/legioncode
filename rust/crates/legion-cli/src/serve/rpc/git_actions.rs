@@ -21,9 +21,9 @@ pub(crate) async fn vcs_create_worktree(state: &AppState, payload: Value) -> Rpc
     };
     let cwd = Path::new(&req.cwd);
     let raw_branch = req
-        .new_branch
+        .new_ref_name
         .as_deref()
-        .or(req.branch.as_deref())
+        .or(req.ref_name.as_deref())
         .map(str::trim)
         .filter(|s| !s.is_empty())
         .map_or_else(
@@ -55,7 +55,7 @@ pub(crate) async fn vcs_create_worktree(state: &AppState, payload: Value) -> Rpc
         return git_err("vcs.createWorktree", &req.cwd, &e.to_string());
     }
     let path_str = target_path.to_string_lossy().into_owned();
-    let base_ref = req.base_branch.as_deref().unwrap_or("HEAD");
+    let base_ref = req.base_ref_name.as_deref().unwrap_or("HEAD");
     match run_git_cmd(
         cwd,
         &["worktree", "add", "-b", &raw_branch, &path_str, base_ref],
@@ -66,7 +66,7 @@ pub(crate) async fn vcs_create_worktree(state: &AppState, payload: Value) -> Rpc
             value: json!({
                 "worktree": {
                     "path": path_str,
-                    "branch": raw_branch,
+                    "refName": raw_branch,
                 },
             }),
         },
@@ -78,9 +78,12 @@ pub(crate) async fn vcs_create_worktree(state: &AppState, payload: Value) -> Rpc
 #[serde(rename_all = "camelCase")]
 struct CreateWorktreePayload {
     cwd: String,
-    branch: Option<String>,
-    new_branch: Option<String>,
-    base_branch: Option<String>,
+    #[serde(alias = "branch")]
+    ref_name: Option<String>,
+    #[serde(alias = "newBranch")]
+    new_ref_name: Option<String>,
+    #[serde(alias = "baseBranch")]
+    base_ref_name: Option<String>,
     path: Option<String>,
 }
 
@@ -104,7 +107,7 @@ pub(crate) async fn vcs_remove_worktree(payload: Value) -> RpcExit {
     }
     args.push(&req.path);
     match run_git_cmd(Path::new(&req.cwd), &args).await {
-        Ok(_) => RpcExit::Success { value: json!({}) },
+        Ok(_) => RpcExit::Success { value: Value::Null },
         Err((op, detail)) => git_err(&op, &req.cwd, &detail),
     }
 }
@@ -129,13 +132,12 @@ struct StackedActionPayload {
     commit_message: Option<String>,
 }
 
-async fn git_run_stacked_action(payload: Value) -> RpcExit {
+pub(crate) async fn git_run_stacked_action(payload: Value) -> RpcExit {
     let req: StackedActionPayload = match parse_payload(payload) {
         Ok(p) => p,
         Err(e) => return e,
     };
     let cwd = Path::new(&req.cwd);
-    let action_id = format!("git-action-{}", Uuid::new_v4());
     let branch = current_branch(cwd)
         .await
         .unwrap_or_else(|| "HEAD".to_owned());
@@ -162,14 +164,18 @@ async fn git_run_stacked_action(payload: Value) -> RpcExit {
     }
     RpcExit::Success {
         value: json!({
-            "actionId": action_id,
-            "branch": { "status": "skipped", "name": branch },
+            "action": req.action,
+            "branch": { "status": "skipped_not_requested", "name": branch },
             "commit": commit_sha.map_or_else(
-                || json!({ "status": "skipped" }),
+                || json!({ "status": "skipped_not_requested" }),
                 |sha| json!({ "status": "created", "commitSha": sha, "subject": "commit" }),
             ),
-            "push": { "status": "skipped" },
-            "pr": { "status": "skipped" },
+            "push": { "status": "skipped_not_requested" },
+            "pr": { "status": "skipped_not_requested" },
+            "toast": {
+                "title": "Git action complete",
+                "cta": { "kind": "none" },
+            },
         }),
     }
 }
@@ -204,8 +210,16 @@ async fn git_resolve_pull_request(payload: Value) -> RpcExit {
     match out {
         Ok(res) if res.status.success() => {
             if let Ok(parsed) = serde_json::from_slice::<Value>(&res.stdout) {
+                let pr = json!({
+                    "number": parsed.get("number").and_then(Value::as_u64).unwrap_or(1),
+                    "title": parsed.get("title").and_then(Value::as_str).unwrap_or("Pull Request"),
+                    "url": parsed.get("url").and_then(Value::as_str).unwrap_or(""),
+                    "baseBranch": parsed.get("baseRefName").and_then(Value::as_str).unwrap_or("main"),
+                    "headBranch": parsed.get("headRefName").and_then(Value::as_str).unwrap_or("HEAD"),
+                    "state": parsed.get("state").and_then(Value::as_str).unwrap_or("open").to_ascii_lowercase(),
+                });
                 return RpcExit::Success {
-                    value: json!({ "pullRequest": parsed }),
+                    value: json!({ "pullRequest": pr }),
                 };
             }
             git_err(
@@ -244,7 +258,7 @@ async fn git_prepare_pr_thread(state: &AppState, payload: Value) -> RpcExit {
         return resolved;
     };
     let branch = pr_wrap
-        .pointer("/pullRequest/headRefName")
+        .pointer("/pullRequest/headBranch")
         .and_then(Value::as_str)
         .unwrap_or("main")
         .to_owned();
@@ -262,6 +276,7 @@ async fn git_prepare_pr_thread(state: &AppState, payload: Value) -> RpcExit {
             "pullRequest": pr_wrap["pullRequest"],
             "branch": branch,
             "worktreePath": worktree_path,
+            "isOnPullRequestHead": false,
         }),
     }
 }

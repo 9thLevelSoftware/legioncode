@@ -79,7 +79,7 @@ async fn assets_attachments_browse_scratch_and_terminal_work() {
         dispatch(&state, "projects.ensureScratch", json!({})).await,
         "projects.ensureScratch",
     );
-    assert!(scratch["project"]["id"].is_string());
+    assert!(scratch["projectId"].is_string());
 
     let term_open = assert_ok(
         dispatch(
@@ -129,7 +129,13 @@ async fn providers_acp_telemetry_preview_and_device_rpcs_work() {
         .await,
         "server.updateProvider",
     );
-    assert_eq!(updated["provider"]["driver"], "devReplay");
+    assert!(
+        updated["providers"]
+            .as_array()
+            .expect("providers")
+            .iter()
+            .any(|p| p["driver"] == "devReplay")
+    );
 
     let text_models = assert_ok(
         dispatch(&state, "server.listTextGeneratorModels", json!({})).await,
@@ -141,7 +147,7 @@ async fn providers_acp_telemetry_preview_and_device_rpcs_work() {
         dispatch(&state, "server.prepareTriage", json!({})).await,
         "server.prepareTriage",
     );
-    assert!(triage["sessionDir"].is_string());
+    assert!(triage["prompt"].is_string());
 
     for tag in [
         "server.getTraceDiagnostics",
@@ -162,7 +168,7 @@ async fn providers_acp_telemetry_preview_and_device_rpcs_work() {
         .await,
         "server.checkOtlpEndpoint",
     );
-    assert_eq!(otlp["ok"], false);
+    assert_ne!(otlp["outcome"], "Accepted");
 
     let _ = assert_ok(
         dispatch(

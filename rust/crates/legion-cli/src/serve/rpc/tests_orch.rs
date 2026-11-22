@@ -139,7 +139,7 @@ async fn orchestration_v2_shell_and_projection_queries_work() {
         .await,
         "orchestration.getWorktreeThreadIds",
     );
-    assert!(wt_ids.is_array());
+    assert!(wt_ids["threadIds"].is_array());
 }
 
 #[tokio::test]
@@ -259,11 +259,11 @@ async fn projects_create_search_entries_attachments_trackers_and_git_commit() {
         .await,
         "projects.createNew",
     );
-    let root = created["project"]["workspaceRoot"]
+    let root = created["workspaceRoot"]
         .as_str()
         .expect("workspaceRoot")
         .to_owned();
-    let proj_id = created["project"]["id"]
+    let proj_id = created["projectId"]
         .as_str()
         .expect("project id")
         .to_owned();
@@ -297,7 +297,10 @@ async fn projects_create_search_entries_attachments_trackers_and_git_commit() {
         dispatch(&state, "issueTrackers.list", json!({})).await,
         "issueTrackers.list",
     );
-    assert_eq!(trackers["bindings"].as_array().map(Vec::len), Some(1));
+    assert_eq!(
+        trackers["bindings"].as_object().map(serde_json::Map::len),
+        Some(1)
+    );
 
     let persisted = assert_ok(
         dispatch(

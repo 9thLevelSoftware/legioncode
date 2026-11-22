@@ -11,6 +11,7 @@ use legion_contracts::orchestration::{
 };
 use legion_orchestrator::outbox::PendingOutboxEffect;
 use legion_orchestrator::sink::{CommitCommandInput, EventSink};
+use serde_json::Value;
 use uuid::Uuid;
 
 use crate::error::ServerRuntimeError;
@@ -51,10 +52,14 @@ pub struct TurnEmitContext {
     pub reasoning_text: String,
     /// Tracked tool call item IDs & titles keyed by provider tool call ID.
     pub tool_items: BTreeMap<String, (TurnItemId, String, u64)>,
+    /// Original tool input payloads keyed by provider tool call ID.
+    pub tool_inputs: BTreeMap<String, Value>,
     /// Turn start timestamp.
     pub started_at: String,
     /// Plan counter for unique plan IDs.
     pub plan_counter: u64,
+    /// Cumulative token usage JSON (`TurnTokenUsage`) recorded during the turn.
+    pub turn_token_usage: Option<Value>,
 }
 
 impl TurnEmitContext {
@@ -95,8 +100,10 @@ impl TurnEmitContext {
             assistant_text: String::new(),
             reasoning_text: String::new(),
             tool_items: BTreeMap::new(),
+            tool_inputs: BTreeMap::new(),
             started_at: now_iso,
             plan_counter: 0,
+            turn_token_usage: None,
         })
     }
 
@@ -192,30 +199,80 @@ impl TurnEmitContext {
         final_status: RunStatus,
         now_iso: &str,
     ) -> Result<Vec<DomainEvent>, ServerRuntimeError> {
+        self.build_finish_events_with_error(run, attempt, final_status, None, now_iso)
+    }
+
+    /// Build terminal events, attaching an error `TurnItem` & `session.last_error` when failed.
+    pub fn build_finish_events_with_error(
+        &mut self,
+        run: &Run,
+        attempt: Option<&RunAttempt>,
+        final_status: RunStatus,
+        error_message: Option<&str>,
+        now_iso: &str,
+    ) -> Result<Vec<DomainEvent>, ServerRuntimeError> {
         let mut events = Vec::new();
         if !self.assistant_text.is_empty() {
             events.extend(self.build_assistant_message_events(false, now_iso)?);
         }
-        if let Some(item_id) = self.reasoning_item_id.clone() {
-            let ord = self.alloc_ordinal();
-            let item = self.make_turn_item(
-                TurnItemMeta {
-                    id: item_id,
-                    ordinal: ord,
-                    status: TurnItemStatus::Completed,
-                    completed_at: Some(now_iso),
-                    title: None,
-                    now_iso,
-                },
-                TurnItemKind::Reasoning {
-                    text: self.reasoning_text.clone(),
-                    streaming: false,
-                },
-            );
-            events.push(
-                self.wrap_event(now_iso, DomainEventPayload::TurnItemUpdated(Box::new(item)))?,
-            );
+        if let Some(evt) = self.build_reasoning_finish_event(now_iso)? {
+            events.push(evt);
         }
+        let clean_error = if final_status == RunStatus::Failed {
+            let trimmed = error_message.map(str::trim).filter(|s| !s.is_empty());
+            trimmed.map(ToOwned::to_owned)
+        } else {
+            None
+        };
+        if let Some(ref msg) = clean_error {
+            events.push(self.build_error_turn_item(msg, "unknown", false, now_iso)?);
+        }
+        self.append_terminal_lifecycle_events(
+            &mut events,
+            run,
+            attempt,
+            final_status,
+            clean_error,
+            now_iso,
+        )?;
+        Ok(events)
+    }
+
+    fn build_reasoning_finish_event(
+        &mut self,
+        now_iso: &str,
+    ) -> Result<Option<DomainEvent>, ServerRuntimeError> {
+        let Some(item_id) = self.reasoning_item_id.clone() else {
+            return Ok(None);
+        };
+        let ord = self.alloc_ordinal();
+        let item = self.make_turn_item(
+            TurnItemMeta {
+                id: item_id,
+                ordinal: ord,
+                status: TurnItemStatus::Completed,
+                completed_at: Some(now_iso),
+                title: None,
+                now_iso,
+            },
+            TurnItemKind::Reasoning {
+                text: self.reasoning_text.clone(),
+                streaming: false,
+            },
+        );
+        self.wrap_event(now_iso, DomainEventPayload::TurnItemUpdated(Box::new(item)))
+            .map(Some)
+    }
+
+    fn append_terminal_lifecycle_events(
+        &mut self,
+        events: &mut Vec<DomainEvent>,
+        run: &Run,
+        attempt: Option<&RunAttempt>,
+        final_status: RunStatus,
+        clean_error: Option<String>,
+        now_iso: &str,
+    ) -> Result<(), ServerRuntimeError> {
         let status_str = match final_status {
             RunStatus::Interrupted => "interrupted",
             RunStatus::Cancelled => "cancelled",
@@ -228,13 +285,24 @@ impl TurnEmitContext {
             Some(&self.started_at),
             Some(now_iso),
         );
-        let p_thread = self.build_provider_thread("idle", run.ordinal, now_iso);
-        let session = self.build_provider_session(
-            "ready",
+        let p_thread_status = if final_status == RunStatus::Failed {
+            "error"
+        } else {
+            "idle"
+        };
+        let p_thread = self.build_provider_thread(p_thread_status, run.ordinal, now_iso);
+        let session_status = if final_status == RunStatus::Failed {
+            "error"
+        } else {
+            "ready"
+        };
+        let mut session = self.build_provider_session(
+            session_status,
             &run.model_selection.model,
             &self.started_at,
             now_iso,
         );
+        session.last_error = clean_error;
         let mut updated_run = run.clone();
         updated_run.status = final_status;
         updated_run.provider_thread_id = Some(self.provider_thread_id.clone());
@@ -277,7 +345,7 @@ impl TurnEmitContext {
                 run: Box::new(updated_run),
             },
         )?);
-        Ok(events)
+        Ok(())
     }
 }
 

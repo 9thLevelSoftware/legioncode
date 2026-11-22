@@ -7,8 +7,8 @@ use std::sync::Arc;
 use legion_contracts::orchestration::PatchValue;
 use legion_persistence::project_store::{
     CreateProjectInput, ProjectRecord, archive_project, create_project,
-    ensure_project_store_schema, find_project_by_id_or_workspace, list_non_deleted_projects,
-    rename_project, soft_delete_project, unarchive_project,
+    ensure_project_store_schema, find_project_by_id_or_workspace, list_projects, rename_project,
+    soft_delete_project, unarchive_project,
 };
 use legion_protocol::rpc_codec::RpcExit;
 use rusqlite::params;
@@ -96,15 +96,14 @@ fn mutate_project(state: &AppState, payload: Value) -> RpcExit {
             .as_deref()
             .or(req.id.as_deref())
             .unwrap_or("");
-        apply_project_mutation(conn, op, &command_id, target_id, &req, &now_iso)?;
-        let projects = list_non_deleted_projects(&*conn)
-            .map_err(|e| rpc_fail("ProjectMutationError", &e.to_string()))?;
-        let wire: Vec<Value> = projects.iter().map(project_to_wire).collect();
+        let affected_id = apply_project_mutation(conn, op, &command_id, target_id, &req, &now_iso)?;
+        let project = list_projects(&*conn)
+            .map_err(|e| mutate_err(&command_id, target_id, &e.to_string()))?
+            .into_iter()
+            .find(|p| p.id == affected_id)
+            .ok_or_else(|| mutate_err(&command_id, target_id, "Mutated project not found."))?;
         Ok(RpcExit::Success {
-            value: json!({
-                "projects": wire,
-                "updatedAt": now_iso,
-            }),
+            value: project_to_wire(&project),
         })
     })
     .unwrap_or_else(|e| e)
@@ -117,7 +116,7 @@ fn apply_project_mutation(
     target_id: &str,
     req: &MutatePayload,
     now_iso: &str,
-) -> Result<(), RpcExit> {
+) -> Result<String, RpcExit> {
     match op {
         "create" | "project.create" => {
             let root = req
@@ -142,7 +141,7 @@ fn apply_project_mutation(
             let created = create_project(conn, &input)
                 .map_err(|e| mutate_err(command_id, target_id, &e.to_string()))?;
             apply_project_extra_patches(conn, &created.id, req, now_iso);
-            Ok(())
+            Ok(created.id)
         }
         "update" | "project.update" | "rename" | "project.rename" => {
             if let Some(title) = req.title.as_deref() {
@@ -155,11 +154,11 @@ fn apply_project_mutation(
                 let _ = unarchive_project(conn, target_id, None);
             }
             apply_project_extra_patches(conn, target_id, req, now_iso);
-            Ok(())
+            Ok(target_id.to_owned())
         }
         "delete" | "project.delete" | "remove" => {
             soft_delete_project(conn, target_id, req.force.unwrap_or(false))
-                .map(|_| ())
+                .map(|res| res.project.id)
                 .map_err(|e| mutate_err(command_id, target_id, &e.to_string()))
         }
         other => Err(mutate_err(
@@ -239,15 +238,16 @@ fn ensure_scratch(state: &AppState, payload: Value) -> RpcExit {
     let scratch_dir = base_dir_from_state(state).join("scratch");
     if let Err(err) = fs::create_dir_all(&scratch_dir) {
         return rpc_fail_obj(json!({
-            "_tag": "ScratchFolderError",
-            "folder": scratch_dir.to_string_lossy(),
+            "_tag": "OrchestrationDispatchCommandError",
+            "commandId": "cmd-ensure-scratch",
+            "commandType": "project.create",
             "message": err.to_string(),
         }));
     }
     let root_str = scratch_dir.to_string_lossy().into_owned();
     with_db_mut(state, |conn| {
         ensure_project_store_schema(conn)
-            .map_err(|e| rpc_fail("ScratchProjectError", &e.to_string()))?;
+            .map_err(|e| rpc_fail("OrchestrationDispatchCommandError", &e.to_string()))?;
         let record = if let Some(existing) = find_project_by_id_or_workspace(&*conn, &root_str)
             .ok()
             .flatten()
@@ -262,14 +262,15 @@ fn ensure_scratch(state: &AppState, payload: Value) -> RpcExit {
             )
             .map_err(|e| {
                 rpc_fail_obj(json!({
-                    "_tag": "ScratchProjectError",
-                    "workspaceRoot": root_str,
+                    "_tag": "OrchestrationDispatchCommandError",
+                    "commandId": "cmd-ensure-scratch",
+                    "commandType": "project.create",
                     "message": e.to_string(),
                 }))
             })?
         };
         Ok(RpcExit::Success {
-            value: json!({ "project": project_to_wire(&record) }),
+            value: json!({ "projectId": record.id }),
         })
     })
     .unwrap_or_else(|e| e)
@@ -295,21 +296,26 @@ pub(crate) fn project_to_wire(p: &ProjectRecord) -> Value {
         .as_deref()
         .and_then(|s| serde_json::from_str(s).ok())
         .unwrap_or(Value::Null);
+    let non_empty = |opt: &Option<String>| {
+        opt.as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map_or(Value::Null, Value::from)
+    };
     json!({
         "id": p.id,
         "title": p.title,
         "workspaceRoot": p.workspace_root,
-        "hasCustomTitle": p.has_custom_title,
         "defaultModelSelection": model,
-        "defaultThreadEnvMode": p.default_thread_env_mode,
+        "defaultThreadEnvMode": non_empty(&p.default_thread_env_mode),
         "autoPull": p.auto_pull,
-        "faviconPath": p.favicon_path,
+        "faviconPath": non_empty(&p.favicon_path),
         "projectIcon": icon,
         "scripts": scripts,
-        "pinnedAt": p.pinned_at,
-        "archivedAt": p.archived_at,
+        "pinnedAt": non_empty(&p.pinned_at),
+        "archivedAt": non_empty(&p.archived_at),
         "createdAt": p.created_at,
         "updatedAt": p.updated_at,
-        "deletedAt": p.deleted_at,
+        "deletedAt": non_empty(&p.deleted_at),
     })
 }

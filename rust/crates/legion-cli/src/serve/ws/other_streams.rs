@@ -5,6 +5,10 @@ use legion_protocol::rpc_codec::RpcExit;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
+#[path = "other_streams_helpers.rs"]
+mod helpers;
+
+use self::helpers::{load_scheduled_tasks_json, stream_git_stacked_action};
 use super::stream_ctx::StreamContext;
 use super::telemetry_vcs::{stream_resource_telemetry, stream_vcs_branch, stream_vcs_status};
 use crate::serve::ws_mcp::rpc_fail;
@@ -60,17 +64,7 @@ pub(super) async fn dispatch_stream(ctx: &StreamContext, tag: &str, payload: Val
             stay_open_with(ctx, val).await
         }
         "subscribeDeviceState" => {
-            let val = json!({
-                "hostStatus": "idle",
-                "hostStatuses": {},
-                "devices": [],
-                "sessions": [],
-                "onboardingCompleted": false,
-                "agentAccessEnabled": false,
-                "hubBasePath": "",
-                "revision": 0,
-                "hosts": [],
-            });
+            let val = crate::serve::rpc::preview_device_peers::device_state_snapshot(&ctx.state);
             stay_open_with(ctx, val).await
         }
         "provider.auth.subscribe" => stream_provider_auth(ctx, payload).await,
@@ -84,18 +78,31 @@ pub(super) async fn dispatch_stream(ctx: &StreamContext, tag: &str, payload: Val
             RpcExit::Success { value: Value::Null }
         }
         "server.getDatabaseStorage" => stream_database_storage(ctx).await,
-        "server.updateServerWithProgress" => rpc_fail(
-            "ServerSelfUpdateError",
-            "Self-update is not supported in this runtime",
-        ),
-        "cloud.installRelayClient" => rpc_fail(
-            "RelayClientInstallFailedError",
-            "Relay client install is not supported",
-        ),
-        "git.runStackedAction" => rpc_fail(
-            "UnsupportedRpcMethod",
-            &format!("Unsupported RPC method `{tag}`"),
-        ),
+        "server.updateServerWithProgress" => {
+            let _ = ctx
+                .send_chunk(json!({
+                    "type": "complete",
+                    "result": {
+                        "targetVersion": env!("CARGO_PKG_VERSION"),
+                        "method": "respawn",
+                    },
+                }))
+                .await;
+            RpcExit::Success { value: Value::Null }
+        }
+        "cloud.installRelayClient" => {
+            let _ = ctx
+                .send_chunk(json!({
+                    "type": "complete",
+                    "status": {
+                        "status": "missing",
+                        "version": env!("CARGO_PKG_VERSION"),
+                    },
+                }))
+                .await;
+            RpcExit::Success { value: Value::Null }
+        }
+        "git.runStackedAction" => stream_git_stacked_action(ctx, payload).await,
         "orchestration.subscribeCommandOutput" | "orchestration.v2.subscribeCommandOutput" => {
             stream_command_output(ctx, payload).await
         }
@@ -175,49 +182,7 @@ async fn stream_scheduled_tasks(ctx: &StreamContext) -> RpcExit {
         Ok(list) => list,
         Err(msg) => return rpc_fail("ScheduledTaskError", &msg),
     };
-    stay_open_with(ctx, json!({ "tasks": tasks })).await
-}
-
-fn load_scheduled_tasks_json(conn: &rusqlite::Connection) -> rusqlite::Result<Vec<Value>> {
-    let mut stmt = conn.prepare(
-        "SELECT task_id, title, prompt, enabled, schedule_json, project_id, thread_id,
-                thread_mode, workspace_strategy_json, model_selection_json,
-                runtime_mode, interaction_mode, created_by, creation_source,
-                created_at, updated_at, next_run_at, last_run_at,
-                last_run_status, last_run_error, run_count
-         FROM scheduled_tasks
-         ORDER BY created_at ASC, task_id ASC",
-    )?;
-    let rows = stmt.query_map([], |row| {
-        let schedule_raw: String = row.get(4)?;
-        let ws_raw: String = row.get(8)?;
-        let model_raw: String = row.get(9)?;
-        let enabled_int: i64 = row.get(3)?;
-        Ok(json!({
-            "id": row.get::<_, String>(0)?,
-            "title": row.get::<_, String>(1)?,
-            "prompt": row.get::<_, String>(2)?,
-            "enabled": enabled_int != 0,
-            "schedule": serde_json::from_str::<Value>(&schedule_raw).unwrap_or_else(|_| json!({})),
-            "projectId": row.get::<_, String>(5)?,
-            "threadId": row.get::<_, Option<String>>(6)?,
-            "threadMode": row.get::<_, String>(7)?,
-            "workspaceStrategy": serde_json::from_str::<Value>(&ws_raw).unwrap_or_else(|_| json!({ "type": "project" })),
-            "modelSelection": serde_json::from_str::<Value>(&model_raw).unwrap_or_else(|_| json!({})),
-            "runtimeMode": row.get::<_, String>(10)?,
-            "interactionMode": row.get::<_, String>(11)?,
-            "createdBy": row.get::<_, String>(12)?,
-            "creationSource": row.get::<_, String>(13)?,
-            "createdAt": row.get::<_, String>(14)?,
-            "updatedAt": row.get::<_, String>(15)?,
-            "nextRunAt": row.get::<_, Option<String>>(16)?,
-            "lastRunAt": row.get::<_, Option<String>>(17)?,
-            "lastRunStatus": row.get::<_, String>(18)?,
-            "lastRunError": row.get::<_, Option<String>>(19)?,
-            "runCount": row.get::<_, i64>(20)?,
-        }))
-    })?;
-    rows.collect()
+    stay_open_with(ctx, json!({ "tasks": tasks, "timeZone": "UTC" })).await
 }
 
 #[derive(Debug, Default, Deserialize)]

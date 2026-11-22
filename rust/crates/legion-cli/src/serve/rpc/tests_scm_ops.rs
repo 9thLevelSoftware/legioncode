@@ -37,9 +37,9 @@ async fn vcs_git_and_review_operations_work_against_real_repo() {
     );
     let wt_path = wt["worktree"]["path"].as_str().expect("wt path").to_owned();
     assert!(
-        wt["worktree"]["branch"]
+        wt["worktree"]["refName"]
             .as_str()
-            .expect("branch")
+            .expect("refName")
             .starts_with("legion/")
     );
 
@@ -129,7 +129,7 @@ async fn scheduled_tasks_mcp_sessions_preview_and_misc_rpcs_work() {
         .await,
         "rotateWebhookToken",
     );
-    assert!(rotated["task"]["webhookToken"].is_string());
+    assert_eq!(rotated["task"]["id"], "task-1");
 
     let disabled = assert_ok(
         dispatch(
@@ -151,7 +151,7 @@ async fn scheduled_tasks_mcp_sessions_preview_and_misc_rpcs_work() {
         .await,
         "runNow",
     );
-    assert!(ran["threadId"].is_string());
+    assert_eq!(ran["task"]["id"], "task-1");
 
     let deliveries = assert_ok(
         dispatch(
@@ -173,7 +173,7 @@ async fn scheduled_tasks_mcp_sessions_preview_and_misc_rpcs_work() {
         .await,
         "scheduledTasks.delete",
     );
-    assert_eq!(deleted["deleted"], true);
+    assert_eq!(deleted["id"], "task-1");
 
     let _ = assert_ok(
         dispatch(
@@ -200,7 +200,7 @@ async fn server_ops_preview_device_peers_secrets_and_guest_share_work() {
         dispatch(&state, "agentSessions.scan", json!({})).await,
         "agentSessions.scan",
     );
-    assert!(scanned["projects"].is_array());
+    assert!(scanned["candidates"].is_array());
 
     let _ = assert_ok(
         dispatch(&state, "server.getStorageCleanupReport", json!({})).await,

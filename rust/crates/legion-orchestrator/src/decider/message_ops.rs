@@ -95,7 +95,7 @@ fn clear_settled_and_snoozed(
     events: &mut Vec<DomainEvent>,
 ) -> Result<(), DeciderError> {
     if thread.settled_override.as_deref() == Some("settled") || thread.settled_at.is_some() {
-        thread.settled_override = Some("unsettled".to_owned());
+        thread.settled_override = Some("active".to_owned());
         thread.settled_at = None;
         thread.unsettled_at = Some(Some(now_iso.to_owned()));
         thread.active_order_key = Some(Some(now_iso.to_owned()));

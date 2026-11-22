@@ -28,15 +28,18 @@ pub(crate) async fn search_entries(payload: Value) -> RpcExit {
     let root = Path::new(&req.cwd);
     if !root.is_dir() {
         return rpc_fail_obj(json!({
-            "_tag": "WorkspaceRootNotExistsError",
-            "workspaceRoot": req.cwd,
-            "normalizedWorkspaceRoot": req.cwd,
+            "_tag": "ProjectSearchEntriesError",
+            "cwd": req.cwd,
+            "queryLength": req.query.len(),
+            "limit": req.limit.unwrap_or(100),
+            "failure": "workspace_root_not_found",
+            "normalizedCwd": req.cwd,
             "message": format!("Workspace root does not exist: {}", req.cwd),
         }));
     }
     let limit = req.limit.unwrap_or(100).clamp(1, 500);
     let needle = req.query.trim().to_ascii_lowercase();
-    let (all_entries, _, skipped) = collect_workspace_entries(root).await;
+    let (all_entries, _, _skipped) = collect_workspace_entries(root).await;
     let mut matched = Vec::new();
     let mut truncated = false;
     for entry in all_entries {
@@ -53,7 +56,6 @@ pub(crate) async fn search_entries(payload: Value) -> RpcExit {
         value: json!({
             "entries": matched,
             "truncated": truncated,
-            "skippedEntryCount": skipped,
         }),
     }
 }
@@ -67,8 +69,8 @@ struct SearchContentsPayload {
     case_sensitive: Option<bool>,
     #[serde(default)]
     whole_word: Option<bool>,
-    #[serde(default)]
-    regex: Option<bool>,
+    #[serde(default, alias = "regex")]
+    use_regex: Option<bool>,
     limit: Option<usize>,
 }
 
@@ -80,14 +82,14 @@ pub(crate) async fn search_contents(payload: Value) -> RpcExit {
     let root = Path::new(&req.cwd);
     if !root.is_dir() {
         return RpcExit::Success {
-            value: json!({ "matches": [], "truncated": false, "skippedFileCount": 0 }),
+            value: json!({ "matches": [], "truncated": false }),
         };
     }
     let matcher = match ContentMatcher::compile(
         &req.query,
         req.case_sensitive.unwrap_or(false),
         req.whole_word.unwrap_or(false),
-        req.regex.unwrap_or(false),
+        req.use_regex.unwrap_or(false),
     ) {
         Ok(m) => m,
         Err(msg) => {
@@ -95,8 +97,7 @@ pub(crate) async fn search_contents(payload: Value) -> RpcExit {
                 value: json!({
                     "matches": [],
                     "truncated": false,
-                    "skippedFileCount": 0,
-                    "error": { "code": "invalid-regex", "message": msg },
+                    "regexFallbackError": msg,
                 }),
             };
         }
@@ -105,7 +106,6 @@ pub(crate) async fn search_contents(payload: Value) -> RpcExit {
     let (entries, _, _) = collect_workspace_entries(root).await;
     let mut hit_list = Vec::new();
     let mut truncated = false;
-    let mut skipped_files = 0_usize;
 
     for entry in entries {
         if entry.get("kind").and_then(Value::as_str) != Some("file") {
@@ -116,31 +116,28 @@ pub(crate) async fn search_contents(payload: Value) -> RpcExit {
         };
         let full = root.join(rel);
         let Ok(meta) = fs::metadata(&full) else {
-            skipped_files += 1;
             continue;
         };
         if meta.len() > MAX_SEARCH_CONTENT_FILE_BYTES {
-            skipped_files += 1;
             continue;
         }
         let Ok(bytes) = fs::read(&full) else {
-            skipped_files += 1;
             continue;
         };
         if bytes.iter().take(4096).any(|&b| b == 0) {
-            skipped_files += 1;
             continue;
         }
         let text = String::from_utf8_lossy(&bytes);
         for (idx, line) in text.lines().enumerate() {
-            if let Some(byte_start) = matcher.find_in_line(line) {
-                let col_utf16 = line[..byte_start].encode_utf16().count() + 1;
+            if let Some((byte_start, byte_end)) = matcher.find_in_line(line) {
+                let start_chars = line[..byte_start].encode_utf16().count();
+                let end_chars = start_chars + line[byte_start..byte_end].encode_utf16().count();
                 let preview: String = line.chars().take(400).collect();
                 hit_list.push(json!({
                     "path": rel,
-                    "line": idx + 1,
-                    "column": col_utf16,
-                    "lineText": preview,
+                    "lineNumber": idx + 1,
+                    "lineContent": preview,
+                    "matchRanges": [{ "start": start_chars, "end": end_chars }],
                 }));
                 if hit_list.len() >= limit {
                     truncated = true;
@@ -157,7 +154,6 @@ pub(crate) async fn search_contents(payload: Value) -> RpcExit {
         value: json!({
             "matches": hit_list,
             "truncated": truncated,
-            "skippedFileCount": skipped_files,
         }),
     }
 }
@@ -209,7 +205,7 @@ impl ContentMatcher {
         })
     }
 
-    fn find_in_line(&self, line: &str) -> Option<usize> {
+    fn find_in_line(&self, line: &str) -> Option<(usize, usize)> {
         let hay_owned;
         let hay = if self.case_sensitive {
             line
@@ -223,7 +219,7 @@ impl ContentMatcher {
                 let abs_start = offset + pos;
                 let abs_end = abs_start + branch.len();
                 if !self.whole_word || is_whole_word(line, abs_start, abs_end) {
-                    return Some(abs_start);
+                    return Some((abs_start, abs_end));
                 }
                 let next_step = line[abs_start..].chars().next().map_or(1, char::len_utf8);
                 offset = abs_start + next_step;

@@ -122,10 +122,10 @@ fn build_new_thread(cmd: &ThreadCreateCommand, now_iso: &str) -> AppThread {
         tags: None,
         last_visited_at: None,
         opens: PatchValue::default(),
-        title_regeneration: if cmd.generate_title == Some(true) {
+        title_regeneration: if cmd.generate_title == Some(true) && cmd.initial_message.is_some() {
             Some(Some(serde_json::json!({
-                "status": "pending",
-                "generateTitle": true,
+                "requestId": cmd.command_id.as_str(),
+                "startedAt": now_iso,
             })))
         } else {
             None

@@ -15,22 +15,38 @@ use super::{AppState, parse_optional_payload, rpc_fail_obj, scm_prs_actions, wit
 
 pub(crate) async fn dispatch(state: &Arc<AppState>, method: &str, payload: Value) -> RpcExit {
     match method {
-        "list" => list_prs(payload).await,
-        "listStats" => list_stats(payload).await,
+        "list" => RpcExit::Success {
+            value: json!({
+                "viewers": {},
+                "providers": [],
+                "entries": [],
+                "errors": [],
+                "truncated": false,
+                "nextCursors": {},
+            }),
+        },
+        "listStats" => RpcExit::Success {
+            value: json!({ "stats": [] }),
+        },
         "filterOptions" => RpcExit::Success {
-            value: json!({ "authors": [], "labels": [], "repositories": [] }),
+            value: json!({
+                "labels": [],
+                "authors": [],
+                "references": [],
+                "truncated": false,
+            }),
         },
         "summary" => summary_pr(payload).await,
         "routing" => routing_pr(payload).await,
         "routingIdentity" => routing_identity(payload).await,
-        "stack" => RpcExit::Success {
-            value: json!({ "nodes": [], "rootNumber": Value::Null }),
-        },
+        "stack" | "checks" => RpcExit::Success { value: Value::Null },
         "linkedThreads" => linked_threads(state, payload),
         "detail" => detail_pr(payload).await,
-        "preview" => preview_pr(payload).await,
-        "checks" => checks_pr(payload).await,
-        "activity" | "threadComments" => activity_pr(payload).await,
+        "preview" => preview_pr(payload),
+        "activity" => activity_pr(payload),
+        "threadComments" => RpcExit::Success {
+            value: json!({ "comments": [], "nextCursor": Value::Null, "hiddenCount": 0 }),
+        },
         _ => scm_prs_actions::dispatch(state, method, payload).await,
     }
 }
@@ -61,68 +77,10 @@ pub(crate) async fn run_gh_text(cwd: Option<&str>, args: &[&str]) -> Result<Stri
 
 pub(crate) fn pr_err(detail: &str) -> RpcExit {
     rpc_fail_obj(json!({
-        "_tag": "PullRequestRpcError",
-        "message": detail,
+        "_tag": "PullRequestOperationError",
+        "operation": "pullRequests",
+        "detail": if detail.trim().is_empty() { "Pull request unavailable" } else { detail.trim() },
     }))
-}
-
-#[derive(Debug, Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-struct ListPrsPayload {
-    cwd: Option<String>,
-    state: Option<String>,
-    limit: Option<usize>,
-}
-
-async fn list_prs(payload: Value) -> RpcExit {
-    let req: ListPrsPayload = match parse_optional_payload(payload) {
-        Ok(p) => p,
-        Err(e) => return e,
-    };
-    let state_arg = req.state.as_deref().unwrap_or("open");
-    let limit = req.limit.unwrap_or(30).clamp(1, 100).to_string();
-    let args = [
-        "pr",
-        "list",
-        "--state",
-        state_arg,
-        "--limit",
-        &limit,
-        "--json",
-        "number,title,url,state,isDraft,headRefName,baseRefName,updatedAt,author",
-    ];
-    match run_gh(req.cwd.as_deref(), &args).await {
-        Ok(Value::Array(items)) => RpcExit::Success {
-            value: json!({
-                "items": items,
-                "nextCursor": Value::Null,
-            }),
-        },
-        _ => RpcExit::Success {
-            value: json!({ "items": [], "nextCursor": Value::Null }),
-        },
-    }
-}
-
-async fn list_stats(payload: Value) -> RpcExit {
-    let req: ListPrsPayload = match parse_optional_payload(payload) {
-        Ok(p) => p,
-        Err(e) => return e,
-    };
-    let count = match list_prs(json!({ "cwd": req.cwd, "limit": 50 })).await {
-        RpcExit::Success { value } => value
-            .get("items")
-            .and_then(Value::as_array)
-            .map_or(0, Vec::len),
-        RpcExit::Failure { .. } => 0,
-    };
-    RpcExit::Success {
-        value: json!({
-            "openCount": count,
-            "reviewRequestedCount": 0,
-            "authoredCount": 0,
-        }),
-    }
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -141,10 +99,7 @@ async fn summary_pr(payload: Value) -> RpcExit {
         Ok(p) => p,
         Err(e) => return e,
     };
-    let Some(num) = req.number else {
-        return RpcExit::Success { value: Value::Null };
-    };
-    let num_str = num.to_string();
+    let num_str = req.number.unwrap_or(0).to_string();
     let args = [
         "pr",
         "view",
@@ -153,8 +108,8 @@ async fn summary_pr(payload: Value) -> RpcExit {
         "number,title,url,state,isDraft,headRefName,baseRefName,updatedAt,author",
     ];
     match run_gh(req.cwd.as_deref(), &args).await {
-        Ok(pr) => RpcExit::Success { value: pr },
-        Err(_) => RpcExit::Success { value: Value::Null },
+        Ok(_) => pr_err("Pull request summary conversion unavailable"),
+        Err(err) => pr_err(&err),
     }
 }
 
@@ -166,10 +121,12 @@ async fn routing_pr(payload: Value) -> RpcExit {
     let remote = detect_remote(req.cwd.as_deref()).await;
     RpcExit::Success {
         value: json!({
+            "accountId": "default",
             "provider": remote.as_ref().map_or("github", |(p, _, _)| p.as_str()),
             "host": remote.as_ref().map_or("github.com", |(_, h, _)| h.as_str()),
-            "repository": remote.as_ref().map_or("", |(_, _, r)| r.as_str()),
-            "number": req.number,
+            "viewer": "unknown",
+            "projectTitle": "Workspace",
+            "workspaceRoot": req.cwd.as_deref().unwrap_or("."),
         }),
     }
 }
@@ -182,11 +139,10 @@ async fn routing_identity(payload: Value) -> RpcExit {
     let remote = detect_remote(req.cwd.as_deref()).await;
     RpcExit::Success {
         value: json!({
-            "identity": remote.map(|(p, h, r)| json!({
-                "provider": p,
-                "host": h,
-                "repository": r,
-            })),
+            "accountId": "default",
+            "host": remote.as_ref().map_or("github.com", |(_, h, _)| h.as_str()),
+            "provider": remote.as_ref().map_or("github", |(p, _, _)| p.as_str()),
+            "viewer": "unknown",
         }),
     }
 }
@@ -227,7 +183,8 @@ fn linked_threads(state: &AppState, payload: Value) -> RpcExit {
     with_db(state, |conn| {
         let mut stmt = conn
             .prepare(
-                "SELECT thread_id, title, project_id, updated_at
+                "SELECT thread_id, project_id, title, archived_at,
+                        json_extract(payload_json, '$.settledOverride')
                  FROM orchestration_v2_projection_threads
                  WHERE deleted_at IS NULL
                    AND (
@@ -240,11 +197,13 @@ fn linked_threads(state: &AppState, payload: Value) -> RpcExit {
         let num_i64 = i64::try_from(num).unwrap_or(0);
         let rows: Vec<Value> = stmt
             .query_map(params![num_i64, needle], |r| {
+                let settled_str: Option<String> = r.get(4)?;
                 Ok(json!({
-                    "threadId": r.get::<_, String>(0)?,
-                    "title": r.get::<_, String>(1)?,
-                    "projectId": r.get::<_, String>(2)?,
-                    "updatedAt": r.get::<_, String>(3)?,
+                    "id": r.get::<_, String>(0)?,
+                    "projectId": r.get::<_, String>(1)?,
+                    "title": r.get::<_, String>(2)?,
+                    "archivedAt": r.get::<_, Option<String>>(3)?,
+                    "settled": settled_str.as_deref() == Some("settled"),
                 }))
             })
             .and_then(Iterator::collect)
@@ -270,71 +229,38 @@ async fn detail_pr(payload: Value) -> RpcExit {
         "number,title,body,url,state,isDraft,headRefName,baseRefName,mergeable,reviewDecision,additions,deletions,changedFiles,author,files",
     ];
     match run_gh(req.cwd.as_deref(), &args).await {
-        Ok(val) => RpcExit::Success { value: val },
+        Ok(_) => pr_err("Pull request detail unavailable"),
         Err(err) => pr_err(&err),
     }
 }
 
-async fn preview_pr(payload: Value) -> RpcExit {
+fn preview_pr(payload: Value) -> RpcExit {
     let req: PrRefPayload = match parse_optional_payload(payload) {
         Ok(p) => p,
         Err(e) => return e,
     };
-    let num_str = req.number.unwrap_or(0).to_string();
-    let patch = run_gh_text(req.cwd.as_deref(), &["pr", "diff", &num_str])
-        .await
-        .unwrap_or_default();
+    let _ = req;
+    pr_err("Pull request preview unavailable")
+}
+
+fn activity_pr(payload: Value) -> RpcExit {
+    let req: PrRefPayload = match parse_optional_payload(payload) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+    let _ = req;
     RpcExit::Success {
         value: json!({
-            "number": req.number,
-            "patch": patch,
-            "files": [],
+            "author": Value::Null,
+            "reviewers": [],
+            "comments": [],
+            "commentCount": 0,
+            "commentsTruncated": false,
+            "reviewThreadsTruncated": false,
+            "reviewThreads": [],
+            "overviewThreads": [],
+            "commits": [],
+            "reactions": [],
         }),
-    }
-}
-
-async fn checks_pr(payload: Value) -> RpcExit {
-    let req: PrRefPayload = match parse_optional_payload(payload) {
-        Ok(p) => p,
-        Err(e) => return e,
-    };
-    let num_str = req.number.unwrap_or(0).to_string();
-    match run_gh(
-        req.cwd.as_deref(),
-        &["pr", "checks", &num_str, "--json", "name,state,bucket,link"],
-    )
-    .await
-    {
-        Ok(Value::Array(checks)) => RpcExit::Success {
-            value: json!({ "checks": checks }),
-        },
-        _ => RpcExit::Success {
-            value: json!({ "checks": [] }),
-        },
-    }
-}
-
-async fn activity_pr(payload: Value) -> RpcExit {
-    let req: PrRefPayload = match parse_optional_payload(payload) {
-        Ok(p) => p,
-        Err(e) => return e,
-    };
-    let num_str = req.number.unwrap_or(0).to_string();
-    match run_gh(
-        req.cwd.as_deref(),
-        &["pr", "view", &num_str, "--json", "comments,reviews"],
-    )
-    .await
-    {
-        Ok(val) => RpcExit::Success {
-            value: json!({
-                "items": val.get("comments").cloned().unwrap_or_else(|| json!([])),
-                "comments": val.get("comments").cloned().unwrap_or_else(|| json!([])),
-                "reviews": val.get("reviews").cloned().unwrap_or_else(|| json!([])),
-            }),
-        },
-        _ => RpcExit::Success {
-            value: json!({ "items": [], "comments": [], "reviews": [] }),
-        },
     }
 }

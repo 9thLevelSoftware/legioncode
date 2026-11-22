@@ -117,14 +117,70 @@ pub(crate) fn normalize_model_selection_wire(mut val: Value) -> Value {
     val
 }
 
-/// Normalizes stored `AppThread` JSON (`settledOverride: "unsettled" -> "active"`, model selection).
-pub(crate) fn normalize_app_thread_wire(mut val: Value) -> Value {
+fn has_non_empty_trimmed_str(obj: &Map<String, Value>, key: &str) -> bool {
+    obj.get(key)
+        .and_then(Value::as_str)
+        .is_some_and(|s| !s.trim().is_empty())
+}
+
+/// Validates a `ThreadTitleRegeneration` JSON value, returning `None` if malformed or `null`.
+#[must_use]
+pub fn sanitize_title_regeneration_value(val: &Value) -> Option<Value> {
+    let obj = val.as_object()?;
+    if has_non_empty_trimmed_str(obj, "requestId") && has_non_empty_trimmed_str(obj, "startedAt") {
+        Some(json!({
+            "requestId": obj["requestId"].clone(),
+            "startedAt": obj["startedAt"].clone(),
+        }))
+    } else {
+        None
+    }
+}
+
+/// Validates a `LastThreadTitleRegeneration` JSON value, returning `None` if malformed or `null`.
+#[must_use]
+pub fn sanitize_last_title_regeneration_value(val: &Value) -> Option<Value> {
+    let obj = val.as_object()?;
+    let status = obj.get("status").and_then(Value::as_str)?;
+    if !matches!(status, "renamed" | "unchanged" | "failed") {
+        return None;
+    }
+    if !has_non_empty_trimmed_str(obj, "requestId")
+        || !has_non_empty_trimmed_str(obj, "completedAt")
+    {
+        return None;
+    }
+    let mut cleaned = Map::new();
+    cleaned.insert("status".to_owned(), Value::String(status.to_owned()));
+    cleaned.insert("requestId".to_owned(), obj["requestId"].clone());
+    cleaned.insert("completedAt".to_owned(), obj["completedAt"].clone());
+    if let Some(msg) = obj.get("message").and_then(Value::as_str) {
+        cleaned.insert("message".to_owned(), Value::String(msg.to_owned()));
+    }
+    Some(Value::Object(cleaned))
+}
+
+/// Normalizes stored `AppThread` JSON (`settledOverride: "unsettled" -> "active"`, title regen, model selection).
+#[must_use]
+pub fn normalize_app_thread_wire(mut val: Value) -> Value {
     if let Some(obj) = val.as_object_mut() {
         if obj.get("settledOverride").and_then(Value::as_str) == Some("unsettled") {
             obj.insert(
                 "settledOverride".to_owned(),
                 Value::String("active".to_owned()),
             );
+        }
+        if let Some(tr) = obj.get("titleRegeneration")
+            && !tr.is_null()
+        {
+            let sanitized = sanitize_title_regeneration_value(tr).unwrap_or(Value::Null);
+            obj.insert("titleRegeneration".to_owned(), sanitized);
+        }
+        if let Some(ltr) = obj.get("lastTitleRegeneration")
+            && !ltr.is_null()
+        {
+            let sanitized = sanitize_last_title_regeneration_value(ltr).unwrap_or(Value::Null);
+            obj.insert("lastTitleRegeneration".to_owned(), sanitized);
         }
         if let Some(ms) = obj.remove("modelSelection") {
             obj.insert(

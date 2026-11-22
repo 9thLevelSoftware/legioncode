@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex as StdMutex};
 
 use legion_contracts::orchestration::ProviderApprovalDecision;
 use legion_contracts::policy::RuntimeMode;
+use legion_providers::core::resolve_cli_model_arg;
 use legion_providers::non_acp::NonAcpTurnUpdate;
 use legion_providers::non_acp::claude_stream_json::{
     build_claude_interrupt_control_request, build_claude_permission_control_response,
@@ -143,7 +144,7 @@ pub(crate) fn write_initial_prompt(
             let (ts_id, ts_line) = codex_codec
                 .encode_thread_start(&CodexThreadStartParams {
                     cwd: cwd.to_owned(),
-                    model: Some(model.to_owned()),
+                    model: resolve_cli_model_arg("codex", model),
                     approval_policy: approval_policy.to_owned(),
                     sandbox: sandbox.to_owned(),
                     experimental_raw_events: false,

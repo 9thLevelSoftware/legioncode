@@ -60,7 +60,7 @@ pub use server_provider::{
     ServerProviderAuth, ServerProviderAuthStatus, ServerProviderModel,
     ServerProviderNativeSessions, ServerProviderSetup, ServerProviderSkill,
     ServerProviderSlashCommand, ServerProviderSnapshot, ServerProviderState,
-    build_server_provider_snapshot, default_models_for_driver,
+    build_server_provider_snapshot, default_models_for_driver, resolve_cli_model_arg,
 };
 pub use usage_limits::{
     ProbeAvailability, UsageLimitsSnapshot, UsageWindow, UsageWindowKind,

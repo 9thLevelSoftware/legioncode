@@ -208,25 +208,23 @@ impl NonAcpProcessRegistry {
     }
 }
 
-/// Spawn and execute one live non-ACP subprocess turn against `ProviderLaunchSpec`.
-pub async fn execute_non_acp_subprocess_turn(
+struct RegisteredNonAcpTurn {
+    ctx: TurnEmitContext,
+    native_thread_id: Arc<StdMutex<Option<String>>>,
+    interrupted: Arc<AtomicBool>,
+    interrupt_notify: Arc<Notify>,
+}
+
+fn register_and_start_non_acp_turn(
     sink: &EventSink,
     registry: &NonAcpProcessRegistry,
-    launch: &ProviderLaunchSpec,
     input: &NonAcpSubprocessInput,
-) -> Result<(), ServerRuntimeError> {
-    let cwd = launch
-        .cwd
-        .as_deref()
-        .map_or_else(|| input.workspace_root.clone(), PathBuf::from);
-    let spawned = spawn_supervised_non_acp(launch, &cwd)?;
-    let supervisor = spawned.supervisor;
-    let token = spawned.token;
-    let writer = spawned.writer;
-    let mut rx = spawned.rx;
-    let stderr_capture = spawned.stderr_capture;
-
-    let driver = ProviderDriverKind::new("codex")
+    driver_slug: &str,
+    token: ProcessToken,
+    supervisor: &Arc<StdMutex<JobProcessSupervisor>>,
+    writer: &ChildLineWriter,
+) -> Result<RegisteredNonAcpTurn, ServerRuntimeError> {
+    let driver = ProviderDriverKind::new(driver_slug)
         .map_err(|e| ServerRuntimeError::Persistence(e.to_string()))?;
     let session_id = ProviderSessionId::new(format!("psess-{}", input.run.id.as_str()))
         .map_err(|e| ServerRuntimeError::Persistence(e.to_string()))?;
@@ -247,15 +245,15 @@ pub async fn execute_non_acp_subprocess_turn(
         provider_thread_id: p_thread_id.clone(),
         kind: input.kind,
         token,
-        supervisor: Arc::clone(&supervisor),
+        supervisor: Arc::clone(supervisor),
         writer: writer.clone(),
         native_thread_id: Arc::clone(&native_thread_id),
-        native_turn_id: Arc::clone(&native_turn_id),
+        native_turn_id,
         interrupted: Arc::clone(&interrupted),
         interrupt_notify: Arc::clone(&interrupt_notify),
     });
 
-    let mut ctx = TurnEmitContext::new(
+    let ctx = TurnEmitContext::new(
         &input.run,
         driver,
         session_id,
@@ -273,11 +271,47 @@ pub async fn execute_non_acp_subprocess_turn(
         start_events,
         Vec::new(),
     )?;
+    Ok(RegisteredNonAcpTurn {
+        ctx,
+        native_thread_id,
+        interrupted,
+        interrupt_notify,
+    })
+}
+
+/// Spawn and execute one live non-ACP subprocess turn against `ProviderLaunchSpec`.
+pub async fn execute_non_acp_subprocess_turn(
+    sink: &EventSink,
+    registry: &NonAcpProcessRegistry,
+    launch: &ProviderLaunchSpec,
+    input: &NonAcpSubprocessInput,
+) -> Result<(), ServerRuntimeError> {
+    let cwd = launch
+        .cwd
+        .as_deref()
+        .map_or_else(|| input.workspace_root.clone(), PathBuf::from);
+    let spawned = spawn_supervised_non_acp(launch, &cwd)?;
+    let driver_slug = match input.kind {
+        NonAcpSubprocessKind::CodexAppServer => "codex",
+        NonAcpSubprocessKind::ClaudeStreamJson => "claudeAgent",
+        NonAcpSubprocessKind::CursorSidecar => "cursor",
+        NonAcpSubprocessKind::PiCli => "pi",
+    };
+    let mut started = register_and_start_non_acp_turn(
+        sink,
+        registry,
+        input,
+        driver_slug,
+        spawned.token,
+        &spawned.supervisor,
+        &spawned.writer,
+    )?;
+    let mut rx = spawned.rx;
 
     let mut codex_codec = CodexAppServerCodec::new();
     let (codex_ts_req, _) = write_initial_prompt(
         input.kind,
-        &writer,
+        &spawned.writer,
         &mut codex_codec,
         &input.prompt,
         &cwd.to_string_lossy(),
@@ -286,37 +320,82 @@ pub async fn execute_non_acp_subprocess_turn(
     )?;
 
     let mut sub = Some(sink.pubsub().subscribe());
-    let mut summary = NonAcpStreamSummary::default();
+    let mut summary = NonAcpStreamSummary {
+        run_ordinal: input.run.ordinal.max(1),
+        ..NonAcpStreamSummary::default()
+    };
     let mut loop_ctx = SubprocessLoopCtx {
         rx: &mut rx,
         sub: &mut sub,
-        writer: &writer,
+        writer: &spawned.writer,
         codex_codec: &mut codex_codec,
         codex_ts_req,
         input,
         sink,
-        ctx: &mut ctx,
+        ctx: &mut started.ctx,
         summary: &mut summary,
-        native_thread_id: &native_thread_id,
-        interrupted: &interrupted,
-        interrupt_notify: &interrupt_notify,
+        native_thread_id: &started.native_thread_id,
+        interrupted: &started.interrupted,
+        interrupt_notify: &started.interrupt_notify,
     };
-    let stream_res = drive_non_acp_lines(&mut loop_ctx).await;
+    let mut stream_res = drive_non_acp_lines(&mut loop_ctx).await;
 
     registry.remove(&input.run.id);
-    writer.close();
-    if let Ok(mut sup_guard) = supervisor.lock() {
-        let _ = sup_guard.terminate_child(token);
+    spawned.writer.close();
+    let was_interrupted = started.interrupted.load(Ordering::SeqCst);
+    let mut early_exit_status: Option<std::process::ExitStatus> = None;
+    if let Ok(mut sup_guard) = spawned.supervisor.lock() {
+        if stream_res.is_ok()
+            && !summary.terminal_seen
+            && !was_interrupted
+            && let Ok(Some(st)) =
+                sup_guard.wait_timeout(spawned.token, std::time::Duration::from_millis(500))
+        {
+            early_exit_status = Some(st);
+        }
+        let _ = sup_guard.terminate_child(spawned.token);
         let _ = sup_guard.terminate_tree(1);
+    }
+    if stream_res.is_ok() && !summary.terminal_seen && !was_interrupted {
+        stream_res = check_silent_exit_failure(
+            driver_slug,
+            early_exit_status,
+            spawned.stderr_capture.as_ref(),
+            &started.ctx,
+        );
     }
 
     finalize_non_acp_turn(
         sink,
         input,
-        &mut ctx,
+        &mut started.ctx,
         &summary,
         stream_res,
-        stderr_capture.as_ref(),
-        interrupted.load(Ordering::SeqCst),
+        spawned.stderr_capture.as_ref(),
+        was_interrupted,
     )
+}
+
+fn check_silent_exit_failure(
+    driver_slug: &str,
+    early_exit_status: Option<std::process::ExitStatus>,
+    stderr_capture: Option<&Arc<StdMutex<String>>>,
+    ctx: &TurnEmitContext,
+) -> Result<(), ServerRuntimeError> {
+    if let Some(status) = early_exit_status
+        && !status.success()
+    {
+        return Err(ServerRuntimeError::Process(format!(
+            "provider `{driver_slug}` exited with status {status}"
+        )));
+    }
+    let has_stderr = stderr_capture
+        .and_then(|s| s.lock().ok())
+        .is_some_and(|s| !s.trim().is_empty());
+    if has_stderr && ctx.assistant_text.is_empty() && ctx.tool_items.is_empty() {
+        return Err(ServerRuntimeError::Process(format!(
+            "provider `{driver_slug}` exited before producing output"
+        )));
+    }
+    Ok(())
 }

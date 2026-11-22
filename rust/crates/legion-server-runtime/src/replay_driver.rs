@@ -60,7 +60,7 @@ pub fn execute_dev_replay_turn(
     sink: &EventSink,
     input: &ReplayTurnInput,
 ) -> Result<(), ServerRuntimeError> {
-    let driver = ProviderDriverKind::new("acp")
+    let driver = ProviderDriverKind::new("devReplay")
         .map_err(|e| ServerRuntimeError::Persistence(e.to_string()))?;
     let session_id = ProviderSessionId::new(format!("psess-{}", input.run.id.as_str()))
         .map_err(|e| ServerRuntimeError::Persistence(e.to_string()))?;

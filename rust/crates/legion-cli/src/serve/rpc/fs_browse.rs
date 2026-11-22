@@ -59,9 +59,12 @@ fn browse_filesystem(payload: Value) -> RpcExit {
         Ok(rd) => rd,
         Err(err) => {
             return rpc_fail_obj(json!({
-                "_tag": "WorkspaceEntriesReadDirectoryError",
+                "_tag": "FilesystemBrowseError",
                 "partialPath": req.partial_path,
+                "cwd": req.cwd,
+                "failure": "read_directory_failed",
                 "parentPath": parent.to_string_lossy(),
+                "pathMissing": !parent.exists(),
                 "message": err.to_string(),
             }));
         }
@@ -173,7 +176,7 @@ fn open_in_editor(payload: Value) -> RpcExit {
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     match cmd.spawn() {
-        Ok(_child) => RpcExit::Success { value: json!({}) },
+        Ok(_child) => RpcExit::Success { value: Value::Null },
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => rpc_fail_obj(json!({
             "_tag": "ExternalLauncherCommandNotFoundError",
             "editor": req.editor,

@@ -22,6 +22,12 @@ pub struct NonAcpStreamSummary {
     pub usage: Option<(u64, u64)>,
     /// Whether `TurnCompleted` or `TurnFailed` was observed.
     pub terminal_seen: bool,
+    /// Orchestration run ordinal attributed to generated provider turns.
+    pub run_ordinal: u64,
+    /// Tracks whether streamed `text_delta` chunks were emitted for the current Claude message block.
+    pub saw_stream_text_delta: bool,
+    /// Tracks whether streamed `thinking_delta` chunks were emitted for the current Claude message block.
+    pub saw_stream_thinking_delta: bool,
 }
 
 /// Apply one normalized [`NonAcpTurnUpdate`] to `ctx`, emitting orchestration domain events.
@@ -71,18 +77,26 @@ pub fn apply_non_acp_update(
             call_id,
             output_json,
             is_error,
-        } => push_tool_completed(ctx, &mut events, call_id, output_json, is_error, now_iso)?,
+        } => push_tool_completed(ctx, &mut events, &call_id, output_json, is_error, now_iso)?,
         NonAcpTurnUpdate::PermissionRequested { .. } => {}
         NonAcpTurnUpdate::UsageReported {
             input_tokens,
             output_tokens,
         } => {
             summary.usage = Some((input_tokens, output_tokens));
-            let mut turn = ctx.build_provider_turn("running", 1, Some(&ctx.started_at), None);
-            turn.turn_token_usage = Some(json!({
+            ctx.turn_token_usage = Some(json!({
+                "usageScope": "main_agent",
+                "hasSubagents": false,
+                "usageStatus": "complete",
                 "inputTokens": input_tokens,
                 "outputTokens": output_tokens,
             }));
+            let turn = ctx.build_provider_turn(
+                "running",
+                summary.run_ordinal.max(1),
+                Some(&ctx.started_at),
+                None,
+            );
             events.push(ctx.wrap_event(now_iso, DomainEventPayload::ProviderTurnUpdated(turn))?);
         }
         NonAcpTurnUpdate::TurnCompleted { .. } => {
@@ -107,6 +121,7 @@ fn push_tool_started(
     let ord = ctx.alloc_ordinal();
     let item_id = TurnItemId::new(format!("item-tool-{}-{}", ctx.run_id.as_str(), ord))
         .map_err(|e| ServerRuntimeError::Persistence(e.to_string()))?;
+    ctx.tool_inputs.insert(call_id.clone(), input_json.clone());
     ctx.tool_items
         .insert(call_id, (item_id.clone(), name.clone(), ord));
     let title = name.clone();
@@ -134,26 +149,27 @@ fn push_tool_started(
 fn push_tool_completed(
     ctx: &mut TurnEmitContext,
     events: &mut Vec<DomainEvent>,
-    call_id: String,
+    call_id: &str,
     output_json: Value,
     is_error: bool,
     now_iso: &str,
 ) -> Result<(), ServerRuntimeError> {
-    let (item_id, name, ord) = if let Some(entry) = ctx.tool_items.get(&call_id) {
+    let (item_id, name, ord) = if let Some(entry) = ctx.tool_items.get(call_id) {
         entry.clone()
     } else {
         let ord = ctx.alloc_ordinal();
         let id = TurnItemId::new(format!("item-tool-{}-{}", ctx.run_id.as_str(), ord))
             .map_err(|e| ServerRuntimeError::Persistence(e.to_string()))?;
         ctx.tool_items
-            .insert(call_id.clone(), (id.clone(), call_id.clone(), ord));
-        (id, call_id, ord)
+            .insert(call_id.to_owned(), (id.clone(), call_id.to_owned(), ord));
+        (id, call_id.to_owned(), ord)
     };
     let status = if is_error {
         TurnItemStatus::Failed
     } else {
         TurnItemStatus::Completed
     };
+    let input = ctx.tool_inputs.get(call_id).cloned().unwrap_or(Value::Null);
     let title = name.clone();
     let item = ctx.make_turn_item(
         TurnItemMeta {
@@ -167,7 +183,7 @@ fn push_tool_completed(
         TurnItemKind::DynamicTool {
             tool_name: Some(name),
             viewed_image_path: None,
-            input: Value::Null,
+            input,
             output: Some(output_json),
             output_omitted: None,
         },
@@ -183,15 +199,21 @@ pub(crate) fn commit_http_turn_finish(
     summary: &NonAcpStreamSummary,
     stream_res: Result<(), ServerRuntimeError>,
 ) -> Result<(), ServerRuntimeError> {
-    let final_status = if stream_res.is_ok() && summary.failure_message.is_none() {
-        legion_contracts::orchestration::RunStatus::Completed
+    let (final_status, err_note) = if stream_res.is_ok() && summary.failure_message.is_none() {
+        (legion_contracts::orchestration::RunStatus::Completed, None)
     } else {
-        legion_contracts::orchestration::RunStatus::Failed
+        let msg = stream_res
+            .as_ref()
+            .err()
+            .map(ToString::to_string)
+            .or_else(|| summary.failure_message.clone());
+        (legion_contracts::orchestration::RunStatus::Failed, msg)
     };
-    let finish_events = ctx.build_finish_events(
+    let finish_events = ctx.build_finish_events_with_error(
         &input.run,
         input.attempt.as_ref(),
         final_status,
+        err_note.as_deref(),
         &input.now_iso,
     )?;
     let mut followups = Vec::new();

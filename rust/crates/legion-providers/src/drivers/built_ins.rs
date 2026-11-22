@@ -333,8 +333,10 @@ pub const DISCOVERY_CLI_DRIVERS: &[&str] = &[
     "claudeAgent",
     "cursor",
     "opencode",
+    "antigravity",
     "pi",
     "kiro",
+    "fx",
     "acpRegistry",
 ];
 

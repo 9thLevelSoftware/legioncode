@@ -173,7 +173,7 @@ impl TurnEmitContext {
             started_at: started_at.map(ToOwned::to_owned),
             completed_at: completed_at.map(ToOwned::to_owned),
             token_usage: None,
-            turn_token_usage: None,
+            turn_token_usage: self.turn_token_usage.clone(),
             model: None,
         }
     }

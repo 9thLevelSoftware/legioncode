@@ -281,11 +281,12 @@ fn build_wire_thread_shell(
         tags: rc.tags,
         last_visited_at: opt_str_at(t, "lastVisitedAt"),
         opens: t.get("opens").cloned().filter(|v| !v.is_null()),
-        title_regeneration: t.get("titleRegeneration").cloned().filter(|v| !v.is_null()),
+        title_regeneration: t
+            .get("titleRegeneration")
+            .and_then(crate::projections::wire_codec::sanitize_title_regeneration_value),
         last_title_regeneration: t
             .get("lastTitleRegeneration")
-            .cloned()
-            .filter(|v| !v.is_null()),
+            .and_then(crate::projections::wire_codec::sanitize_last_title_regeneration_value),
         limit_recovery: t.get("limitRecovery").cloned().filter(|v| !v.is_null()),
         deleted_at: opt_str_at(t, "deletedAt"),
     }

@@ -3,19 +3,19 @@
 
 use std::fs;
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 
 use legion_persistence::paths::sweep_stale_pending_attachments;
 use legion_protocol::rpc_codec::RpcExit;
-use legion_remote::secrets::FileSecretStore;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use super::{AppState, base64url_encode, hmac_sha256, parse_payload, rpc_fail, rpc_fail_obj};
+use super::assets_paths::resolve_target_for_resource;
+use super::{AppState, parse_payload, rpc_fail, rpc_fail_obj};
 
-const ASSET_TOKEN_TTL_MS: u64 = 60 * 60 * 1000;
-const UPLOAD_TOKEN_TTL_MS: u64 = 15 * 60 * 1000;
+const ASSET_TOKEN_TTL_MS: i64 = 60 * 60 * 1000;
+const UPLOAD_TOKEN_TTL_MS: i64 = 15 * 60 * 1000;
 
 pub(crate) fn dispatch(state: &AppState, tag: &str, payload: Value) -> RpcExit {
     match tag {
@@ -30,35 +30,6 @@ pub(crate) fn dispatch(state: &AppState, tag: &str, payload: Value) -> RpcExit {
     }
 }
 
-fn load_or_create_signing_key(state: &AppState) -> Result<Vec<u8>, String> {
-    let store = FileSecretStore::new(&state.paths.secrets_dir).map_err(|e| e.to_string())?;
-    let key_name = "asset-access-signing-key";
-    if let Some(existing) = store.get(key_name).map_err(|e| e.to_string())?
-        && !existing.is_empty()
-    {
-        return Ok(existing);
-    }
-    let key = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple()).into_bytes();
-    store.set(key_name, &key).map_err(|e| e.to_string())?;
-    Ok(key)
-}
-
-fn now_millis() -> u64 {
-    let raw = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    u64::try_from(raw).unwrap_or(u64::MAX)
-}
-
-fn sign_claims(state: &AppState, claims: &Value) -> Result<String, String> {
-    let key = load_or_create_signing_key(state)?;
-    let encoded_payload = base64url_encode(claims.to_string().as_bytes());
-    let mac = hmac_sha256(&key, encoded_payload.as_bytes());
-    let sig = base64url_encode(&mac);
-    Ok(format!("{encoded_payload}.{sig}"))
-}
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AssetCreateUrlPayload {
@@ -70,31 +41,28 @@ fn create_asset_url(state: &AppState, payload: Value) -> RpcExit {
         Ok(p) => p,
         Err(e) => return e,
     };
-    let expires_at = now_millis().saturating_add(ASSET_TOKEN_TTL_MS);
-    let mut claims = match req.resource.as_object() {
-        Some(obj) => obj.clone(),
-        None => {
-            return rpc_fail_obj(json!({
-                "_tag": "AssetSigningKeyLoadError",
-                "message": "Invalid asset resource payload.",
-            }));
-        }
+    let (target_path, display_name) = match resolve_target_for_resource(state, &req.resource) {
+        Ok(pair) => pair,
+        Err(e) => return e,
     };
-    claims.insert("version".to_owned(), json!(1));
-    claims.insert("expiresAt".to_owned(), json!(expires_at));
-    let token = match sign_claims(state, &Value::Object(claims)) {
-        Ok(t) => t,
-        Err(msg) => {
+    let signed = match state.runtime_http.create_signed_asset_url(
+        &target_path,
+        display_name.as_deref(),
+        Some(ASSET_TOKEN_TTL_MS),
+    ) {
+        Ok(url) => url,
+        Err(err) => {
             return rpc_fail_obj(json!({
-                "_tag": "AssetSigningKeyLoadError",
-                "message": msg,
+                "_tag": "AssetWorkspaceContextResolutionError",
+                "resource": req.resource,
+                "cause": err.to_string(),
             }));
         }
     };
     RpcExit::Success {
         value: json!({
-            "relativeUrl": format!("/api/assets/{token}"),
-            "expiresAt": expires_at,
+            "relativeUrl": signed.relative_url,
+            "expiresAt": signed.expires_at,
         }),
     }
 }
@@ -152,7 +120,6 @@ struct CreateUploadUrlPayload {
     #[serde(rename = "type")]
     kind: Option<String>,
     name: String,
-    mime_type: String,
     size_bytes: u64,
 }
 
@@ -175,31 +142,24 @@ fn create_upload_url(state: &AppState, payload: Value) -> RpcExit {
     } else {
         format!("pending-{}", Uuid::new_v4())
     };
-    let expires_at = now_millis().saturating_add(UPLOAD_TOKEN_TTL_MS);
-    let claims = json!({
-        "version": 1,
-        "kind": "attachment-upload",
-        "type": attachment_type,
-        "attachmentId": attachment_id,
-        "name": req.name,
-        "mimeType": req.mime_type,
-        "sizeBytes": req.size_bytes,
-        "expiresAt": expires_at,
-    });
-    let token = match sign_claims(state, &claims) {
-        Ok(t) => t,
-        Err(msg) => {
+    let signed = match state.runtime_http.create_attachment_upload_url(
+        &attachment_id,
+        Some(req.size_bytes),
+        Some(UPLOAD_TOKEN_TTL_MS),
+    ) {
+        Ok(url) => url,
+        Err(err) => {
             return rpc_fail_obj(json!({
                 "_tag": "AttachmentUploadSigningKeyError",
-                "message": msg,
+                "cause": err.to_string(),
             }));
         }
     };
     RpcExit::Success {
         value: json!({
             "attachmentId": attachment_id,
-            "relativeUrl": format!("/api/attachments/upload/{token}"),
-            "expiresAt": expires_at,
+            "relativeUrl": signed.relative_url,
+            "expiresAt": signed.expires_at,
         }),
     }
 }
@@ -228,7 +188,7 @@ fn delete_attachment(state: &AppState, payload: Value) -> RpcExit {
             }
         }
     }
-    RpcExit::Success { value: json!({}) }
+    RpcExit::Success { value: Value::Null }
 }
 
 fn sanitize_thread_segment(thread_id: &str) -> String {

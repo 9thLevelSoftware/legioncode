@@ -185,7 +185,7 @@ pub(crate) fn get_worktree_thread_ids(state: &AppState, payload: Value) -> RpcEx
             })
             .collect();
         Ok(RpcExit::Success {
-            value: json!(matching),
+            value: json!({ "threadIds": matching }),
         })
     })
     .unwrap_or_else(|e| e)

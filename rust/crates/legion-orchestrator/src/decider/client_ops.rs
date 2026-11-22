@@ -9,7 +9,8 @@ use serde_json::json;
 
 use crate::decider::message_ops::make_run_event;
 use crate::decider::thread_ops::{make_thread_event, require_live_thread};
-use crate::decider::types::{CommandDecision, DeciderError};
+use crate::decider::types::{CommandDecision, DeciderError, derived_effect_id};
+use crate::outbox::{OutboxEffectRequest, PendingOutboxEffect};
 use crate::sink::projection_apply::DeciderThreadState;
 
 pub(crate) fn decide_thread_metadata_update(
@@ -68,24 +69,37 @@ pub(crate) fn decide_thread_metadata_update(
         PatchValue::Null => thread.linked_pull_request = Some(None),
         PatchValue::Set(pr) => thread.linked_pull_request = Some(Some(pr.clone())),
     }
+    let mut outbox_effects = Vec::new();
     if let Some(regen) = cmd.regenerate_title {
         if regen {
             thread.title_regeneration = Some(Some(json!({
                 "requestId": cmd.command_id.as_str(),
                 "startedAt": now_iso,
             })));
+            outbox_effects.push(PendingOutboxEffect {
+                id: derived_effect_id(&cmd.command_id, 0),
+                command_id: cmd.command_id.clone(),
+                thread_id: cmd.thread_id.clone(),
+                request: OutboxEffectRequest::ThreadTitleGenerate {
+                    kind: "regenerate".to_owned(),
+                    message_id: None,
+                },
+                available_at: None,
+            });
         } else {
             thread.title_regeneration = Some(None);
         }
     }
     now_iso.clone_into(&mut thread.updated_at);
-    emit_thread_decision(
+    let mut decision = emit_thread_decision(
         &cmd.command_id,
         "thread.metadata.update",
         "thread.metadata-updated",
         thread,
         now_iso,
-    )
+    )?;
+    decision.outbox_effects = outbox_effects;
+    Ok(decision)
 }
 
 pub(crate) fn decide_runtime_mode_set(

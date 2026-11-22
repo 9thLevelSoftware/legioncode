@@ -21,14 +21,14 @@ pub(crate) fn dispatch(state: &AppState, tag: &str, payload: Value) -> RpcExit {
 }
 
 fn mcp_call_tool(payload: &Value) -> RpcExit {
-    let tool = payload
-        .get("tool")
-        .or_else(|| payload.get("name"))
+    let thread_id = payload
+        .get("threadId")
         .and_then(Value::as_str)
-        .unwrap_or("");
+        .unwrap_or("thread-default");
     rpc_fail_obj(json!({
-        "_tag": "McpAppRpcError",
-        "message": format!("MCP app tool `{tool}` is not connected."),
+        "_tag": "McpAppRequestError",
+        "threadId": thread_id,
+        "reason": "session-stopped",
     }))
 }
 
@@ -37,20 +37,28 @@ fn mcp_tool_info(payload: &Value) -> RpcExit {
         .get("tool")
         .or_else(|| payload.get("name"))
         .and_then(Value::as_str)
-        .unwrap_or("");
+        .map_or("", str::trim);
+    let mut out = serde_json::Map::from_iter([
+        ("callable".to_owned(), Value::Bool(false)),
+        ("readOnly".to_owned(), Value::Bool(true)),
+    ]);
+    if !tool.is_empty() {
+        out.insert("title".to_owned(), Value::String(tool.to_owned()));
+    }
     RpcExit::Success {
-        value: json!({
-            "tool": tool,
-            "available": false,
-        }),
+        value: Value::Object(out),
     }
 }
 
 fn mcp_read_resource(payload: &Value) -> RpcExit {
-    let uri = payload.get("uri").and_then(Value::as_str).unwrap_or("");
+    let thread_id = payload
+        .get("threadId")
+        .and_then(Value::as_str)
+        .unwrap_or("thread-default");
     rpc_fail_obj(json!({
-        "_tag": "McpAppRpcError",
-        "message": format!("MCP resource `{uri}` is not available."),
+        "_tag": "McpAppRequestError",
+        "threadId": thread_id,
+        "reason": "session-stopped",
     }))
 }
 
@@ -59,15 +67,28 @@ fn mcp_read_resource(payload: &Value) -> RpcExit {
 struct UpdateModelContextPayload {
     thread_id: String,
     item_id: String,
+    #[serde(default)]
     server: String,
+    #[serde(default)]
     tool: String,
+    #[serde(default)]
     text: String,
+    #[serde(default)]
+    content: Option<Value>,
 }
 
 fn mcp_update_model_context(state: &AppState, payload: Value) -> RpcExit {
     let req: UpdateModelContextPayload = match parse_payload(payload) {
         Ok(p) => p,
         Err(e) => return e,
+    };
+    let text = if req.text.is_empty() {
+        req.content
+            .as_ref()
+            .and_then(|v| serde_json::to_string(v).ok())
+            .unwrap_or_default()
+    } else {
+        req.text
     };
     let now = utc_now_iso();
     with_db(state, |conn| {
@@ -90,17 +111,16 @@ fn mcp_update_model_context(state: &AppState, payload: Value) -> RpcExit {
                tool = excluded.tool,
                text = excluded.text,
                updated_at = excluded.updated_at",
-            params![
-                req.thread_id,
-                req.item_id,
-                req.server,
-                req.tool,
-                req.text,
-                now
-            ],
+            params![req.thread_id, req.item_id, req.server, req.tool, text, now],
         )
-        .map_err(|e| rpc_fail_obj(json!({ "_tag": "McpAppRpcError", "message": e.to_string() })))?;
-        Ok(RpcExit::Success { value: json!({}) })
+        .map_err(|e| {
+            rpc_fail_obj(json!({
+                "_tag": "McpAppRequestError",
+                "threadId": req.thread_id,
+                "reason": e.to_string(),
+            }))
+        })?;
+        Ok(RpcExit::Success { value: Value::Null })
     })
     .unwrap_or_else(|e| e)
 }

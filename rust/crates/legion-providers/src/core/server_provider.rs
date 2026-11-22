@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::catalog::ServerModelEntry;
 use crate::core::server_provider_models::capabilities_for_reasoning;
-pub use crate::core::server_provider_models::default_models_for_driver;
+pub use crate::core::server_provider_models::{default_models_for_driver, resolve_cli_model_arg};
 use crate::drivers::{ProviderDriverSpec, ProviderProbeStatus};
 
 /// Lifecycle readiness status matching `ServerProviderState` in `packages/contracts/src/server.ts`.

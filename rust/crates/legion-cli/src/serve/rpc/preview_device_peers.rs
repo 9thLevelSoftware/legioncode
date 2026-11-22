@@ -7,7 +7,7 @@ use legion_protocol::rpc_codec::RpcExit;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use super::{AppState, peers_secrets_share, rpc_fail, utc_now_iso};
+use super::{AppState, peers_secrets_share, rpc_fail, rpc_fail_obj, utc_now_iso};
 
 #[derive(Default)]
 struct PreviewRegistry {
@@ -42,27 +42,32 @@ pub(crate) async fn dispatch(state: &Arc<AppState>, tag: &str, payload: Value) -
         "preview.list" => preview_list(&payload),
         "preview.open" => preview_open(&payload),
         "preview.resize" => preview_resize(&payload),
-        "preview.adjust"
-        | "preview.reportProfiles"
+        "preview.adjust" => preview_adjust(&payload),
+        "preview.reportProfiles"
         | "preview.reportStatus"
         | "preview.clearProfile"
         | "preview.stopLocalServer"
-        | "peerLinks.answerRequest" => RpcExit::Success { value: json!({}) },
+        | "peerLinks.answerRequest"
+        | "device.close"
+        | "device.shutdown" => RpcExit::Success { value: Value::Null },
         "preview.close" => preview_close(state, &payload).await,
         "device.configure" => device_configure(state, &payload),
-        "device.list"
-        | "device.testHost"
-        | "device.easAccount"
-        | "device.simlockIdentity"
-        | "device.open"
-        | "device.close"
-        | "device.shutdown"
-        | "device.action" => RpcExit::Success {
+        "device.list" => RpcExit::Success {
             value: device_state_snapshot(state),
         },
-        "device.detail" => RpcExit::Success {
+        "device.testHost" => device_test_host(&payload),
+        "device.easAccount" => rpc_fail_obj(json!({
+            "_tag": "DeviceEasAccountError",
+            "reason": "Expo account credentials are not configured.",
+        })),
+        "device.simlockIdentity" => rpc_fail_obj(json!({
+            "_tag": "DeviceSimlockIdentityError",
+            "reason": "Simlock identity is not configured.",
+        })),
+        "device.open" => device_open(&payload),
+        "device.detail" | "device.action" => RpcExit::Success {
             value: json!({
-                "hostId": "local",
+                "hostId": payload.get("hostId").and_then(Value::as_str).unwrap_or("local"),
                 "deviceId": payload.get("deviceId").and_then(Value::as_str).unwrap_or("local"),
                 "settings": {},
                 "foregroundApp": Value::Null,
@@ -105,6 +110,39 @@ fn preview_list(payload: &Value) -> RpcExit {
     }
 }
 
+fn build_preview_snapshot(payload: &Value, thread_id: &str, tab_id: &str) -> Value {
+    let url = payload
+        .get("url")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    let nav_status = match url {
+        Some(u) => json!({ "_tag": "Success", "url": u, "title": "" }),
+        None => json!({ "_tag": "Idle" }),
+    };
+    let viewport = payload
+        .get("viewport")
+        .filter(|v| v.get("_tag").is_some())
+        .cloned()
+        .unwrap_or_else(|| json!({ "_tag": "freeform", "width": 1280, "height": 800 }));
+    json!({
+        "threadId": thread_id,
+        "tabId": tab_id,
+        "navStatus": nav_status,
+        "canGoBack": false,
+        "canGoForward": false,
+        "viewport": viewport,
+        "colorScheme": payload.get("colorScheme").and_then(Value::as_str).unwrap_or("system"),
+        "zoomFactor": payload.get("zoomFactor").and_then(Value::as_f64).unwrap_or(1.0),
+        "profileId": payload.get("profileId").and_then(Value::as_str).unwrap_or("default"),
+        "runtime": payload.get("runtime").and_then(Value::as_str).unwrap_or("server"),
+        "headless": true,
+        "automationOwner": Value::Null,
+        "reveal": false,
+        "updatedAt": utc_now_iso(),
+    })
+}
+
 fn preview_open(payload: &Value) -> RpcExit {
     let thread_id = payload
         .get("threadId")
@@ -119,20 +157,7 @@ fn preview_open(payload: &Value) -> RpcExit {
             || format!("tab-{}", &Uuid::new_v4().simple().to_string()[..8]),
             str::to_owned,
         );
-    let url = payload
-        .get("url")
-        .and_then(Value::as_str)
-        .unwrap_or("about:blank");
-    let snapshot = json!({
-        "threadId": thread_id,
-        "tabId": tab_id,
-        "navStatus": { "status": "idle", "url": url, "title": "" },
-        "canGoBack": false,
-        "canGoForward": false,
-        "runtime": payload.get("runtime").and_then(Value::as_str).unwrap_or("server"),
-        "headless": true,
-        "updatedAt": utc_now_iso(),
-    });
+    let snapshot = build_preview_snapshot(payload, &thread_id, &tab_id);
     if let Ok(mut guard) = preview_registry().lock() {
         guard.revision += 1;
         guard.sessions.insert(tab_id, snapshot.clone());
@@ -141,11 +166,16 @@ fn preview_open(payload: &Value) -> RpcExit {
 }
 
 fn preview_resize(payload: &Value) -> RpcExit {
+    let thread_id = payload
+        .get("threadId")
+        .and_then(Value::as_str)
+        .unwrap_or("thread-default")
+        .to_owned();
     let tab_id = payload
         .get("tabId")
         .or_else(|| payload.get("sessionId"))
         .and_then(Value::as_str)
-        .unwrap_or("");
+        .unwrap_or("default");
     if let Ok(mut guard) = preview_registry().lock()
         && let Some(entry) = guard.sessions.get_mut(tab_id)
     {
@@ -157,7 +187,39 @@ fn preview_resize(payload: &Value) -> RpcExit {
         guard.revision += 1;
         return RpcExit::Success { value: updated };
     }
-    RpcExit::Success { value: json!({}) }
+    RpcExit::Success {
+        value: build_preview_snapshot(payload, &thread_id, tab_id),
+    }
+}
+
+fn preview_adjust(payload: &Value) -> RpcExit {
+    let thread_id = payload
+        .get("threadId")
+        .and_then(Value::as_str)
+        .unwrap_or("thread-default")
+        .to_owned();
+    let tab_id = payload
+        .get("tabId")
+        .or_else(|| payload.get("sessionId"))
+        .and_then(Value::as_str)
+        .unwrap_or("default");
+    if let Ok(mut guard) = preview_registry().lock()
+        && let Some(entry) = guard.sessions.get_mut(tab_id)
+    {
+        if let Some(cs) = payload.get("colorScheme") {
+            entry["colorScheme"] = cs.clone();
+        }
+        if let Some(zf) = payload.get("zoomFactor") {
+            entry["zoomFactor"] = zf.clone();
+        }
+        entry["updatedAt"] = Value::String(utc_now_iso());
+        let updated = entry.clone();
+        guard.revision += 1;
+        return RpcExit::Success { value: updated };
+    }
+    RpcExit::Success {
+        value: build_preview_snapshot(payload, &thread_id, tab_id),
+    }
 }
 
 async fn preview_close(state: &AppState, payload: &Value) -> RpcExit {
@@ -177,7 +239,35 @@ async fn preview_close(state: &AppState, payload: &Value) -> RpcExit {
         guard.revision += 1;
     }
     state.runtime_http.preview_browser().close().await;
-    RpcExit::Success { value: json!({}) }
+    RpcExit::Success { value: Value::Null }
+}
+
+fn device_test_host(payload: &Value) -> RpcExit {
+    RpcExit::Success {
+        value: json!({
+            "id": payload.get("id").and_then(Value::as_str).unwrap_or("local"),
+            "label": payload.get("label").and_then(Value::as_str).unwrap_or("This machine"),
+            "kind": payload.get("kind").and_then(Value::as_str).unwrap_or("local"),
+            "platforms": [
+                { "platform": "ios", "available": cfg!(target_os = "macos") },
+                { "platform": "android", "available": true },
+            ],
+            "hubInstalled": false,
+            "agentDeviceInstalled": false,
+        }),
+    }
+}
+
+fn device_open(payload: &Value) -> RpcExit {
+    RpcExit::Success {
+        value: json!({
+            "threadId": payload.get("threadId").and_then(Value::as_str).unwrap_or("thread-default"),
+            "hostId": payload.get("hostId").and_then(Value::as_str).unwrap_or("local"),
+            "deviceId": payload.get("deviceId").and_then(Value::as_str).unwrap_or("local"),
+            "platform": payload.get("platform").and_then(Value::as_str).unwrap_or("android"),
+            "openedAt": utc_now_iso(),
+        }),
+    }
 }
 
 fn device_configure(state: &AppState, payload: &Value) -> RpcExit {
@@ -195,12 +285,17 @@ fn device_configure(state: &AppState, payload: &Value) -> RpcExit {
     }
 }
 
-fn device_state_snapshot(state: &AppState) -> Value {
+pub(crate) fn device_state_snapshot(state: &AppState) -> Value {
     let (revision, agent_access_enabled, onboarding_completed) =
         device_cache().lock().map_or((0, false, false), |g| {
             (g.revision, g.agent_access_enabled, g.onboarding_completed)
         });
     json!({
+        "supportsHostRetry": false,
+        "supportsToolUpdate": false,
+        "supportsToolInspection": false,
+        "supportsEasHosts": false,
+        "supportsSimlockHosts": false,
         "hosts": [{
             "id": "local",
             "label": "This machine",
@@ -218,6 +313,7 @@ fn device_state_snapshot(state: &AppState) -> Value {
         "hostStatuses": { "local": { "status": "idle" } },
         "devices": [],
         "sessions": [],
+        "bootingDevices": [],
         "onboardingCompleted": onboarding_completed,
         "agentAccessEnabled": agent_access_enabled,
         "hubBasePath": state.paths.state_dir.join("device-hub").to_string_lossy(),

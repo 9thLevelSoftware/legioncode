@@ -258,6 +258,20 @@ pub(crate) fn format_process_failure(
     }
 }
 
+pub(crate) fn format_error_with_stderr(
+    base: &str,
+    stderr_capture: Option<&Arc<StdMutex<String>>>,
+) -> String {
+    let stderr_note = stderr_capture
+        .and_then(|s| s.lock().ok())
+        .map(|s| s.trim().to_owned())
+        .filter(|s| !s.is_empty());
+    match stderr_note {
+        Some(note) => format!("{base} (stderr: {note})"),
+        None => base.to_owned(),
+    }
+}
+
 pub(crate) fn finalize_acp_turn(
     sink: &EventSink,
     input: &AcpTurnInput,
@@ -267,16 +281,20 @@ pub(crate) fn finalize_acp_turn(
     stderr_capture: Option<&Arc<StdMutex<String>>>,
 ) -> Result<(), ServerRuntimeError> {
     let is_interrupted = interrupted.load(Ordering::SeqCst);
-    let final_status = match &result {
-        Ok(StopReason::Cancelled) => RunStatus::Interrupted,
-        Ok(_) => RunStatus::Completed,
-        Err(_) if is_interrupted => RunStatus::Interrupted,
-        Err(_) => RunStatus::Failed,
+    let (final_status, failure_note) = match &result {
+        Ok(StopReason::Cancelled) => (RunStatus::Interrupted, None),
+        Ok(_) => (RunStatus::Completed, None),
+        Err(_) if is_interrupted => (RunStatus::Interrupted, None),
+        Err(err) => (
+            RunStatus::Failed,
+            Some(format_error_with_stderr(&err.to_string(), stderr_capture)),
+        ),
     };
-    let finish_events = ctx.build_finish_events(
+    let finish_events = ctx.build_finish_events_with_error(
         &input.run,
         input.attempt.as_ref(),
         final_status,
+        failure_note.as_deref(),
         &input.now_iso,
     )?;
     let mut followups = Vec::new();

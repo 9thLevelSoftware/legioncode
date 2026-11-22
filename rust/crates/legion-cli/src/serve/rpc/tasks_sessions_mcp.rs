@@ -130,7 +130,7 @@ fn upsert_task(state: &AppState, payload: Value) -> RpcExit {
     let schedule_json = serde_json::to_string(&req.schedule).unwrap_or_else(|_| "{}".to_owned());
     let ws_json = serde_json::to_string(
         &req.workspace_strategy
-            .unwrap_or_else(|| json!({ "type": "root" })),
+            .unwrap_or_else(|| json!({ "type": "root", "branch": null })),
     )
     .unwrap_or_else(|_| "{}".to_owned());
     let ms_json = serde_json::to_string(&req.model_selection).unwrap_or_else(|_| "{}".to_owned());
@@ -249,14 +249,14 @@ fn delete_task(state: &AppState, payload: Value) -> RpcExit {
     };
     with_db(state, |conn| {
         ensure_tasks_schema(conn)?;
-        let changed = conn
+        let _changed = conn
             .execute(
                 "DELETE FROM scheduled_tasks WHERE task_id = ?1",
                 params![req.task_id],
             )
             .map_err(|e| task_err(&e.to_string()))?;
         Ok(RpcExit::Success {
-            value: json!({ "deleted": changed > 0, "taskId": req.task_id }),
+            value: json!({ "id": req.task_id }),
         })
     })
     .unwrap_or_else(|e| e)
@@ -338,8 +338,6 @@ async fn run_now(state: &Arc<AppState>, payload: Value) -> RpcExit {
         Ok(RpcExit::Success {
             value: json!({
                 "task": updated,
-                "threadId": thread_id_str,
-                "startedAt": now,
             }),
         })
     })

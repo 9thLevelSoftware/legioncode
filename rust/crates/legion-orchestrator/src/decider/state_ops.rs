@@ -109,7 +109,7 @@ pub(crate) fn decide_thread_unsettle(
     now_iso: &str,
 ) -> Result<CommandDecision, DeciderError> {
     let mut thread = require_live_thread(state, &cmd.thread_id)?;
-    thread.settled_override = Some("unsettled".to_owned());
+    thread.settled_override = Some("active".to_owned());
     thread.settled_at = None;
     thread.unsettled_at = Some(Some(now_iso.to_owned()));
     thread.active_order_key = Some(Some(now_iso.to_owned()));

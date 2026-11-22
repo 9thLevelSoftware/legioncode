@@ -6,6 +6,7 @@ use std::path::Path;
 use legion_protocol::rpc_codec::RpcExit;
 use serde::Deserialize;
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 
 use super::vcs_git::{current_branch, run_git_cmd};
 use super::{parse_payload, rpc_fail_obj, utc_now_iso};
@@ -63,16 +64,14 @@ pub(crate) async fn get_branch_commits(payload: Value) -> RpcExit {
         let short_sha = cols.next().unwrap_or("");
         let subject = cols.next().unwrap_or("");
         let committed_at = cols.next().unwrap_or("");
-        let author = cols.next().unwrap_or("");
+        let _author = cols.next().unwrap_or("");
         if sha.is_empty() {
             continue;
         }
         commits.push(json!({
             "sha": sha,
-            "shortSha": short_sha,
-            "subject": subject,
+            "subject": if subject.is_empty() { short_sha } else { subject },
             "committedAt": committed_at,
-            "authorName": author,
         }));
     }
     RpcExit::Success {
@@ -113,7 +112,7 @@ pub(crate) async fn get_diff_preview(payload: Value) -> RpcExit {
     let head = current_branch(cwd).await;
     let mut sources = Vec::new();
     if let Some(sha) = req.commit_sha.as_deref().filter(|s| !s.trim().is_empty()) {
-        if let Some(files) = collect_diff_files(
+        if let Some((files, diff)) = collect_diff_files(
             cwd,
             &format!("{sha}^"),
             Some(sha),
@@ -122,30 +121,47 @@ pub(crate) async fn get_diff_preview(payload: Value) -> RpcExit {
         .await
         {
             sources.push(json!({
+                "id": format!("commit:{sha}"),
                 "kind": "commit",
-                "commitSha": sha,
+                "title": format!("Commit {}", &sha[..sha.len().min(8)]),
+                "baseRef": format!("{sha}^"),
+                "headRef": sha,
+                "diff": diff,
+                "diffHash": hash_diff(&diff),
+                "truncated": false,
                 "files": files,
             }));
         }
     } else {
-        if let Some(wt_files) =
+        if let Some((wt_files, wt_diff)) =
             collect_diff_files(cwd, "HEAD", None, req.metadata_only.unwrap_or(false)).await
         {
             sources.push(json!({
+                "id": "working-tree",
                 "kind": "working-tree",
-                "branch": head,
+                "title": "Working tree",
+                "baseRef": "HEAD",
+                "headRef": head.clone(),
+                "diff": wt_diff,
+                "diffHash": hash_diff(&wt_diff),
+                "truncated": false,
                 "files": wt_files,
             }));
         }
         if let Some(base) = req.base_ref.as_deref().filter(|s| !s.trim().is_empty())
-            && let Some(branch_files) =
+            && let Some((branch_files, branch_diff)) =
                 collect_diff_files(cwd, base, Some("HEAD"), req.metadata_only.unwrap_or(false))
                     .await
         {
             sources.push(json!({
-                "kind": "branch",
+                "id": format!("branch-range:{base}"),
+                "kind": "branch-range",
+                "title": format!("{base}...HEAD"),
                 "baseRef": base,
                 "headRef": head,
+                "diff": branch_diff,
+                "diffHash": hash_diff(&branch_diff),
+                "truncated": false,
                 "files": branch_files,
             }));
         }
@@ -160,18 +176,32 @@ pub(crate) async fn get_diff_preview(payload: Value) -> RpcExit {
     }
 }
 
+fn hash_diff(diff: &str) -> String {
+    let digest = Sha256::digest(diff.as_bytes());
+    format!("{digest:x}")
+}
+
 async fn collect_diff_files(
     cwd: &Path,
     from_ref: &str,
     to_ref: Option<&str>,
     metadata_only: bool,
-) -> Option<Vec<Value>> {
+) -> Option<(Vec<Value>, String)> {
     let mut args = vec!["diff", "--numstat"];
     args.push(from_ref);
     if let Some(to) = to_ref {
         args.push(to);
     }
     let numstat = run_git_cmd(cwd, &args).await.ok()?;
+    let diff_text = if metadata_only {
+        String::new()
+    } else {
+        let mut diff_args = vec!["diff", "--unified=3", from_ref];
+        if let Some(to) = to_ref {
+            diff_args.push(to);
+        }
+        run_git_cmd(cwd, &diff_args).await.unwrap_or_default()
+    };
     let mut out = Vec::new();
     for line in numstat.lines() {
         let mut parts = line.splitn(3, '\t');
@@ -181,40 +211,25 @@ async fn collect_diff_files(
         if path.is_empty() {
             continue;
         }
-        let binary = add_raw == "-" || del_raw == "-";
         let additions = add_raw.parse::<u64>().unwrap_or(0);
         let deletions = del_raw.parse::<u64>().unwrap_or(0);
-        let diff_patch = if metadata_only || binary {
-            Value::Null
-        } else {
-            let mut diff_args = vec!["diff", "--unified=3", from_ref];
-            if let Some(to) = to_ref {
-                diff_args.push(to);
-            }
-            diff_args.push("--");
-            diff_args.push(path);
-            run_git_cmd(cwd, &diff_args)
-                .await
-                .ok()
-                .map_or(Value::Null, Value::String)
-        };
         out.push(json!({
             "path": path,
+            "previousPath": Value::Null,
+            "changeType": "change",
             "additions": additions,
             "deletions": deletions,
-            "binary": binary,
-            "status": "modified",
-            "patch": diff_patch,
         }));
     }
-    Some(out)
+    Some((out, diff_text))
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DiffFileContentsPayload {
     cwd: String,
-    path: String,
+    #[serde(alias = "path")]
+    new_path: String,
     old_path: Option<String>,
     base_ref: Option<String>,
     head_ref: Option<String>,
@@ -236,25 +251,26 @@ pub(crate) async fn get_diff_file_contents(payload: Value) -> RpcExit {
         }));
     }
     let old_rev = req.base_ref.as_deref().unwrap_or("HEAD");
-    let old_path_rel = req.old_path.as_deref().unwrap_or(&req.path);
+    let old_path_rel = req.old_path.as_deref().unwrap_or(&req.new_path);
     let old_spec = format!("{old_rev}:{old_path_rel}");
-    let old_contents = run_git_cmd(cwd, &["show", &old_spec]).await.ok();
+    let old_contents = run_git_cmd(cwd, &["show", &old_spec])
+        .await
+        .unwrap_or_default();
 
     let new_contents = if let Some(head) = req.head_ref.as_deref().filter(|s| !s.trim().is_empty())
     {
-        let new_spec = format!("{head}:{}", req.path);
-        run_git_cmd(cwd, &["show", &new_spec]).await.ok()
+        let new_spec = format!("{head}:{}", req.new_path);
+        run_git_cmd(cwd, &["show", &new_spec])
+            .await
+            .unwrap_or_default()
     } else {
-        fs::read_to_string(cwd.join(&req.path)).ok()
+        fs::read_to_string(cwd.join(&req.new_path)).unwrap_or_default()
     };
 
     RpcExit::Success {
         value: json!({
-            "path": req.path,
-            "oldPath": req.old_path,
             "oldContents": old_contents,
             "newContents": new_contents,
-            "binary": false,
         }),
     }
 }

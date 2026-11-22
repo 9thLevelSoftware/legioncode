@@ -20,7 +20,7 @@ use legion_orchestrator::outbox::OutboxWorkerOptions;
 use legion_persistence::project_store::{CreateProjectInput, create_project};
 use legion_persistence::sqlite::SqliteStore;
 use legion_providers::core::ServerProviderState;
-use legion_providers::drivers::ProviderProbeStatus;
+use legion_providers::drivers::{DISCOVERY_CLI_DRIVERS, ProviderProbeStatus};
 use legion_server_runtime::{ProviderProbeService, ProviderProbeTarget, RuntimeOutboxExecutor};
 use tempfile::TempDir;
 
@@ -313,7 +313,8 @@ async fn provider_probe_discovers_providers_and_enforces_fast_timeout() -> TestR
 
     let fleet_probe = ProviderProbeService::new()?.with_cli_timeout(Duration::from_millis(500));
     let discovered = fleet_probe.discover_local_providers().await;
-    assert_eq!(discovered.len(), 8);
+    assert_eq!(discovered.len(), DISCOVERY_CLI_DRIVERS.len() + 1);
+    assert!(discovered.iter().any(|p| p.instance_id == "antigravity"));
     let dev_replay = discovered
         .iter()
         .find(|p| p.instance_id == "devReplay")

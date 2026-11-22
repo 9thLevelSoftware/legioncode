@@ -2,7 +2,8 @@
 
 use legion_contracts::ids::{PlanId, TurnItemId};
 use legion_contracts::orchestration::{
-    DomainEvent, DomainEventPayload, PlanArtifact, TurnItemKind, TurnItemStatus,
+    DomainEvent, DomainEventPayload, PlanArtifact, ProviderFailure, ProviderFailureClass,
+    TurnItemKind, TurnItemStatus,
 };
 use legion_providers::acp::presentation::{ToolCallKind, ToolCallStatus, ToolCallUpdatePayload};
 use legion_providers::acp::protocol::PromptContentBlock;
@@ -51,7 +52,7 @@ impl TurnEmitContext {
                     run_id: Some(self.run_id.clone()),
                     node_id: self.root_node_id.clone(),
                     status: "active".to_owned(),
-                    detail_in_turn_item: Some(false),
+                    detail_in_turn_item: None,
                     kind: "todo_list".to_owned(),
                     markdown: None,
                     steps: Some(entries.clone()),
@@ -162,6 +163,54 @@ impl TurnEmitContext {
                 now_iso,
             },
             kind,
+        );
+        self.wrap_event(now_iso, DomainEventPayload::TurnItemUpdated(Box::new(item)))
+    }
+
+    pub(crate) fn build_error_turn_item(
+        &mut self,
+        message: &str,
+        failure_class: &str,
+        retryable: bool,
+        now_iso: &str,
+    ) -> Result<DomainEvent, ServerRuntimeError> {
+        let ord = self.alloc_ordinal();
+        let item_id = TurnItemId::new(format!("item-error-{}-{}", self.run_id.as_str(), ord))
+            .map_err(|e| ServerRuntimeError::Persistence(e.to_string()))?;
+        let trimmed = message.trim();
+        let raw = if trimmed.is_empty() {
+            "Provider turn failed"
+        } else {
+            trimmed
+        };
+        let bounded: String = raw.chars().take(4_000).collect();
+        let class = match failure_class {
+            "provider_error" | "provider_unavailable" => ProviderFailureClass::ProviderError,
+            "transport_error" => ProviderFailureClass::TransportError,
+            "permission_error" => ProviderFailureClass::PermissionError,
+            "validation_error" => ProviderFailureClass::ValidationError,
+            "usage_limit" => ProviderFailureClass::UsageLimit,
+            _ => ProviderFailureClass::Unknown,
+        };
+        let item = self.make_turn_item(
+            TurnItemMeta {
+                id: item_id,
+                ordinal: ord,
+                status: TurnItemStatus::Failed,
+                completed_at: Some(now_iso),
+                title: None,
+                now_iso,
+            },
+            TurnItemKind::Error {
+                failure: ProviderFailure {
+                    class,
+                    message: bounded,
+                    code: None,
+                    retryable: Some(retryable),
+                    reset_at: None,
+                },
+                retry: None,
+            },
         );
         self.wrap_event(now_iso, DomainEventPayload::TurnItemUpdated(Box::new(item)))
     }

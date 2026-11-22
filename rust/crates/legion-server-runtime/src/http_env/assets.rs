@@ -162,6 +162,7 @@ fn guess_mime_from_path(path: &Path) -> &'static str {
         Some("gif") => "image/gif",
         Some("webp") => "image/webp",
         Some("svg") => "image/svg+xml",
+        Some("ico") => "image/x-icon",
         Some("pdf") => "application/pdf",
         Some("txt" | "log" | "md") => "text/plain; charset=utf-8",
         Some("json") => "application/json",

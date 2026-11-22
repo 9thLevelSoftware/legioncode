@@ -74,21 +74,33 @@ struct AcpLoopIo<'a> {
     interrupt_notify: &'a Arc<Notify>,
 }
 
-/// Spawn and drive one bidirectional ACP stdio subprocess turn to completion or interruption.
-pub async fn execute_acp_turn(
-    sink: &EventSink,
-    registry: &AcpProcessRegistry,
+struct SpawnedAcpChild {
+    supervisor: Arc<StdMutex<JobProcessSupervisor>>,
+    token: legion_process_ffi::supervisor::ProcessToken,
+    writer: AcpWriter,
+    rx: mpsc::UnboundedReceiver<AcpIoEvent>,
+    stderr_capture: Option<Arc<StdMutex<String>>>,
+}
+
+fn spawn_acp_child(
     spec: &AcpDriverSpec,
-    input: &AcpTurnInput,
-) -> Result<(), ServerRuntimeError> {
-    let mut sub = Some(sink.pubsub().subscribe());
+    workspace_root: &std::path::Path,
+) -> Result<SpawnedAcpChild, ServerRuntimeError> {
     let mut env = SanitizedChildEnv::from_os_env();
     for (k, v) in &spec.env_overrides {
         env.set(k.as_str(), v.as_str());
     }
-    let spawn_spec = SpawnSpec::new(&spec.program)
-        .args(&spec.args)
-        .cwd(&input.workspace_root)
+    let raw_program = spec.program.to_string_lossy();
+    let raw_args: Vec<String> = spec
+        .args
+        .iter()
+        .map(|a| a.to_string_lossy().into_owned())
+        .collect();
+    let (program, args) =
+        crate::driver_resolver::resolve_spawn_program_args(&raw_program, &raw_args);
+    let spawn_spec = SpawnSpec::new(program)
+        .args(args)
+        .cwd(workspace_root)
         .env(env)
         .stdio(PipeSetConfig::piped())
         .windows_no_window(spec.windows_no_window);
@@ -104,10 +116,30 @@ pub async fn execute_acp_turn(
     let stdout = pipes
         .take_stdout()
         .ok_or_else(|| ServerRuntimeError::Process("child stdout pipe missing".to_owned()))?;
-    let mut rx = spawn_stdout_reader(stdout);
+    let rx = spawn_stdout_reader(stdout);
     let stderr_capture = pipes.take_stderr().map(spawn_stderr_collector);
+    Ok(SpawnedAcpChild {
+        supervisor,
+        token,
+        writer,
+        rx,
+        stderr_capture,
+    })
+}
 
-    let driver = ProviderDriverKind::new("acp")
+/// Spawn and drive one bidirectional ACP stdio subprocess turn to completion or interruption.
+pub async fn execute_acp_turn(
+    sink: &EventSink,
+    registry: &AcpProcessRegistry,
+    spec: &AcpDriverSpec,
+    input: &AcpTurnInput,
+) -> Result<(), ServerRuntimeError> {
+    let mut sub = Some(sink.pubsub().subscribe());
+    let mut spawned = spawn_acp_child(spec, &input.workspace_root)?;
+    let driver_slug = spec.driver_slug.as_deref().unwrap_or_else(|| {
+        legion_providers::drivers::normalize_driver_slug(input.run.provider_instance_id.as_str())
+    });
+    let driver = ProviderDriverKind::new(driver_slug)
         .map_err(|e| ServerRuntimeError::Persistence(e.to_string()))?;
     let session_id = ProviderSessionId::new(format!("psess-{}", input.run.id.as_str()))
         .map_err(|e| ServerRuntimeError::Persistence(e.to_string()))?;
@@ -125,9 +157,9 @@ pub async fn execute_acp_turn(
         thread_id: input.run.thread_id.clone(),
         provider_session_id: session_id.clone(),
         provider_thread_id: p_thread_id.clone(),
-        token,
-        supervisor: Arc::clone(&supervisor),
-        writer: writer.clone(),
+        token: spawned.token,
+        supervisor: Arc::clone(&spawned.supervisor),
+        writer: spawned.writer.clone(),
         acp_session_id: Arc::clone(&acp_session_id),
         interrupted: Arc::clone(&interrupted),
         interrupt_notify: Arc::clone(&interrupt_notify),
@@ -156,8 +188,8 @@ pub async fn execute_acp_turn(
         sink,
         registry,
         input,
-        writer: &writer,
-        rx: &mut rx,
+        writer: &spawned.writer,
+        rx: &mut spawned.rx,
         sub: &mut sub,
         ctx: &mut ctx,
         acp_session_id: &acp_session_id,
@@ -167,9 +199,9 @@ pub async fn execute_acp_turn(
     let result = drive_acp_protocol(&mut io).await;
 
     registry.remove(&input.run.id);
-    writer.close_stdin();
-    if let Ok(mut sup_guard) = supervisor.lock() {
-        let _ = sup_guard.terminate_child(token);
+    spawned.writer.close_stdin();
+    if let Ok(mut sup_guard) = spawned.supervisor.lock() {
+        let _ = sup_guard.terminate_child(spawned.token);
         let _ = sup_guard.terminate_tree(1);
     }
 
@@ -179,7 +211,7 @@ pub async fn execute_acp_turn(
         &mut ctx,
         result,
         &interrupted,
-        stderr_capture.as_ref(),
+        spawned.stderr_capture.as_ref(),
     )
 }
 

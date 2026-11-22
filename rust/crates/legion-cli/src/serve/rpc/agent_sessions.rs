@@ -39,20 +39,44 @@ pub(crate) fn scan(_state: &AppState, payload: Value) -> RpcExit {
         scan_claude_projects_dir(&claude_projects, &mut projects_map, &mut total_sessions);
     }
 
-    let projects: Vec<Value> = projects_map.into_values().collect();
+    let candidates: Vec<Value> = projects_map
+        .into_iter()
+        .map(|(root, entry)| {
+            let count = entry
+                .get("sessions")
+                .and_then(Value::as_array)
+                .map_or(0, Vec::len);
+            let title = Path::new(&root)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or(&root)
+                .to_owned();
+            json!({
+                "path": root,
+                "title": title,
+                "sources": ["claudeAgent"],
+                "threadCount": count,
+                "lastActiveAt": Value::Null,
+                "alreadyImported": false,
+                "git": Value::Null,
+            })
+        })
+        .collect();
     RpcExit::Success {
         value: json!({
-            "projects": projects,
-            "totalSessions": total_sessions,
+            "candidates": candidates,
             "scannedAt": utc_now_iso(),
+            "truncated": false,
         }),
     }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
 struct ImportPayload {
-    #[serde(default)]
+    project_id: Option<String>,
+    expected_workspace_root: Option<String>,
     projects: Vec<ImportProjectEntry>,
 }
 
@@ -79,21 +103,74 @@ pub(crate) async fn import(state: &AppState, payload: Value) -> RpcExit {
         Ok(p) => p,
         Err(e) => return e,
     };
-    let mut imported_project_ids = Vec::new();
-    let mut imported_thread_ids = Vec::new();
-
-    for proj in req.projects {
-        let root = proj.workspace_root.trim();
-        if root.is_empty() {
-            continue;
-        }
-        let proj_res = with_db_mut(state, |conn| {
+    if let Some(ref pid) = req.project_id {
+        let lookup = with_db_mut(state, |conn| {
             ensure_project_store_schema(conn).map_err(|e| {
-                rpc_fail_obj(json!({ "_tag": "AgentSessionScanError", "message": e.to_string() }))
+                rpc_fail_obj(json!({
+                    "_tag": "AgentSessionScanError",
+                    "operation": "read-projects",
+                    "cause": e.to_string(),
+                }))
             })?;
-            let rec = if let Some(existing) =
-                find_project_by_id_or_workspace(&*conn, root).ok().flatten()
-            {
+            Ok(find_project_by_id_or_workspace(&*conn, pid).ok().flatten())
+        });
+        match lookup {
+            Ok(Some(project)) => {
+                if let Some(ref expected) = req.expected_workspace_root
+                    && project.workspace_root != *expected
+                {
+                    return rpc_fail_obj(json!({
+                        "_tag": "AgentSessionImportProjectChangedError",
+                        "projectId": pid,
+                    }));
+                }
+                return RpcExit::Success {
+                    value: json!({ "importedCount": 0, "skippedCount": 0 }),
+                };
+            }
+            Ok(None) => {
+                return rpc_fail_obj(json!({
+                    "_tag": "AgentSessionImportProjectNotFoundError",
+                    "projectId": pid,
+                }));
+            }
+            Err(e) => return e,
+        }
+    }
+    let mut imported_count = 0_usize;
+    for proj in req.projects {
+        match import_project_sessions(state, proj).await {
+            Ok(count) => imported_count += count,
+            Err(e) => return e,
+        }
+    }
+
+    RpcExit::Success {
+        value: json!({
+            "importedCount": imported_count,
+            "skippedCount": 0,
+        }),
+    }
+}
+
+async fn import_project_sessions(
+    state: &AppState,
+    proj: ImportProjectEntry,
+) -> Result<usize, RpcExit> {
+    let root = proj.workspace_root.trim();
+    if root.is_empty() {
+        return Ok(0);
+    }
+    let project_id_str = with_db_mut(state, |conn| {
+        ensure_project_store_schema(conn).map_err(|e| {
+            rpc_fail_obj(json!({
+                "_tag": "AgentSessionScanError",
+                "operation": "read-projects",
+                "cause": e.to_string(),
+            }))
+        })?;
+        let rec =
+            if let Some(existing) = find_project_by_id_or_workspace(&*conn, root).ok().flatten() {
                 existing
             } else {
                 let mut input = CreateProjectInput::new(root);
@@ -101,65 +178,56 @@ pub(crate) async fn import(state: &AppState, payload: Value) -> RpcExit {
                     input = input.with_title(t);
                 }
                 create_project(&*conn, &input).map_err(|e| {
-                    rpc_fail_obj(
-                        json!({ "_tag": "AgentSessionScanError", "message": e.to_string() }),
-                    )
+                    rpc_fail_obj(json!({
+                        "_tag": "AgentSessionScanError",
+                        "operation": "read-projects",
+                        "cause": e.to_string(),
+                    }))
                 })?
             };
-            Ok(rec.id)
-        });
-        let project_id_str = match proj_res {
-            Ok(id) => id,
-            Err(e) => return e,
-        };
-        imported_project_ids.push(project_id_str.clone());
+        Ok(rec.id)
+    })?;
 
-        for sess in proj.sessions {
-            let tid_str = format!("thread-{}", Uuid::new_v4());
-            let title = sess
-                .title
-                .or(sess.id)
-                .unwrap_or_else(|| "Imported session".to_owned());
-            if let (Ok(cmd_id), Ok(tid), Ok(pid), Ok(ms)) = (
-                CommandId::new(format!("import-{}", Uuid::new_v4())),
-                ThreadId::new(tid_str.clone()),
-                ProjectId::new(&project_id_str),
-                serde_json::from_value::<ModelSelection>(json!({
-                    "instanceId": "claude",
-                    "model": "claude-sonnet-4-5",
-                })),
-            ) {
-                let cmd = OrchestrationCommand::ThreadCreate(ThreadCreateCommand {
-                    created_by: OrchestrationActor::User,
-                    creation_source: CreationSource::Web,
-                    command_id: cmd_id,
-                    thread_id: tid,
-                    project_id: pid,
-                    title,
-                    generate_title: Some(false),
-                    model_selection: ms,
-                    runtime_mode: RuntimeMode::ApprovalRequired,
-                    interaction_mode: ProviderInteractionMode::Default,
-                    branch: None,
-                    worktree_path: None,
-                    link_origin: None,
-                    delegated_from: None,
-                    imported_native_thread: None,
-                    initial_message: None,
-                });
-                if state.orchestrator.dispatch_now(&cmd).await.is_ok() {
-                    imported_thread_ids.push(tid_str);
-                }
+    let mut imported = 0_usize;
+    for sess in proj.sessions {
+        let tid_str = format!("thread-{}", Uuid::new_v4());
+        let title = sess
+            .title
+            .or(sess.id)
+            .unwrap_or_else(|| "Imported session".to_owned());
+        if let (Ok(cmd_id), Ok(tid), Ok(pid), Ok(ms)) = (
+            CommandId::new(format!("import-{}", Uuid::new_v4())),
+            ThreadId::new(tid_str.clone()),
+            ProjectId::new(&project_id_str),
+            serde_json::from_value::<ModelSelection>(json!({
+                "instanceId": "claudeAgent",
+                "model": "claude-sonnet-4-5",
+            })),
+        ) {
+            let cmd = OrchestrationCommand::ThreadCreate(ThreadCreateCommand {
+                created_by: OrchestrationActor::User,
+                creation_source: CreationSource::Web,
+                command_id: cmd_id,
+                thread_id: tid,
+                project_id: pid,
+                title,
+                generate_title: Some(false),
+                model_selection: ms,
+                runtime_mode: RuntimeMode::ApprovalRequired,
+                interaction_mode: ProviderInteractionMode::Default,
+                branch: None,
+                worktree_path: None,
+                link_origin: None,
+                delegated_from: None,
+                imported_native_thread: None,
+                initial_message: None,
+            });
+            if state.orchestrator.dispatch_now(&cmd).await.is_ok() {
+                imported += 1;
             }
         }
     }
-
-    RpcExit::Success {
-        value: json!({
-            "importedProjectIds": imported_project_ids,
-            "importedThreadIds": imported_thread_ids,
-        }),
-    }
+    Ok(imported)
 }
 
 fn scan_claude_projects_dir(

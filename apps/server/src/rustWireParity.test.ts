@@ -25,6 +25,7 @@ import * as Schema from "effect/Schema";
 import { fetch } from "undici";
 
 import { resolveRustCliBinary } from "./rustCutover.ts";
+import { runFullRpcAndProviderParityChecks } from "./rustWireParitySuite.ts";
 
 interface RpcFrame {
   readonly _tag: string;
@@ -232,7 +233,13 @@ function connectWs(url: string): Promise<RpcSocketHarness> {
   });
 }
 
-async function runWireParityChecks(origin: string, pairingToken: string, workspaceDir: string) {
+async function runWireParityChecks(
+  origin: string,
+  pairingToken: string,
+  workspaceDir: string,
+  tempRoot: string,
+  isWindows: boolean,
+) {
   // 1. ExecutionEnvironmentDescriptor
   const envRes = await fetch(`${origin}/.well-known/legioncode/environment`);
   assert.strictEqual(envRes.status, 200);
@@ -374,6 +381,16 @@ async function runWireParityChecks(origin: string, pairingToken: string, workspa
     rpc.sendInterrupt("sub-cfg");
     rpc.sendInterrupt("sub-shell");
     rpc.sendInterrupt("sub-thread");
+
+    await runFullRpcAndProviderParityChecks(
+      rpc,
+      workspaceDir,
+      tempRoot,
+      origin,
+      "proj-wire-1",
+      "thread-parity-sweep",
+      isWindows,
+    );
   } finally {
     rpc.close();
   }
@@ -424,7 +441,13 @@ it.live(
       );
 
       yield* Effect.promise(() =>
-        runWireParityChecks(started.origin, started.pairingToken, workspaceDir),
+        runWireParityChecks(
+          started.origin,
+          started.pairingToken,
+          workspaceDir,
+          tempRoot,
+          platform === "win32",
+        ),
       );
     }).pipe(Effect.scoped),
 );

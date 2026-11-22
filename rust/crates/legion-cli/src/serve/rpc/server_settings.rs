@@ -14,7 +14,7 @@ use super::{AppState, parse_optional_payload, parse_payload, rpc_fail, rpc_fail_
 pub(crate) fn dispatch(state: &AppState, tag: &str, payload: Value) -> RpcExit {
     match tag {
         "server.getSettings" => get_settings(state),
-        "server.updateSettings" => update_settings(state, payload),
+        "server.updateSettings" => update_settings(state, &payload),
         "server.upsertKeybinding" => upsert_keybinding(state, payload),
         "server.removeKeybinding" => remove_keybinding(state, payload),
         _ => rpc_fail(
@@ -40,14 +40,14 @@ fn get_settings(state: &AppState) -> RpcExit {
 #[serde(default, rename_all = "camelCase")]
 struct UpdateSettingsPayload {
     patch: Option<Value>,
+    provider_instance_mutation: Option<Value>,
 }
 
-fn update_settings(state: &AppState, payload: Value) -> RpcExit {
+fn update_settings(state: &AppState, payload: &Value) -> RpcExit {
     let raw: UpdateSettingsPayload = match parse_optional_payload(payload.clone()) {
         Ok(p) => p,
         Err(e) => return e,
     };
-    let patch = raw.patch.unwrap_or(payload);
     let mut current = match read_settings_json(&state.paths.settings_path) {
         Ok(v) => v,
         Err(msg) => {
@@ -59,7 +59,31 @@ fn update_settings(state: &AppState, payload: Value) -> RpcExit {
             }));
         }
     };
-    deep_merge_json(&mut current, &patch);
+    if let Some(patch) = raw.patch {
+        deep_merge_json(&mut current, &patch);
+    } else if raw.provider_instance_mutation.is_none() {
+        deep_merge_json(&mut current, payload);
+    }
+    if let Some(mutation) = raw.provider_instance_mutation
+        && let Some(op) = mutation.get("operation").and_then(Value::as_str)
+        && let Some(inst_id) = mutation.get("instanceId").and_then(Value::as_str)
+        && let Some(root) = current.as_object_mut()
+    {
+        let instances = root.entry("providerInstances").or_insert_with(|| json!({}));
+        if let Some(map) = instances.as_object_mut() {
+            match op {
+                "create" | "upsert" => {
+                    if let Some(inst) = mutation.get("instance").filter(|v| v.is_object()) {
+                        map.insert(inst_id.to_owned(), inst.clone());
+                    }
+                }
+                "remove" => {
+                    map.remove(inst_id);
+                }
+                _ => {}
+            }
+        }
+    }
     if let Err(msg) = write_json_atomic(&state.paths.settings_path, &current) {
         return rpc_fail_obj(json!({
             "_tag": "ServerSettingsError",

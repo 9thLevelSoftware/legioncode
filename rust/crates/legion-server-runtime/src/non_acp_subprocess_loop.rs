@@ -18,7 +18,9 @@ use serde_json::Value;
 use tokio::sync::{Notify, mpsc};
 use uuid::Uuid;
 
-use crate::acp_protocol_io::{format_process_failure, spawn_stderr_collector};
+use crate::acp_protocol_io::{
+    format_error_with_stderr, format_process_failure, spawn_stderr_collector,
+};
 use crate::error::ServerRuntimeError;
 use crate::non_acp_subprocess::NonAcpSubprocessInput;
 use crate::non_acp_subprocess_proto::{
@@ -47,8 +49,10 @@ pub(crate) fn spawn_supervised_non_acp(
     for (k, v) in &launch.env {
         env.set(k.as_str(), v.as_str());
     }
-    let spawn_spec = SpawnSpec::new(&launch.executable)
-        .args(&launch.args)
+    let (program, args) =
+        crate::driver_resolver::resolve_spawn_program_args(&launch.executable, &launch.args);
+    let spawn_spec = SpawnSpec::new(program)
+        .args(args)
         .cwd(cwd)
         .env(env)
         .stdio(PipeSetConfig::piped())
@@ -114,78 +118,121 @@ pub(crate) async fn drive_non_acp_lines(
         };
         match next {
             Some(LineIoEvent::Line(line)) => {
-                if line.trim().is_empty() {
-                    continue;
-                }
-                if !codex_turn_sent
-                    && let Some(ts_id) = loop_ctx.codex_ts_req
-                    && let Some(thread_id_str) = extract_codex_thread_id(&line, ts_id)
-                {
-                    if let Ok(mut guard) = loop_ctx.native_thread_id.lock() {
-                        *guard = Some(thread_id_str.clone());
-                    }
-                    let _ = send_codex_turn_start(
-                        loop_ctx.writer,
-                        loop_ctx.codex_codec,
-                        &thread_id_str,
-                        &loop_ctx.input.prompt,
-                    )?;
-                    codex_turn_sent = true;
-                }
-                let updates =
-                    parse_line_for_kind(loop_ctx.input.kind, loop_ctx.codex_codec, &line)?;
-                if !updates.is_empty() {
-                    let mut batch = Vec::new();
-                    for upd in updates {
-                        if let NonAcpTurnUpdate::PermissionRequested {
-                            ref request_id,
-                            ref tool_name,
-                            ..
-                        } = upd
-                        {
-                            send_permission_auto_reply(
-                                loop_ctx.input.kind,
-                                loop_ctx.writer,
-                                request_id,
-                                tool_name,
-                                loop_ctx.input.runtime_mode,
-                            );
-                        }
-                        if let NonAcpTurnUpdate::SessionStarted {
-                            ref provider_session_id,
-                            ..
-                        } = upd
-                            && let Ok(mut g) = loop_ctx.native_thread_id.lock()
-                            && g.is_none()
-                        {
-                            *g = Some(provider_session_id.clone());
-                        }
-                        batch.extend(apply_non_acp_update(
-                            loop_ctx.ctx,
-                            loop_ctx.summary,
-                            upd,
-                            &loop_ctx.input.now_iso,
-                            &loop_ctx.input.run.model_selection.model,
-                        )?);
-                    }
-                    if !batch.is_empty() {
-                        commit_runtime_events(
-                            loop_ctx.sink,
-                            &loop_ctx.input.run.thread_id,
-                            "runtime.non-acp.stream",
-                            &loop_ctx.input.now_iso,
-                            batch,
-                            Vec::new(),
-                        )?;
-                    }
-                    if loop_ctx.summary.terminal_seen {
-                        return Ok(());
-                    }
+                if process_non_acp_line(loop_ctx, &line, &mut codex_turn_sent)? {
+                    return Ok(());
                 }
             }
             Some(LineIoEvent::Eof) | None => return Ok(()),
             Some(LineIoEvent::Error(msg)) => return Err(ServerRuntimeError::Process(msg)),
         }
+    }
+}
+
+fn process_non_acp_line(
+    loop_ctx: &mut SubprocessLoopCtx<'_>,
+    line: &str,
+    codex_turn_sent: &mut bool,
+) -> Result<bool, ServerRuntimeError> {
+    if line.trim().is_empty() {
+        return Ok(false);
+    }
+    if !*codex_turn_sent
+        && let Some(ts_id) = loop_ctx.codex_ts_req
+        && let Some(thread_id_str) = extract_codex_thread_id(line, ts_id)
+    {
+        if let Ok(mut guard) = loop_ctx.native_thread_id.lock() {
+            *guard = Some(thread_id_str.clone());
+        }
+        let _ = send_codex_turn_start(
+            loop_ctx.writer,
+            loop_ctx.codex_codec,
+            &thread_id_str,
+            &loop_ctx.input.prompt,
+        )?;
+        *codex_turn_sent = true;
+    }
+    let updates = parse_line_for_kind(loop_ctx.input.kind, loop_ctx.codex_codec, line)?;
+    if updates.is_empty() {
+        return Ok(false);
+    }
+    let frame_kind = claude_frame_kind(loop_ctx.input.kind, line);
+    let suppress_asst_text =
+        frame_kind == Some("assistant") && loop_ctx.summary.saw_stream_text_delta;
+    let suppress_asst_thinking =
+        frame_kind == Some("assistant") && loop_ctx.summary.saw_stream_thinking_delta;
+    if frame_kind == Some("assistant") {
+        loop_ctx.summary.saw_stream_text_delta = false;
+        loop_ctx.summary.saw_stream_thinking_delta = false;
+    }
+    let mut batch = Vec::new();
+    for upd in updates {
+        if frame_kind == Some("stream_event") {
+            if matches!(&upd, NonAcpTurnUpdate::AssistantTextDelta { text } if !text.is_empty()) {
+                loop_ctx.summary.saw_stream_text_delta = true;
+            }
+            if matches!(&upd, NonAcpTurnUpdate::ReasoningDelta { text } if !text.is_empty()) {
+                loop_ctx.summary.saw_stream_thinking_delta = true;
+            }
+        }
+        if suppress_asst_text && matches!(&upd, NonAcpTurnUpdate::AssistantTextDelta { .. }) {
+            continue;
+        }
+        if suppress_asst_thinking && matches!(&upd, NonAcpTurnUpdate::ReasoningDelta { .. }) {
+            continue;
+        }
+        if let NonAcpTurnUpdate::PermissionRequested {
+            ref request_id,
+            ref tool_name,
+            ..
+        } = upd
+        {
+            send_permission_auto_reply(
+                loop_ctx.input.kind,
+                loop_ctx.writer,
+                request_id,
+                tool_name,
+                loop_ctx.input.runtime_mode,
+            );
+        }
+        if let NonAcpTurnUpdate::SessionStarted {
+            ref provider_session_id,
+            ..
+        } = upd
+            && let Ok(mut g) = loop_ctx.native_thread_id.lock()
+            && g.is_none()
+        {
+            *g = Some(provider_session_id.clone());
+        }
+        batch.extend(apply_non_acp_update(
+            loop_ctx.ctx,
+            loop_ctx.summary,
+            upd,
+            &loop_ctx.input.now_iso,
+            &loop_ctx.input.run.model_selection.model,
+        )?);
+    }
+    if !batch.is_empty() {
+        commit_runtime_events(
+            loop_ctx.sink,
+            &loop_ctx.input.run.thread_id,
+            "runtime.non-acp.stream",
+            &loop_ctx.input.now_iso,
+            batch,
+            Vec::new(),
+        )?;
+    }
+    Ok(loop_ctx.summary.terminal_seen)
+}
+
+pub(crate) fn claude_frame_kind(kind: NonAcpSubprocessKind, line: &str) -> Option<&'static str> {
+    if kind != NonAcpSubprocessKind::ClaudeStreamJson {
+        return None;
+    }
+    let val: Value = serde_json::from_str(line).ok()?;
+    match val.get("type").and_then(Value::as_str) {
+        Some("stream_event") => Some("stream_event"),
+        Some("assistant") => Some("assistant"),
+        _ => None,
     }
 }
 
@@ -198,17 +245,27 @@ pub(crate) fn finalize_non_acp_turn(
     stderr_capture: Option<&Arc<StdMutex<String>>>,
     was_interrupted: bool,
 ) -> Result<(), ServerRuntimeError> {
-    let final_status = if was_interrupted {
-        RunStatus::Interrupted
+    let (final_status, failure_note) = if was_interrupted {
+        (RunStatus::Interrupted, None)
     } else if stream_res.is_ok() && summary.failure_message.is_none() {
-        RunStatus::Completed
+        (RunStatus::Completed, None)
     } else {
-        RunStatus::Failed
+        let base = stream_res
+            .as_ref()
+            .err()
+            .map(ToString::to_string)
+            .or_else(|| summary.failure_message.clone())
+            .unwrap_or_else(|| "provider turn failed".to_owned());
+        (
+            RunStatus::Failed,
+            Some(format_error_with_stderr(&base, stderr_capture)),
+        )
     };
-    let finish_events = ctx.build_finish_events(
+    let finish_events = ctx.build_finish_events_with_error(
         &input.run,
         input.attempt.as_ref(),
         final_status,
+        failure_note.as_deref(),
         &input.now_iso,
     )?;
     let mut followups = Vec::new();

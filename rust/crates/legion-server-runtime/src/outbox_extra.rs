@@ -174,58 +174,92 @@ pub(crate) async fn handle_delegated_tasks_stop(
     Ok(())
 }
 
+pub(crate) struct TitleGenerateRequest<'a> {
+    pub orchestrator: &'a Orchestrator,
+    pub ctx: LoadedThreadContext,
+    pub title_provider: Option<ProviderDriverMode>,
+    pub thread_id: &'a ThreadId,
+    pub kind: &'a str,
+    pub command_id: &'a str,
+    pub message_id: Option<&'a MessageId>,
+    pub now_iso: &'a str,
+}
+
 pub(crate) async fn handle_title_generate(
-    orchestrator: &Orchestrator,
-    ctx: LoadedThreadContext,
-    title_provider: Option<ProviderDriverMode>,
-    thread_id: &ThreadId,
-    message_id: Option<&MessageId>,
-    now_iso: &str,
+    req: TitleGenerateRequest<'_>,
 ) -> Result<(), ServerRuntimeError> {
-    if ctx.thread.title_renamed == Some(true) {
-        return Ok(());
-    }
+    let TitleGenerateRequest {
+        orchestrator,
+        ctx,
+        title_provider,
+        thread_id,
+        kind,
+        command_id,
+        message_id,
+        now_iso,
+    } = req;
+    let request_id = ctx
+        .thread
+        .title_regeneration
+        .as_ref()
+        .and_then(|o| o.as_ref())
+        .and_then(|v| v.get("requestId"))
+        .and_then(serde_json::Value::as_str)
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(command_id)
+        .to_owned();
+    let skip_initial = kind != "regenerate" && ctx.thread.title_renamed == Some(true);
     let source_text = message_id
         .map(|id| ctx.message_text(id))
         .filter(|s| !s.trim().is_empty())
         .or_else(|| ctx.messages_by_id.values().next().cloned())
         .unwrap_or_default();
-    if source_text.trim().is_empty() {
-        return Ok(());
-    }
 
-    let generated = match title_provider {
-        Some(ProviderDriverMode::GrokHttp {
-            endpoint_url,
-            api_key,
-            model,
-        }) => {
-            let eff_model = model.as_deref().unwrap_or("grok-3-mini");
-            let base = (!endpoint_url.trim().is_empty()).then_some(endpoint_url.as_str());
-            let spec = build_grok_chat_completions_request(
-                base,
-                &api_key,
-                eff_model,
-                &[GrokChatMessage {
-                    role: "user".to_owned(),
-                    content: format!(
-                        "Summarize as a short 3-6 word thread title without quotes:\n{source_text}"
-                    ),
-                }],
-                false,
-                Some(24),
-            );
-            fetch_short_grok_title(&spec).await.ok().flatten()
-        }
-        _ => None,
+    let new_title = if skip_initial || source_text.trim().is_empty() {
+        None
+    } else {
+        let generated = match title_provider {
+            Some(ProviderDriverMode::GrokHttp {
+                endpoint_url,
+                api_key,
+                model,
+            }) => {
+                let eff_model = model.as_deref().unwrap_or("grok-3-mini");
+                let base = (!endpoint_url.trim().is_empty()).then_some(endpoint_url.as_str());
+                let spec = build_grok_chat_completions_request(
+                    base,
+                    &api_key,
+                    eff_model,
+                    &[GrokChatMessage {
+                        role: "user".to_owned(),
+                        content: format!(
+                            "Summarize as a short 3-6 word thread title without quotes:\n{source_text}"
+                        ),
+                    }],
+                    false,
+                    Some(24),
+                );
+                fetch_short_grok_title(&spec).await.ok().flatten()
+            }
+            _ => None,
+        };
+        generated.or_else(|| derive_thread_title(&source_text))
     };
 
-    let Some(new_title) = generated.or_else(|| derive_thread_title(&source_text)) else {
-        return Ok(());
-    };
     let mut updated_thread = ctx.thread;
-    updated_thread.title = new_title;
+    let status = if let Some(title) = new_title {
+        updated_thread.title = title;
+        "renamed"
+    } else {
+        "unchanged"
+    };
     now_iso.clone_into(&mut updated_thread.updated_at);
+    updated_thread.title_regeneration = Some(None);
+    updated_thread.last_title_regeneration = Some(Some(serde_json::json!({
+        "status": status,
+        "requestId": request_id,
+        "completedAt": now_iso,
+    })));
     let event = wrap_system_event(
         thread_id,
         None,

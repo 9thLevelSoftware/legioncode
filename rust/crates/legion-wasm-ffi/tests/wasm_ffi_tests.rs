@@ -7,5 +7,4 @@ mod wasm_ffi_tests {
     mod hook_actor;
     mod terminal_vt;
     mod wave5_helpers;
-    mod web_ui;
 }

@@ -1,26 +1,11 @@
-import { resolveLocale } from "../locales.ts";
-
 const DEFAULT_SOCKET_FRAME_PART_BYTES = 48 * 1024;
 const PART_PREFIX = "\u001e";
 const FALLBACK_ABI_VERSION = 1;
-const SUPPORTED_WEB_LOCALES = [
-  "en",
-  "de",
-  "es",
-  "fr",
-  "ja",
-  "ko",
-  "pt-BR",
-  "ru",
-  "sv",
-  "zh",
-] as const;
 
 interface WasmFfiExports {
   readonly legion_wasm_abi_version: () => number;
   readonly sanitize_bracketed_paste_str: (raw: string) => string;
   readonly split_utf16_frame_parts_json: (inputJson: string) => string;
-  readonly emit_web_app_bundle_json: () => string;
   readonly translate_i18n_json?: (inputJson: string) => string;
   readonly normalize_nfd_filename?: (raw: string) => string;
   readonly strip_osc4_queries?: (raw: string) => string;
@@ -52,12 +37,6 @@ interface RuntimeProcessLike {
   readonly getBuiltinModule?: (id: string) => unknown;
 }
 
-interface WebAppBundleAssets {
-  readonly indexHtml: string;
-  readonly stylesCss: string;
-  readonly appMjs: string;
-}
-
 let cachedNodeWasm: WasmFfiExports | null | undefined;
 let cachedBrowserWasm: WasmFfiExports | undefined;
 
@@ -71,8 +50,7 @@ function isWasmFfiExports(value: unknown): value is WasmFfiExports {
   return (
     typeof candidate.legion_wasm_abi_version === "function" &&
     typeof candidate.sanitize_bracketed_paste_str === "function" &&
-    typeof candidate.split_utf16_frame_parts_json === "function" &&
-    typeof candidate.emit_web_app_bundle_json === "function"
+    typeof candidate.split_utf16_frame_parts_json === "function"
   );
 }
 
@@ -444,73 +422,6 @@ export function splitSocketFrameParts(
     return response.parts;
   }
   return splitSocketFramePartsFallback(payload, partBytes);
-}
-
-function resolveWasmBundleLocale(wasm: WasmFfiExports, locale?: string): string {
-  if (!locale || !wasm.translate_i18n_json) {
-    return "en";
-  }
-  try {
-    const translated = JSON.parse(
-      wasm.translate_i18n_json(JSON.stringify({ language: locale })),
-    ) as { readonly locale?: string; readonly bcp47Tag?: string };
-    return translated.bcp47Tag ?? translated.locale ?? "en";
-  } catch {
-    return "en";
-  }
-}
-
-function fallbackWebAppBundleJson(locale?: string): string {
-  const resolvedLocale = locale
-    ? resolveLocale(locale, [locale], SUPPORTED_WEB_LOCALES, "en")
-    : "en";
-  const bundle: WebAppBundleAssets = {
-    indexHtml: [
-      "<!doctype html>",
-      `<html lang="${resolvedLocale}">`,
-      "  <head>",
-      '    <meta charset="utf-8" />',
-      '    <meta name="viewport" content="width=device-width, initial-scale=1" />',
-      "    <title>LegionCode</title>",
-      '    <link rel="stylesheet" href="./styles.css" />',
-      "  </head>",
-      "  <body>",
-      '    <div id="app" data-testid="app-root"></div>',
-      '    <script type="module" src="./app.mjs"></script>',
-      "  </body>",
-      "</html>",
-      "",
-    ].join("\n"),
-    stylesCss: ":root { color-scheme: dark; }\n.lc-shell { display: grid; min-height: 100vh; }\n",
-    appMjs: [
-      'import init, { WasmWebApp } from "./legion_wasm_ffi.js";',
-      "await init();",
-      'const app = new WasmWebApp(navigator.language || "en", Date.now());',
-      'app.dispatch_json(JSON.stringify({ type: "setLocale", language: "system" }));',
-      "",
-    ].join("\n"),
-  };
-  return JSON.stringify(bundle);
-}
-
-export function emitWebAppBundleJson(locale?: string): string {
-  const wasm = resolveActiveWasmExports();
-  if (wasm) {
-    const rawJson = wasm.emit_web_app_bundle_json();
-    if (!locale) {
-      return rawJson;
-    }
-    const targetLang = resolveWasmBundleLocale(wasm, locale);
-    if (targetLang === "en") {
-      return rawJson;
-    }
-    const parsed = JSON.parse(rawJson) as WebAppBundleAssets;
-    return JSON.stringify({
-      ...parsed,
-      indexHtml: parsed.indexHtml.replace('<html lang="en">', `<html lang="${targetLang}">`),
-    });
-  }
-  return fallbackWebAppBundleJson(locale);
 }
 
 const TRAILING_SEPARATORS_RE = /[/\\]+$/;

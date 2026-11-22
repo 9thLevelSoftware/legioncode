@@ -2,7 +2,6 @@
 import { spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
-import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -22,10 +21,16 @@ const VALID_SURFACES = new Set([
   "cloudflare-workers",
 ]);
 
-function run(command, args, cwd = repoRoot) {
+const WASM_WEB_FILES = ["legion_wasm_ffi.js", "legion_wasm_ffi.d.ts", "legion_wasm_ffi_bg.wasm"];
+
+function run(command, args, cwd = repoRoot, options = {}) {
   const rendered = `${command} ${args.join(" ")}`;
   process.stdout.write(`[build-dist] ${rendered}\n`);
-  const result = spawnSync(command, args, { cwd, stdio: "inherit" });
+  const result = spawnSync(command, args, {
+    cwd,
+    stdio: "inherit",
+    ...(options.shell ? { shell: true } : {}),
+  });
   if (result.error) {
     throw result.error;
   }
@@ -72,6 +77,20 @@ function copyDirContents(srcDir, destDir) {
   fs.cpSync(srcDir, destDir, { recursive: true, force: true });
 }
 
+function replaceDirContents(srcDir, destDir) {
+  fs.rmSync(destDir, { recursive: true, force: true });
+  copyDirContents(srcDir, destDir);
+}
+
+function stageWebBundle(webDistDir, destDir, wasmSourceDir) {
+  replaceDirContents(webDistDir, destDir);
+  if (wasmSourceDir && fs.existsSync(path.join(wasmSourceDir, "legion_wasm_ffi.js"))) {
+    for (const fileName of WASM_WEB_FILES) {
+      copyFileEnsured(path.join(wasmSourceDir, fileName), path.join(destDir, fileName));
+    }
+  }
+}
+
 function writeWasmPackageJson(dir, name, version, moduleType) {
   const manifest = {
     name,
@@ -116,6 +135,7 @@ const { values } = parseArgs({
     surfaces: { type: "string", default: "all" },
     target: { type: "string" },
     "out-dir": { type: "string" },
+    "skip-web-build": { type: "boolean", default: false },
   },
 });
 
@@ -149,8 +169,24 @@ const exeExt = isWindowsTarget ? ".exe" : "";
 const targetReleaseDir = target
   ? path.join(rustRoot, "target", target, "release")
   : path.join(rustRoot, "target", "release");
+const webDistDir = path.join(repoRoot, "apps", "web", "dist");
+const webDistIndex = path.join(webDistDir, "index.html");
+const skipWebBuild = Boolean(values["skip-web-build"]);
 
 fs.mkdirSync(outDir, { recursive: true });
+
+if (wantWebApp) {
+  if (skipWebBuild && fs.existsSync(webDistIndex)) {
+    process.stdout.write(`[build-dist] Reusing existing @legioncode/web build at ${webDistDir}\n`);
+  } else {
+    run("pnpm", ["--filter", "@legioncode/web", "build"], repoRoot, {
+      shell: process.platform === "win32",
+    });
+  }
+  if (!fs.existsSync(webDistIndex)) {
+    throw new Error(`Missing built @legioncode/web bundle at ${webDistIndex}`);
+  }
+}
 
 const nativePackages = [
   ...(wantCli ? ["legion-cli"] : []),
@@ -242,6 +278,8 @@ if (wantMobileSdk) {
   }
 }
 
+const wasmWebDir = path.join(outDir, "wasm-web");
+
 if (wantWasm) {
   run(
     "cargo",
@@ -269,7 +307,6 @@ if (wantWasm) {
     throw new Error(`Missing built WASM binary at ${wasmBinary}`);
   }
 
-  const wasmWebDir = path.join(outDir, "wasm-web");
   const wasmNodeDir = path.join(outDir, "wasm-nodejs");
   fs.mkdirSync(wasmWebDir, { recursive: true });
   fs.mkdirSync(wasmNodeDir, { recursive: true });
@@ -285,20 +322,6 @@ if (wantWasm) {
   writeWasmPackageJson(wasmWebDir, "@legioncode/legion-wasm-ffi", version, "module");
   writeWasmPackageJson(wasmNodeDir, "@legioncode/legion-wasm-ffi-node", version, "commonjs");
 
-  if (wantWebApp) {
-    const webAppDir = path.join(outDir, "web-app");
-    fs.mkdirSync(webAppDir, { recursive: true });
-    const req = createRequire(import.meta.url);
-    const wasmNode = req(path.join(wasmNodeDir, "legion_wasm_ffi.js"));
-    const bundle = JSON.parse(wasmNode.emit_web_app_bundle_json());
-    fs.writeFileSync(path.join(webAppDir, "index.html"), bundle.indexHtml);
-    fs.writeFileSync(path.join(webAppDir, "styles.css"), bundle.stylesCss);
-    fs.writeFileSync(path.join(webAppDir, "app.mjs"), bundle.appMjs);
-    for (const fileName of ["legion_wasm_ffi.js", "legion_wasm_ffi.d.ts", "legion_wasm_ffi_bg.wasm"]) {
-      copyFileEnsured(path.join(wasmWebDir, fileName), path.join(webAppDir, fileName));
-    }
-  }
-
   if (wantCloudflareWorkers) {
     const workerDir = path.join(outDir, "cloudflare-workers");
     const workerTemplatesDir = path.join(scriptDir, "cloudflare-workers");
@@ -306,10 +329,20 @@ if (wantWasm) {
     for (const fileName of ["worker.mjs", "worker_runtime.mjs", "wrangler.toml"]) {
       copyFileEnsured(path.join(workerTemplatesDir, fileName), path.join(workerDir, fileName));
     }
-    for (const fileName of ["legion_wasm_ffi.js", "legion_wasm_ffi.d.ts", "legion_wasm_ffi_bg.wasm"]) {
+    for (const fileName of WASM_WEB_FILES) {
       copyFileEnsured(path.join(wasmWebDir, fileName), path.join(workerDir, fileName));
     }
   }
+}
+
+if (wantWebApp) {
+  stageWebBundle(webDistDir, path.join(outDir, "web-app"), wasmWebDir);
+}
+if (wantCli && (wantWebApp || fs.existsSync(webDistIndex))) {
+  stageWebBundle(webDistDir, path.join(outDir, "bin", "client"), wasmWebDir);
+}
+if (wantDesktop && (wantWebApp || fs.existsSync(webDistIndex))) {
+  stageWebBundle(webDistDir, path.join(outDir, "desktop", "web-app"), wasmWebDir);
 }
 
 writeSha256Sums(outDir);

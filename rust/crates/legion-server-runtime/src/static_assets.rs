@@ -49,73 +49,115 @@ async fn handle_static_asset(
     uri: Uri,
     headers: HeaderMap,
 ) -> Response {
-    if method != Method::GET && method != Method::HEAD {
-        return text_response_with_header(
-            StatusCode::METHOD_NOT_ALLOWED,
-            "Method not allowed",
-            ALLOW,
-            "GET, HEAD",
-        );
-    }
-    let Some(ref configured_dir) = state.static_dir else {
-        return text_response(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "No static directory configured",
-        );
-    };
-    let Ok(canonical_root) = std::fs::canonicalize(configured_dir) else {
-        return text_response(StatusCode::NOT_FOUND, "Static directory not found");
-    };
-
     let Ok(decoded) = decode_and_validate_url_path(uri.path()) else {
         return text_response(StatusCode::BAD_REQUEST, "Invalid static file path");
     };
+    let is_head = method == Method::HEAD;
+    if ["/api", "/ws", "/oauth"]
+        .iter()
+        .any(|p| has_route_prefix(&decoded, p))
+    {
+        return json_not_found(is_head);
+    }
+    let is_well_known = has_route_prefix(&decoded, "/.well-known");
+    if method != Method::GET && method != Method::HEAD {
+        if is_well_known {
+            return json_not_found(false);
+        }
+        let mut resp = text_response(StatusCode::METHOD_NOT_ALLOWED, "Method not allowed");
+        insert_hdr(resp.headers_mut(), ALLOW, "GET, HEAD");
+        return resp;
+    }
+    let Some(canonical_root) = state
+        .static_dir
+        .as_deref()
+        .and_then(|dir| std::fs::canonicalize(dir).ok())
+    else {
+        if is_well_known {
+            return json_not_found(is_head);
+        }
+        return if state.static_dir.is_none() {
+            text_response(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "No static directory configured",
+            )
+        } else {
+            text_response(StatusCode::NOT_FOUND, "Static directory not found")
+        };
+    };
+
     let normalized = if decoded == "/" {
         "index.html".to_owned()
     } else {
         decoded.trim_start_matches('/').to_owned()
     };
     if normalized.is_empty() {
-        return serve_spa_index(&canonical_root, method == Method::HEAD);
+        return serve_spa_index(&canonical_root, is_head);
     }
 
     let candidate = resolve_candidate_path(&canonical_root, &normalized);
     let is_symlink =
         std::fs::symlink_metadata(&candidate).is_ok_and(|meta| meta.file_type().is_symlink());
-    match std::fs::canonicalize(&candidate) {
-        Ok(canonical_file) => {
-            if !canonical_file.starts_with(&canonical_root) {
-                return text_response(StatusCode::BAD_REQUEST, "Invalid static file path");
-            }
-            if is_symlink
-                && !canonical_file.is_dir()
-                && !is_workspace_preview_entry_path(&canonical_file)
-            {
-                return text_response(StatusCode::FORBIDDEN, "Symlink target is not previewable");
-            }
-            if canonical_file.is_dir() {
-                return serve_spa_index(&canonical_root, method == Method::HEAD);
-            }
-            let rel = canonical_file
-                .strip_prefix(&canonical_root)
-                .ok()
-                .map_or_default(|p| p.to_string_lossy().replace('\\', "/"));
-            if rel == "index.html" {
-                return serve_spa_index(&canonical_root, method == Method::HEAD);
-            }
-            serve_static_file(
-                &canonical_file,
-                &rel,
-                &state.manifest_assets,
-                method == Method::HEAD,
-                &headers,
-            )
-        }
-        Err(_) => {
-            // Check whether normalized still contains non-existent path inside valid root vs traversal
-            serve_spa_index(&canonical_root, method == Method::HEAD)
-        }
+    let Ok(canonical_file) = std::fs::canonicalize(&candidate) else {
+        return fallback_or_well_known_404(is_well_known, &canonical_root, is_head);
+    };
+    if !canonical_file.starts_with(&canonical_root) {
+        return text_response(StatusCode::BAD_REQUEST, "Invalid static file path");
     }
+    if is_symlink && !canonical_file.is_dir() && !is_workspace_preview_entry_path(&canonical_file) {
+        return text_response(StatusCode::FORBIDDEN, "Symlink target is not previewable");
+    }
+    if canonical_file.is_dir() {
+        return fallback_or_well_known_404(is_well_known, &canonical_root, is_head);
+    }
+    let rel = canonical_file
+        .strip_prefix(&canonical_root)
+        .ok()
+        .map_or_default(|p| p.to_string_lossy().replace('\\', "/"));
+    if rel == "index.html" {
+        return serve_spa_index(&canonical_root, is_head);
+    }
+    serve_static_file(
+        &canonical_file,
+        &rel,
+        &state.manifest_assets,
+        is_head,
+        &headers,
+    )
+}
+
+fn fallback_or_well_known_404(
+    is_well_known: bool,
+    canonical_root: &Path,
+    is_head: bool,
+) -> Response {
+    if is_well_known {
+        json_not_found(is_head)
+    } else {
+        serve_spa_index(canonical_root, is_head)
+    }
+}
+
+fn has_route_prefix(path: &str, prefix: &str) -> bool {
+    path == prefix
+        || path
+            .strip_prefix(prefix)
+            .is_some_and(|r| r.starts_with('/'))
+}
+
+fn json_not_found(is_head: bool) -> Response {
+    let body = if is_head {
+        ""
+    } else {
+        r#"{"error":"Not Found"}"#
+    };
+    let mut resp = text_response(StatusCode::NOT_FOUND, body);
+    insert_hdr(
+        resp.headers_mut(),
+        CONTENT_TYPE,
+        "application/json; charset=utf-8",
+    );
+    resp
 }
 
 fn resolve_candidate_path(canonical_root: &Path, normalized_rel: &str) -> PathBuf {
@@ -281,17 +323,6 @@ fn text_response(status: StatusCode, body: &str) -> Response {
         CONTENT_TYPE,
         "text/plain; charset=utf-8",
     );
-    resp
-}
-
-fn text_response_with_header(
-    status: StatusCode,
-    body: &str,
-    name: HeaderName,
-    value: &str,
-) -> Response {
-    let mut resp = text_response(status, body);
-    insert_hdr(resp.headers_mut(), name, value);
     resp
 }
 

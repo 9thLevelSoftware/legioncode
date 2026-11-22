@@ -1,8 +1,7 @@
-//! Host tests verifying Wave 5 `legion-wasm-ffi` pure helpers, `WasmClientCore` additions, and
-//! `WasmWebApp` Wave 5 integration.
+//! Host tests verifying Wave 5 `legion-wasm-ffi` pure helpers and `bridge` helpers.
 
 use legion_wasm_ffi::bridge::{
-    WebAppBridge, active_brand_json, allows_preview_tunnel_json, link_batch_plan_json,
+    active_brand_json, allows_preview_tunnel_json, highlight_hdl_json, link_batch_plan_json,
     normalize_nfd_filename, resolve_linked_thread_open_json, strip_osc4_queries,
 };
 use serde_json::Value;
@@ -75,22 +74,15 @@ fn wave5_client_core_and_web_app_bridge_helpers() -> Result<(), String> {
     assert_eq!(batch["concurrency"].as_u64(), Some(4));
     assert_eq!(batch["startedIds"].as_array().map(Vec::len), Some(4));
 
-    let mut web = WebAppBridge::new("en", 1_000);
-    let hdl: Value = serde_json::from_str(
-        &web.highlight_hdl_json("alu.sv", "always_ff @(posedge clk) q <= 1;")?,
-    )
+    let hdl: Value = serde_json::from_str(&highlight_hdl_json(
+        "alu.sv",
+        "always_ff @(posedge clk) q <= 1;",
+    )?)
     .map_err(|e| e.to_string())?;
     assert_eq!(hdl["language"].as_str(), Some("system-verilog"));
 
-    let res: Value =
-        serde_json::from_str(&web.dispatch_json(r#"{"type":"setDictationActive","active":true}"#)?)
-            .map_err(|e| e.to_string())?;
-    assert_eq!(res["state"]["composer"]["dictating"].as_bool(), Some(true));
-    assert!(
-        res["html"]
-            .as_str()
-            .unwrap_or_default()
-            .contains("data-dictating=\"true\"")
-    );
+    let unknown_hdl: Value = serde_json::from_str(&highlight_hdl_json("notes.txt", "plain text")?)
+        .map_err(|e| e.to_string())?;
+    assert_eq!(unknown_hdl["language"], Value::Null);
     Ok(())
 }

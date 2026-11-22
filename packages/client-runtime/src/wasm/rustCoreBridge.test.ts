@@ -1,10 +1,14 @@
+// @effect-diagnostics nodeBuiltinImport:off -- Probes built WASM artifact presence directly in Vitest.
+import * as NodeFS from "node:fs";
+import * as NodePath from "node:path";
+import * as NodeURL from "node:url";
+
 import { describe, expect, it } from "vite-plus/test";
 
 import {
   abiVersion,
   activeBrand,
   allowsPreviewTunnel,
-  emitWebAppBundleJson,
   initRustCoreBridge,
   isLegacyWebForced,
   isRustCoreWasmActive,
@@ -13,6 +17,11 @@ import {
   splitSocketFrameParts,
   stripOsc4Queries,
 } from "./rustCoreBridge.ts";
+
+const nodeWasmEntryPath = NodePath.resolve(
+  NodePath.dirname(NodeURL.fileURLToPath(import.meta.url)),
+  "../../../../rust/dist/wasm-nodejs/legion_wasm_ffi.js",
+);
 
 function withLegacyWebEnv<T>(value: string | undefined, fn: () => Promise<T>): Promise<T> {
   const previous = process.env.LEGIONCODE_LEGACY_WEB;
@@ -31,10 +40,13 @@ function withLegacyWebEnv<T>(value: string | undefined, fn: () => Promise<T>): P
 }
 
 describe("rustCoreBridge", () => {
-  it("loads live WASM in Node/Vitest and preserves paste, framing, and web bundle parity", async () => {
+  it("loads live WASM in Node/Vitest and preserves paste and framing parity", async () => {
     await withLegacyWebEnv(undefined, async () => {
       expect(isLegacyWebForced()).toBe(false);
       const wasmLoaded = await initRustCoreBridge();
+      if (NodeFS.existsSync(nodeWasmEntryPath)) {
+        expect(wasmLoaded).toBe(true);
+      }
       expect(isRustCoreWasmActive()).toBe(wasmLoaded);
       expect(abiVersion()).toBe(1);
 
@@ -49,17 +61,6 @@ describe("rustCoreBridge", () => {
       const unpairedPayload = "\ud800中中";
       const unpairedWasmParts = splitSocketFrameParts(unpairedPayload, 5);
       expect(unpairedWasmParts).toEqual(["\u001e\ufffd", "\u001e中", "中"]);
-
-      const bundle = JSON.parse(emitWebAppBundleJson("sv")) as {
-        readonly indexHtml: string;
-        readonly stylesCss: string;
-        readonly appMjs: string;
-      };
-      expect(bundle.indexHtml).toContain('<html lang="sv">');
-      expect(bundle.indexHtml).toContain("./styles.css");
-      expect(bundle.indexHtml).toContain("./app.mjs");
-      expect(bundle.stylesCss).toContain(".lc-shell");
-      expect(bundle.appMjs).toContain("WasmWebApp");
     });
   });
 
@@ -82,20 +83,13 @@ describe("rustCoreBridge", () => {
 
       const unpairedFallbackParts = splitSocketFrameParts("\ud800中中", 5);
       expect(unpairedFallbackParts).toEqual(["\u001e\ufffd", "\u001e中", "中"]);
-
-      const fallbackBundle = JSON.parse(emitWebAppBundleJson("de-DE")) as {
-        readonly indexHtml: string;
-        readonly stylesCss: string;
-        readonly appMjs: string;
-      };
-      expect(fallbackBundle.indexHtml).toContain('<html lang="de">');
-      expect(fallbackBundle.indexHtml).toContain("./styles.css");
-      expect(fallbackBundle.stylesCss).toContain(".lc-shell");
-      expect(fallbackBundle.appMjs).toContain("WasmWebApp");
     });
 
     await withLegacyWebEnv(undefined, async () => {
       const wasmLoaded = await initRustCoreBridge();
+      if (NodeFS.existsSync(nodeWasmEntryPath)) {
+        expect(wasmLoaded).toBe(true);
+      }
       expect(isRustCoreWasmActive()).toBe(wasmLoaded);
       expect(sanitizeBracketedPaste(rawPaste)).toBe(fallbackPaste);
       expect(splitSocketFrameParts("😀😀😀", 6)).toEqual(fallbackParts);

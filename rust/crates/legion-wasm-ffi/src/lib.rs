@@ -19,14 +19,13 @@ mod bridge_shared;
 mod bridge_surfaces;
 mod bridge_terminal;
 mod bridge_wave5;
-mod bridge_web_ui;
 mod bridge_worker;
 mod bridge_worker_bindings;
+mod hdl_highlight;
+mod hdl_keywords;
 mod wasm_edge;
-mod wasm_web;
 
 pub use wasm_edge::{WasmEdgeWorker, WasmHookInboxObject};
-pub use wasm_web::{WasmWebApp, emit_web_app_bundle_json};
 
 use wasm_bindgen::prelude::{JsValue, wasm_bindgen};
 

@@ -9,7 +9,7 @@ use crate::hdl_keywords::is_hdl_keyword;
 /// Supported hardware description languages (`f8f4a0b057`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum HdlLanguage {
+pub(crate) enum HdlLanguage {
     /// IEEE 1364 Verilog (`.v`, `.vh`, `verilog`).
     Verilog,
     /// IEEE 1800 `SystemVerilog` (`.sv`, `.svh`, `systemverilog`).
@@ -20,7 +20,7 @@ pub enum HdlLanguage {
 
 /// Resolves a language tag, markdown fence token, or file path/extension to an [`HdlLanguage`].
 #[must_use]
-pub fn resolve_hdl_language(lang_or_path: &str) -> Option<HdlLanguage> {
+pub(crate) fn resolve_hdl_language(lang_or_path: &str) -> Option<HdlLanguage> {
     let trimmed = lang_or_path.trim().trim_start_matches('.');
     let tail = trimmed.rsplit(['/', '\\']).next().unwrap_or(trimmed);
     let candidate = tail.rsplit('.').next().unwrap_or(tail).to_ascii_lowercase();
@@ -35,7 +35,7 @@ pub fn resolve_hdl_language(lang_or_path: &str) -> Option<HdlLanguage> {
 /// Tokenizes one source snippet or diff line in Verilog, `SystemVerilog`, or VHDL into
 /// `SyntaxTokenInput` runs (comments, strings, based literals, keywords, types, identifiers).
 #[must_use]
-pub fn tokenize_hdl(lang: HdlLanguage, source: &str) -> Vec<SyntaxTokenInput> {
+pub(crate) fn tokenize_hdl(lang: HdlLanguage, source: &str) -> Vec<SyntaxTokenInput> {
     let mut out = Vec::new();
     let mut idx = 0_usize;
     while idx < source.len() {

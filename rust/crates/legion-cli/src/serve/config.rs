@@ -200,34 +200,32 @@ pub(crate) fn build_descriptor(
 ) -> ExecutionEnvironmentDescriptor {
     let label = resolve_environment_label(cwd);
     let platform = PlatformInfo::new(current_platform_os(), current_platform_arch());
-    let mut builder = ExecutionEnvironmentDescriptor::builder(
+    let voice_supported = !legion_speech::discover_speech_devices().is_empty();
+    ExecutionEnvironmentDescriptor::builder(
         environment_id,
         label,
         platform,
         env!("CARGO_PKG_VERSION"),
-    );
-    if let Some(migration) = database_migration {
-        builder = builder.database_migration(migration);
-    }
-    builder.build()
+    )
+    .database_migration(database_migration.unwrap_or(105))
+    .voice_transcription(voice_supported)
+    .build()
 }
 
 fn resolve_environment_label(cwd: &Path) -> String {
-    for key in ["COMPUTERNAME", "HOSTNAME"] {
-        if let Ok(val) = env::var(key) {
-            let trimmed = val.trim();
-            if !trimmed.is_empty() {
-                return trimmed.to_owned();
-            }
-        }
-    }
-    if let Some(name) = cwd.file_name().and_then(|s| s.to_str()) {
-        let trimmed = name.trim();
-        if !trimmed.is_empty() {
-            return trimmed.to_owned();
-        }
-    }
-    "LegionCode environment".to_owned()
+    ["COMPUTERNAME", "HOSTNAME"]
+        .into_iter()
+        .filter_map(|k| env::var(k).ok())
+        .map(|v| v.trim().to_owned())
+        .find(|v| !v.is_empty())
+        .or_else(|| {
+            cwd.file_name()
+                .and_then(|s| s.to_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_owned)
+        })
+        .unwrap_or_else(|| "LegionCode environment".to_owned())
 }
 
 const fn current_platform_os() -> PlatformOs {
@@ -281,62 +279,47 @@ mod tests {
 
         let outside_cwd = temp.path().join("outside");
         fs::create_dir_all(&outside_cwd)?;
+        let pick = |e: &Path| resolve_default_static_dir_from(Some(e), &outside_cwd);
 
         // (5b) repo apps/server/dist/client fallback from rust/target/{debug,release}
         let repo_server_client = repo.join("apps").join("server").join("dist").join("client");
         write_index(&repo_server_client)?;
-        assert_eq!(
-            resolve_default_static_dir_from(Some(&target_debug), &outside_cwd),
-            Some(repo_server_client)
-        );
+        assert_eq!(pick(&target_debug), Some(repo_server_client));
 
         // (5a) repo apps/web/dist beats apps/server/dist/client
         let repo_web_dist = repo.join("apps").join("web").join("dist");
         write_index(&repo_web_dist)?;
-        assert_eq!(
-            resolve_default_static_dir_from(Some(&target_release), &outside_cwd),
-            Some(repo_web_dist)
-        );
+        assert_eq!(pick(&target_release), Some(repo_web_dist));
 
         // Non-target exe_dir does not walk up to repo root
         let non_target_bin = repo.join("bundle").join("bin");
         fs::create_dir_all(&non_target_bin)?;
-        assert_eq!(
-            resolve_default_static_dir_from(Some(&non_target_bin), &outside_cwd),
-            None
-        );
+        assert_eq!(pick(&non_target_bin), None);
 
-        // (4) <cwd>/client beats (5)
-        let cwd_client = outside_cwd.join("client");
-        write_index(&cwd_client)?;
-        assert_eq!(
-            resolve_default_static_dir_from(Some(&target_debug), &outside_cwd),
-            Some(cwd_client)
-        );
+        // (4) <cwd>/client beats (5), (3) <cwd>/apps/web/dist beats (4), (2) ../web-app beats (3), (1) exe/client beats (2)
+        for dir in [
+            outside_cwd.join("client"),
+            outside_cwd.join("apps").join("web").join("dist"),
+            repo.join("rust").join("target").join("web-app"),
+            target_debug.join("client"),
+        ] {
+            write_index(&dir)?;
+            assert_eq!(pick(&target_debug), Some(dir));
+        }
+        Ok(())
+    }
 
-        // (3) <cwd>/apps/web/dist beats (4)
-        let cwd_web_dist = outside_cwd.join("apps").join("web").join("dist");
-        write_index(&cwd_web_dist)?;
-        assert_eq!(
-            resolve_default_static_dir_from(Some(&target_debug), &outside_cwd),
-            Some(cwd_web_dist)
-        );
-
-        // (2) <exe_dir>/../web-app beats (3)
-        let exe_webapp = repo.join("rust").join("target").join("web-app");
-        write_index(&exe_webapp)?;
-        assert_eq!(
-            resolve_default_static_dir_from(Some(&target_debug), &outside_cwd),
-            Some(exe_webapp)
-        );
-
-        // (1) <exe_dir>/client beats (2)
-        let exe_client = target_debug.join("client");
-        write_index(&exe_client)?;
-        assert_eq!(
-            resolve_default_static_dir_from(Some(&target_debug), &outside_cwd),
-            Some(exe_client)
-        );
+    #[test]
+    fn build_descriptor_emits_protocol_v2_and_capabilities()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let env_id = legion_contracts::ids::EnvironmentId::new("env-test-1")?;
+        let v = serde_json::to_value(super::build_descriptor(env_id, Path::new("."), None))?;
+        assert_eq!(v["orchestrationProtocolVersion"], 2);
+        assert_eq!(v["databaseMigration"], 105);
+        for key in "shellThreadFamilies shellOlderSettled connectionProbe attachmentUploads vcsBranchStatus inlineMessageContext threadSettlement projectOrganization ignoredFileListing ignoredFileSearch environmentThemes commandOutputStreaming".split(' ') {
+            assert_eq!(v["capabilities"][key], true, "missing capability {key}");
+        }
+        assert!(v["capabilities"]["fileAttachments"]["maxUploadBytes"].is_number());
         Ok(())
     }
 }

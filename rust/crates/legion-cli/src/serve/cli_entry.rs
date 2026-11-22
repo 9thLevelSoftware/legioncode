@@ -2,12 +2,18 @@
 //! root `legioncode`, `legioncode start`, and `legioncode serve`.
 
 use std::io::IsTerminal as _;
+use std::path::Path;
 use std::process::{Command, Stdio};
+use std::time::{SystemTime, UNIX_EPOCH};
 
+use legion_persistence::pairing_tokens::{
+    ADMINISTRATIVE_CLIENT_SCOPES, IssuePairingTokenInput, issue_pairing_token,
+};
 use legion_persistence::paths::{ServerDerivedPaths, ensure_server_directories};
 use legion_persistence::project_store::{CreateProjectInput, add_or_unarchive_project};
 use legion_remote::live_network::LiveTailscaleController;
 use legion_remote::tunnel::tailscale::ServeTarget;
+use legion_shared::qr_code::build_pairing_url;
 
 use super::cli_flags::{ServerEntryKind, parse_server_cli_args};
 use super::config::ServeMode;
@@ -45,8 +51,10 @@ pub(crate) async fn run_entry(
         }
     }
 
+    let web_mode = parsed.config.mode == ServeMode::Web;
+    let dev_url = parsed.dev_url;
     let allow_browser = kind != ServerEntryKind::Serve
-        && parsed.config.mode == ServeMode::Web
+        && web_mode
         && !parsed.config.no_browser
         && std::io::stdin().is_terminal()
         && std::io::stdout().is_terminal();
@@ -74,9 +82,20 @@ pub(crate) async fn run_entry(
         false
     };
 
+    let pairing_url = if web_mode {
+        let base_origin = dev_url.as_deref().unwrap_or_else(|| server.origin());
+        mint_startup_pairing_url(&server.paths().db_path, base_origin)
+    } else {
+        None
+    };
+
     println!("LegionCode server listening on {}", server.origin());
+    if let Some(ref url) = pairing_url {
+        println!("  pairingUrl: {url}");
+    }
     if allow_browser {
-        open_browser_best_effort(server.origin());
+        let target = pairing_url.as_deref().unwrap_or_else(|| server.origin());
+        open_browser_best_effort(target);
     }
 
     wait_for_shutdown(&server.lock_fence()).await;
@@ -126,6 +145,20 @@ async fn disable_tailscale_serve(serve_port: u16) {
     if let Ok(ctl) = LiveTailscaleController::new() {
         let _ = ctl.disable_serve(serve_port, None).await;
     }
+}
+
+fn mint_startup_pairing_url(db_path: &Path, origin: &str) -> Option<String> {
+    const STARTUP_PAIRING_TTL_MS: i64 = 24 * 60 * 60 * 1_000;
+    let now_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|d| i64::try_from(d.as_millis()).ok())?;
+    let input = IssuePairingTokenInput::default()
+        .with_scopes(ADMINISTRATIVE_CLIENT_SCOPES.iter().map(|s| (*s).to_owned()))
+        .with_ttl_ms(STARTUP_PAIRING_TTL_MS)
+        .with_label("Browser startup");
+    let issued = issue_pairing_token(db_path, &input, now_ms).ok()?;
+    build_pairing_url(origin, &issued.credential).ok()
 }
 
 fn open_browser_best_effort(url: &str) {

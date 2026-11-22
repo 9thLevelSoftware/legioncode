@@ -1,8 +1,8 @@
-import { isProviderSkillUserInvocable } from "@t3tools/client-runtime/providerSkills";
-import type { ServerProviderSkill } from "@t3tools/contracts";
-import { assistantCitationLabel } from "@t3tools/shared/assistantCitations";
-import { formatProviderSkillDisplayName } from "@t3tools/shared/inlineSkills";
-import { fileBasename } from "@t3tools/shared/path";
+import { isProviderSkillUserInvocable } from "@legioncode/client-runtime/providerSkills";
+import type { ServerProviderSkill } from "@legioncode/contracts";
+import { assistantCitationLabel } from "@legioncode/shared/assistantCitations";
+import { formatProviderSkillDisplayName } from "@legioncode/shared/inlineSkills";
+import { fileBasename } from "@legioncode/shared/path";
 import {
   CircleDashedIcon,
   ImageIcon,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import type { EnvironmentProject } from "@t3tools/client-runtime/state/models";
-import { EnvironmentId, ProjectId } from "@t3tools/contracts";
+import type { EnvironmentProject } from "@legioncode/client-runtime/state/models";
+import { EnvironmentId, ProjectId } from "@legioncode/contracts";
 
 import { issueFilterProjects, issuesSearchFromUrl } from "./issuesSearch.logic";
 
@@ -29,9 +29,9 @@ describe("issueFilterProjects", () => {
       ({
         id: ProjectId.make(id),
         environmentId,
-        title: "t3code",
+        title: "legioncode",
         workspaceRoot: `/work/${id}`,
-        repositoryIdentity: { canonicalKey: "github.com/pingdotgg/t3code" },
+        repositoryIdentity: { canonicalKey: "github.com/9thLevelSoftware/legioncode" },
         isScratch,
       }) as unknown as EnvironmentProject;
     const choices = issueFilterProjects(
@@ -39,8 +39,8 @@ describe("issueFilterProjects", () => {
       new Map([[environmentId, "laptop"]]),
     );
     expect(choices.map((choice) => [choice.id, choice.title])).toEqual([
-      ["main", "t3code · laptop · /work/main"],
-      ["worktree", "t3code · laptop · /work/worktree"],
+      ["main", "legioncode · laptop · /work/main"],
+      ["worktree", "legioncode · laptop · /work/worktree"],
     ]);
   });
 });

@@ -1,9 +1,9 @@
-import type { EnvironmentCloudLinkStateResult } from "@t3tools/contracts";
+import type { EnvironmentCloudLinkStateResult } from "@legioncode/contracts";
 import type {
   RelayManagedEndpoint,
   RelayManagedEndpointProviderKind,
-} from "@t3tools/contracts/relay";
-import { parseUrl } from "@t3tools/shared/url";
+} from "@legioncode/contracts/relay";
+import { parseUrl } from "@legioncode/shared/url";
 
 // Require managed discovery: stale tunnel config after a publish-only switch causes endpoint_provider_not_managed.
 export function isManagedTunnelActive(
@@ -39,11 +39,11 @@ export function cloudChangeReplacesLink(
 const TUNNEL_HOSTNAME = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i;
 
 /**
- * An environment's MCP URL on its T3 Connect tunnel, or null. This machine reports its own
- * tunnel hostname; a saved machine's comes from T3 Connect, and only a tunnel counts there,
+ * An environment's MCP URL on its Legion Connect tunnel, or null. This machine reports its own
+ * tunnel hostname; a saved machine's comes from Legion Connect, and only a tunnel counts there,
  * since a publish-only link registers its local address as `manual`.
  */
-export function t3ConnectMcpUrl(input: {
+export function legionConnectMcpUrl(input: {
   readonly thisMachine: boolean;
   readonly tunnelHostname: string | undefined;
   readonly relayEndpoint: RelayManagedEndpoint | undefined;
@@ -58,8 +58,8 @@ export function t3ConnectMcpUrl(input: {
     : null;
 }
 
-/** Where T3 Connect can be turned on for an environment: from here, only by policy, or on its host. */
-export type T3ConnectTurnOn =
+/** Where Legion Connect can be turned on for an environment: from here, only by policy, or on its host. */
+export type LegionConnectTurnOn =
   | { readonly kind: "here" }
   | { readonly kind: "policy"; readonly reason: string }
   | { readonly kind: "on-host" };
@@ -68,13 +68,13 @@ export type T3ConnectTurnOn =
  * Settings and the MCP wizard share this, so a Turn on control shows only where linking works.
  * `linkableHere` is the environment's own answer for this session (its link state).
  */
-export function resolveT3ConnectTurnOn(input: {
+export function resolveLegionConnectTurnOn(input: {
   readonly linkableHere: boolean;
   readonly cloudConfigured: boolean;
   readonly canReadRelay: boolean;
   readonly canWriteRelay: boolean;
   readonly connectDenial: string | undefined;
-}): T3ConnectTurnOn {
+}): LegionConnectTurnOn {
   if (input.connectDenial !== undefined) return { kind: "policy", reason: input.connectDenial };
   return input.linkableHere && input.cloudConfigured && input.canReadRelay && input.canWriteRelay
     ? { kind: "here" }

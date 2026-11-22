@@ -1,9 +1,14 @@
 import {
   makeThreadRequestsResolvedAnnouncer,
   userInputDraftKey,
-} from "@t3tools/client-runtime/state/thread-requests";
-import { ApprovalRequestId, EnvironmentId, RuntimeRequestId, ThreadId } from "@t3tools/contracts";
-import { threadContextRecord } from "@t3tools/shared/composerContextReferences";
+} from "@legioncode/client-runtime/state/thread-requests";
+import {
+  ApprovalRequestId,
+  EnvironmentId,
+  RuntimeRequestId,
+  ThreadId,
+} from "@legioncode/contracts";
+import { threadContextRecord } from "@legioncode/shared/composerContextReferences";
 import { beforeEach, expect, it, vi } from "vite-plus/test";
 import { useComposerDraftStore } from "./composerDraftStore";
 import { formatInlineContextReference } from "./lib/composerContextReferences";

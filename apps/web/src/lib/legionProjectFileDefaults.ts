@@ -1,6 +1,10 @@
-import { T3_PROJECT_FILE_NAME, type EnvironmentId, type T3ProjectFile } from "@t3tools/contracts";
-import { parseT3ProjectFile } from "@t3tools/shared/t3ProjectFile";
-import { executeAtomQuery } from "@t3tools/client-runtime/state/runtime";
+import {
+  LEGION_PROJECT_FILE_NAME,
+  type EnvironmentId,
+  type LegionProjectFile,
+} from "@legioncode/contracts";
+import { parseLegionProjectFile } from "@legioncode/shared/legionProjectFile";
+import { executeAtomQuery } from "@legioncode/client-runtime/state/runtime";
 
 import {
   getProjectFileQueryAtom,
@@ -8,21 +12,21 @@ import {
 } from "~/components/files/projectFilesQueryState";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 
-export async function readT3ProjectFile(
+export async function readLegionProjectFile(
   environmentId: EnvironmentId,
   workspaceRoot: string,
-): Promise<T3ProjectFile | null> {
+): Promise<LegionProjectFile | null> {
   const result = await executeAtomQuery(
     appAtomRegistry,
-    getProjectFileQueryAtom(environmentId, workspaceRoot, T3_PROJECT_FILE_NAME),
+    getProjectFileQueryAtom(environmentId, workspaceRoot, LEGION_PROJECT_FILE_NAME),
     { reportDefect: false, reportFailure: false },
   );
   const data = resolveProjectFileQueryData(
     environmentId,
     workspaceRoot,
-    T3_PROJECT_FILE_NAME,
+    LEGION_PROJECT_FILE_NAME,
     result._tag === "Success" ? result.value : null,
   );
   if (data === null || data.exists === false || data.truncated) return null;
-  return parseT3ProjectFile(data.contents);
+  return parseLegionProjectFile(data.contents);
 }

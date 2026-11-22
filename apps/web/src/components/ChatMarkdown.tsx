@@ -1,9 +1,9 @@
 import { m } from "../i18n/messages";
-import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { thrownErrorMessage } from "@legioncode/client-runtime/errors";
 import { msg, T, useGT, useMessages } from "gt-react";
-import { resolvePathLinkTarget } from "@t3tools/shared/fileLinks";
+import { resolvePathLinkTarget } from "@legioncode/shared/fileLinks";
 import { clientHostEnvironmentAtom } from "../state/clientHostEnvironment";
-import { buildFileLinkParentSuffixByPath, fileLinkLabel } from "@t3tools/shared/fileLinks";
+import { buildFileLinkParentSuffixByPath, fileLinkLabel } from "@legioncode/shared/fileLinks";
 import {
   isMarkdownFileLinkLabel,
   isWindowsDrivePathHref,
@@ -12,15 +12,15 @@ import {
   extractInlineCodeSpans,
   extractMarkdownLinkHrefs,
   inlineCodeFilePathCandidate,
-} from "@t3tools/shared/markdownLinks";
-import { taskListMarkerOffset } from "@t3tools/shared/markdownTaskList";
-import { isHostPath, resolveWorkspaceFilePath } from "@t3tools/shared/path";
+} from "@legioncode/shared/markdownLinks";
+import { taskListMarkerOffset } from "@legioncode/shared/markdownTaskList";
+import { isHostPath, resolveWorkspaceFilePath } from "@legioncode/shared/path";
 import { usePullRequestLinking } from "~/hooks/usePullRequestLinking";
 import {
   AuthFilesystemReadScope,
   AuthOrchestrationOperateScope,
   SOURCE_CONTROL_MEDIA_ASSET,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   CHAT_MARKDOWN_REMARK_PLUGINS,
   CHAT_MARKDOWN_REMARK_PLUGINS_WITH_BREAKS,
@@ -28,12 +28,12 @@ import {
   chatMarkdownImageSource,
   decodeMarkdownLinkEscapes,
   remarkAssistantInsights,
-} from "@t3tools/shared/markdownPipeline";
+} from "@legioncode/shared/markdownPipeline";
 import { useAtomValue } from "@effect/atom-react";
 import {
   COMPOSER_CONTEXT_CLIPBOARD_MIME,
   encodeComposerContextClipboardHtml,
-} from "@t3tools/shared/composerContextClipboard";
+} from "@legioncode/shared/composerContextClipboard";
 import {
   FileSpreadsheetIcon,
   FileTextIcon,
@@ -59,23 +59,23 @@ import {
   type ScopedThreadRef,
   type ServerProviderSkill,
   type ThreadPullRequestKey,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
-import { scopedThreadKey } from "@t3tools/client-runtime/environment";
+} from "@legioncode/client-runtime/state/runtime";
+import { scopedThreadKey } from "@legioncode/client-runtime/environment";
 import type {
   CodexArtifactTemplate,
   CodexArtifactTemplateKind,
-} from "@t3tools/shared/codexArtifactTemplates";
-import { codexArtifactTemplatePresentationLabel } from "@t3tools/shared/codexArtifactTemplatesCopy";
+} from "@legioncode/shared/codexArtifactTemplates";
+import { codexArtifactTemplatePresentationLabel } from "@legioncode/shared/codexArtifactTemplatesCopy";
 import {
   classifyMarkdownImageSource,
   markdownImageSourceFragment,
-} from "@t3tools/client-runtime/markdown-images";
-import { mediaUrlReference } from "@t3tools/client-runtime/media-reference";
-import { mediaKindFromPath, mediaMimeTypeFromExtension } from "@t3tools/shared/mediaPreview";
+} from "@legioncode/client-runtime/markdown-images";
+import { mediaUrlReference } from "@legioncode/client-runtime/media-reference";
+import { mediaKindFromPath, mediaMimeTypeFromExtension } from "@legioncode/shared/mediaPreview";
 import { InlineAudioPreview } from "./files/InlineAudioPreview";
 import { HostImageUrlContext } from "./chat/hostImageUrl";
 import * as Cause from "effect/Cause";
@@ -102,17 +102,17 @@ import type {
 import { createIncrementalMarkdownPlugin } from "../markdown-incremental";
 import type { Pluggable, PluggableList } from "unified";
 import { defaultUrlTransform } from "react-markdown";
-import { parseAssistantCitationHref } from "@t3tools/shared/assistantCitations";
-import { parseComposerContextHref } from "@t3tools/shared/composerContextReferences";
-import { parseThreadLinkHref } from "@t3tools/shared/threadLinks";
+import { parseAssistantCitationHref } from "@legioncode/shared/assistantCitations";
+import { parseComposerContextHref } from "@legioncode/shared/composerContextReferences";
+import { parseThreadLinkHref } from "@legioncode/shared/threadLinks";
 import { AssistantCitationEmbed } from "./chat/AssistantCitationChip";
 import { MarkdownThreadLink } from "./chat/MarkdownThreadLink";
-import { mathKind } from "@t3tools/shared/markdownMath";
+import { mathKind } from "@legioncode/shared/markdownMath";
 import remarkMath from "remark-math";
 import {
   artifactTemplateFromHastProperties,
   renderCodexInlineDirectivesAsMarkdown,
-} from "@t3tools/shared/codexMarkdownDirectives";
+} from "@legioncode/shared/codexMarkdownDirectives";
 import { renderSkillInlineMarkdownChildren } from "./chat/SkillInlineText";
 import { MarkdownMath } from "./chat/MarkdownMath";
 import {
@@ -190,13 +190,13 @@ import {
   pickWorkspaceLinkMatch,
   WORKSPACE_BASENAME_LOOKUP_LIMIT,
   workspaceLinkLookupQuery,
-} from "@t3tools/client-runtime/workspace-basename-lookup";
-import { resolvePullRequestPreviewTarget } from "@t3tools/client-runtime/change-request-links";
+} from "@legioncode/client-runtime/workspace-basename-lookup";
+import { resolvePullRequestPreviewTarget } from "@legioncode/client-runtime/change-request-links";
 import {
   mayContainStandaloneIssueLink,
   resolveIssueLinkTarget,
-} from "@t3tools/client-runtime/issue-links";
-import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
+} from "@legioncode/client-runtime/issue-links";
+import { sourceControlClients } from "@legioncode/client-runtime/source-control-clients";
 import { useOpenChangeRequestLink } from "~/lib/openPullRequestLink";
 import { textDirection } from "~/textDirection";
 import { useOpenLink } from "../browser/useOpenLink";
@@ -574,7 +574,7 @@ function useChatMarkdownState({
     setLocalMedia(null);
   }
   // Layout cleanup blocks stale requests from reaching onImageExpand before paint.
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- layout cleanup invalidates media requests still loading for the old scope before paint
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- layout cleanup invalidates media requests still loading for the old scope before paint
   useLayoutEffect(
     () => () => {
       mediaRequestId.current += 1;
@@ -1917,7 +1917,7 @@ const MarkdownSource = memo(function MarkdownSource({
         urlTransform: markdownUrlTransform,
       });
   const element = render(text);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Caching during render would make React Compiler rebuild the element when `cache` flips.
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- Caching during render would make React Compiler rebuild the element when `cache` flips.
   useEffect(() => {
     if (shared && cache) render.remember(text, element);
   }, [render, text, element, shared, cache]);

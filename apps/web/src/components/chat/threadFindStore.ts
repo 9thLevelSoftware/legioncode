@@ -2,13 +2,13 @@ import type {
   OrchestrationThreadSearchMatch,
   OrchestrationV2SearchThreadResult,
   ScopedThreadRef,
-} from "@t3tools/contracts";
-import { scopedThreadKey } from "@t3tools/client-runtime/environment";
+} from "@legioncode/contracts";
+import { scopedThreadKey } from "@legioncode/client-runtime/environment";
 import {
   findSearchTokenRanges,
   messagePhrase,
   messageSearchTokens,
-} from "@t3tools/shared/paletteSearch";
+} from "@legioncode/shared/paletteSearch";
 import { create } from "zustand";
 import type { ThemeAppearance } from "~/themePalette";
 import type { ThreadFindPositionReader, ThreadFindStart } from "./threadFind";

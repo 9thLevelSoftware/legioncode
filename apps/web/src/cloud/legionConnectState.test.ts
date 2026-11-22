@@ -1,7 +1,7 @@
-import type { EnvironmentCloudLinkStateResult } from "@t3tools/contracts";
+import type { EnvironmentCloudLinkStateResult } from "@legioncode/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
-import { cloudChangeReplacesLink } from "./t3ConnectState";
+import { cloudChangeReplacesLink } from "./legionConnectState";
 
 function linkState(input: {
   readonly linked: boolean;

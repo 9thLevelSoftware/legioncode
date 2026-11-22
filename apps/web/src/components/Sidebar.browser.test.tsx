@@ -1,8 +1,8 @@
 import appCss from "../index.css?inline";
-import type { EnvironmentServerConfig } from "@t3tools/client-runtime/connection";
+import type { EnvironmentServerConfig } from "@legioncode/client-runtime/connection";
 import * as shelfHooks from "../state/olderSettledShelf";
 import { createWorkspaceFocusController, workspaceAreaProps } from "../lib/workspaceFocus";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
+import type { EnvironmentThreadShell } from "@legioncode/client-runtime/state/shell";
 import {
   DEFAULT_CLIENT_SETTINGS,
   EnvironmentId,
@@ -10,8 +10,8 @@ import {
   ProjectId,
   ThreadId,
   type ScopedThreadRef,
-} from "@t3tools/contracts";
-import { isMacPlatform } from "@t3tools/shared/keybindings";
+} from "@legioncode/contracts";
+import { isMacPlatform } from "@legioncode/shared/keybindings";
 import { describe, expect, it, vi } from "vite-plus/test";
 import { userEvent } from "vite-plus/test/browser";
 
@@ -47,7 +47,7 @@ vi.mock("../state/use-orchestration-command", { spy: true });
 vi.mock("../localApi", { spy: true });
 vi.mock(import("../state/server"), async (original) => {
   const { Atom } = await import("effect/reactivity");
-  const { compileResolvedKeybindingsConfig } = await import("@t3tools/shared/keybindings");
+  const { compileResolvedKeybindingsConfig } = await import("@legioncode/shared/keybindings");
   // The desktop defaults: holding Mod alone already matches a thread jump.
   const keybindings = compileResolvedKeybindingsConfig([
     { key: "mod+1", command: "thread.jump.1" },

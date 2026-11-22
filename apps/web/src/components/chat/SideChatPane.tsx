@@ -1,16 +1,16 @@
-import { scopeThreadRef } from "@t3tools/client-runtime/environment";
-import { threadRuntimeIsActive } from "@t3tools/client-runtime/state/shell";
-import { resolveLatestMergeBackRun } from "@t3tools/client-runtime/state/thread-workflows";
+import { scopeThreadRef } from "@legioncode/client-runtime/environment";
+import { threadRuntimeIsActive } from "@legioncode/client-runtime/state/shell";
+import { resolveLatestMergeBackRun } from "@legioncode/client-runtime/state/thread-workflows";
 import {
   isAtomCommandInterrupted,
   settlePromise,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@legioncode/client-runtime/state/runtime";
 import {
   AuthOrchestrationOperateScope,
   type ScopedThreadRef,
   type ThreadId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import { T, useGT } from "gt-react";
 import { Trash2Icon, XIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -43,7 +43,7 @@ export default function SideChatPane(props: {
   const { parentRef, threadId } = props;
   const gt = useGT();
   const threadRef = scopeThreadRef(parentRef.environmentId, threadId);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- registers the parent panel as host in the panel store
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- registers the parent panel as host in the panel store
   useEffect(
     () => hostRightPanel(scopeThreadRef(parentRef.environmentId, threadId), parentRef),
     [parentRef, threadId],

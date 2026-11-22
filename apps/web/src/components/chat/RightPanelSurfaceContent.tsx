@@ -9,8 +9,8 @@ import type {
   ScopedThreadRef,
   ThreadLinkedPullRequest,
   ThreadPullRequestLink,
-} from "@t3tools/contracts";
-import { scopedThreadKey } from "@t3tools/client-runtime/environment";
+} from "@legioncode/contracts";
+import { scopedThreadKey } from "@legioncode/client-runtime/environment";
 import { lazy, Suspense } from "react";
 import SideChatPane from "./SideChatPane";
 import type { ComposerImageAttachment, DraftId } from "../../composerDraftStore";
@@ -129,7 +129,7 @@ export function RightPanelSurfaceContent(props: {
         return (
           <PullRequestsUnavailableState
             title={gt("Pull requests unavailable")}
-            error={gt("Update this environment's T3 Code server to browse pull requests.")}
+            error={gt("Update this environment's LegionCode server to browse pull requests.")}
           />
         );
       }
@@ -182,7 +182,7 @@ export function RightPanelSurfaceContent(props: {
         return (
           <PullRequestsUnavailableState
             title={gt("Issues unavailable")}
-            error={gt("Update this environment's T3 Code server to browse issues.")}
+            error={gt("Update this environment's LegionCode server to browse issues.")}
           />
         );
       }

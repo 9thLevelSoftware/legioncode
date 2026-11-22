@@ -4,7 +4,7 @@ import type {
   VoiceStreamingSession,
   VoiceInputErrorCode,
   VoiceTranscriptionOptions,
-} from "@t3tools/client-runtime/voice-input";
+} from "@legioncode/client-runtime/voice-input";
 import { requestMicrophone } from "./requestMicrophone";
 import workletUrl from "./pcmWorklet.ts?worker&url";
 import { msg } from "gt-react";
@@ -91,7 +91,7 @@ export function createBrowserPcmCapture(
         audioContext = context;
         await context.audioWorklet.addModule(workletUrl);
         captureSignal.throwIfAborted();
-        const node = new AudioWorkletNode(context, "t3-pcm-capture", { channelCount: 1 });
+        const node = new AudioWorkletNode(context, "legion-pcm-capture", { channelCount: 1 });
         worklet = node;
         node.port.onmessage = ({
           data,

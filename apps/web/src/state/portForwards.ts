@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-react";
-import type { DesktopPortForward, EnvironmentId } from "@t3tools/contracts";
+import type { DesktopPortForward, EnvironmentId } from "@legioncode/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
@@ -9,7 +9,7 @@ import * as AsyncResult from "effect/reactivity/AsyncResult";
 import { Atom } from "effect/reactivity";
 import { msg } from "gt-react";
 
-import type { ConnectionTarget } from "@t3tools/client-runtime/connection";
+import type { ConnectionTarget } from "@legioncode/client-runtime/connection";
 
 import { tunnelsEnvironmentLoopback } from "../browser/browserTargetResolver";
 import { m } from "../i18n/messages";

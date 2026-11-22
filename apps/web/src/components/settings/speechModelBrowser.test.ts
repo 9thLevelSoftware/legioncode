@@ -1,6 +1,6 @@
-import type { EnvironmentSpeechModel } from "@t3tools/contracts";
+import type { EnvironmentSpeechModel } from "@legioncode/contracts";
 import { expect, it } from "vite-plus/test";
-import { recommendSpeechModels } from "@t3tools/shared/speech";
+import { recommendSpeechModels } from "@legioncode/shared/speech";
 
 import { filterSpeechModels } from "./speechModelBrowser";
 

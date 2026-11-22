@@ -3,7 +3,7 @@ import {
   ClientCapabilities,
   PlatformConnectionSource,
   Persistence,
-} from "@t3tools/client-runtime/platform";
+} from "@legioncode/client-runtime/platform";
 import {
   BearerConnectionCredential,
   BearerConnectionProfile,
@@ -19,11 +19,14 @@ import {
   PrimaryConnectionTarget,
   sshTargetKey,
   Wakeups,
-} from "@t3tools/client-runtime/connection";
-import { bootstrapRemoteBearerSession } from "@t3tools/client-runtime/authorization";
-import { fetchRemoteEnvironmentDescriptor } from "@t3tools/client-runtime/environment";
-import { managedRelayAccountChanges, managedRelaySessionAtom } from "@t3tools/client-runtime/relay";
-import { EnvironmentRpcRequestObserver } from "@t3tools/client-runtime/rpc";
+} from "@legioncode/client-runtime/connection";
+import { bootstrapRemoteBearerSession } from "@legioncode/client-runtime/authorization";
+import { fetchRemoteEnvironmentDescriptor } from "@legioncode/client-runtime/environment";
+import {
+  managedRelayAccountChanges,
+  managedRelaySessionAtom,
+} from "@legioncode/client-runtime/relay";
+import { EnvironmentRpcRequestObserver } from "@legioncode/client-runtime/rpc";
 import {
   AuthStandardClientScopes,
   type DesktopBridge,
@@ -32,7 +35,7 @@ import {
   type DesktopSshEnvironmentTarget,
   type EnvironmentId,
   PRIMARY_LOCAL_ENVIRONMENT_ID,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -278,7 +281,7 @@ export const provisionDesktopSshEnvironment = Effect.fn(
         reason: "configuration",
         detail: m(
           msg(
-            "{label} runs T3 Code {serverVersion}, but this desktop is {appVersion}, and that server could not accept its pairing. Restart the T3 server on {label} so it runs {appVersion}, then retry.",
+            "{label} runs LegionCode {serverVersion}, but this desktop is {appVersion}, and that server could not accept its pairing. Restart the LegionCode server on {label} so it runs {appVersion}, then retry.",
             {
               label: descriptor.label,
               serverVersion: descriptor.serverVersion,
@@ -351,7 +354,7 @@ export const prepareDesktopSshEnvironment = Effect.fn("web.connectionPlatform.ss
   },
 );
 
-const ANALYTICS_DEVICE_ID_KEY = "t3code:analytics-device-id";
+const ANALYTICS_DEVICE_ID_KEY = "legioncode:analytics-device-id";
 
 // Lives as long as this browser profile's site data. Storage can be blocked, which only drops the id.
 const analyticsDevice = {
@@ -380,7 +383,7 @@ const layerCapabilities = Layer.effectContext(
         if (session === null) {
           return yield* new ConnectionBlockedError({
             reason: "authentication",
-            detail: m(msg("Sign in to T3 Connect to connect this environment.")),
+            detail: m(msg("Sign in to Legion Connect to connect this environment.")),
           });
         }
         const token = yield* session.readClerkToken().pipe(
@@ -395,7 +398,7 @@ const layerCapabilities = Layer.effectContext(
         if (token === null) {
           return yield* new ConnectionBlockedError({
             reason: "authentication",
-            detail: m(msg("The T3 Connect session is unavailable.")),
+            detail: m(msg("The Legion Connect session is unavailable.")),
           });
         }
         return token;

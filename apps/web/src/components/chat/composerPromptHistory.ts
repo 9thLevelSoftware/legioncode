@@ -1,13 +1,13 @@
-import { resolveUserMessagePresentation } from "@t3tools/client-runtime/user-message";
+import { resolveUserMessagePresentation } from "@legioncode/client-runtime/user-message";
 import {
   EnvironmentContextRecord,
   type OrchestrationMessageContext,
   ThreadContextRecord,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   ATTACHMENT_ONLY_BOOTSTRAP_PROMPT,
   collectComposerContextReferences,
-} from "@t3tools/shared/composerContextReferences";
+} from "@legioncode/shared/composerContextReferences";
 import { Schema } from "effect";
 import { PLAN_IMPLEMENTATION_PROMPT_PREFIX } from "../../proposedPlan";
 

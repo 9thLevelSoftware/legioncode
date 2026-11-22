@@ -2,14 +2,14 @@ import type {
   EnvironmentId,
   ScopedProjectRef,
   SidebarProjectGroupingMode,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   buildProjectGroups,
   derivePhysicalProjectKey,
   isPickableProjectMember,
   resolveScratchProjectScopeKey,
   type ProjectGroupingSettings,
-} from "@t3tools/client-runtime/state/project-grouping";
+} from "@legioncode/client-runtime/state/project-grouping";
 import { msg } from "gt-react";
 
 import { m, type MessageResolver } from "./i18n/messages";

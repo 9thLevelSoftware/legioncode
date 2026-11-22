@@ -1,5 +1,5 @@
 import { T, useGT, useMessages, Var } from "gt-react";
-import { threadErrorText } from "@t3tools/client-runtime/state/threads";
+import { threadErrorText } from "@legioncode/client-runtime/state/threads";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
 import type { ToolCallDiffTarget } from "../../diffPanelStore";
@@ -9,7 +9,7 @@ import { MarkdownFindContext } from "./markdownFindContext";
 import { useChatCanvas } from "./ChatCanvasContext";
 import { WorkLogBlock } from "./WorkLog";
 import { TimelinePendingApprovalRow } from "./TimelinePendingApprovalRow";
-import type { WorktreeSetupSnapshot } from "@t3tools/contracts";
+import type { WorktreeSetupSnapshot } from "@legioncode/contracts";
 import { deriveTimelineMinimapItems } from "./timelineMinimapItems";
 import {
   type AssistantCitation,
@@ -20,10 +20,10 @@ import {
   type ServerProviderSkill,
   type RunId,
   ThreadId,
-} from "@t3tools/contracts";
-import { parseScopedThreadKey } from "@t3tools/client-runtime/environment";
-import { resolveWorkGroupScrollAnchor } from "@t3tools/client-runtime/work-log/scroll-anchor";
-import type { WorkflowOpening } from "@t3tools/client-runtime/state/subagentRuntime";
+} from "@legioncode/contracts";
+import { parseScopedThreadKey } from "@legioncode/client-runtime/environment";
+import { resolveWorkGroupScrollAnchor } from "@legioncode/client-runtime/work-log/scroll-anchor";
+import type { WorkflowOpening } from "@legioncode/client-runtime/state/subagentRuntime";
 import { observeResize } from "~/lib/observeResize";
 import { useStableCallback } from "~/hooks/useStableCallback";
 
@@ -33,7 +33,7 @@ const EMPTY_RESPONDING_REQUEST_IDS: TimelineRowSharedState["respondingRequestIds
 
 const NOOP_OPEN_ATTACHMENT = (_attachment: ChatFileAttachment) => {};
 
-import { resolveChatListAnchoredEndSpace } from "@t3tools/shared/chatList";
+import { resolveChatListAnchoredEndSpace } from "@legioncode/shared/chatList";
 import { observeVisibleAnimation } from "../../lib/visibleAnimation";
 import {
   memo,
@@ -53,7 +53,7 @@ import {
   type MaintainScrollAtEndOptions,
 } from "@legendapp/list/react";
 import { type PendingApproval, type TimelineEntry } from "../../session-logic";
-import type { CodexArtifactTemplate } from "@t3tools/shared/codexArtifactTemplates";
+import type { CodexArtifactTemplate } from "@legioncode/shared/codexArtifactTemplates";
 import { type ChatFileAttachment, type TurnDiffSummary } from "../../types";
 import {
   ArrowRightIcon,
@@ -77,7 +77,7 @@ import { AssistantSelectionToolbar } from "./AssistantSelectionToolbar";
 import type { AssistantCitationSourceAnchor } from "~/lib/assistantTextSelection";
 import { type AssistantCitationRequest } from "./AssistantCitationSource";
 import { useAssistantCitationTarget } from "./useAssistantCitationTarget";
-import { worktreeSetupAgentStarted } from "@t3tools/client-runtime/worktree-setup";
+import { worktreeSetupAgentStarted } from "@legioncode/client-runtime/worktree-setup";
 import { resolveCitationPhase, type CitedHistory } from "./citationProcedure";
 import {
   resolveTimelineIsAtEnd,
@@ -99,7 +99,7 @@ import { WorktreeSetupCard } from "./WorktreeSetupCard";
 import { useOpenPrLink } from "~/lib/openPullRequestLink";
 import { useMediaQuery } from "~/hooks/useMediaQuery";
 import { cn } from "~/lib/utils";
-import { type TimestampFormat } from "@t3tools/contracts/settings";
+import { type TimestampFormat } from "@legioncode/contracts/settings";
 import { type HandoffTimelineRun } from "./V2LifecycleRow";
 import { TimelineSystemDivider } from "./TimelineSystemDivider";
 
@@ -174,7 +174,7 @@ function TimelineListFooter({
   readonly children?: ReactNode;
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- reports growth of the footer's content, which the list does not follow
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- reports growth of the footer's content, which the list does not follow
   useLayoutEffect(() => {
     const content = contentRef.current;
     if (!content || !onGrow) return;
@@ -805,7 +805,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
   // must land before paint, after LegendList's own layout effects applied the
   // new data. A citation request that arrives mid-restore takes over.
   const { findOpenAtOpening } = identityChanged ? { findOpenAtOpening: findOpen } : listState;
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- restores LegendList's scroll position for the shown thread before paint, after the list's own layout
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- restores LegendList's scroll position for the shown thread before paint, after the list's own layout
   useLayoutEffect(() => {
     const list = listRef.current;
     const viewport = viewportRef.current;
@@ -987,7 +987,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     });
   });
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- the minimap skips refreshes until the restore commits, and the restore can land without a scroll event
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- the minimap skips refreshes until the restore commits, and the restore can land without a scroll event
   useLayoutEffect(() => {
     if (!restoringThreadPosition) scheduleMinimapRefresh();
   }, [restoringThreadPosition, scheduleMinimapRefresh]);
@@ -1566,7 +1566,7 @@ function isMessageRow(row: MessagesTimelineRow) {
 // moves a native selection's ends onto other rows. Pin the selected rows.
 function useSelectedTimelineRowIds(viewport: HTMLElement | null) {
   const [rowIds, setRowIds] = useState<ReadonlyArray<string>>([]);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to document selectionchange to track which timeline rows a native selection covers
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- subscribes to document selectionchange to track which timeline rows a native selection covers
   useEffect(() => {
     if (!viewport) return;
     const update = () => {
@@ -1772,7 +1772,7 @@ function ContextCompactionTimelineRow({
         label
       )}
       {row.failure ? (
-        // oxlint-disable-next-line t3code/no-untranslated-copy -- separator before server-authored failure text
+        // oxlint-disable-next-line legioncode/no-untranslated-copy -- separator before server-authored failure text
         <span className="min-w-0 truncate opacity-80">&middot; {row.failure}</span>
       ) : null}
     </span>
@@ -1824,7 +1824,7 @@ function useDeferredWorkLoading(
     );
   };
   const loadOnExpand = useEffectEvent(load);
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Restored expanded folds load their deferred server history on mount.
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- Restored expanded folds load their deferred server history on mount.
   useEffect(() => {
     if (row.expanded && anchorsKey && environmentId && threadId) loadOnExpand();
   }, [row.expanded, anchorsKey, environmentId, threadId]);

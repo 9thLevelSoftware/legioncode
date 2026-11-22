@@ -1,11 +1,11 @@
 import { msg, T, useGT, useMessages } from "gt-react";
 import { m, type MessageResolver } from "../i18n/messages";
-import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
-import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { sourceControlClients } from "@legioncode/client-runtime/source-control-clients";
+import { scopeThreadRef } from "@legioncode/client-runtime/environment";
 import {
   threadRuntimeIsActive,
   type EnvironmentThreadShell,
-} from "@t3tools/client-runtime/state/shell";
+} from "@legioncode/client-runtime/state/shell";
 import {
   useProjects,
   useQuietThreadShell,
@@ -15,7 +15,7 @@ import {
 import {
   threadPullRequestKeysEqual,
   visibleThreadPullRequests,
-} from "@t3tools/client-runtime/thread-pull-requests";
+} from "@legioncode/client-runtime/thread-pull-requests";
 import type {
   ContextMenuItem,
   EnvironmentId,
@@ -25,8 +25,8 @@ import type {
   PullRequestState,
   ResolvedKeybindingsConfig,
   ThreadId,
-} from "@t3tools/contracts";
-import { getTerminalLabel } from "@t3tools/shared/terminalLabelsCopy";
+} from "@legioncode/contracts";
+import { getTerminalLabel } from "@legioncode/shared/terminalLabelsCopy";
 import {
   closestCenter,
   DndContext,
@@ -90,7 +90,7 @@ import {
 import { useBrowserDefaults } from "~/browser/browserDefaults";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { PanelTabCloseButton } from "~/components/ui/panel-tab-close-button";
-import { faviconUrlForOrigin } from "@t3tools/shared/favicon";
+import { faviconUrlForOrigin } from "@legioncode/shared/favicon";
 import { useTheme } from "~/hooks/useTheme";
 import { useDeviceState } from "~/state/device";
 import type { PreviewPanelInlineSize } from "~/hooks/usePreviewPanelInlineSize";
@@ -180,7 +180,7 @@ function shouldOpenDefaultBrowserProfileFromMenuClick(pointerType: string | unde
 }
 
 const SURFACE_DISABLED_REASONS = {
-  browser: msg("Browser previews are only available in the T3 Code desktop app."),
+  browser: msg("Browser previews are only available in the LegionCode desktop app."),
   terminal: msg("Terminal surfaces are only available from a project thread."),
   files: msg("Files are only available when a project is open."),
   diff: msg("Diff is only available for server threads in Git repositories."),
@@ -439,7 +439,7 @@ function RightPanelEmptyState(props: {
     event.stopPropagation();
     action.onClick();
   });
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes a capture-phase window keydown listener for surface shortcuts while the menu is mounted
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- subscribes a capture-phase window keydown listener for surface shortcuts while the menu is mounted
   useEffect(() => {
     const handler = (event: KeyboardEvent) => handleShortcut(event);
     window.addEventListener("keydown", handler, true);
@@ -1133,7 +1133,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       setAddSurfaceMenuOpen(true);
     }
   });
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes a document keydown listener for the new surface shortcut while the panel is open
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- subscribes a document keydown listener for the new surface shortcut while the panel is open
   useEffect(() => {
     if (props.open === false) return;
     document.addEventListener("keydown", onNewSurfaceKeyDown, true);
@@ -1356,7 +1356,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
   });
 
   // A newly active tab, or tabs that start overflowing, can sit outside the scrolled strip.
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- scrolls the active tab DOM node into view after it changes or the tab strip starts overflowing
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- scrolls the active tab DOM node into view after it changes or the tab strip starts overflowing
   useEffect(() => {
     if (!props.activeSurfaceId || !tabScrollState.hasOverflow) return;
     const activeTab = tabListRef.current?.querySelector<HTMLElement>("[data-active-tab='true']");

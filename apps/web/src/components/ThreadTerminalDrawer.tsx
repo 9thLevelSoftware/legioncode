@@ -1,4 +1,4 @@
-import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { thrownErrorMessage } from "@legioncode/client-runtime/errors";
 import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { useAtomMount, useAtomValue } from "@effect/atom-react";
 import { msg, T, useGT, useMessages } from "gt-react";
@@ -7,14 +7,14 @@ import {
   isAtomCommandInterrupted,
   executeAtomQuery,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@legioncode/client-runtime/state/runtime";
 import {
   INITIAL_TERMINAL_OUTPUT_CURSOR,
   readTerminalOutputUpdate,
   type TerminalOutputCursor,
   type TerminalOutputUpdate,
   type TerminalSessionState,
-} from "@t3tools/client-runtime/state/terminal";
+} from "@legioncode/client-runtime/state/terminal";
 import {
   Plus,
   Square,
@@ -33,8 +33,8 @@ import {
   type ResolvedKeybindingsConfig,
   type ScopedThreadRef,
   type ThreadId,
-} from "@t3tools/contracts";
-import { getTerminalLabel } from "@t3tools/shared/terminalLabelsCopy";
+} from "@legioncode/contracts";
+import { getTerminalLabel } from "@legioncode/shared/terminalLabelsCopy";
 import * as Schema from "effect/Schema";
 import { AsyncResult } from "effect/reactivity";
 import {
@@ -678,14 +678,14 @@ function TerminalSessionViewport({
       openTerminalLinkInPreview({ url, threadRef, openPreview, fallbackToBrowser, forceBrowser }),
   );
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- sets the terminal input's readOnly from the operate grant and consumes a pending focus request
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- sets the terminal input's readOnly from the operate grant and consumes a pending focus request
   useLayoutEffect(() => {
     if (terminalRef.current) terminalRef.current.input.readOnly = !canOperateTerminal;
     if (canOperateTerminal && visibleRef.current)
       consumePendingTerminalFocus(threadRef, terminalId);
   }, [canOperateTerminal, terminalId, threadRef]);
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- refreshes the imperative terminal's hovered link after filesystem metadata or editor permissions change
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- refreshes the imperative terminal's hovered link after filesystem metadata or editor permissions change
   useEffect(() => {
     if (!linkMetadataQuery) {
       terminalRef.current?.refreshLinkActivation();
@@ -698,7 +698,7 @@ function TerminalSessionViewport({
     );
   }, [linkMetadataQuery]);
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- pushes visibility into the terminal surface before paint and consumes focus requests made while hidden
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- pushes visibility into the terminal surface before paint and consumes focus requests made while hidden
   useLayoutEffect(() => {
     visibleRef.current = visible;
     terminalRef.current?.setVisible(visible);
@@ -706,7 +706,7 @@ function TerminalSessionViewport({
     if (visible) consumePendingTerminalFocus(threadRef, terminalId);
   }, [terminalId, threadRef, visible]);
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- applies font family and size changes to the live Ghostty terminal surface
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- applies font family and size changes to the live Ghostty terminal surface
   useEffect(() => {
     const current = terminalFontRef.current;
     if (current.family === terminalFontFamily && current.size === terminalFontSize) return;
@@ -714,7 +714,7 @@ function TerminalSessionViewport({
     void terminalRef.current?.setFont(terminalFontOptions(terminalFontFamily, terminalFontSize));
   }, [terminalFontFamily, terminalFontSize]);
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- creates the Ghostty terminal in the mount node and subscribes it to the terminal session
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- creates the Ghostty terminal in the mount node and subscribes it to the terminal session
   useEffect(() => {
     const mount = containerRef.current;
     if (!mount) return;
@@ -1778,7 +1778,7 @@ export default function ThreadTerminalDrawer({
       if (heightBudgetChanged) setDrawerLayout(layout);
     },
   );
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- measures the drawer before visible paint and observes window and chat column resizes while visible
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- measures the drawer before visible paint and observes window and chat column resizes while visible
   useLayoutEffect(() => {
     if (!visible) {
       return;

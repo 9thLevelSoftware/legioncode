@@ -9,8 +9,8 @@ import type {
   DesktopPortForward,
   DesktopPreviewTunnelAccessRequest,
   EnvironmentId,
-} from "@t3tools/contracts";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+} from "@legioncode/contracts";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import type { NonEmptyReadonlyArray } from "effect/Array";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
@@ -137,7 +137,7 @@ const isTunnelEndpoint = (tunnelUrl: string, port: number) => {
 
 /** Opens a connection to the destination; `ws` pauses its socket, so a slow page slows the tunnel. */
 /** Set by the environment's /api/preview/tunnel when it reached the port and nothing listens. */
-const PORT_REFUSED_HEADER = "x-t3-tunnel-port-refused";
+const PORT_REFUSED_HEADER = "x-legioncode-tunnel-port-refused";
 const WEBSOCKET_OPEN = 1;
 
 const socketWriteError = (cause: unknown) =>
@@ -344,7 +344,7 @@ export class LoopbackTunnel extends Context.Service<
       listener: (forwards: ReadonlyArray<DesktopPortForward>) => Effect.Effect<void>,
     ) => Effect.Effect<void, never, Scope.Scope>;
   }
->()("@t3tools/desktop/preview/LoopbackTunnel") {}
+>()("@legioncode/desktop/preview/LoopbackTunnel") {}
 
 const make = Effect.gen(function* () {
   const electronWindow = yield* ElectronWindow.ElectronWindow;

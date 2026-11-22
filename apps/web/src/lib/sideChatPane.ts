@@ -1,5 +1,5 @@
-import { scopeThreadRef } from "@t3tools/client-runtime/environment";
-import type { OrchestrationV2ThreadShell, ScopedThreadRef } from "@t3tools/contracts";
+import { scopeThreadRef } from "@legioncode/client-runtime/environment";
+import type { OrchestrationV2ThreadShell, ScopedThreadRef } from "@legioncode/contracts";
 
 import type { ToolCallDiffTarget } from "../diffPanelStore";
 import { useRightPanelStore } from "../rightPanelStore";

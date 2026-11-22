@@ -1,5 +1,5 @@
-import type { DesktopBridge } from "@t3tools/contracts";
-import { ClientCapabilities } from "@t3tools/client-runtime/platform";
+import type { DesktopBridge } from "@legioncode/contracts";
+import { ClientCapabilities } from "@legioncode/client-runtime/platform";
 import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -55,7 +55,7 @@ describe("primary environment HTTP layer", { concurrent: false }, () => {
     Object.defineProperty(globalThis, "window", {
       configurable: true,
       value: {
-        location: { origin: "t3code://app" },
+        location: { origin: "legioncode://app" },
         desktopBridge: {
           getLocalEnvironmentBootstrap: () => ({
             label: "Local environment",
@@ -102,7 +102,7 @@ describe("primary environment HTTP layer", { concurrent: false }, () => {
     Object.defineProperty(globalThis, "window", {
       configurable: true,
       value: {
-        location: { href: "t3code://app/", origin: "t3code://app" },
+        location: { href: "legioncode://app/", origin: "legioncode://app" },
         desktopBridge: {
           getClientPlatform: () => "linux",
           getLocalEnvironmentEnabled: () => true,
@@ -140,7 +140,7 @@ describe("primary environment HTTP layer", { concurrent: false }, () => {
     Object.defineProperty(globalThis, "window", {
       configurable: true,
       value: {
-        location: { href: "t3code://app/", origin: "t3code://app" },
+        location: { href: "legioncode://app/", origin: "legioncode://app" },
         desktopBridge: {
           getClientPlatform: () => "linux",
           getLocalEnvironmentEnabled: () => true,

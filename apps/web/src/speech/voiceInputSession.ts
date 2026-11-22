@@ -5,8 +5,8 @@ import {
   type VoiceDraftSnapshot,
   type VoiceInputControllerDependencies,
   type VoiceInputState,
-} from "@t3tools/client-runtime/voice-input";
-import type { PreparedConnection } from "@t3tools/client-runtime/connection";
+} from "@legioncode/client-runtime/voice-input";
+import type { PreparedConnection } from "@legioncode/client-runtime/connection";
 import type {
   CloudSpeechModelId,
   CloudSpeechProvider,
@@ -16,9 +16,9 @@ import type {
   SpeechPostProcessingOptions,
   SpeechStreamText,
   SpeechTranscriptionOptions,
-} from "@t3tools/contracts";
-import { DEFAULT_CLIENT_SETTINGS } from "@t3tools/contracts";
-import { resolveSpeechVocabulary } from "@t3tools/shared/speech";
+} from "@legioncode/contracts";
+import { DEFAULT_CLIENT_SETTINGS } from "@legioncode/contracts";
+import { resolveSpeechVocabulary } from "@legioncode/shared/speech";
 import { useEffect, useSyncExternalStore } from "react";
 
 import { toastManager } from "../components/ui/toast";
@@ -359,7 +359,7 @@ export function useRetainedVoiceInputSession(input: {
   readonly cloudModel?: CloudSpeechModelId | undefined;
 }): VoiceInputSession | null {
   const { prepared, grantId, cloudProvider, cloudModel } = input;
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- retains the shared recording session for this destination while mounted
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- retains the shared recording session for this destination while mounted
   useEffect(() => {
     if (!prepared || !grantId || typeof navigator === "undefined") return;
     return retainVoiceInputSession({ prepared, grantId, cloudProvider, cloudModel });

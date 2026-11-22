@@ -1,5 +1,5 @@
-import { Discovery } from "@t3tools/client-runtime/relay";
-import type { EnvironmentId } from "@t3tools/contracts";
+import { Discovery } from "@legioncode/client-runtime/relay";
+import type { EnvironmentId } from "@legioncode/contracts";
 import { T, useGT, Var } from "gt-react";
 import { useState } from "react";
 
@@ -14,9 +14,9 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Button, InlineButton } from "../ui/button";
-import { useT3ConnectAccountPage } from "./T3ConnectAccountPages";
+import { useLegionConnectAccountPage } from "./LegionConnectAccountPages";
 
-export function RemoveT3ConnectEnvironmentDialog({
+export function RemoveLegionConnectEnvironmentDialog({
   environmentLabel,
   environmentId,
   onCancel,
@@ -27,7 +27,7 @@ export function RemoveT3ConnectEnvironmentDialog({
   readonly onCancel: () => void;
   readonly onConfirm: () => void;
 }) {
-  const accountPage = useT3ConnectAccountPage();
+  const accountPage = useLegionConnectAccountPage();
   const gt = useGT();
   const discovery = useRelayEnvironmentDiscovery();
   const registration = environmentId
@@ -48,10 +48,10 @@ export function RemoveT3ConnectEnvironmentDialog({
         openAccountPage();
       }}
     >
-      <T>T3 Connect settings</T>
+      <T>Legion Connect settings</T>
     </InlineButton>
   ) : (
-    gt("T3 Connect settings")
+    gt("Legion Connect settings")
   );
 
   return (
@@ -75,14 +75,14 @@ export function RemoveT3ConnectEnvironmentDialog({
             <AlertDialogDescription>
               {shown.registration === "registered" ? (
                 <T>
-                  It stays on your T3 Connect account and keeps its host space. Deregister it in{" "}
+                  It stays on your Legion Connect account and keeps its host space. Deregister it in{" "}
                   <Var>{accountPageLink}</Var> to free it.
                 </T>
               ) : shown.registration === "unregistered" ? (
-                gt("It's no longer on your T3 Connect account.")
+                gt("It's no longer on your Legion Connect account.")
               ) : (
                 <T>
-                  This doesn't change your T3 Connect account. To deregister it there, use{" "}
+                  This doesn't change your Legion Connect account. To deregister it there, use{" "}
                   <Var>{accountPageLink}</Var>.
                 </T>
               )}

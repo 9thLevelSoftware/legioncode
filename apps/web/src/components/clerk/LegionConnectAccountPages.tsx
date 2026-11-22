@@ -6,9 +6,9 @@ import { createPortal } from "react-dom";
 
 import { MobileClientsUserProfilePage } from "./MobileClientsUserProfilePage";
 import { T3ChatUserProfilePage } from "./T3ChatUserProfilePage";
-import { T3ConnectUserProfilePage } from "./T3ConnectUserProfilePage";
+import { LegionConnectUserProfilePage } from "./LegionConnectUserProfilePage";
 
-export const T3_CONNECT_ACCOUNT_PAGES = [
+export const LEGION_CONNECT_ACCOUNT_PAGES = [
   {
     label: msg("Mobile clients"),
     url: "mobile-clients",
@@ -16,10 +16,10 @@ export const T3_CONNECT_ACCOUNT_PAGES = [
     content: <MobileClientsUserProfilePage />,
   },
   {
-    label: "T3 Connect",
-    url: "t3-connect",
+    label: "Legion Connect",
+    url: "legion-connect",
     icon: <ServerIcon className="size-4" />,
-    content: <T3ConnectUserProfilePage />,
+    content: <LegionConnectUserProfilePage />,
   },
   {
     label: "T3 Chat",
@@ -29,13 +29,13 @@ export const T3_CONNECT_ACCOUNT_PAGES = [
   },
 ] as const;
 
-export type T3ConnectAccountPageUrl = (typeof T3_CONNECT_ACCOUNT_PAGES)[number]["url"];
+export type LegionConnectAccountPageUrl = (typeof LEGION_CONNECT_ACCOUNT_PAGES)[number]["url"];
 
 type PortalTargets = Readonly<Record<string, HTMLDivElement | undefined>>;
 
 /** Keep portals rendered while the modal can open; Clerk owns the custom-page DOM nodes. */
-export function useT3ConnectAccountPage(): {
-  readonly open: ((page?: T3ConnectAccountPageUrl) => void) | null;
+export function useLegionConnectAccountPage(): {
+  readonly open: ((page?: LegionConnectAccountPageUrl) => void) | null;
   readonly portals: ReactNode;
 } {
   const clerk = useClerk();
@@ -43,12 +43,12 @@ export function useT3ConnectAccountPage(): {
   const m = useMessages();
   const [targets, setTargets] = useState<PortalTargets>({});
 
-  const open = (page: T3ConnectAccountPageUrl = "t3-connect") => {
+  const open = (page: LegionConnectAccountPageUrl = "legion-connect") => {
     const setTarget = (key: string, element: HTMLDivElement | undefined) =>
       setTargets((current) => ({ ...current, [key]: element }));
     clerk.openUserProfile({
       __experimental_startPath: `/${page}`,
-      customPages: T3_CONNECT_ACCOUNT_PAGES.map((page) => ({
+      customPages: LEGION_CONNECT_ACCOUNT_PAGES.map((page) => ({
         label: m(page.label),
         url: page.url,
         mount: (element: HTMLDivElement) => setTarget(`content:${page.url}`, element),
@@ -59,7 +59,7 @@ export function useT3ConnectAccountPage(): {
     });
   };
 
-  const portals = T3_CONNECT_ACCOUNT_PAGES.flatMap((page) => {
+  const portals = LEGION_CONNECT_ACCOUNT_PAGES.flatMap((page) => {
     const content = targets[`content:${page.url}`];
     const icon = targets[`icon:${page.url}`];
     return [

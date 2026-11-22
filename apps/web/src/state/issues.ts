@@ -5,9 +5,9 @@ import {
   type IssueCandidatesTarget,
   type IssueListTarget,
   type MergedIssueList,
-} from "@t3tools/client-runtime/state/issues";
+} from "@legioncode/client-runtime/state/issues";
 import { useAtomValue } from "@effect/atom-react";
-import type { EnvironmentId, ThreadIssueLink } from "@t3tools/contracts";
+import type { EnvironmentId, ThreadIssueLink } from "@legioncode/contracts";
 
 import { connectionAtomRuntime } from "../connection/runtime";
 import { appAtomRegistry } from "../rpc/atomRegistry";

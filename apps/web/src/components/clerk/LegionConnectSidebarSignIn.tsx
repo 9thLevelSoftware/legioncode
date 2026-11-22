@@ -5,22 +5,22 @@ import { LogInIcon, RotateCwIcon } from "lucide-react";
 import { hasCloudPublicConfig } from "../../cloud/publicConfig";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 import { retryClerkLoad, useClerkLoadFailed } from "./clerkLoadFailure";
-import { T3_CONNECT_ACCOUNT_PAGES } from "./T3ConnectAccountPages";
-import { useT3ConnectAuthPrompt } from "./useT3ConnectAuthPrompt";
+import { LEGION_CONNECT_ACCOUNT_PAGES } from "./LegionConnectAccountPages";
+import { useLegionConnectAuthPrompt } from "./useLegionConnectAuthPrompt";
 
-export function T3ConnectSidebarSignIn() {
+export function LegionConnectSidebarSignIn() {
   if (!hasCloudPublicConfig()) return null;
 
-  return <ConfiguredT3ConnectSidebarSignIn />;
+  return <ConfiguredLegionConnectSidebarSignIn />;
 }
 
-export function T3ConnectSidebarAvatar() {
+export function LegionConnectSidebarAvatar() {
   if (!hasCloudPublicConfig()) return null;
 
-  return <ConfiguredT3ConnectSidebarAvatar />;
+  return <ConfiguredLegionConnectSidebarAvatar />;
 }
 
-function ConfiguredT3ConnectSidebarAvatar() {
+function ConfiguredLegionConnectSidebarAvatar() {
   const { isLoaded, isSignedIn } = useAuth();
   const m = useMessages();
 
@@ -36,7 +36,7 @@ function ConfiguredT3ConnectSidebarAvatar() {
         },
       }}
     >
-      {T3_CONNECT_ACCOUNT_PAGES.map((page) => (
+      {LEGION_CONNECT_ACCOUNT_PAGES.map((page) => (
         <UserButton.UserProfilePage
           key={page.url}
           label={m(page.label)}
@@ -50,10 +50,10 @@ function ConfiguredT3ConnectSidebarAvatar() {
   );
 }
 
-function ConfiguredT3ConnectSidebarSignIn() {
+function ConfiguredLegionConnectSidebarSignIn() {
   const { isLoaded, isSignedIn } = useAuth();
   const loadFailed = useClerkLoadFailed();
-  const { openAuthPrompt } = useT3ConnectAuthPrompt();
+  const { openAuthPrompt } = useLegionConnectAuthPrompt();
 
   if (loadFailed) {
     return (
@@ -62,7 +62,7 @@ function ConfiguredT3ConnectSidebarSignIn() {
           <SidebarMenuButton onClick={retryClerkLoad}>
             <RotateCwIcon />
             <span>
-              <T>Retry T3 Connect</T>
+              <T>Retry Legion Connect</T>
             </span>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -77,7 +77,7 @@ function ConfiguredT3ConnectSidebarSignIn() {
         <SidebarMenuButton onClick={openAuthPrompt}>
           <LogInIcon />
           <span>
-            <T>Sign in to T3 Connect</T>
+            <T>Sign in to Legion Connect</T>
           </span>
         </SidebarMenuButton>
       </SidebarMenuItem>

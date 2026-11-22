@@ -4,16 +4,16 @@ import type {
   VcsRef,
   ProjectId,
   WorktreeSubmodules,
-} from "@t3tools/contracts";
-import type { ThreadStructureRuntime } from "@t3tools/client-runtime/state/shell";
+} from "@legioncode/contracts";
+import type { ThreadStructureRuntime } from "@legioncode/client-runtime/state/shell";
 import * as Schema from "effect/Schema";
 import { msg } from "gt-react";
-import { sanitizeNewRefName } from "@t3tools/shared/git";
-import { workspaceRelativeFilePath } from "@t3tools/shared/path";
-import { toSortableTimestamp } from "@t3tools/client-runtime/state/thread-sort";
+import { sanitizeNewRefName } from "@legioncode/shared/git";
+import { workspaceRelativeFilePath } from "@legioncode/shared/path";
+import { toSortableTimestamp } from "@legioncode/client-runtime/state/thread-sort";
 import { m, type MessageResolver } from "../i18n/messages";
 import { deriveCanInterruptRunningThread } from "../session-logic";
-export { deriveLocalBranchNameFromRemoteRef, sanitizeNewRefName } from "@t3tools/shared/git";
+export { deriveLocalBranchNameFromRemoteRef, sanitizeNewRefName } from "@legioncode/shared/git";
 
 export interface EnvironmentOption {
   environmentId: EnvironmentId;

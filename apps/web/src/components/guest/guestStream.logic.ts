@@ -13,16 +13,16 @@ import {
   type OrchestrationV2ThreadProjection,
   type OrchestrationV2TurnItem,
   type ThreadGuestMessage,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import { msg } from "gt-react";
 
 import { m, type MessageResolver } from "~/i18n/messages";
-import { applyOrchestrationV2ProjectionEvent } from "@t3tools/client-runtime/state/orchestration-v2-projection";
+import { applyOrchestrationV2ProjectionEvent } from "@legioncode/client-runtime/state/orchestration-v2-projection";
 import {
   mergeOlderHistoryIntoProjection,
   mergeOlderSubagentsIntoProjection,
-} from "@t3tools/client-runtime/state/thread-history-merge";
-import { boundedSnapshotProjection } from "@t3tools/shared/orchestrationV2BoundedSnapshot";
+} from "@legioncode/client-runtime/state/thread-history-merge";
+import { boundedSnapshotProjection } from "@legioncode/shared/orchestrationV2BoundedSnapshot";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 

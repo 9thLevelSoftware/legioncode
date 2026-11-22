@@ -2,11 +2,11 @@ import { pipe } from "effect/Function";
 import {
   IMAGE_DIMENSIONS_HEADER_BYTES,
   readImageDimensions,
-} from "@t3tools/shared/imageDimensions";
+} from "@legioncode/shared/imageDimensions";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
 import { decodeHTMLAttribute, decodeHTMLStrict as decodeEntities } from "entities";
 import type JSZip from "jszip";
-import { terminalOutputPlainText } from "@t3tools/shared/terminalOutput";
+import { terminalOutputPlainText } from "@legioncode/shared/terminalOutput";
 
 import { type OfficeWorkerResult, type NotebookCell } from "./officePreviewProtocol";
 import { PreviewError } from "./previewFailure";
@@ -504,7 +504,7 @@ const RTF_CHARACTERS = new Map([
   ["tab", "\t"],
   ["cell", "\t"],
   ["endash", "–"],
-  // oxlint-disable-next-line t3code/no-em-dash-copy -- Preserve the RTF document's punctuation.
+  // oxlint-disable-next-line legioncode/no-em-dash-copy -- Preserve the RTF document's punctuation.
   ["emdash", "—"],
   ["bullet", "•"],
   ["lquote", "‘"],

@@ -1,12 +1,12 @@
-import type { EnvironmentId } from "@t3tools/contracts";
+import type { EnvironmentId } from "@legioncode/contracts";
 import { useGT, useMessages } from "gt-react";
 import {
   formatHostedThreadLink,
   guessThreadLinkRef,
   threadLinkCandidates,
   type ThreadLink,
-} from "@t3tools/shared/threadLinks";
-import { unknownThreadLinkLabel } from "@t3tools/shared/threadLinksCopy";
+} from "@legioncode/shared/threadLinks";
+import { unknownThreadLinkLabel } from "@legioncode/shared/threadLinksCopy";
 
 import { configuredHostedAppUrl } from "../../hostedPairing";
 import { useThreadRefs, useThreadShell } from "../../state/entities";

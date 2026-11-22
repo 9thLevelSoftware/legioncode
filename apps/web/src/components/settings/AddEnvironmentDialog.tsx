@@ -1,4 +1,4 @@
-import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { thrownErrorMessage } from "@legioncode/client-runtime/errors";
 import { m } from "~/i18n/messages";
 import { pipe } from "effect/Function";
 import { ChevronsLeftRightEllipsisIcon, PlusIcon, TerminalIcon } from "lucide-react";
@@ -8,15 +8,15 @@ import { T, useGT, useMessages, Var } from "gt-react";
 import {
   type DesktopDiscoveredSshHost,
   type DesktopSshEnvironmentTarget,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   RelayConnectionRegistration,
   RelayConnectionTarget,
-} from "@t3tools/client-runtime/connection";
+} from "@legioncode/client-runtime/connection";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@legioncode/client-runtime/state/runtime";
 import * as Option from "effect/Option";
 
 import { cn } from "../../lib/utils";
@@ -136,7 +136,7 @@ export function AddEnvironmentDialog({
   // The discovery atom is kept alive across dialog opens, so re-read SSH config
   // each time the SSH tab is shown; stale hosts stay visible while it refreshes.
   const refreshDesktopSshHosts = desktopSshHosts.refresh;
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- rereads desktop SSH config through the bridge each time the SSH tab is shown
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- rereads desktop SSH config through the bridge each time the SSH tab is shown
   useEffect(() => {
     if (isSshDiscoveryActive) refreshDesktopSshHosts();
   }, [isSshDiscoveryActive, refreshDesktopSshHosts]);
@@ -481,7 +481,7 @@ export function AddEnvironmentDialog({
       type: "success",
       title: gt("Route added"),
       description: gt(
-        "{environment} falls back to T3 Connect when its other routes are unreachable.",
+        "{environment} falls back to Legion Connect when its other routes are unreachable.",
         { environment: routeTarget.label },
       ),
     });
@@ -491,7 +491,7 @@ export function AddEnvironmentDialog({
       {relayRouteOffer !== null ? (
         <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
           <p className="text-xs text-muted-foreground">
-            <T>This machine is on your T3 Connect account. Use it as a fallback route.</T>
+            <T>This machine is on your Legion Connect account. Use it as a fallback route.</T>
           </p>
           <Button
             size="xs"
@@ -499,7 +499,7 @@ export function AddEnvironmentDialog({
             disabled={isAddingSavedBackend}
             onClick={() => void addRelayRoute()}
           >
-            <T>Add T3 Connect</T>
+            <T>Add Legion Connect</T>
           </Button>
         </div>
       ) : null}

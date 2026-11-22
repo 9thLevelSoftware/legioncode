@@ -4,7 +4,7 @@ import { isElectron } from "../../env";
 import { resolveClerkSignInProps } from "./authRedirect";
 import { retryClerkLoad } from "./clerkLoadFailure";
 
-export function useT3ConnectAuthPrompt() {
+export function useLegionConnectAuthPrompt() {
   const clerk = useClerk();
   const openAuthPrompt = () => {
     if (clerk.status === "error") {

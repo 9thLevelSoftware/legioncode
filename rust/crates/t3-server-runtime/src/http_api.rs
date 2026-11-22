@@ -227,10 +227,7 @@ impl RuntimeHttpState {
 
     /// Returns recorded redacted HTTP access log lines (`#40133`).
     pub fn access_logs(&self) -> Vec<String> {
-        self.access_logs
-            .lock()
-            .map(|g| g.clone())
-            .unwrap_or_default()
+        self.access_logs.lock().ok().map_or_default(|g| g.clone())
     }
 }
 

@@ -197,8 +197,8 @@ fn open_request_window(state: &Arc<AppState>, client_id: u64, id: &RpcId, tag: &
     let live_snapshot = state
         .live_clients
         .lock()
-        .map(|set| set.clone())
-        .unwrap_or_default();
+        .ok()
+        .map_or_default(|set| set.clone());
     if let Ok(mut windows) = state.output_windows.lock() {
         let _ = windows.open_for_request(client_id, id.clone(), tag, &live_snapshot);
     }

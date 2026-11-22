@@ -122,8 +122,8 @@ impl RuntimeOutboxExecutor {
         let overrides = self
             .workspace_overrides
             .lock()
-            .map(|g| g.clone())
-            .unwrap_or_default();
+            .ok()
+            .map_or_default(|g| g.clone());
         let conn = self
             .orchestrator
             .sink()

@@ -246,8 +246,12 @@ mod linux_proc {
                     return None;
                 }
                 let stat = fs::read(entry.path().join("stat")).ok()?;
-                let (name, _, ppid, _, _) = parse_proc_stat_fields(&stat)?;
-                Some(ProcessTableEntryV3 { pid, ppid, name })
+                let (name, _, parent_pid, _, _) = parse_proc_stat_fields(&stat)?;
+                Some(ProcessTableEntryV3 {
+                    pid,
+                    ppid: parent_pid,
+                    name,
+                })
             })
             .collect::<Vec<_>>();
         rows.sort_by_key(|row| row.pid);
@@ -257,7 +261,8 @@ mod linux_proc {
     pub(super) fn read_process_sample(pid: u32) -> Option<RawProcessSample> {
         let proc_dir = Path::new("/proc").join(pid.to_string());
         let stat = fs::read(proc_dir.join("stat")).ok()?;
-        let (name, status, ppid, cpu_time_ms, start_ticks_ms) = parse_proc_stat_fields(&stat)?;
+        let (name, status, parent_pid, cpu_time_ms, start_ticks_ms) =
+            parse_proc_stat_fields(&stat)?;
         let now_unix = unix_time_ms();
         let up_ms = uptime_ms();
         let start_time_ms = now_unix
@@ -278,7 +283,7 @@ mod linux_proc {
             .unwrap_or_else(|| name.clone());
         Some(RawProcessSample {
             pid,
-            ppid,
+            ppid: parent_pid,
             start_time_ms,
             run_time_ms: up_ms.saturating_sub(start_ticks_ms),
             name,

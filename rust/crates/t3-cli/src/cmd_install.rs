@@ -193,16 +193,17 @@ impl ResolveExt for PathBuf {
     }
 }
 
-fn read_existing_launcher_target(link: &Path, _bin_dir: &Path) -> Option<PathBuf> {
+fn read_existing_launcher_target(link: &Path, bin_dir: &Path) -> Option<PathBuf> {
     #[cfg(windows)]
     {
+        let _ = bin_dir;
         let raw = fs::read_to_string(link).ok()?;
         extract_windows_shim_target(&raw).map(PathBuf::from)
     }
     #[cfg(not(windows))]
     {
         if let Ok(target) = fs::read_link(link) {
-            return Some(fs::canonicalize(link).unwrap_or_else(|_| _bin_dir.join(target)));
+            return Some(fs::canonicalize(link).unwrap_or_else(|_| bin_dir.join(target)));
         }
         let raw = fs::read_to_string(link).ok()?;
         extract_posix_launcher_target(&raw).map(PathBuf::from)

@@ -157,7 +157,11 @@ pub(crate) fn current_unix_uid() -> Option<u32> {
         if let Ok(meta) = std::fs::metadata("/proc/self") {
             return Some(meta.uid());
         }
-        let out = std::process::Command::new("id").arg("-u").output().ok()?;
+        let out = std::process::Command::new("id")
+            .arg("-u")
+            .output()
+            .or_else(|_| std::process::Command::new("/usr/bin/id").arg("-u").output())
+            .ok()?;
         out.status
             .success()
             .then(|| {

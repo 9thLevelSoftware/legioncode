@@ -259,7 +259,7 @@ fn install_apt_deps(missing: &[String], needs_fonts: bool) -> i32 {
     }
     if !missing.is_empty() {
         let mut args = vec!["install", "-y", "--no-install-recommends"];
-        args.extend(DEBIAN_PACKAGES.iter().map(|opts| pick_apt_pkg(opts)));
+        args.extend(DEBIAN_PACKAGES.iter().copied().map(pick_apt_pkg));
         if run_cmd("install the browser's libraries", "apt-get", &args) != 0 {
             return 1;
         }

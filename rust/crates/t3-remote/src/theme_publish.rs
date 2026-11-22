@@ -215,14 +215,16 @@ pub fn publish_theme_file(
     })
 }
 
-fn write_new_file_with_mode(path: &Path, bytes: &[u8], _mode: u32) -> Result<(), ThemeError> {
+fn write_new_file_with_mode(path: &Path, bytes: &[u8], mode: u32) -> Result<(), ThemeError> {
     let mut opts = OpenOptions::new();
     opts.write(true).create_new(true);
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
-        opts.mode(_mode);
+        opts.mode(mode);
     }
+    #[cfg(not(unix))]
+    let _ = mode;
     let mut file = opts.open(path).map_err(|source| ThemeError::PublishIo {
         path: path.to_path_buf(),
         source,

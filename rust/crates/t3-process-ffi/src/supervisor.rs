@@ -1,6 +1,6 @@
 //! Cross-platform OS process-tree supervisor (`BUG-09` closure).
 //!
-//! Combines [`SanitizedChildEnv`], [`ScopedPipeSet`], and (on Windows) [`JobHandle`]
+//! Combines [`SanitizedChildEnv`], [`ScopedPipeSet`], and (on Windows) `JobHandle`
 //! so spawned child trees receive a sanitized environment, leak zero pipe descriptors
 //! when pre-spawn steps fail, and terminate directly in the kernel without spawning
 //! `taskkill` through a saturated worker pool.

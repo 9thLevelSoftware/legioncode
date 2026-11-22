@@ -100,7 +100,7 @@ pub const BUILTIN_DRIVER_SPECS: &[ProviderDriverSpec] = &[
         cancel_behavior: "interrupt",
     },
     ProviderDriverSpec {
-        slug: "museCode",
+        slug: "muse",
         display_name: "Muse Code",
         default_binary: "muse",
         supports_acp: false,
@@ -325,4 +325,75 @@ pub fn cursor_isolated_sidecar_spec(
         use_http1_for_agent,
         env: build_child_env(env, &[], &overrides),
     }
+}
+
+/// Core local CLI provider driver slugs probed during workspace/machine discovery.
+pub const DISCOVERY_CLI_DRIVERS: &[&str] = &[
+    "codex",
+    "claudeAgent",
+    "cursor",
+    "opencode",
+    "pi",
+    "kiro",
+    "acpRegistry",
+];
+
+/// Normalizes common driver slug aliases (e.g. `"claude"` -> `"claudeAgent"`, `"museCode"` -> `"muse"`, `"replay-dev"` -> `"devReplay"`).
+#[must_use]
+pub fn normalize_driver_slug(raw: &str) -> &str {
+    let trimmed = raw.trim();
+    match trimmed.to_ascii_lowercase().as_str() {
+        "codex" => "codex",
+        "claude" | "claude-code" | "claude_agent" | "claudeagent" => "claudeAgent",
+        "cursor" | "cursor-agent" => "cursor",
+        "grok" => "grok",
+        "opencode" | "open-code" => "opencode",
+        "antigravity" | "agy" => "antigravity",
+        "kiro" | "kiro-cli" => "kiro",
+        "pi" => "pi",
+        "muse" | "musecode" | "muse-code" => "muse",
+        "fx" => "fx",
+        "acp" | "acpregistry" | "acp-registry" => "acpRegistry",
+        "replay" | "replay-dev" | "dev-replay" | "dev_replay" | "devreplay" => "devReplay",
+        _ => trimmed,
+    }
+}
+
+/// Looks up a built-in [`ProviderDriverSpec`] by canonical slug or recognized alias.
+#[must_use]
+pub fn find_builtin_driver_spec(driver_or_alias: &str) -> Option<&'static ProviderDriverSpec> {
+    let canonical = normalize_driver_slug(driver_or_alias);
+    BUILTIN_DRIVER_SPECS
+        .iter()
+        .find(|spec| spec.slug == canonical)
+}
+
+/// Builds a fast, non-interactive `--version` [`super::ProviderProbeSpec`] for any CLI-backed driver.
+///
+/// Returns `None` for unknown slugs or built-in in-process drivers (`"devReplay"`).
+#[must_use]
+pub fn builtin_cli_probe_spec(
+    env: &SanitizedEnv,
+    driver_or_alias: &str,
+) -> Option<super::ProviderProbeSpec> {
+    let spec = find_builtin_driver_spec(driver_or_alias)?;
+    if spec.slug == "devReplay" {
+        return None;
+    }
+    if spec.slug == "pi" {
+        return Some(pi_probe_spec(env, spec.default_binary));
+    }
+    let removed = if spec.slug == "claudeAgent" {
+        CLAUDE_HOST_SESSION_VARIABLES
+    } else {
+        &[][..]
+    };
+    let mut overrides = BTreeMap::new();
+    overrides.insert("NO_COLOR".to_owned(), "1".to_owned());
+    Some(super::ProviderProbeSpec {
+        executable: spec.default_binary.to_owned(),
+        args: vec!["--version".to_owned()],
+        env: build_child_env(env, removed, &overrides),
+        removed_env_keys: removed.iter().map(|s| (*s).to_owned()).collect(),
+    })
 }

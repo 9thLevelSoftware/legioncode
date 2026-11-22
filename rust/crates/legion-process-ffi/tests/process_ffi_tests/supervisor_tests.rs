@@ -260,3 +260,39 @@ fn job_handle_assign_pid_terminates_detached_process() -> Result<(), String> {
     let _ = child.wait();
     Ok(())
 }
+
+#[test]
+fn wait_timeout_reports_none_while_running_and_some_when_finished() -> Result<(), String> {
+    let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| e.to_string())?;
+    let addr = listener
+        .local_addr()
+        .map_err(|e| e.to_string())?
+        .to_string();
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let mut env = SanitizedChildEnv::from_os_env();
+    env.set("LEGION_PROCESS_FFI_CHILD_ROLE", "tree_child");
+    env.set("LEGION_TEST_ADDR", &addr);
+    let spec = SpawnSpec::new(exe)
+        .args([
+            "--exact",
+            "process_ffi_tests::supervisor_tests::child_role_entrypoint",
+        ])
+        .env(env)
+        .stdio(PipeSetConfig::null());
+
+    let mut sup = JobProcessSupervisor::new().map_err(|e| e.to_string())?;
+    let (token, _pipes) = sup.spawn(&spec).map_err(|e| e.to_string())?;
+    let (socket, _) = listener.accept().map_err(|e| e.to_string())?;
+
+    assert!(
+        sup.wait_timeout(token, Duration::ZERO)
+            .map_err(|e| e.to_string())?
+            .is_none()
+    );
+    drop(socket);
+    let exited = sup
+        .wait_timeout(token, Duration::from_secs(5))
+        .map_err(|e| e.to_string())?;
+    assert!(exited.is_some(), "child should exit once socket closes");
+    Ok(())
+}

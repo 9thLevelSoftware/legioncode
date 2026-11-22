@@ -46,6 +46,9 @@ pub(crate) async fn run_checkpoint_capture(
     scope_id: &CheckpointScopeId,
     now_iso: &str,
 ) -> Result<(), ServerRuntimeError> {
+    if !crate::git_checkpoints_cli::is_git_workspace(&workspace_root) {
+        return Ok(());
+    }
     let thread_id = ctx.thread.id.clone();
     let run = ctx.find_run(run_id)?.clone();
     let parent = ctx
@@ -71,7 +74,7 @@ pub(crate) async fn run_checkpoint_capture(
             .db()
             .lock()
             .map_err(|_| ServerRuntimeError::Persistence("db mutex poisoned".to_owned()))?;
-        engine.capture_checkpoint(
+        let captured = engine.capture_checkpoint(
             &conn,
             &CaptureCheckpointRequest {
                 workspace_root: &workspace_root,
@@ -83,7 +86,18 @@ pub(crate) async fn run_checkpoint_capture(
                 to_turn_count: to_turn,
                 captured_at: &now_owned,
             },
-        )
+        )?;
+        drop(conn);
+        if let Ok(scm_ref) =
+            legion_scm::checkpoints::checkpoint_ref_for_turn(&thread_id_owned, to_turn)
+        {
+            let _ = crate::git_checkpoints_cli::run_git(
+                &workspace_root,
+                &["update-ref", scm_ref.as_str(), &captured.commit_oid],
+                &[],
+            );
+        }
+        Ok(captured)
     })
     .await
     .map_err(|e| ServerRuntimeError::Process(format!("checkpoint task failed: {e}")))??;

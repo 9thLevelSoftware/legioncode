@@ -16,6 +16,8 @@ pub mod compatibility;
 mod compatibility_semver;
 pub mod failures;
 pub mod prompts;
+pub mod server_provider;
+mod server_provider_models;
 pub mod usage_limits;
 pub mod usage_routing;
 
@@ -52,6 +54,13 @@ pub use prompts::{
     TITLE_MESSAGE_MAX_CHARS, TextGenerationPrompts, TitleContextMessage, TitleContextRole,
     limit_section, limit_title_message, sanitize_commit_subject, sanitize_pr_title,
     sanitize_thread_title,
+};
+pub use server_provider::{
+    ModelCapabilities, ProviderDiscoveryOutcome, ProviderOptionChoice, ProviderOptionDescriptor,
+    ServerProviderAuth, ServerProviderAuthStatus, ServerProviderModel,
+    ServerProviderNativeSessions, ServerProviderSetup, ServerProviderSkill,
+    ServerProviderSlashCommand, ServerProviderSnapshot, ServerProviderState,
+    build_server_provider_snapshot, default_models_for_driver,
 };
 pub use usage_limits::{
     ProbeAvailability, UsageLimitsSnapshot, UsageWindow, UsageWindowKind,

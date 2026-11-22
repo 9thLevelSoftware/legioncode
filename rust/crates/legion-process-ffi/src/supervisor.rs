@@ -9,6 +9,7 @@ use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
 use std::process::{Child, Command, ExitStatus};
+use std::time::Duration;
 
 use thiserror::Error;
 
@@ -257,6 +258,58 @@ impl JobProcessSupervisor {
             return Err(SupervisorError::UnknownChild(token.0));
         };
         child.wait().map_err(SupervisorError::SpawnFailed)
+    }
+
+    /// Waits up to `timeout` for the child identified by `token` to exit.
+    ///
+    /// Returns `Ok(Some(status))` and releases the handle once exited, or `Ok(None)` if
+    /// the child is still running when `timeout` elapses (leaving the handle tracked).
+    pub fn wait_timeout(
+        &mut self,
+        token: ProcessToken,
+        timeout: Duration,
+    ) -> Result<Option<ExitStatus>, SupervisorError> {
+        let Some(slot) = self.children.get_mut(token.0) else {
+            return Err(SupervisorError::UnknownChild(token.0));
+        };
+        let Some(child) = slot.as_mut() else {
+            return Err(SupervisorError::UnknownChild(token.0));
+        };
+        if let Some(status) = child.try_wait().map_err(SupervisorError::SpawnFailed)? {
+            let _ = slot.take();
+            return Ok(Some(status));
+        }
+        #[cfg(windows)]
+        {
+            if crate::pty_win32_ffi::wait_child_timeout(child, timeout)
+                .map_err(SupervisorError::SpawnFailed)?
+            {
+                let mut done_child = slot.take().ok_or(SupervisorError::UnknownChild(token.0))?;
+                return done_child
+                    .wait()
+                    .map(Some)
+                    .map_err(SupervisorError::SpawnFailed);
+            }
+            Ok(None)
+        }
+        #[cfg(not(windows))]
+        {
+            let deadline = std::time::Instant::now() + timeout;
+            let mut backoff_ms = 1_u64;
+            loop {
+                if let Some(status) = child.try_wait().map_err(SupervisorError::SpawnFailed)? {
+                    let _ = slot.take();
+                    return Ok(Some(status));
+                }
+                let now = std::time::Instant::now();
+                if now >= deadline {
+                    return Ok(None);
+                }
+                let remaining = deadline.saturating_duration_since(now);
+                std::thread::sleep(remaining.min(Duration::from_millis(backoff_ms)));
+                backoff_ms = (backoff_ms * 2).min(10);
+            }
+        }
     }
 
     /// Kills and reaps a single tracked direct child identified by `token`.

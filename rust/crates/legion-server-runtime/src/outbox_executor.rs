@@ -106,7 +106,7 @@ impl RuntimeOutboxExecutor {
         let normalized = instance_id.trim().to_ascii_lowercase();
         if matches!(
             normalized.as_str(),
-            "replay" | "replay-dev" | "dev-replay" | "dev_replay"
+            "replay" | "replay-dev" | "dev-replay" | "dev_replay" | "devreplay"
         ) {
             return Ok(ProviderDriverMode::DevReplay);
         }

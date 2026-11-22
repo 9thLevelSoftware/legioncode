@@ -61,6 +61,7 @@ fn init_minimal_git_repo(dir: &Path) -> TestResult {
         vec!["init"],
         vec!["config", "user.name", "Test User"],
         vec!["config", "user.email", "test@example.com"],
+        vec!["config", "core.autocrlf", "false"],
     ] {
         let out = Command::new("git")
             .current_dir(dir)

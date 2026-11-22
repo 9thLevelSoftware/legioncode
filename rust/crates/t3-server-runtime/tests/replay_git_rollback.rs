@@ -41,6 +41,7 @@ fn init_git_repo_with_dirty_file(dir: &Path) -> TestResult {
     let _ = run_git_ok(dir, &["init"])?;
     let _ = run_git_ok(dir, &["config", "user.name", "Test User"])?;
     let _ = run_git_ok(dir, &["config", "user.email", "test@example.com"])?;
+    let _ = run_git_ok(dir, &["config", "core.autocrlf", "false"])?;
     std::fs::write(dir.join("README.md"), "initial committed line\n")?;
     let _ = run_git_ok(dir, &["add", "README.md"])?;
     let _ = run_git_ok(dir, &["commit", "-m", "initial commit"])?;

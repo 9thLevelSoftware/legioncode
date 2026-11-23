@@ -57,7 +57,7 @@ end run"#;
     }
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
     {
-        run_linux_folder_picker(initial_path)
+        Ok(run_linux_folder_picker(initial_path))
     }
 }
 
@@ -98,7 +98,7 @@ end run"#;
     }
     #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
     {
-        run_linux_file_picker(false, initial_path).map(|mut paths| paths.pop())
+        Ok(run_linux_file_picker(false, initial_path).pop())
     }
 }
 
@@ -135,7 +135,7 @@ end try"#;
         }
         #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
         {
-            run_linux_file_picker(true, None)?
+            run_linux_file_picker(true, None)
         }
     };
 
@@ -208,7 +208,7 @@ fn run_macos_picker(script: &str, initial_path: Option<&str>) -> Result<Vec<Stri
 }
 
 #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
-fn run_linux_folder_picker(initial_path: Option<&str>) -> Result<Option<String>, String> {
+fn run_linux_folder_picker(initial_path: Option<&str>) -> Option<String> {
     let mut zenity = Command::new("zenity");
     zenity.args(["--file-selection", "--directory"]);
     if let Some(init) = initial_path.map(str::trim).filter(|s| !s.is_empty()) {
@@ -216,9 +216,9 @@ fn run_linux_folder_picker(initial_path: Option<&str>) -> Result<Option<String>,
     }
     if let Ok(out) = zenity.output() {
         if out.status.success() {
-            return Ok(split_nonempty_lines(&String::from_utf8_lossy(&out.stdout)).pop());
+            return split_nonempty_lines(&String::from_utf8_lossy(&out.stdout)).pop();
         }
-        return Ok(None);
+        return None;
     }
     let mut kdialog = Command::new("kdialog");
     kdialog.arg("--getexistingdirectory");
@@ -227,17 +227,14 @@ fn run_linux_folder_picker(initial_path: Option<&str>) -> Result<Option<String>,
     }
     match kdialog.output() {
         Ok(out) if out.status.success() => {
-            Ok(split_nonempty_lines(&String::from_utf8_lossy(&out.stdout)).pop())
+            split_nonempty_lines(&String::from_utf8_lossy(&out.stdout)).pop()
         }
-        _ => Ok(None),
+        _ => None,
     }
 }
 
 #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
-fn run_linux_file_picker(
-    multiple: bool,
-    initial_path: Option<&str>,
-) -> Result<Vec<String>, String> {
+fn run_linux_file_picker(multiple: bool, initial_path: Option<&str>) -> Vec<String> {
     let mut zenity = Command::new("zenity");
     zenity.arg("--file-selection");
     if multiple {
@@ -248,9 +245,9 @@ fn run_linux_file_picker(
     }
     match zenity.output() {
         Ok(out) if out.status.success() => {
-            Ok(split_nonempty_lines(&String::from_utf8_lossy(&out.stdout)))
+            split_nonempty_lines(&String::from_utf8_lossy(&out.stdout))
         }
-        _ => Ok(Vec::new()),
+        _ => Vec::new(),
     }
 }
 

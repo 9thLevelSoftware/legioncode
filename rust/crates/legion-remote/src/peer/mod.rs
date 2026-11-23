@@ -13,7 +13,9 @@
 
 pub mod batch_linking;
 pub mod client_pairing;
+pub mod client_pairing_issuer;
 pub mod delegation;
+pub mod linked_history;
 pub mod links;
 pub mod thread_relay;
 pub mod thread_relay_helpers;

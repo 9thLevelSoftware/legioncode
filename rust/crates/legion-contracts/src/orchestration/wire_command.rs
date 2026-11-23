@@ -5,6 +5,7 @@ use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::ids::{CommandId, ProjectId};
+use crate::workspace_folders::ProjectTrackedFolder;
 
 /// Default thread workspace environment mode (`packages/contracts/src/environment.ts`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -52,6 +53,9 @@ pub struct ProjectCreateWireCommand {
     /// Configured scripts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scripts: Option<Vec<Value>>,
+    /// Extra folders associated with this project.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tracked_folders: Option<Vec<ProjectTrackedFolder>>,
 }
 
 /// Wire payload for `project.meta.update` / `project.update`.
@@ -87,6 +91,15 @@ pub struct ProjectUpdateWireCommand {
     /// Updated scripts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scripts: Option<Vec<Value>>,
+    /// Replacement tracked folders list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tracked_folders: Option<Vec<ProjectTrackedFolder>>,
+    /// Incremental tracked folders to add server-side (`project.update`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub track_folders: Option<Vec<ProjectTrackedFolder>>,
+    /// Tracked folder paths to remove server-side (`project.update`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub untrack_folders: Option<Vec<String>>,
     /// Pin toggle.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pinned: Option<bool>,

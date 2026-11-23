@@ -13,6 +13,7 @@ mod orchestration_diff;
 mod orchestration_launch;
 mod orchestration_queries;
 mod orchestration_search;
+pub(crate) mod peer_links_rpc;
 mod peers_secrets_share;
 pub(crate) mod preview_device_peers;
 mod projects_create;
@@ -35,6 +36,8 @@ mod tasks_sessions_mcp;
 mod tasks_webhooks_mcp;
 mod vcs_git;
 mod vcs_review;
+pub(crate) mod workflows_feedback;
+mod workspace_folders_rpc;
 mod workspace_walk;
 
 #[cfg(test)]
@@ -125,6 +128,15 @@ pub(crate) async fn dispatch(state: &Arc<AppState>, tag: &str, payload: Value) -
         {
             tasks_sessions_mcp::dispatch(state, tag, payload).await
         }
+        _ if tag.starts_with("workspace.") => workspace_folders_rpc::dispatch(state, tag, payload),
+        _ if tag.starts_with("workflows.") || tag == "agentFeedback.answerRequest" => {
+            workflows_feedback::dispatch(state, tag, payload).await
+        }
+        "peerLinks.names"
+        | "peerLinks.threadHistoryPage"
+        | "peerLinks.threadItem"
+        | "peerLinks.pairClient"
+        | "peerLinks.pairLink" => peer_links_rpc::dispatch(state, tag, payload).await,
         _ if tag.starts_with("preview.")
             || tag.starts_with("device.")
             || tag.starts_with("peerLinks.")

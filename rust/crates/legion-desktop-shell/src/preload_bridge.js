@@ -223,6 +223,23 @@
     },
     openSystemSettings: (pane) => invoke("desktop.bridge.openSystemSettings", { pane }),
     checkSystemPermission: (pane) => invoke("desktop.bridge.checkSystemPermission", { pane }),
+    appleSpeech: {
+      available: () => invoke("desktop.appleSpeech.available"),
+      supportedLocales: () => invoke("desktop.appleSpeech.supportedLocales"),
+      prepare: (locale) => invoke("desktop.appleSpeech.prepare", locale),
+      transcribe: (input) => {
+        const rawPcm = input && input.pcm;
+        const pcm = ArrayBuffer.isView(rawPcm)
+          ? Array.from(new Uint8Array(rawPcm.buffer, rawPcm.byteOffset, rawPcm.byteLength))
+          : Array.isArray(rawPcm)
+            ? rawPcm
+            : [];
+        return invoke("desktop.appleSpeech.transcribe", {
+          locale: input && input.locale,
+          pcm,
+        });
+      },
+    },
     probeRemoteEditors: () => invoke("desktop.bridge.probeRemoteEditors"),
     pasteAsText: () => invoke("desktop.bridge.pasteAsText"),
     onMenuAction: (listener) => on("menuAction", listener),

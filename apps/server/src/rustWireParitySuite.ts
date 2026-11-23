@@ -4,7 +4,23 @@ import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 
 import { assert } from "@effect/vitest";
-import { OrchestrationV2RpcSchemas, WsRpcGroup } from "@legioncode/contracts";
+import {
+  IsoDateTime,
+  MilestoneId,
+  milestoneMatches,
+  OrchestrationV2RpcSchemas,
+  PEER_LINK_THREAD_HISTORY_ROUTE,
+  PEER_LINK_THREAD_ITEM_ROUTE,
+  PEER_LINK_THREAD_STREAM_ROUTE,
+  ProjectId,
+  ProviderInstanceId,
+  RunId,
+  ThreadId,
+  TrimmedNonEmptyString,
+  WsRpcGroup,
+} from "@legioncode/contracts";
+import { pastedUrl } from "@legioncode/shared/oauthCallback";
+import { hasPendingBackgroundSubagent } from "@legioncode/shared/orchestrationV2PendingBackgroundWork";
 import * as Schema from "effect/Schema";
 import { fetch } from "undici";
 
@@ -41,7 +57,10 @@ interface ParityRpcHarness {
 
 interface WsRpcEntry {
   readonly payloadSchema: Schema.Codec<unknown>;
-  readonly successSchema: Schema.Codec<unknown> & { readonly success?: Schema.Codec<unknown> };
+  readonly successSchema: Schema.Codec<unknown> & {
+    readonly success?: Schema.Codec<unknown>;
+    readonly error?: Schema.Codec<unknown>;
+  };
   readonly errorSchema: Schema.Codec<unknown>;
 }
 
@@ -54,6 +73,7 @@ interface CompiledRpcCodecs {
 const decodeThreadProjection = Schema.decodeUnknownSync(
   Schema.toCodecJson(OrchestrationV2RpcSchemas.getThreadProjection.output),
 );
+const decodeIsoDateTime = Schema.decodeSync(IsoDateTime);
 
 function isStreamEntry(rpcDef: WsRpcEntry): boolean {
   return (
@@ -75,10 +95,14 @@ for (const [tag, rpcDef] of rpcEntries) {
     isStreamEntry(rpcDef) && rpcDef.successSchema.success
       ? rpcDef.successSchema.success
       : rpcDef.successSchema;
+  const targetErrorSchema =
+    isStreamEntry(rpcDef) && rpcDef.successSchema.error
+      ? rpcDef.successSchema.error
+      : rpcDef.errorSchema;
   compiledRpcCodecs.set(tag, {
     decodePayload: Schema.decodeUnknownSync(Schema.toCodecJson(rpcDef.payloadSchema)),
     decodeSuccess: Schema.decodeUnknownSync(Schema.toCodecJson(targetSuccessSchema)),
-    decodeError: Schema.decodeUnknownSync(Schema.toCodecJson(rpcDef.errorSchema)),
+    decodeError: Schema.decodeUnknownSync(Schema.toCodecJson(targetErrorSchema)),
   });
 }
 
@@ -382,7 +406,7 @@ export async function runFullRpcAndProviderParityChecks(
     commandId: nextCmd,
   };
 
-  // 1. Verify 100% WsRpcGroup.requests coverage across all 235 methods.
+  // 1. Verify 100% WsRpcGroup.requests coverage across all methods.
   const fixtures = buildWsRpcFixtures(ctx);
   assert.strictEqual(
     Object.keys(fixtures).length,
@@ -622,4 +646,85 @@ export async function runFullRpcAndProviderParityChecks(
     "failed",
   );
   assert.isTrue(failProj.turnItems.some((item) => item.type === "error"));
+
+  // 4. Verify v0.1.12 HTTP endpoints (/oauth/mcp/revoke, /api/peer-link/client-pairing, /api/links/thread/*).
+  const oauthMetaRes = await fetch(`${origin}/.well-known/oauth-authorization-server`);
+  assert.strictEqual(oauthMetaRes.status, 200);
+  const oauthMeta = (await oauthMetaRes.json()) as { readonly revocation_endpoint?: string };
+  assert.isTrue(oauthMeta.revocation_endpoint?.endsWith("/oauth/mcp/revoke") === true);
+
+  const revokeRes = await fetch(`${origin}/oauth/mcp/revoke`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: "token=nonexistent-parity-token",
+  });
+  assert.strictEqual(revokeRes.status, 200);
+  assert.strictEqual(revokeRes.headers.get("cache-control"), "no-store");
+
+  const unauthPairingRes = await fetch(`${origin}/api/peer-link/client-pairing`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ scopes: ["orchestration:read"], clientLabel: "Parity" }),
+  });
+  assert.strictEqual(unauthPairingRes.status, 401);
+
+  const originPairingRes = await fetch(`${origin}/api/peer-link/client-pairing`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      origin: "http://evil.example",
+    },
+    body: JSON.stringify({ scopes: ["orchestration:read"], clientLabel: "Parity" }),
+  });
+  assert.strictEqual(originPairingRes.status, 403);
+
+  for (const peerThreadPath of [
+    `${PEER_LINK_THREAD_STREAM_ROUTE}?thread=${encodeURIComponent(primaryThreadId)}`,
+    `${PEER_LINK_THREAD_HISTORY_ROUTE}?thread=${encodeURIComponent(primaryThreadId)}&cursor=1`,
+    `${PEER_LINK_THREAD_ITEM_ROUTE}?thread=${encodeURIComponent(primaryThreadId)}&item=${encodeURIComponent(ctx.itemId)}`,
+  ]) {
+    const peerRes = await fetch(`${origin}${peerThreadPath}`);
+    assert.strictEqual(peerRes.status, 401);
+  }
+
+  // 5. Exercise Wave 1/7 shared & contract helpers.
+  const normalizedCallback = pastedUrl("127.0.0.1:1455/cb?code=abc&state=s1");
+  assert.strictEqual(normalizedCallback.origin, "http://127.0.0.1:1455");
+
+  const sampleMilestone = {
+    id: MilestoneId.make("m-1"),
+    occurredAt: decodeIsoDateTime("2026-01-01T00:00:00.000Z"),
+    type: "thread.run_settled" as const,
+    projectId: ProjectId.make(ctx.projectId),
+    threadId: ThreadId.make(ctx.threadId),
+    parentThreadId: null,
+    actor: { type: "agent" as const },
+    isSubagentChild: false,
+    runId: RunId.make("run-1"),
+    outcome: "completed" as const,
+  };
+  assert.isTrue(
+    milestoneMatches(sampleMilestone, {
+      types: ["thread.run_settled"],
+      projectIds: [ProjectId.make(ctx.projectId)],
+    }),
+  );
+  assert.isFalse(
+    milestoneMatches(sampleMilestone, { workflows: [TrimmedNonEmptyString.make("nightly")] }),
+  );
+
+  const claudeProvider = ProviderInstanceId.make("claudeAgent");
+  assert.isFalse(hasPendingBackgroundSubagent([], claudeProvider));
+  assert.isTrue(
+    hasPendingBackgroundSubagent(
+      [
+        {
+          kind: "subagent" as const,
+          taskId: TrimmedNonEmptyString.make("bg-1"),
+          providerInstanceId: claudeProvider,
+        },
+      ],
+      claudeProvider,
+    ),
+  );
 }

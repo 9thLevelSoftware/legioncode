@@ -237,6 +237,14 @@ _legioncode()
         _legioncode_triage "$i"
         return
         ;;
+      workflow)
+        _legioncode_workflow "$i"
+        return
+        ;;
+      feedback)
+        _legioncode_feedback "$i"
+        return
+        ;;
     esac
   done
 
@@ -277,7 +285,7 @@ _legioncode()
     return
   fi
 
-  _legioncode--choices "$cur" "$_comp_word" 'help' 'serve' 'app' 'pair' 'auth' 'environment' 'browser' 'project' 'thread' 'up' 'status' 'service' 'update' 'install' 'uninstall' 'theme' 'trace' 'doctor' 'policy' 'triage'
+  _legioncode--choices "$cur" "$_comp_word" 'help' 'serve' 'app' 'pair' 'auth' 'environment' 'browser' 'project' 'thread' 'up' 'status' 'service' 'update' 'install' 'uninstall' 'theme' 'trace' 'doctor' 'policy' 'triage' 'workflow' 'feedback'
 }
 
 _legioncode_help()
@@ -2028,6 +2036,36 @@ _legioncode_triage()
     return
   fi
 
+}
+
+_legioncode_workflow()
+{
+  local cur prev words cword i
+  local _command_index="$1"
+  _init_completion -n "$COMP_WORDBREAKS" || return
+  if [[ "$cur" == -* ]]; then
+    COMPREPLY=( $(compgen -W "--base-dir --remote-url --token --json --key --input --status --reason --run --wait --workflow --channel --id" -- "$cur") )
+    return
+  fi
+  _legioncode--choices "$cur" "" 'start' 'list' 'show' 'resume' 'cancel' 'signal' 'questions' 'hooks' 'store'
+}
+
+_legioncode_feedback()
+{
+  local cur prev words cword i
+  local _command_index="$1"
+  _init_completion -n "$COMP_WORDBREAKS" || return
+  case "$prev" in
+    --kind)
+      _legioncode--choices "$cur" "" 'bug' 'confusing' 'missing_capability' 'wrong_docs' 'other'
+      return
+      ;;
+  esac
+  if [[ "$cur" == -* ]]; then
+    COMPREPLY=( $(compgen -W "--kind --subject --expected --actual --workaround --base-dir --remote-url --token --json" -- "$cur") )
+    return
+  fi
+  _legioncode--choices "$cur" "" 'list'
 }
 
 complete -F _legioncode legioncode

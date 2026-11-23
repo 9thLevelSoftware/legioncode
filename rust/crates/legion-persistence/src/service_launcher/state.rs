@@ -81,7 +81,7 @@ impl ServiceUpdateRecord {
         }
     }
 
-    fn baseline_version(&self) -> &str {
+    pub(super) fn baseline_version(&self) -> &str {
         match self {
             Self::Pending { from_version, .. }
             | Self::Committed { from_version, .. }
@@ -90,7 +90,7 @@ impl ServiceUpdateRecord {
         }
     }
 
-    fn target_version(&self) -> &str {
+    pub(super) fn target_version(&self) -> &str {
         match self {
             Self::Pending { target_version, .. }
             | Self::Committed { target_version, .. }

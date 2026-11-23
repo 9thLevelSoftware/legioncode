@@ -2,7 +2,7 @@ import { isProviderSkillUserInvocable } from "@legioncode/client-runtime/provide
 import type { ServerProviderSkill } from "@legioncode/contracts";
 import { assistantCitationLabel } from "@legioncode/shared/assistantCitations";
 import { formatProviderSkillDisplayName } from "@legioncode/shared/inlineSkills";
-import { fileBasename } from "@legioncode/shared/path";
+import { fileDisplayName } from "@legioncode/shared/path";
 import {
   CircleDashedIcon,
   ImageIcon,
@@ -89,7 +89,7 @@ export function CollapsedComposerPromptPreview(props: {
             key={key}
             kind="mention"
             icon={<PierreEntryIcon pathValue={segment.path} kind="file" theme={props.theme} />}
-            label={fileBasename(segment.path)}
+            label={fileDisplayName(segment.path)}
           />
         );
       case "context-reference": {

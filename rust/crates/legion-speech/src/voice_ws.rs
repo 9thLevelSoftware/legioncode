@@ -3,10 +3,10 @@
 use crate::asr::{AsrEngine, AsrTranscriberSession};
 use crate::types::{TranscriptionOptions, decode_f32le_bytes, decode_pcm16le_bytes};
 pub use crate::voice_ws_types::{
-    AudioSampleEncoding, CloseFrame, DEFAULT_MAX_AUDIO_BUFFER_BYTES, DEFAULT_MAX_CHUNK_BYTES,
-    DEFAULT_MAX_CONTROL_FRAME_BYTES, DEFAULT_MAX_SESSION_DURATION_MS, SystemClock, VOICE_WS_PATH,
-    VirtualClock, VoiceClientCommand, VoiceClientFrame, VoiceClock, VoiceErrorCode,
-    VoiceOutboundFrame, VoiceServerEvent, VoiceWsConfig, VoiceWsState,
+    AudioSampleEncoding, CloseFrame, DEFAULT_IDLE_TIMEOUT_MS, DEFAULT_MAX_AUDIO_BUFFER_BYTES,
+    DEFAULT_MAX_CHUNK_BYTES, DEFAULT_MAX_CONTROL_FRAME_BYTES, DEFAULT_MAX_SESSION_DURATION_MS,
+    SystemClock, VOICE_WS_PATH, VirtualClock, VoiceClientCommand, VoiceClientFrame, VoiceClock,
+    VoiceErrorCode, VoiceOutboundFrame, VoiceServerEvent, VoiceWsConfig, VoiceWsState,
 };
 use crate::voice_ws_types::{decode_raw_text_frame, event_frame};
 
@@ -23,6 +23,7 @@ pub struct VoiceWsSession<C: VoiceClock> {
     config: VoiceWsConfig,
     clock: C,
     opened_at_ms: u64,
+    last_activity_ms: u64,
     state: VoiceWsState,
     buffered_bytes: usize,
     buffered_audio: Vec<u8>,
@@ -37,6 +38,7 @@ impl<C: VoiceClock> VoiceWsSession<C> {
             config,
             clock,
             opened_at_ms,
+            last_activity_ms: opened_at_ms,
             state: VoiceWsState::AwaitingStart,
             buffered_bytes: 0,
             buffered_audio: Vec::new(),
@@ -52,6 +54,11 @@ impl<C: VoiceClock> VoiceWsSession<C> {
     /// Returns the opening timestamp in milliseconds captured from `clock`.
     pub fn opened_at_ms(&self) -> u64 {
         self.opened_at_ms
+    }
+
+    /// Returns the most recent activity timestamp in milliseconds captured from `clock`.
+    pub fn last_activity_ms(&self) -> u64 {
+        self.last_activity_ms
     }
 
     /// Returns the cumulative audio byte count accepted in this session.
@@ -90,7 +97,8 @@ impl<C: VoiceClock> VoiceWsSession<C> {
         if self.is_terminal() {
             return Vec::new();
         }
-        let elapsed_ms = self.clock.now_ms().saturating_sub(self.opened_at_ms);
+        let now_ms = self.clock.now_ms();
+        let elapsed_ms = now_ms.saturating_sub(self.opened_at_ms);
         if elapsed_ms >= self.config.max_session_duration_ms {
             return self.fail(
                 VoiceErrorCode::SessionTimeout,
@@ -102,12 +110,31 @@ impl<C: VoiceClock> VoiceWsSession<C> {
                 "Voice session timed out",
             );
         }
+        if let Some(idle_timeout_ms) = self.config.idle_timeout_ms
+            && idle_timeout_ms > 0
+            && now_ms.saturating_sub(self.last_activity_ms) >= idle_timeout_ms
+        {
+            return self.expire_idle(idle_timeout_ms);
+        }
         Vec::new()
+    }
+
+    /// Closes the session for inactivity when an async timer has already elapsed (`#41075`).
+    pub fn expire_idle(&mut self, idle_timeout_ms: u64) -> Vec<VoiceOutboundFrame> {
+        if self.is_terminal() {
+            return Vec::new();
+        }
+        self.fail(
+            VoiceErrorCode::SessionTimeout,
+            format!("Voice session timed out after {idle_timeout_ms} ms of inactivity."),
+            1008,
+            "Voice session idle timeout",
+        )
     }
 
     /// Processes an inbound [`VoiceClientFrame`] in standalone protocol mode.
     pub fn handle_frame(&mut self, frame: VoiceClientFrame) -> Vec<VoiceOutboundFrame> {
-        match self.step_protocol(frame) {
+        let out = match self.step_protocol(frame) {
             ProtocolStep::Emitted(frames) => frames,
             ProtocolStep::StartAccepted(_) => vec![event_frame(VoiceServerEvent::Ready)],
             ProtocolStep::AudioAccepted(_) => {
@@ -118,7 +145,11 @@ impl<C: VoiceClock> VoiceWsSession<C> {
                 })]
             }
             ProtocolStep::StopAccepted => self.finish_with_text(String::new()),
+        };
+        if !self.is_terminal() {
+            self.last_activity_ms = self.clock.now_ms();
         }
+        out
     }
 
     /// Processes an inbound [`VoiceClientFrame`] wired end-to-end with [`AsrTranscriberSession`].
@@ -127,7 +158,7 @@ impl<C: VoiceClock> VoiceWsSession<C> {
         frame: VoiceClientFrame,
         asr: &mut AsrTranscriberSession<E>,
     ) -> Vec<VoiceOutboundFrame> {
-        match self.step_protocol(frame) {
+        let out = match self.step_protocol(frame) {
             ProtocolStep::Emitted(frames) => frames,
             ProtocolStep::StartAccepted(options) => {
                 if let Err(err) = asr.begin_stream(options) {
@@ -180,7 +211,11 @@ impl<C: VoiceClock> VoiceWsSession<C> {
                     "Speech stream failed",
                 ),
             },
+        };
+        if !self.is_terminal() {
+            self.last_activity_ms = self.clock.now_ms();
         }
+        out
     }
 
     fn step_protocol(&mut self, frame: VoiceClientFrame) -> ProtocolStep {

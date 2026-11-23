@@ -18,6 +18,7 @@ fn nav_fields(p: &MobileNavigationPresenter) -> Vec<(&'static str, String)> {
         ("pull_requests", s.pull_requests),
         ("prs_short", s.prs_short),
         ("issues", s.issues),
+        ("workflows", s.workflows),
         ("usage", s.usage),
         ("settings", s.settings),
         ("new_thread", s.new_thread),
@@ -56,6 +57,7 @@ fn supported_locales_have_zero_english_fallback_leakage_in_navigation() {
             NavigationTabKind::Threads,
             NavigationTabKind::PullRequests,
             NavigationTabKind::Issues,
+            NavigationTabKind::Workflows,
             NavigationTabKind::Usage,
             NavigationTabKind::Settings,
         ] {

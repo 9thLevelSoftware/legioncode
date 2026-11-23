@@ -110,7 +110,7 @@ pub(crate) fn is_allowed_cors_origin(
     false
 }
 
-/// Credentialed CORS middleware matching `apps/server/src/http.ts` and `httpCors.ts`.
+/// Credentialed CORS middleware matching `apps/server/src/http.ts` and `httpCors.ts` (`#41092`).
 pub(crate) async fn browser_api_cors_middleware(
     State(state): State<Arc<RuntimeHttpState>>,
     req: Request<Body>,
@@ -136,8 +136,19 @@ pub(crate) async fn browser_api_cors_middleware(
             .body(Body::empty())
             .unwrap_or_else(|_| StatusCode::NO_CONTENT.into_response());
         let headers = resp.headers_mut();
-        headers.insert(VARY, HeaderValue::from_static("Origin"));
-        if allowed
+        with_vary_origin(headers);
+        if origin.is_none() {
+            headers.insert(ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("*"));
+            headers.insert(
+                ACCESS_CONTROL_ALLOW_METHODS,
+                HeaderValue::from_static(CORS_ALLOW_METHODS),
+            );
+            headers.insert(
+                ACCESS_CONTROL_ALLOW_HEADERS,
+                HeaderValue::from_static(CORS_ALLOW_HEADERS),
+            );
+            headers.insert(ACCESS_CONTROL_MAX_AGE, HeaderValue::from_static("600"));
+        } else if allowed
             && let Some(ref origin_val) = origin
             && let Ok(hv) = HeaderValue::from_str(origin_val)
         {
@@ -160,26 +171,53 @@ pub(crate) async fn browser_api_cors_middleware(
     }
 
     let mut resp = next.run(req).await;
-    if origin.is_some() {
-        resp.headers_mut()
-            .insert(VARY, HeaderValue::from_static("Origin"));
-    }
-    if allowed
-        && let Some(ref origin_val) = origin
-        && let Ok(hv) = HeaderValue::from_str(origin_val)
-    {
+    if origin.is_none() {
         let headers = resp.headers_mut();
-        headers.insert(ACCESS_CONTROL_ALLOW_ORIGIN, hv);
-        headers.insert(
-            ACCESS_CONTROL_ALLOW_CREDENTIALS,
-            HeaderValue::from_static("true"),
-        );
+        with_vary_origin(headers);
+        headers.insert(ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("*"));
         headers.insert(
             ACCESS_CONTROL_EXPOSE_HEADERS,
             HeaderValue::from_static(CORS_EXPOSE_HEADERS),
         );
+    } else {
+        with_vary_origin(resp.headers_mut());
+        if allowed
+            && let Some(ref origin_val) = origin
+            && let Ok(hv) = HeaderValue::from_str(origin_val)
+        {
+            let headers = resp.headers_mut();
+            headers.insert(ACCESS_CONTROL_ALLOW_ORIGIN, hv);
+            headers.insert(
+                ACCESS_CONTROL_ALLOW_CREDENTIALS,
+                HeaderValue::from_static("true"),
+            );
+            headers.insert(
+                ACCESS_CONTROL_EXPOSE_HEADERS,
+                HeaderValue::from_static(CORS_EXPOSE_HEADERS),
+            );
+        }
     }
     resp
+}
+
+fn with_vary_origin(headers: &mut axum::http::HeaderMap) {
+    let existing = headers
+        .get(VARY)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_owned);
+    if let Some(ref raw) = existing {
+        if raw
+            .split(',')
+            .any(|token| token.trim().eq_ignore_ascii_case("origin"))
+        {
+            return;
+        }
+        if let Ok(hv) = HeaderValue::from_str(&format!("{raw}, Origin")) {
+            headers.insert(VARY, hv);
+        }
+    } else {
+        headers.insert(VARY, HeaderValue::from_static("Origin"));
+    }
 }
 
 pub(crate) fn generate_signing_secret() -> [u8; 32] {
@@ -221,14 +259,13 @@ pub(crate) fn resolve_initial_dev_url() -> Option<String> {
 pub(crate) fn resolve_dev_allowed_origins() -> Vec<String> {
     std::env::var("LEGIONCODE_DEV_ALLOWED_ORIGINS")
         .ok()
-        .map(|raw| {
+        .map_or_default(|raw| {
             raw.split(',')
                 .map(str::trim)
                 .filter(|s| !s.is_empty())
                 .map(str::to_owned)
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 pub(crate) fn resolve_initial_auth_policy() -> String {

@@ -4,6 +4,11 @@ use legion_persistence::project_store::{ensure_project_store_schema, list_non_de
 use rusqlite::{Connection, params};
 use serde_json::{Value, json};
 
+#[path = "mcp_wait_wake.rs"]
+mod wait_wake;
+pub(super) use wait_wake::evaluate_wait_wake_for_thread;
+use wait_wake::{clamp_limit, insert_optional_json_field};
+
 /// Executes `legion_project_list` over `projection_projects`.
 pub(super) fn project_list(conn: &Connection, args: &Value) -> Result<Value, String> {
     let cursor =
@@ -33,11 +38,19 @@ pub(super) fn thread_list(conn: &Connection, args: &Value) -> Result<Value, Stri
         usize::try_from(args.get("cursor").and_then(Value::as_u64).unwrap_or(0)).unwrap_or(0);
     let limit = clamp_limit(args, "limit", 100, 100);
 
+    let include_subagents = args
+        .get("includeSubagents")
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
     let mut stmt = conn
         .prepare(
             "SELECT thread_id, project_id, title, COALESCE(provider_instance_id, default_provider),
                     COALESCE(json_extract(payload_json, '$.modelSelection.model'), ''),
-                    created_at, updated_at
+                    created_at, updated_at,
+                    json_extract(payload_json, '$.delegatedFrom'),
+                    json_extract(payload_json, '$.workflowRun'),
+                    json_extract(payload_json, '$.lineage.parentThreadId'),
+                    json_extract(payload_json, '$.lineage.relationshipToParent')
              FROM orchestration_v2_projection_threads
              WHERE deleted_at IS NULL AND archived_at IS NULL
                AND (?1 IS NULL OR project_id = ?1)
@@ -54,14 +67,32 @@ pub(super) fn thread_list(conn: &Connection, args: &Value) -> Result<Value, Stri
                 row.get::<_, String>(4)?,
                 row.get::<_, String>(5)?,
                 row.get::<_, String>(6)?,
+                row.get::<_, Option<String>>(7)?,
+                row.get::<_, Option<String>>(8)?,
+                row.get::<_, Option<String>>(9)?,
+                row.get::<_, Option<String>>(10)?,
             ))
         })
         .map_err(|e| e.to_string())?;
 
     let mut all = Vec::new();
     for row in rows {
-        let (tid, pid, title, provider, model, created_at, updated_at) =
-            row.map_err(|e| e.to_string())?;
+        let (
+            tid,
+            pid,
+            title,
+            provider,
+            model,
+            created_at,
+            updated_at,
+            delegated_raw,
+            wf_raw,
+            parent_thread_id,
+            rel_to_parent,
+        ) = row.map_err(|e| e.to_string())?;
+        if !include_subagents && rel_to_parent.as_deref() == Some("subagent") {
+            continue;
+        }
         let (latest_run_id, status) = run_status_for(conn, &tid, None)?;
         let item_count: i64 = conn
             .query_row(
@@ -70,7 +101,7 @@ pub(super) fn thread_list(conn: &Connection, args: &Value) -> Result<Value, Stri
                 |r| r.get(0),
             )
             .unwrap_or(0);
-        all.push(json!({
+        let mut entry = json!({
             "threadId": tid,
             "projectId": pid,
             "title": title,
@@ -78,10 +109,15 @@ pub(super) fn thread_list(conn: &Connection, args: &Value) -> Result<Value, Stri
             "latestRunId": latest_run_id,
             "providerInstanceId": provider,
             "model": model,
+            "parentThreadId": parent_thread_id,
+            "relationshipToParent": rel_to_parent,
             "itemCount": item_count,
             "createdAt": created_at,
             "updatedAt": updated_at,
-        }));
+        });
+        insert_optional_json_field(&mut entry, "delegatedFrom", delegated_raw.as_deref());
+        insert_optional_json_field(&mut entry, "workflowRun", wf_raw.as_deref());
+        all.push(entry);
     }
     let total = all.len();
     let end = cursor.saturating_add(limit).min(total);
@@ -103,12 +139,13 @@ pub(super) fn thread_read(
     let limit = clamp_limit(args, "limit", 100, 100);
     let max_chars = clamp_limit(args, "maxCharsPerItem", 20_000, 20_000);
 
-    let (project_id, title, provider, model, branch, worktree) = conn
+    let (project_id, title, provider, model, branch, worktree, prs_raw) = conn
         .query_row(
             "SELECT project_id, title, COALESCE(provider_instance_id, default_provider),
                     COALESCE(json_extract(payload_json, '$.modelSelection.model'), ''),
                     json_extract(payload_json, '$.branch'),
-                    json_extract(payload_json, '$.worktreePath')
+                    json_extract(payload_json, '$.worktreePath'),
+                    json_extract(payload_json, '$.pullRequests')
              FROM orchestration_v2_projection_threads
              WHERE thread_id = ?1 AND deleted_at IS NULL",
             [thread_id],
@@ -120,6 +157,7 @@ pub(super) fn thread_read(
                     row.get::<_, String>(3)?,
                     row.get::<_, Option<String>>(4)?,
                     row.get::<_, Option<String>>(5)?,
+                    row.get::<_, Option<String>>(6)?,
                 ))
             },
         )
@@ -141,20 +179,36 @@ pub(super) fn thread_read(
         .last()
         .and_then(|it| it.get("position").and_then(Value::as_u64));
 
+    let include_pr_preview = args.get("beforePosition").is_none();
+    let mut thread_obj = json!({
+        "threadId": thread_id,
+        "projectId": project_id,
+        "title": title,
+        "status": status,
+        "providerInstanceId": provider,
+        "model": model,
+        "branch": branch,
+        "worktreePath": worktree,
+        "latestRunId": latest_run_id,
+        "pendingRequestCount": 0,
+        "itemCount": total_items,
+    });
+    if include_pr_preview
+        && let Some(prs_val) = prs_raw
+            .and_then(|s| serde_json::from_str::<Vec<Value>>(&s).ok())
+            .filter(|v| !v.is_empty())
+        && let Some(obj) = thread_obj.as_object_mut()
+    {
+        let open_count = prs_val
+            .iter()
+            .filter(|p| p.get("state").and_then(Value::as_str) == Some("open"))
+            .count();
+        obj.insert("pullRequests".to_owned(), Value::Array(prs_val));
+        obj.insert("openPullRequestCount".to_owned(), json!(open_count));
+    }
+
     Ok(json!({
-        "thread": {
-            "threadId": thread_id,
-            "projectId": project_id,
-            "title": title,
-            "status": status,
-            "providerInstanceId": provider,
-            "model": model,
-            "branch": branch,
-            "worktreePath": worktree,
-            "latestRunId": latest_run_id,
-            "pendingRequestCount": 0,
-            "itemCount": total_items,
-        },
+        "thread": thread_obj,
         "recentRuns": recent_runs,
         "items": items,
         "nextPosition": next_position,
@@ -278,14 +332,4 @@ fn query_thread_items(
     }
     let total = out.len();
     Ok((out, total))
-}
-
-fn clamp_limit(args: &Value, key: &str, default_val: u64, max_val: u64) -> usize {
-    usize::try_from(
-        args.get(key)
-            .and_then(Value::as_u64)
-            .unwrap_or(default_val)
-            .clamp(1, max_val),
-    )
-    .unwrap_or(usize::try_from(default_val).unwrap_or(100))
 }

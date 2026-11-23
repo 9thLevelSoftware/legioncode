@@ -324,3 +324,74 @@ impl PrLookupGitMemo {
         self.queried_provider = true;
     }
 }
+
+/// Parses `(branch_name, worktree_path)` pairs from `git worktree list --porcelain` (`#40556`).
+#[must_use]
+pub fn parse_worktree_branch_paths(porcelain_output: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    let mut current_path: Option<String> = None;
+    let mut current_branch: Option<String> = None;
+
+    for raw_line in porcelain_output.lines() {
+        let line = raw_line.trim_end_matches('\r');
+        if line.is_empty() {
+            if let (Some(branch), Some(path)) = (current_branch.take(), current_path.take()) {
+                out.push((branch, path));
+            } else {
+                current_path = None;
+                current_branch = None;
+            }
+            continue;
+        }
+        if let Some(path) = line.strip_prefix("worktree ") {
+            current_path = Some(path.trim().to_owned());
+        } else if let Some(branch_ref) = line.strip_prefix("branch ") {
+            let clean = branch_ref.trim();
+            let short = clean.strip_prefix("refs/heads/").unwrap_or(clean);
+            if !short.is_empty() {
+                current_branch = Some(short.to_owned());
+            }
+        }
+    }
+    if let (Some(branch), Some(path)) = (current_branch, current_path) {
+        out.push((branch, path));
+    }
+    out
+}
+
+/// Builds a deterministic worktree occupancy stamp filtering out `git_common_dir` itself and
+/// missing worktree directories so external worktree edits invalidate picker caches (`#40556`).
+#[must_use]
+pub fn compute_worktree_branch_stamp(
+    entries: &[(String, String)],
+    git_common_dir: &Path,
+) -> String {
+    let norm_common = crate::workspace_folders_parse::lexical_clean(git_common_dir);
+    let mut lines: Vec<String> = entries
+        .iter()
+        .filter_map(|(branch, wt_path)| {
+            let clean_wt = crate::workspace_folders_parse::lexical_clean(Path::new(wt_path));
+            if clean_wt == norm_common || !clean_wt.exists() {
+                return None;
+            }
+            Some(format!(
+                "{branch}\t{}",
+                clean_wt.to_string_lossy().replace('\\', "/")
+            ))
+        })
+        .collect();
+    lines.sort();
+    lines.join("\n")
+}
+
+/// Extends [`read_ref_snapshot`] with worktree occupancy metadata so branch pickers refresh
+/// after external worktree changes while local-only status polls keep using lightweight [`read_ref_snapshot`] (`#40556`).
+#[must_use]
+pub fn read_ref_snapshot_with_worktrees(
+    git_common_dir: &Path,
+    worktree_stamp: Option<&str>,
+) -> Option<String> {
+    let local = read_ref_snapshot(git_common_dir)?;
+    let stamp = worktree_stamp?;
+    Some(format!("{local}\0{stamp}"))
+}

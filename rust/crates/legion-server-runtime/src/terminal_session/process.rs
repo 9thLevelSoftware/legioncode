@@ -263,6 +263,8 @@ fn spawn_vt_pipe_pump(mut reader: PipeReader, sinks: TerminalSessionSinks) {
     });
 }
 
+type PtyExitParts = (Option<i32>, Option<i32>);
+
 fn spawn_pty_pumps(
     pty: Arc<PtyProcess>,
     mut reader: PtyReader,
@@ -272,7 +274,7 @@ fn spawn_pty_pumps(
     // On Windows ConPTY, `conhost.exe` keeps `out_read` open until `ClosePseudoConsole` runs inside `wait()`.
     #[cfg(windows)]
     let exit_rx = {
-        let (tx, rx) = mpsc::sync_channel(1);
+        let (tx, rx) = mpsc::sync_channel::<Option<PtyExitParts>>(1);
         let pty_wait = Arc::clone(&pty);
         std::thread::spawn(move || {
             let parts = pty_wait.wait().ok().map(exit_parts);
@@ -281,7 +283,7 @@ fn spawn_pty_pumps(
         Some(rx)
     };
     #[cfg(not(windows))]
-    let exit_rx: Option<mpsc::Receiver<Option<(Option<i32>, Option<i32>)>>> = None;
+    let exit_rx: Option<mpsc::Receiver<Option<PtyExitParts>>> = None;
 
     std::thread::spawn(move || {
         let mut buf = [0_u8; 4096];

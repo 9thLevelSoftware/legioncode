@@ -91,9 +91,13 @@ pub fn sweep_stale_pending_attachments(attachments_dir: &Path, now: SystemTime) 
         } else {
             PENDING_ATTACHMENT_MAX_AGE
         };
-        let Ok(metadata) = fs::metadata(entry.path()) else {
+        // Never follow symlinks during attachment sweeps (#40528).
+        let Ok(metadata) = fs::symlink_metadata(entry.path()) else {
             continue;
         };
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            continue;
+        }
         let Ok(modified) = metadata.modified() else {
             continue;
         };

@@ -236,6 +236,60 @@ fn parse_pi_session_start(val: &Value) -> Vec<NonAcpTurnUpdate> {
     }]
 }
 
+/// Normalized Pi per-turn token counters where `input_tokens` includes `input`,
+/// `cacheRead`, and `cacheWrite` (`#40758`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PiTurnTokenUsage {
+    /// Combined input tokens (`uncached + cache_read + cache_write`).
+    pub input_tokens: u64,
+    /// Prompt cache read tokens.
+    pub cached_input_tokens: u64,
+    /// Generated output tokens.
+    pub output_tokens: u64,
+}
+
+/// Parses a Pi `message_update.usage` object into [`PiTurnTokenUsage`] (`#40758`).
+#[must_use]
+pub fn parse_pi_turn_token_usage(usage: &Value) -> PiTurnTokenUsage {
+    let uncached = u64_field(Some(usage), "input")
+        .or_else(|| u64_field(Some(usage), "inputTokens"))
+        .unwrap_or(0);
+    let cache_read = u64_field(Some(usage), "cacheRead")
+        .or_else(|| u64_field(Some(usage), "cache_read"))
+        .or_else(|| u64_field(Some(usage), "cachedInputTokens"))
+        .unwrap_or(0);
+    let cache_write = u64_field(Some(usage), "cacheWrite")
+        .or_else(|| u64_field(Some(usage), "cache_write"))
+        .unwrap_or(0);
+    let output = u64_field(Some(usage), "output")
+        .or_else(|| u64_field(Some(usage), "outputTokens"))
+        .unwrap_or(0);
+    PiTurnTokenUsage {
+        input_tokens: uncached
+            .saturating_add(cache_read)
+            .saturating_add(cache_write),
+        cached_input_tokens: cache_read,
+        output_tokens: output,
+    }
+}
+
+/// Derives completed Pi turn context/token usage from `get_session_stats` (`contextUsage`) and the
+/// turn's own last message usage rather than session-cumulative `stats.tokens` (`#40758`).
+#[must_use]
+pub fn pi_token_usage_from_session_stats(
+    stats: &Value,
+    fallback_used_tokens: Option<u64>,
+    last_message_usage: Option<PiTurnTokenUsage>,
+) -> Option<(u64, u64, Option<PiTurnTokenUsage>)> {
+    let ctx = stats.get("contextUsage");
+    let max_tokens = u64_field(ctx, "contextWindow")?;
+    let used_tokens = u64_field(ctx, "tokens").or(fallback_used_tokens)?;
+    if max_tokens == 0 {
+        return None;
+    }
+    Some((used_tokens, max_tokens, last_message_usage))
+}
+
 fn parse_pi_message_update(val: &Value) -> Vec<NonAcpTurnUpdate> {
     let mut out = Vec::new();
     let delta_ev = val.get("assistantMessageEvent");
@@ -255,16 +309,11 @@ fn parse_pi_message_update(val: &Value) -> Vec<NonAcpTurnUpdate> {
     }
 
     if let Some(usage) = val.get("usage") {
-        let input = u64_field(Some(usage), "input")
-            .or_else(|| u64_field(Some(usage), "inputTokens"))
-            .unwrap_or(0);
-        let output = u64_field(Some(usage), "output")
-            .or_else(|| u64_field(Some(usage), "outputTokens"))
-            .unwrap_or(0);
-        if input > 0 || output > 0 {
+        let parsed = parse_pi_turn_token_usage(usage);
+        if parsed.input_tokens > 0 || parsed.output_tokens > 0 {
             out.push(NonAcpTurnUpdate::UsageReported {
-                input_tokens: input,
-                output_tokens: output,
+                input_tokens: parsed.input_tokens,
+                output_tokens: parsed.output_tokens,
             });
         }
     }

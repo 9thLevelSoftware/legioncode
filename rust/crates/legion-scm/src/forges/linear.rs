@@ -6,6 +6,12 @@ use http::{HeaderMap, Method};
 use regex::Regex;
 use serde_json::{Value, json};
 
+pub use crate::forges::linear_accounts::{
+    BoundIssueProjectScope, LinearAccountBinding, are_all_host_accounts_unusable,
+    build_linear_viewer_request, issue_tracker_secret_name, linear_list_cursor_key,
+    linear_viewer_key, matches_linear_workspace_url, parse_linear_viewer_identity,
+    resolve_bound_issue_scope, select_standalone_url_account_order,
+};
 use crate::forges::{ForgeError, HttpRequestSpec, json_str};
 
 /// Canonical `Linear` GraphQL API endpoint URL.

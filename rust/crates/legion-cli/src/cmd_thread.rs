@@ -1,28 +1,23 @@
 //! Standalone `legioncode thread list|read|send|wait` commands backed by `legion_remote::thread_client`.
 
 #[path = "cmd_thread_ops.rs"]
-mod ops;
+pub(crate) mod ops;
 #[path = "cmd_thread_start.rs"]
 pub(crate) mod start;
+pub(crate) use start::parse_wait;
 
 use std::path::Path;
 
 use legion_contracts::brand::ACTIVE_BRAND;
 use legion_remote::acp_mcp_bridge::McpHttpClient;
 use legion_remote::thread_client::{
-    ThreadClientError, ThreadListRequest, ThreadMcpClient, discover_live_server_runtime,
-    format_thread_list_line,
+    ThreadClientError, ThreadMcpClient, discover_live_server_runtime, format_thread_list_line,
 };
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::cli_global::fail_with_command_help;
 use crate::cmd_project_args::normalize_workspace_root;
-use crate::cmd_thread_args::{
-    ParsedThreadCli, ThreadAction, ThreadCommonOpts, bad_flag, parse_thread_cli, take_common_opt,
-    take_single_thread, take_thr_opt,
-};
-use crate::cmd_trace::parse_duration_ms;
+use crate::cmd_thread_args::{ParsedThreadCli, ThreadAction, parse_thread_cli};
 use crate::fallback::{
     delegate_to_node, resolve_base_dir, unit_forced_original, write_stdout_line,
 };
@@ -130,7 +125,7 @@ async fn execute(parsed: ParsedThreadCli) -> i32 {
             after_position,
             json,
             ..
-        } => run_read(&client, &thread_id, view, limit, after_position, json).await,
+        } => run_read(&mcp, &client, &thread_id, view, limit, after_position, json).await,
         ThreadAction::Send {
             thread_id,
             message,
@@ -185,30 +180,68 @@ async fn run_list(
         Some(resolve_project_id(mcp, identifier).await?)
     };
 
-    let mut threads = Vec::new();
+    let mut threads: Vec<serde_json::Value> = Vec::new();
     let mut cursor = Some(0_u32);
     while let Some(page_cursor) = cursor {
-        let page = client
-            .list_threads(&ThreadListRequest {
-                project_id: project_id.clone(),
-                all_projects: all.then_some(true),
-                include_subagents: Some(false),
-                cursor: Some(page_cursor),
-                limit: Some(100),
-                ..ThreadListRequest::default()
-            })
-            .await?;
-        threads.extend(page.threads);
-        cursor = page.next_cursor;
+        let mut req_args = json!({
+            "includeSubagents": true,
+            "limit": 100,
+            "cursor": page_cursor,
+        });
+        if let Some(ref pid) = project_id
+            && let Some(obj) = req_args.as_object_mut()
+        {
+            obj.insert(
+                "projectId".to_owned(),
+                serde_json::Value::String(pid.clone()),
+            );
+        }
+        if all && let Some(obj) = req_args.as_object_mut() {
+            obj.insert("allProjects".to_owned(), serde_json::Value::Bool(true));
+        }
+        let raw = mcp
+            .call_tool("legion_thread_list", &req_args)
+            .await
+            .map_err(|err| ThreadClientError::ToolFailed {
+                tool: "legion_thread_list".to_owned(),
+                detail: err.to_string(),
+            })?;
+        let Some(structured) = raw.get("structuredContent") else {
+            break;
+        };
+        if let Some(arr) = structured
+            .get("threads")
+            .and_then(serde_json::Value::as_array)
+        {
+            for item in arr {
+                // Include delegated threads across pages while leaving out child subagents (#40738).
+                if item
+                    .get("relationshipToParent")
+                    .and_then(serde_json::Value::as_str)
+                    != Some("subagent")
+                {
+                    threads.push(item.clone());
+                }
+            }
+        }
+        cursor = structured
+            .get("nextCursor")
+            .and_then(serde_json::Value::as_u64)
+            .and_then(|v| u32::try_from(v).ok());
     }
+    let _ = client;
 
     if json {
         return Ok(print_json_value(&threads));
     }
     for item in &threads {
-        let line = format_thread_list_line(item);
-        if write_stdout_line(&line, "thread list") != 0 {
-            return Ok(1);
+        if let Ok(parsed) =
+            serde_json::from_value::<legion_remote::thread_client::ThreadListItem>(item.clone())
+        {
+            let line = format_thread_list_line(&parsed);
+            if write_stdout_line(&line, "thread list") != 0 {
+                return Ok(1);
+            }
         }
     }
     Ok(0)
@@ -273,47 +306,5 @@ async fn resolve_project_id(
         detail: format!(
             "No LegionCode project matches '{identifier}'. Pass a project id or a path inside a project."
         ),
-    })
-}
-
-pub(crate) fn parse_wait(tail: &[String]) -> Result<ParsedThreadCli, i32> {
-    let path = &["thread"];
-    let mut common = ThreadCommonOpts::default();
-    let mut run_id = None;
-    let mut timeout_ms = None;
-    let mut json = false;
-    let mut pos = Vec::new();
-    let mut idx = 0;
-
-    while idx < tail.len() {
-        let arg = &tail[idx];
-        if arg == "--json" {
-            json = true;
-        } else if take_common_opt(path, tail, &mut idx, &mut common)? {
-        } else if let Some(val) = take_thr_opt(path, tail, &mut idx, "run")? {
-            run_id = Some(val);
-        } else if let Some(val) = take_thr_opt(path, tail, &mut idx, "timeout")? {
-            let ms = parse_duration_ms(&val)
-                .filter(|d| *d > 0)
-                .ok_or_else(|| fail_with_command_help(path, "Invalid duration for --timeout."))?;
-            timeout_ms = u64::try_from(ms).ok();
-        } else if arg.starts_with('-') {
-            return Err(bad_flag(path, arg, "wait"));
-        } else {
-            pos.push(arg.clone());
-        }
-        idx += 1;
-    }
-
-    Ok(ParsedThreadCli {
-        remote_url: common.remote_url,
-        token: common.token,
-        action: ThreadAction::Wait {
-            base_dir: common.base_dir,
-            thread_id: take_single_thread(path, pos)?,
-            run_id,
-            timeout_ms,
-            json,
-        },
     })
 }

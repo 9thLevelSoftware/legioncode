@@ -111,12 +111,129 @@ pub(crate) fn resolve_direct_pairing_base(runtime: &PersistedServerRuntimeState)
 }
 
 fn local_lan_ipv4() -> Option<String> {
+    if cfg!(windows)
+        && let Some(chosen) = detect_windows_lan_ipv4()
+    {
+        return Some(chosen);
+    }
     let sock = UdpSocket::bind("0.0.0.0:0").ok()?;
     sock.connect("192.0.2.1:80").ok()?;
     let IpAddr::V4(v4) = sock.local_addr().ok()?.ip() else {
         return None;
     };
     (!v4.is_loopback() && !v4.is_unspecified()).then(|| v4.to_string())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct LanAdapterCandidate {
+    pub(crate) name: String,
+    pub(crate) address: std::net::Ipv4Addr,
+    pub(crate) mac: Option<String>,
+}
+
+/// Returns `true` for `VirtualBox` and `VMware` host-only adapter MAC prefixes on Windows (`#33441`).
+pub(crate) fn is_windows_host_only_mac(mac: &str) -> bool {
+    let norm = mac.trim().replace('-', ":").to_ascii_lowercase();
+    norm.starts_with("0a:00:27:") || norm.starts_with("00:50:56:c0:00:")
+}
+
+fn is_virtual_interface_name(name: &str) -> bool {
+    const PREFIXES: &[&str] = &[
+        "docker",
+        "br-",
+        "veth",
+        "virbr",
+        "vmnet",
+        "vboxnet",
+        "vEthernet",
+        "podman",
+        "cni",
+        "flannel",
+        "cali",
+        "lxcbr",
+        "lxdbr",
+        "tailscale",
+    ];
+    PREFIXES.iter().any(|p| name.starts_with(p))
+}
+
+/// Selects the best LAN IPv4 from `candidates`, skipping VirtualBox/VMware host-only adapters on
+/// Windows (`#33441`) and preferring non-virtual adapters.
+pub(crate) fn select_preferred_lan_ipv4(
+    candidates: &[LanAdapterCandidate],
+    is_windows: bool,
+) -> Option<String> {
+    let eligible: Vec<&LanAdapterCandidate> = candidates
+        .iter()
+        .filter(|c| {
+            !(c.address.is_loopback()
+                || c.address.is_unspecified()
+                || c.address.is_link_local()
+                || (is_windows && c.mac.as_deref().is_some_and(is_windows_host_only_mac)))
+        })
+        .collect();
+    eligible
+        .iter()
+        .find(|c| !is_virtual_interface_name(&c.name) && c.address.is_private())
+        .or_else(|| {
+            eligible
+                .iter()
+                .find(|c| !is_virtual_interface_name(&c.name))
+        })
+        .or_else(|| eligible.first())
+        .map(|c| c.address.to_string())
+}
+
+fn detect_windows_lan_ipv4() -> Option<String> {
+    let out = std::process::Command::new("ipconfig")
+        .arg("/all")
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&out.stdout);
+    let mut candidates = Vec::new();
+    let mut cur_name = String::new();
+    let mut cur_mac: Option<String> = None;
+    let mut cur_ip: Option<std::net::Ipv4Addr> = None;
+    for raw_line in text.lines() {
+        let trimmed = raw_line.trim();
+        if !raw_line.starts_with(' ') && !trimmed.is_empty() && trimmed.ends_with(':') {
+            if let Some(ip) = cur_ip.take() {
+                candidates.push(LanAdapterCandidate {
+                    name: cur_name.clone(),
+                    address: ip,
+                    mac: cur_mac.take(),
+                });
+            }
+            trimmed.trim_end_matches(':').clone_into(&mut cur_name);
+            cur_mac = None;
+            continue;
+        }
+        let Some((label, val)) = trimmed.split_once(':') else {
+            continue;
+        };
+        if label.contains("Physical Address") {
+            let cleaned = val.trim();
+            if !cleaned.is_empty() {
+                cur_mac = Some(cleaned.to_owned());
+            }
+        } else if label.contains("IPv4 Address") {
+            let ip_part = val.trim().split('(').next().unwrap_or("").trim();
+            if let Ok(parsed) = ip_part.parse::<std::net::Ipv4Addr>() {
+                cur_ip = Some(parsed);
+            }
+        }
+    }
+    if let Some(ip) = cur_ip {
+        candidates.push(LanAdapterCandidate {
+            name: cur_name,
+            address: ip,
+            mac: cur_mac,
+        });
+    }
+    select_preferred_lan_ipv4(&candidates, true)
 }
 
 pub(crate) struct PairOutputFields<'a> {
@@ -182,4 +299,38 @@ pub(crate) async fn discover_pair_target(
         return Some((variant, paths.db_path, runtime, descriptor));
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use std::net::Ipv4Addr;
+
+    use super::{LanAdapterCandidate, is_windows_host_only_mac, select_preferred_lan_ipv4};
+
+    #[test]
+    fn windows_pair_skips_virtualbox_and_vmware_host_only_adapters() {
+        let candidates = vec![
+            LanAdapterCandidate {
+                name: "Custom Alias 1".to_owned(),
+                address: Ipv4Addr::new(192, 168, 56, 1),
+                mac: Some("0A-00-27-00-00-0A".to_owned()),
+            },
+            LanAdapterCandidate {
+                name: "VMnet Adapter".to_owned(),
+                address: Ipv4Addr::new(192, 168, 159, 1),
+                mac: Some("00:50:56:c0:00:08".to_owned()),
+            },
+            LanAdapterCandidate {
+                name: "Wi-Fi".to_owned(),
+                address: Ipv4Addr::new(192, 168, 1, 20),
+                mac: Some("3c:22:fb:12:34:56".to_owned()),
+            },
+        ];
+        assert_eq!(
+            select_preferred_lan_ipv4(&candidates, true).as_deref(),
+            Some("192.168.1.20")
+        );
+        assert!(is_windows_host_only_mac("0a:00:27:11:22:33"));
+        assert!(is_windows_host_only_mac("00:50:56:C0:00:01"));
+    }
 }

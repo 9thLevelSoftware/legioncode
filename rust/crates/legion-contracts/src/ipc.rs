@@ -2,6 +2,24 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Desktop release track (`DesktopUpdateChannel`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DesktopUpdateChannel {
+    /// Stable release feed.
+    Latest,
+    /// Nightly prerelease feed.
+    Nightly,
+}
+
+/// Update-check track mismatch details when the build channel differs from saved settings (`ipc.ts`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopUpdateTrackMismatch {
+    /// Channel baked into the running desktop binary.
+    pub build_channel: DesktopUpdateChannel,
+}
+
 /// Error reason returned by macOS on-device Apple Speech recognition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

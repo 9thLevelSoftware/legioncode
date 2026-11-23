@@ -99,7 +99,10 @@ fn is_subagent(t: &WireThreadShell) -> bool {
 }
 
 fn is_listed_lineage(t: &WireThreadShell) -> bool {
-    !is_subagent(t) && t.lineage.get("sideChat").and_then(Value::as_bool) != Some(true)
+    !is_subagent(t)
+        && t.lineage.get("sideChat").and_then(Value::as_bool) != Some(true)
+        && t.lineage.get("workflowStep").and_then(Value::as_bool) != Some(true)
+        && t.workflow_run.as_ref().is_none_or(Value::is_null)
 }
 
 fn lineage_parent_id(t: &WireThreadShell) -> Option<&str> {

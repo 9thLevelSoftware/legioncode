@@ -122,8 +122,23 @@ pub(crate) async fn drive_non_acp_lines(
                     return Ok(());
                 }
             }
-            Some(LineIoEvent::Eof) | None => return Ok(()),
-            Some(LineIoEvent::Error(msg)) => return Err(ServerRuntimeError::Process(msg)),
+            Some(LineIoEvent::Eof) | None => {
+                if loop_ctx.input.kind == NonAcpSubprocessKind::CodexAppServer
+                    && !loop_ctx.summary.terminal_seen
+                {
+                    loop_ctx
+                        .summary
+                        .codex_retirement
+                        .mark_terminated("codex app-server closed stdout");
+                }
+                return Ok(());
+            }
+            Some(LineIoEvent::Error(msg)) => {
+                if loop_ctx.input.kind == NonAcpSubprocessKind::CodexAppServer {
+                    loop_ctx.summary.codex_retirement.mark_terminated(&msg);
+                }
+                return Err(ServerRuntimeError::Process(msg));
+            }
         }
     }
 }
@@ -136,21 +151,19 @@ fn process_non_acp_line(
     if line.trim().is_empty() {
         return Ok(false);
     }
-    if !*codex_turn_sent
-        && let Some(ts_id) = loop_ctx.codex_ts_req
-        && let Some(thread_id_str) = extract_codex_thread_id(line, ts_id)
-    {
-        if let Ok(mut guard) = loop_ctx.native_thread_id.lock() {
-            *guard = Some(thread_id_str.clone());
-        }
-        let _ = send_codex_turn_start(
-            loop_ctx.writer,
-            loop_ctx.codex_codec,
-            &thread_id_str,
-            &loop_ctx.input.prompt,
-        )?;
-        *codex_turn_sent = true;
+    if loop_ctx.input.kind == NonAcpSubprocessKind::CodexAppServer {
+        loop_ctx
+            .summary
+            .codex_retirement
+            .reject_if_retired()
+            .map_err(|e| ServerRuntimeError::Process(e.display_message()))?;
     }
+    if loop_ctx.input.kind == NonAcpSubprocessKind::ClaudeStreamJson {
+        loop_ctx
+            .summary
+            .handle_claude_thinking_line(line, loop_ctx.ctx.assistant_message_id.as_str());
+    }
+    maybe_send_codex_turn_start(loop_ctx, line, codex_turn_sent)?;
     let updates = parse_line_for_kind(loop_ctx.input.kind, loop_ctx.codex_codec, line)?;
     if updates.is_empty() {
         return Ok(false);
@@ -222,6 +235,29 @@ fn process_non_acp_line(
         )?;
     }
     Ok(loop_ctx.summary.terminal_seen)
+}
+
+fn maybe_send_codex_turn_start(
+    loop_ctx: &mut SubprocessLoopCtx<'_>,
+    line: &str,
+    codex_turn_sent: &mut bool,
+) -> Result<(), ServerRuntimeError> {
+    if !*codex_turn_sent
+        && let Some(ts_id) = loop_ctx.codex_ts_req
+        && let Some(thread_id_str) = extract_codex_thread_id(line, ts_id)
+    {
+        if let Ok(mut guard) = loop_ctx.native_thread_id.lock() {
+            *guard = Some(thread_id_str.clone());
+        }
+        let _ = send_codex_turn_start(
+            loop_ctx.writer,
+            loop_ctx.codex_codec,
+            &thread_id_str,
+            &loop_ctx.input.prompt,
+        )?;
+        *codex_turn_sent = true;
+    }
+    Ok(())
 }
 
 pub(crate) fn claude_frame_kind(kind: NonAcpSubprocessKind, line: &str) -> Option<&'static str> {

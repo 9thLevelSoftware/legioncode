@@ -13,3 +13,7 @@ mod orchestration_stream;
 mod permissions_guards;
 #[path = "contracts_props/policy_templates.rs"]
 mod policy_templates;
+#[path = "contracts_props/wave1_contracts.rs"]
+mod wave1_contracts;
+#[path = "contracts_props/wave1_orchestration.rs"]
+mod wave1_orchestration;

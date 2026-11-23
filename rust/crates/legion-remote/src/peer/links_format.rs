@@ -4,6 +4,7 @@ use legion_contracts::ids::EnvironmentId;
 use legion_contracts::orchestration::McpClientAccess;
 use serde::{Deserialize, Serialize};
 
+use super::types::PeerUnlinkOutcome;
 use super::{PeerLinkError, PeerLinkErrorReason};
 
 /// Reachability classification for a linked peer environment (`packages/contracts/src/peerLink.ts:26`).
@@ -94,6 +95,21 @@ pub fn format_peer_unlink_result(environment_id: &str, removed: bool) -> String 
         )
     } else {
         format!("No linked environment {environment_id}.\n")
+    }
+}
+
+/// Formats the `#41005` `legioncode environment unlink` outcome reflecting whether the peer ended
+/// its remote session (`ended_there`).
+#[must_use]
+pub fn format_peer_unlink_outcome(environment_id: &str, outcome: PeerUnlinkOutcome) -> String {
+    if !outcome.removed {
+        format!("No linked environment {environment_id}.\n")
+    } else if outcome.ended_there {
+        format!("Forgot {environment_id} and ended its session there.\n")
+    } else {
+        format!(
+            "Forgot {environment_id}. It did not answer, so revoke it in that environment's Sharing & access to end its session there too.\n"
+        )
     }
 }
 

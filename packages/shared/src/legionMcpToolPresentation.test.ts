@@ -42,6 +42,20 @@ describe("resolveLegionMcpToolPresentation", () => {
       resolveLegionMcpToolPresentation("legion-code-thread_opencode2-adapter_not_a_tool"),
     ).toBeNull();
   });
+
+  it("preserves legacy t3_ tool names and server aliases", () => {
+    expect(resolveLegionMcpToolPresentation("t3_workflow")).toEqual(
+      resolveLegionMcpToolPresentation("legion_workflow"),
+    );
+    expect(resolveLegionMcpToolPresentation("mcp__t3-code__t3_submit_output")).toEqual(
+      resolveLegionMcpToolPresentation("mcp__legion-code__legion_submit_output"),
+    );
+    expect(
+      resolveLegionMcpToolPresentation("t3-code-thread_opencode2-adapter_t3_thread_wait")
+        ?.displayName,
+    ).toBe(resolveLegionMcpToolPresentation("legion_thread_wait")?.displayName);
+    expect(resolveLegionMcpSummaryAction("t3_queue", { action: "list" })).toBe("queue-list");
+  });
 });
 
 describe("resolveLegionMcpToolDefinition", () => {

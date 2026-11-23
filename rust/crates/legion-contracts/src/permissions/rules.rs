@@ -12,7 +12,9 @@ pub(super) fn static_guarded_scope(method: &WsMethod) -> Option<EnvironmentScope
         | WsMethod::ProviderMcpSignInStart
         | WsMethod::ProviderMcpSignInComplete => Some(EnvironmentScope::ProvidersManage),
         WsMethod::PreviewClose => Some(EnvironmentScope::PreviewOperate),
-        WsMethod::PreviewStopLocalServer => Some(EnvironmentScope::TerminalOperate),
+        WsMethod::PreviewStopLocalServer
+        | WsMethod::WorkflowsSaveDefinition
+        | WsMethod::WorkflowsDeleteDefinition => Some(EnvironmentScope::TerminalOperate),
         WsMethod::ServerRunStorageCleanup
         | WsMethod::ServerUpdateSettings
         | WsMethod::ServerCheckOtlpEndpoint
@@ -65,7 +67,11 @@ pub(super) fn static_guarded_scope(method: &WsMethod) -> Option<EnvironmentScope
         | WsMethod::ScheduledTasksRunNow
         | WsMethod::ScheduledTasksRotateWebhookToken
         | WsMethod::OrchestrationStopWorkflow
-        | WsMethod::OrchestrationForceStopThread => Some(EnvironmentScope::OrchestrationOperate),
+        | WsMethod::OrchestrationForceStopThread
+        | WsMethod::WorkflowsAnswer
+        | WsMethod::WorkflowsResume
+        | WsMethod::WorkflowsCancel
+        | WsMethod::AgentFeedbackAnswerRequest => Some(EnvironmentScope::OrchestrationOperate),
         WsMethod::ProjectsWriteFile => Some(EnvironmentScope::FilesystemWrite),
         WsMethod::GuestShareCreate
         | WsMethod::PeerLinksLink
@@ -89,7 +95,11 @@ pub fn server_required_scope_for_ws_method(method: &WsMethod) -> Option<Environm
         WsMethod::PeerLinksNames
         | WsMethod::PeerLinksSubscribeThread
         | WsMethod::PeerLinksThreadHistoryPage
-        | WsMethod::PeerLinksThreadItem => Some(EnvironmentScope::OrchestrationRead),
+        | WsMethod::PeerLinksThreadItem
+        | WsMethod::WorkflowsSubscribe
+        | WsMethod::WorkflowsCounts
+        | WsMethod::WorkflowsGet
+        | WsMethod::WorkflowsGetDefinition => Some(EnvironmentScope::OrchestrationRead),
         _ => None,
     }
 }

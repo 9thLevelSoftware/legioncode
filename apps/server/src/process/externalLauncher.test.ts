@@ -693,16 +693,30 @@ it.effect.each([
       ),
     );
 
-    assert.deepEqual(
-      spawned.map((command) => command.command),
-      ["C:\\Windows\\System32\\reg.exe"],
-    );
     if (native) {
+      assert.deepEqual(
+        spawned.map((command) => command.command),
+        ["C:\\Windows\\System32\\reg.exe"],
+      );
       assert.isTrue(Exit.isSuccess(exit));
       assert.deepEqual(verbatim, [
-        ["C:\\Windows\\explorer.exe", ['/select,"C:\\Users\\legion\\my project\\a,b.ts"']],
+        ["C:\\Windows\\explorer.exe", ['/select,"C:\\Users\\legioncode\\my project\\a,b.ts"']],
       ]);
+    } else if (windowsHost) {
+      assert.deepEqual(
+        spawned.map((command) => command.command),
+        [
+          "C:\\Windows\\System32\\reg.exe",
+          "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+        ],
+      );
+      assert.deepEqual(verbatim, []);
+      assert.isTrue(Exit.isSuccess(exit));
     } else {
+      assert.deepEqual(
+        spawned.map((command) => command.command),
+        ["C:\\Windows\\System32\\reg.exe"],
+      );
       assert.deepEqual(verbatim, []);
       // The PowerShell launch is reached; this host has no powershell.exe to run it.
       assert.isTrue(Exit.isFailure(exit));

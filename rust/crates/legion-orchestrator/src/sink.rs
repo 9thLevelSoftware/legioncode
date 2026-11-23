@@ -39,6 +39,7 @@ pub mod projection_apply;
 mod projection_apply_extra;
 mod projection_apply_runtime;
 pub mod projection_load;
+pub mod projection_queries;
 pub mod tx;
 pub mod types;
 

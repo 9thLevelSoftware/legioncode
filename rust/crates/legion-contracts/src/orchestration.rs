@@ -3,9 +3,9 @@
 //! Mirrors `packages/contracts/src/orchestrationV2.ts` while enforcing strict `type`
 //! tag validation (fixing BUG-18):
 //! - [`OrchestrationCommand`] accepts all 58 client-dispatchable commands and rejects
-//!   the 15 server-only `OrchestrationV2InternalCommand` variants.
+//!   the 17 server-only `OrchestrationV2InternalCommand` variants.
 //! - [`StoredDomainEvent`] wraps persisted sequence numbers, nullable command IDs, and
-//!   all 48 domain event types.
+//!   all 49 domain event types.
 //! - [`StreamItem`] maps unknown *string* event/turn-item types to [`StreamItem::UnknownEvent`]
 //!   while rejecting missing or non-string `"type"` tags (such as numbers or `null`) with `Err`.
 //!
@@ -55,13 +55,13 @@ mod wire_command;
 
 pub use checkpoint_models::{
     Checkpoint, CheckpointRollbackRequest, CheckpointScope, ContextHandoff, ContextTransfer,
-    PlanArtifact,
+    PlanArtifact, repository_rewind_checkpoint,
 };
 pub use command_meta::{INTERNAL_COMMAND_TYPES, is_internal_command_type};
 pub use command_payloads::{
     DispatchMode, ImportedNativeThreadPayload, ImportedNativeThreadRef, InitialThreadMessage,
     MessageDispatchCommand, MetadataContinuation, ProviderInteractionMode, ThreadCreateCommand,
-    ThreadMetadataUpdateCommand,
+    ThreadMetadataUpdateCommand, WorkflowThreadCreateCommand,
 };
 pub use command_payloads_extra::{
     CheckpointRollbackCommand, CompletionWakePolicy, ExtraCommandTypes, PreparedRunPhase,
@@ -109,9 +109,12 @@ pub use run_output::{
 };
 pub use runtime_models::{
     ConversationMessage, ProviderSession, ProviderSessionDetached, ProviderThread, ProviderTurn,
-    RuntimeRequest,
+    ProviderTurnWire, RuntimeRequest, is_delivered_provider_turn,
 };
-pub use state_models::{AppThread, RollbackUnrestored, ThreadLineage, ThreadVisit};
+pub use state_models::{
+    AppThread, RollbackUnrestored, ThreadLineage, ThreadVisit, WorkflowAppThread, WorkflowOrigin,
+    WorkflowThreadLineage, is_listed_lineage, is_listed_thread_lineage,
+};
 pub use stream::{StreamItem, ThreadProjection};
 pub use wire_command::{
     ProjectCreateWireCommand, ProjectUpdateWireCommand, ProjectWireCommand, ThreadEnvMode,

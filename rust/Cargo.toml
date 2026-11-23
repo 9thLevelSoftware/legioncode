@@ -23,6 +23,7 @@ missing_panics_doc = "allow"
 [workspace.dependencies]
 axum = { version = "0.8", features = ["ws"] }
 base64 = "0.22"
+boa_engine = "0.22"
 futures-util = "0.3"
 hex = "0.4"
 http = "1"

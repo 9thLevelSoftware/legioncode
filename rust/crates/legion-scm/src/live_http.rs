@@ -13,6 +13,9 @@ use crate::forges::{ForgeError, HttpRequestSpec, is_same_origin};
 /// Maximum HTTP redirects followed automatically within the same trusted origin.
 pub const MAX_REDIRECTS: usize = 5;
 
+/// Default maximum `GitHub` GraphQL response payload bytes decoded (`8 MiB`, `#39928`).
+pub const DEFAULT_MAX_GRAPHQL_RESPONSE_BYTES: usize = 8 * 1024 * 1024;
+
 /// Errors raised by live HTTP, git/forge CLI, and forge client operations.
 #[derive(Debug, thiserror::Error)]
 pub enum LiveClientError {
@@ -100,6 +103,44 @@ pub async fn execute_http_spec(
     spec: &HttpRequestSpec,
     allow_reserve: bool,
 ) -> Result<LiveHttpResponse, LiveClientError> {
+    execute_http_spec_with_max_bytes(client, rate_limit, spec, allow_reserve, None).await
+}
+
+/// Streams chunked HTTP response bytes up to `limit`, aborting and discarding before UTF-8/JSON
+/// decoding when the byte cap would be exceeded (`#39928`).
+pub async fn collect_response_text_within_limit(
+    mut resp: reqwest::Response,
+    url: &str,
+    limit: Option<usize>,
+) -> Result<String, LiveClientError> {
+    let Some(max_bytes) = limit else {
+        return resp.text().await.map_err(|err| {
+            LiveClientError::Http(format!("reading body from `{url}` failed: {err}"))
+        });
+    };
+
+    let mut buf = Vec::new();
+    while let Some(chunk) = resp.chunk().await.map_err(|err| {
+        LiveClientError::Http(format!("streaming body from `{url}` failed: {err}"))
+    })? {
+        if buf.len().saturating_add(chunk.len()) > max_bytes {
+            return Err(LiveClientError::Forge(ForgeError::MalformedResponse(
+                format!("HTTP response from `{url}` exceeded {max_bytes}-byte decode limit"),
+            )));
+        }
+        buf.extend_from_slice(&chunk);
+    }
+    Ok(String::from_utf8_lossy(&buf).into_owned())
+}
+
+/// Executes an [`HttpRequestSpec`] while optionally capping streamed response bytes before decoding (`#39928`).
+pub async fn execute_http_spec_with_max_bytes(
+    client: &reqwest::Client,
+    rate_limit: &SourceControlRateLimit,
+    spec: &HttpRequestSpec,
+    allow_reserve: bool,
+    max_response_bytes: Option<usize>,
+) -> Result<LiveHttpResponse, LiveClientError> {
     let mut current_method = spec.method.clone();
     let mut current_url = spec.url.clone();
     let mut current_body = spec.body.clone();
@@ -129,9 +170,8 @@ pub async fn execute_http_spec(
 
         let status = resp.status();
         let headers = resp.headers().clone();
-        let body_text = resp.text().await.map_err(|err| {
-            LiveClientError::Http(format!("reading body from `{current_url}` failed: {err}"))
-        })?;
+        let body_text =
+            collect_response_text_within_limit(resp, &current_url, max_response_bytes).await?;
 
         let after_secs = current_epoch_secs();
         let _ = rate_limit.update_from_headers(&host, status, &headers, after_secs)?;

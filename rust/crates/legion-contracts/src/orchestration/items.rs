@@ -86,7 +86,7 @@ pub struct CheckpointFileTotals {
     pub deletions: u64,
 }
 
-/// All 25 known `OrchestrationV2TurnItem` `type` discriminants.
+/// All 26 known `OrchestrationV2TurnItem` `type` discriminants.
 pub const KNOWN_TURN_ITEM_TYPES: &[&str] = &[
     "notification",
     "user_message",
@@ -111,11 +111,12 @@ pub const KNOWN_TURN_ITEM_TYPES: &[&str] = &[
     "thread_created",
     "secret_request",
     "link_request",
+    "feedback_request",
     "subagent",
     "dynamic_tool",
 ];
 
-/// Returns `true` if `item_type` is one of the 25 known turn-item discriminants.
+/// Returns `true` if `item_type` is one of the 26 known turn-item discriminants.
 pub fn is_known_turn_item_type(item_type: &str) -> bool {
     KNOWN_TURN_ITEM_TYPES.contains(&item_type)
 }

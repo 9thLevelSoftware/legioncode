@@ -138,14 +138,36 @@ fn antigravity_attachments_mcp_failures_and_usage() {
     let mut obj = Map::new();
     obj.insert(
         "CommandLine".to_owned(),
-        json!(format!("{}tail", "a".repeat(9000))),
+        json!(format!("git-status-head-{}", "a".repeat(9000))),
+    );
+    obj.insert(
+        "output".to_owned(),
+        json!(format!("{}tail-end", "z".repeat(9000))),
     );
     let sanitized = sanitize_antigravity_command_fields(&obj);
     assert!(
         sanitized["CommandLine"]
             .as_str()
             .expect("str")
+            .starts_with("git-status-head-")
+    );
+    assert!(
+        sanitized["CommandLine"]
+            .as_str()
+            .expect("str")
+            .ends_with("\n\n[Command truncated]")
+    );
+    assert!(
+        sanitized["output"]
+            .as_str()
+            .expect("str")
             .starts_with("... [truncated]\n")
+    );
+    assert!(
+        sanitized["output"]
+            .as_str()
+            .expect("str")
+            .ends_with("tail-end")
     );
 
     let utf16_le = [0xFF, 0xFE, b'h', 0x00, b'i', 0x00];

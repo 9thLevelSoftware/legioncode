@@ -3,8 +3,11 @@
 pub mod cli_entry;
 pub mod cli_flags;
 pub mod config;
+mod init;
 pub mod mcp;
+mod mcp_milestones;
 mod mcp_tools;
+mod mcp_wf_feedback;
 pub(crate) mod rpc;
 mod rpc_terminal;
 pub mod rpc_wave_d;
@@ -33,23 +36,27 @@ use legion_persistence::paths::{
 };
 use legion_persistence::sqlite::{BUILD_MIGRATION_HEAD, SqliteStore};
 use legion_persistence::{CancellationToken, read_migration_head};
+use legion_protocol::milestones::MilestoneHub;
 use legion_protocol::rpc_codec::OutputWindowRegistry;
 use legion_server_runtime::{
     RuntimeHttpState, RuntimeOutboxExecutor, TerminalRuntime, runtime_api_router,
     static_assets_router,
 };
+use legion_workflows::store::WorkflowStore;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
 pub use config::{DEFAULT_PORT, ServeConfig, ServeError, ServeMode, UNIT_SERVE};
 use config::{build_descriptor, format_bind_addr};
+use init::{build_runtime_http_state, init_workflow_and_bg_tasks};
 
 pub(crate) struct AppState {
     pub descriptor: ExecutionEnvironmentDescriptor,
     pub orchestrator: Arc<Orchestrator>,
     pub runtime_http: Arc<RuntimeHttpState>,
     pub terminal_runtime: Arc<TerminalRuntime>,
+    pub workflow_store: Option<WorkflowStore>,
     pub paths: ServerDerivedPaths,
     pub next_client_id: AtomicU64,
     pub live_clients: Mutex<HashSet<u64>>,
@@ -69,6 +76,7 @@ pub struct RunningServer {
     owner_lock: Option<ServerOwnerLock>,
     shutdown_tx: Option<oneshot::Sender<()>>,
     task: Option<JoinHandle<Result<(), std::io::Error>>>,
+    bg_tasks: Vec<JoinHandle<()>>,
 }
 
 impl std::fmt::Debug for RunningServer {
@@ -138,6 +146,9 @@ impl RunningServer {
                 .map_err(|err| ServeError::ServerTask(err.to_string()))?
                 .map_err(|err| ServeError::ServerTask(err.to_string()))?;
         }
+        for handle in self.bg_tasks.drain(..) {
+            handle.abort();
+        }
         if let Some(worker) = self.outbox_worker.take() {
             worker
                 .shutdown()
@@ -153,6 +164,9 @@ impl RunningServer {
 
 impl Drop for RunningServer {
     fn drop(&mut self) {
+        for handle in self.bg_tasks.drain(..) {
+            handle.abort();
+        }
         if let Some(tx) = self.shutdown_tx.take() {
             let _ = tx.send(());
         }
@@ -219,6 +233,10 @@ pub async fn spawn_server_with_dev_url(
     let outbox_worker =
         orchestrator.spawn_outbox_worker(outbox_executor, OutboxWorkerOptions::default());
     let terminal_runtime = Arc::new(TerminalRuntime::default());
+    let milestone_hub = Arc::new(MilestoneHub::new());
+    let (workflow_store, workflow_manager, bg_tasks) =
+        init_workflow_and_bg_tasks(&config, &paths, &orchestrator, &milestone_hub);
+
     let runtime_http = build_runtime_http_state(
         &config,
         &paths,
@@ -226,6 +244,8 @@ pub async fn spawn_server_with_dev_url(
         local_addr.port(),
         &orchestrator,
         &terminal_runtime,
+        &milestone_hub,
+        workflow_manager.as_ref(),
         dev_url,
     );
     let state = Arc::new(AppState {
@@ -233,6 +253,7 @@ pub async fn spawn_server_with_dev_url(
         orchestrator: Arc::clone(&orchestrator),
         runtime_http: Arc::clone(&runtime_http),
         terminal_runtime: Arc::clone(&terminal_runtime),
+        workflow_store,
         paths: paths.clone(),
         next_client_id: AtomicU64::new(1),
         live_clients: Mutex::new(HashSet::new()),
@@ -263,40 +284,8 @@ pub async fn spawn_server_with_dev_url(
         owner_lock: Some(owner_lock),
         shutdown_tx: Some(shutdown_tx),
         task: Some(task),
+        bg_tasks,
     })
-}
-
-fn build_runtime_http_state(
-    config: &ServeConfig,
-    paths: &ServerDerivedPaths,
-    bind_host: &str,
-    port: u16,
-    orchestrator: &Arc<Orchestrator>,
-    terminal_runtime: &Arc<TerminalRuntime>,
-    dev_url: Option<String>,
-) -> Arc<RuntimeHttpState> {
-    let dev_auth_token = legion_contracts::brand::ACTIVE_BRAND
-        .read_env("DEV_AUTH_TOKEN")
-        .map(|v| v.trim().to_owned());
-    let auth_policy = if config.mode == ServeMode::Desktop {
-        "desktop-managed-local"
-    } else if config.lan || !matches!(bind_host, "127.0.0.1" | "localhost" | "::1") {
-        "remote-reachable"
-    } else {
-        "loopback-browser"
-    };
-    let mut rt =
-        RuntimeHttpState::new(Arc::clone(orchestrator.sink().db()), paths.logs_dir.clone())
-            .with_static_dir(config.static_dir.clone())
-            .with_dev_auth_token(dev_auth_token)
-            .with_port(port)
-            .with_auth_policy(auth_policy)
-            .with_orchestrator(Arc::clone(orchestrator))
-            .with_terminal_runtime(Arc::clone(terminal_runtime));
-    if dev_url.is_some() {
-        rt = rt.with_dev_url(dev_url);
-    }
-    Arc::new(rt)
 }
 
 fn build_server_router(

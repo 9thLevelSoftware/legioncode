@@ -39,6 +39,7 @@ pub(super) fn build_test_state() -> (TempDir, Arc<AppState>) {
         orchestrator,
         runtime_http,
         terminal_runtime,
+        workflow_store: None,
         paths,
         next_client_id: AtomicU64::new(1),
         live_clients: Mutex::new(HashSet::new()),
@@ -99,7 +100,7 @@ async fn server_probe_config_settings_and_keybindings_persist() {
         dispatch(&state, "server.probe", json!({})).await,
         "server.probe",
     );
-    assert_eq!(probe, json!({}));
+    assert!(probe["serverTime"].as_str().is_some_and(|s| !s.is_empty()));
 
     let cfg = assert_ok(
         dispatch(&state, "server.getConfig", json!({})).await,

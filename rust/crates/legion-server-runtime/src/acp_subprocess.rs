@@ -27,8 +27,8 @@ use serde_json::Value;
 use tokio::sync::{Notify, mpsc};
 
 use crate::acp_protocol_io::{
-    AcpIoEvent, AcpWriter, decode_session_update, finalize_acp_turn, handle_agent_request,
-    spawn_stderr_collector, spawn_stdout_reader,
+    AcpIoEvent, AcpWriter, decode_session_update, finalize_acp_turn,
+    handle_agent_request_for_driver, spawn_stderr_collector, spawn_stdout_reader,
 };
 use crate::acp_registry::{AcpDriverSpec, AcpProcessRegistry, ActiveTurnEntry};
 use crate::error::ServerRuntimeError;
@@ -301,11 +301,12 @@ async fn await_response<T: DeserializeOwned>(
                 }
                 JsonRpcEnvelope::Response(_) => {}
                 JsonRpcEnvelope::Request(req) => {
-                    handle_agent_request(
+                    handle_agent_request_for_driver(
                         io.writer,
                         &req,
                         io.input.runtime_mode,
                         io.input.interaction_mode,
+                        Some(io.ctx.driver.as_str()),
                     )?;
                 }
                 JsonRpcEnvelope::Notification(notif) => {

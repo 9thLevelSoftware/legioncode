@@ -3,6 +3,7 @@ import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
+import * as NodeSqlite from "node:sqlite";
 import * as NodeURL from "node:url";
 
 import * as NodeWS from "@effect/platform-node/NodeWS";
@@ -424,30 +425,70 @@ it.live(
       NodeFS.mkdirSync(homeDir, { recursive: true });
       NodeFS.mkdirSync(workspaceDir, { recursive: true });
 
-      const started = yield* Effect.acquireRelease(
-        Effect.promise(() => startRustServer(binaryPath!, homeDir, workspaceDir)),
-        ({ child }) =>
-          Effect.promise(
-            () =>
-              new Promise<void>((resolve) => {
-                if (child.exitCode !== null || child.signalCode !== null) {
-                  resolve();
-                  return;
-                }
-                child.once("exit", () => resolve());
-                child.kill();
-              }),
-          ),
-      );
+      yield* Effect.gen(function* () {
+        const started = yield* Effect.acquireRelease(
+          Effect.promise(() => startRustServer(binaryPath!, homeDir, workspaceDir)),
+          ({ child }) =>
+            Effect.promise(
+              () =>
+                new Promise<void>((resolve) => {
+                  if (child.exitCode !== null || child.signalCode !== null) {
+                    resolve();
+                    return;
+                  }
+                  child.once("exit", () => resolve());
+                  child.kill();
+                }),
+            ),
+        );
 
-      yield* Effect.promise(() =>
-        runWireParityChecks(
-          started.origin,
-          started.pairingToken,
-          workspaceDir,
-          tempRoot,
-          platform === "win32",
-        ),
-      );
+        yield* Effect.promise(() =>
+          runWireParityChecks(
+            started.origin,
+            started.pairingToken,
+            workspaceDir,
+            tempRoot,
+            platform === "win32",
+          ),
+        );
+      }).pipe(Effect.scoped);
+
+      // Verify SQLite v110 migrations & tables persisted cleanly in statev2.sqlite.
+      const dbPath = NodePath.join(homeDir, "userdata", "statev2.sqlite");
+      assert.isTrue(NodeFS.existsSync(dbPath), `Expected statev2.sqlite at ${dbPath}`);
+      const db = new NodeSqlite.DatabaseSync(dbPath, { readOnly: true });
+      try {
+        const headRow = db
+          .prepare("SELECT MAX(migration_id) AS head FROM effect_sql_migrations")
+          .get() as { readonly head?: number } | undefined;
+        assert.strictEqual(headRow?.head, 110);
+
+        const tables = new Set(
+          (
+            db
+              .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+              .all() as unknown as ReadonlyArray<{ readonly name: string }>
+          ).map((row) => row.name),
+        );
+        for (const requiredTable of [
+          "agent_feedback",
+          "issue_tracker_accounts",
+          "workflow_runs",
+          "workflow_steps",
+          "workflow_waits",
+          "workflow_mail",
+          "workflow_marks",
+          "workflow_signals",
+          "workflow_triggers",
+          "workflow_hooks",
+          "workflow_store",
+          "workflow_run_references",
+          "workflow_engine_journal",
+        ]) {
+          assert.isTrue(tables.has(requiredTable), `Missing SQLite v110 table ${requiredTable}`);
+        }
+      } finally {
+        db.close();
+      }
     }).pipe(Effect.scoped),
 );

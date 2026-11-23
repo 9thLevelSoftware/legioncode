@@ -49,3 +49,5 @@ SUBCOMMANDS
   doctor         Inspect this LegionCode data directory and repair it. Pauses and restarts the background service as needed.
   policy         Inspect the administrator's managed policy.
   triage         Investigate a LegionCode problem on this machine with Claude Code, Codex, or Antigravity, and help file a good issue.
+  workflow       Start, inspect and steer durable workflow runs on the running server.
+  feedback       Record and inspect local agent feedback reports.

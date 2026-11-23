@@ -243,3 +243,131 @@ pub fn normalize_azure_pr_json(json: &Value) -> Result<NormalizedPullRequest, Fo
         checks_state: PullRequestChecksState::Pending,
     })
 }
+
+/// Parsed pull-request reference extracted from an `Azure` `DevOps` URL (`#40436`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AzurePullRequestUrlRef {
+    /// Organization segment (`dev.azure.com/{org}` or `{org}.visualstudio.com`).
+    pub organization: String,
+    /// Optional project segment (`None` for project-less URLs accepted in `#40436`).
+    pub project: Option<String>,
+    /// Git repository slug after `/_git/`.
+    pub repository: String,
+    /// Numeric pull request ID.
+    pub pull_request_id: u64,
+}
+
+/// Parses project-scoped and project-less `Azure` `DevOps` pull-request URLs (`#40436`), including
+/// `dev.azure.com/{org}[/{project}]/_git/{repo}/pullrequest/{id}` and
+/// `{org}.visualstudio.com[/DefaultCollection][/{project}]/_git/{repo}/pullrequest/{id}`.
+#[must_use]
+pub fn parse_azure_change_request_url(raw_url: &str) -> Option<AzurePullRequestUrlRef> {
+    let trimmed = raw_url.trim();
+    let without_scheme = trimmed.strip_prefix("https://")?;
+    let clean = without_scheme.split(['?', '#']).next()?;
+    let (host, path) = clean.split_once('/')?;
+    let host_lower = host.to_ascii_lowercase();
+    let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    let git_idx = segments.iter().position(|&s| s == "_git")?;
+    if git_idx + 3 >= segments.len() || !segments[git_idx + 2].eq_ignore_ascii_case("pullrequest") {
+        return None;
+    }
+    let repository = segments[git_idx + 1].to_owned();
+    let pull_request_id = segments[git_idx + 3]
+        .parse::<u64>()
+        .ok()
+        .filter(|&n| n > 0)?;
+
+    if host_lower == "dev.azure.com" {
+        if git_idx == 1 {
+            return Some(AzurePullRequestUrlRef {
+                organization: segments[0].to_owned(),
+                project: None,
+                repository,
+                pull_request_id,
+            });
+        }
+        if git_idx == 2 {
+            return Some(AzurePullRequestUrlRef {
+                organization: segments[0].to_owned(),
+                project: Some(segments[1].to_owned()),
+                repository,
+                pull_request_id,
+            });
+        }
+        return None;
+    }
+
+    if let Some(org) = host_lower.strip_suffix(".visualstudio.com")
+        && !org.is_empty()
+    {
+        let prefix = &segments[..git_idx];
+        let project_slice = match prefix.first().copied() {
+            Some(first) if first.eq_ignore_ascii_case("DefaultCollection") => &prefix[1..],
+            _ => prefix,
+        };
+        if project_slice.len() > 1 {
+            return None;
+        }
+        return Some(AzurePullRequestUrlRef {
+            organization: org.to_owned(),
+            project: project_slice.first().map(|p| (*p).to_owned()),
+            repository,
+            pull_request_id,
+        });
+    }
+    None
+}
+
+/// Selects the work-item text field (`Microsoft.VSTS.TCM.ReproSteps` for Bugs without
+/// `System.Description`, else `System.Description`) (`#39738`).
+#[must_use]
+pub fn azure_work_item_body_field(
+    work_item_type: Option<&str>,
+    system_description: Option<&str>,
+    repro_steps: Option<&str>,
+) -> &'static str {
+    let has_desc = system_description.is_some_and(|s| !s.trim().is_empty());
+    let has_repro = repro_steps.is_some_and(|s| !s.trim().is_empty());
+    let is_bug = work_item_type
+        .map(str::trim)
+        .is_some_and(|t| t.eq_ignore_ascii_case("bug"));
+    if !has_desc && (is_bug || has_repro) {
+        "Microsoft.VSTS.TCM.ReproSteps"
+    } else {
+        "System.Description"
+    }
+}
+
+/// Builds `az repos pr create` args including `--draft true` when `draft` is enabled (`#39772`).
+#[must_use]
+pub fn build_azure_pr_create_args(
+    remote: &ParsedRemote,
+    source_branch: &str,
+    target_branch: &str,
+    title: &str,
+    body_file: &str,
+    draft: bool,
+) -> (Vec<String>, Option<String>) {
+    let (mut title_args, stdin) = azure_text_option("title", title);
+    let mut raw_args: Vec<&str> = vec![
+        "repos",
+        "pr",
+        "create",
+        "--output",
+        "json",
+        "--source-branch",
+        source_branch,
+        "--target-branch",
+        target_branch,
+    ];
+    let desc_flag = format!("--description=@{body_file}");
+    raw_args.push(&desc_flag);
+    if draft {
+        raw_args.push("--draft");
+        raw_args.push("true");
+    }
+    let mut scoped = scope_azure_cli_args(remote, &raw_args);
+    scoped.append(&mut title_args);
+    (scoped, stdin)
+}

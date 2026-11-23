@@ -339,8 +339,7 @@ pub(crate) fn project_turn_item_for_wire(mut val: Value) -> Value {
                 let prompt = obj
                     .get("prompt")
                     .and_then(Value::as_str)
-                    .map(|s| truncate_utf8_detail(s, MAX_DETAIL_STRING_BYTES))
-                    .unwrap_or_default();
+                    .map_or_default(|s| truncate_utf8_detail(s, MAX_DETAIL_STRING_BYTES));
                 obj.insert("prompt".to_owned(), Value::String(prompt));
                 if let Some(Value::String(p)) = obj.get("progress") {
                     let truncated = truncate_utf8_detail(p, MAX_DETAIL_STRING_BYTES);

@@ -41,6 +41,7 @@ const StoredSecret = Schema.fromJsonString(
   Schema.Struct({ projectId: Schema.String, value: Schema.String, savedAt: Schema.Number }),
 );
 const encodeStored = Schema.encodeEffect(StoredSecret);
+const encodeSecretValues = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 const decodeStored = Schema.decodeUnknownOption(StoredSecret);
 
 export class SecretRequests extends Context.Service<
@@ -134,7 +135,9 @@ const make = Effect.gen(function* () {
       }
       const secret =
         input.answer.type === "save"
-          ? input.answer.secret
+          ? "secret" in input.answer
+            ? input.answer.secret
+            : yield* encodeSecretValues(input.answer.values).pipe(Effect.orDie)
           : input.answer.type === "reference"
             ? yield* readReference(input.answer.reference)
             : undefined;

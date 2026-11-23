@@ -5,7 +5,8 @@ use std::sync::{Arc, Barrier};
 
 use legion_persistence::ownership::{
     OwnershipError, PersistedServerRuntimeState, SERVER_EXIT_CODE_STATE_DIR_OWNED, ServerOwnerLock,
-    is_process_alive, persist_server_runtime_state, read_live_server_runtime_state,
+    is_process_alive, is_server_ownership_held, persist_server_runtime_state,
+    read_contending_server_runtime_state, read_live_server_runtime_state,
     read_persisted_server_runtime_state,
 };
 use legion_persistence::paths::{
@@ -294,5 +295,35 @@ async fn ownership_lock_contention_runtime_state_and_fencing() -> TestResult {
         assert!(fenced.is_fenced());
     }
     fenced.release()?;
+    Ok(())
+}
+
+#[test]
+fn ignores_stale_pid_reused_runtime_record_without_ownership_lock() -> TestResult {
+    let temp = tempfile::tempdir()?;
+    let state_dir = temp.path().join("userdata");
+    let runtime_path = state_dir.join("server-runtime.json");
+
+    // Simulate OS PID reuse after container restart: record carries live PID + ownerId, no lock held.
+    let mut stale = PersistedServerRuntimeState::for_current_process(3777, None);
+    stale.owner_id = Some("dead-owner".to_owned());
+    persist_server_runtime_state(&runtime_path, &stale)?;
+    assert!(!is_server_ownership_held(&runtime_path));
+    assert!(
+        !state_dir.join("server-owner.sqlite").exists(),
+        "probing ownership must not create server-owner.sqlite"
+    );
+    assert_eq!(read_live_server_runtime_state(&runtime_path), None);
+    assert_eq!(read_contending_server_runtime_state(&runtime_path), None);
+
+    // Once a real ServerOwnerLock acquires and publishes, lock probe & live runtime return active state.
+    let lock = ServerOwnerLock::acquire(&runtime_path)?;
+    assert!(is_server_ownership_held(&runtime_path));
+    lock.publish(PersistedServerRuntimeState::for_current_process(3777, None))?;
+    assert!(read_live_server_runtime_state(&runtime_path).is_some());
+    // Self-PID contention is still ignored (`runtime.pid !== process.pid`).
+    assert_eq!(read_contending_server_runtime_state(&runtime_path), None);
+    lock.release()?;
+    assert!(!is_server_ownership_held(&runtime_path));
     Ok(())
 }

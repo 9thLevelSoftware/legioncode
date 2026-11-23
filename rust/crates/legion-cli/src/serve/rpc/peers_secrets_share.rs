@@ -62,7 +62,7 @@ struct UnlinkPayload {
     environment_id: String,
 }
 
-pub(crate) fn peer_links_unlink(state: &AppState, payload: Value) -> RpcExit {
+pub(crate) async fn peer_links_unlink(state: &AppState, payload: Value) -> RpcExit {
     let req: UnlinkPayload = match parse_payload(payload) {
         Ok(p) => p,
         Err(e) => return e,
@@ -71,15 +71,32 @@ pub(crate) fn peer_links_unlink(state: &AppState, payload: Value) -> RpcExit {
         Ok(s) => s,
         Err(e) => return e,
     };
-    with_db(state, |conn| {
-        let removed = svc
-            .unlink(conn, &req.environment_id)
-            .map_err(|e| peer_err("storage", &e.to_string()))?;
-        Ok(RpcExit::Success {
-            value: json!({ "removed": removed }),
-        })
-    })
-    .unwrap_or_else(|e| e)
+    let target = match with_db(state, |conn| {
+        svc.unlink_with_revocation_target(conn, &req.environment_id)
+            .map_err(|e| peer_err("storage", &e.to_string()))
+    }) {
+        Ok(t) => t,
+        Err(e) => return e,
+    };
+    let Some(revocation) = target else {
+        return RpcExit::Success {
+            value: json!({ "removed": false, "endedThere": false }),
+        };
+    };
+    let ended_there = match (
+        revocation.token.as_deref(),
+        legion_remote::live_network::LivePeerClient::new(),
+    ) {
+        (Some(tok), Ok(client)) => {
+            client
+                .revoke_peer_token(&revocation.environment_id, &revocation.urls, tok)
+                .await
+        }
+        _ => false,
+    };
+    RpcExit::Success {
+        value: json!({ "removed": true, "endedThere": ended_there }),
+    }
 }
 
 #[derive(Debug, Deserialize)]

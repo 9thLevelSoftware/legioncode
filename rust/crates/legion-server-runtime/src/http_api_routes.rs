@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use axum::Router;
+use axum::response::Response;
 use axum::routing::{any, delete, get, post};
 
 use crate::http_api::RuntimeHttpState;
@@ -11,9 +12,7 @@ use crate::http_auth_admin::{
     handle_create_pairing, handle_issue_session, handle_list_connect_devices, handle_list_pairing,
     handle_list_sessions, handle_revoke_pairing, handle_revoke_session,
 };
-use crate::http_env::assets::{
-    handle_api_not_found, handle_signed_asset, handle_signed_attachment_upload,
-};
+use crate::http_env::assets::{handle_signed_asset, handle_signed_attachment_upload};
 use crate::http_env::auth::{
     handle_get_session, handle_post_browser_session, handle_ws_ticket, handle_ws_ticket_for,
 };
@@ -31,11 +30,12 @@ use crate::http_env::connect_relay::{
     handle_legion_connect_health, handle_legion_connect_mint_credential,
 };
 use crate::http_env::cors::browser_api_cors_middleware;
+use crate::http_env::env_not_found;
 use crate::http_env::mcp_oauth::{
     handle_mcp_approval, handle_mcp_authorization_server, handle_mcp_authorize,
     handle_mcp_protected_resource, handle_mcp_register,
 };
-use crate::http_env::mcp_oauth_tokens::{handle_mcp_decision, handle_mcp_token};
+use crate::http_env::mcp_oauth_tokens::{handle_mcp_decision, handle_mcp_revoke, handle_mcp_token};
 use crate::http_env::oauth_token::handle_oauth_token_exchange;
 use crate::http_env::orchestration::{
     handle_shell_snapshot, handle_thread_bounded, handle_thread_detail, handle_thread_history,
@@ -161,6 +161,7 @@ fn mount_auth_and_mcp_routes(
         .route("/oauth/mcp/approval", post(handle_mcp_approval))
         .route("/oauth/mcp/decision", post(handle_mcp_decision))
         .route("/oauth/mcp/token", post(handle_mcp_token))
+        .route("/oauth/mcp/revoke", post(handle_mcp_revoke))
 }
 
 fn mount_orchestration_project_scm_routes(
@@ -298,6 +299,10 @@ fn mount_peer_and_asset_routes(
             "/api/links/client-pairing",
             post(handle_issue_client_pairing),
         )
+        .route(
+            "/api/peer-link/client-pairing",
+            post(handle_issue_client_pairing),
+        )
         .route("/api/mcp/sign-in/start", post(handle_mcp_sign_in_start))
         .route(
             "/api/mcp/sign-in/complete",
@@ -314,9 +319,14 @@ fn mount_peer_and_asset_routes(
             post(handle_signed_attachment_upload),
         )
         .route("/api/hooks/{hookId}/{token}", any(handle_webhook_delivery))
+        .route("/webhooks/{hookId}/{token}", any(handle_webhook_delivery))
         .route("/api/observability/v1/traces", post(handle_otlp_traces))
         .route("/api", any(handle_api_not_found))
         .route("/api/{*rest}", any(handle_api_not_found))
         .route("/oauth", any(handle_api_not_found))
         .route("/oauth/{*rest}", any(handle_api_not_found))
+}
+
+async fn handle_api_not_found() -> Response {
+    env_not_found("Not Found")
 }

@@ -136,6 +136,8 @@ pub(crate) fn emit_text(node: &XmlNode, out: &mut Vec<TextPart>) -> Result<(), D
         return Ok(());
     }
     match node.name.as_str() {
+        // Word text boxes hold their own paragraphs inside the anchoring paragraph (#40782).
+        "txbxContent" => crate::doc_extractor_layout::emit_paragraphs(node, out)?,
         "tab" | "ptab" | "cell" => out.push(TextPart::Text("\t".to_owned())),
         "br" | "line-break" | "cr" => out.push(TextPart::Text("\n".to_owned())),
         "noBreakHyphen" => out.push(TextPart::Text("\u{2011}".to_owned())),

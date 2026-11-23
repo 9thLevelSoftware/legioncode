@@ -27,6 +27,7 @@ pub mod live_http;
 pub mod workspace_folders;
 pub mod workspace_folders_parse;
 pub mod workspace_folders_scanner;
+pub mod worktree_guards;
 
 pub use crate::checkpoints::diff_query::{
     CheckpointDiffQuery, ComputedDiff, DiffFileInput, DiffQueryOptions,

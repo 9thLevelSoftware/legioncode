@@ -221,6 +221,11 @@ fn base_server_capabilities() -> EnvironmentCapabilities {
         preview_tunnel_setting: Some(true),
         multi_repo_projects: Some(true),
         linked_thread_read: Some(true),
+        link_thread_stream: Some(true),
+        link_client_pairing: Some(true),
+        link_pairing_for_link: Some(true),
         transitive_peer_linking: Some(true),
+        agent_feedback: Some(true),
+        issue_tracker_accounts: Some(true),
     }
 }

@@ -57,6 +57,9 @@ pub mod desktop_app_control;
 #[cfg(feature = "dpop")]
 pub mod dpop;
 pub mod frame_parts;
+pub mod keybinding_matching;
+pub mod markdown_chunks;
+pub mod markdown_task_edits;
 pub mod oauth_callback;
 pub mod qr_code;
 pub mod search;

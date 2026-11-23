@@ -4,7 +4,11 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
 
+use legion_contracts::mcp_sign_in::{ProviderMcpSignInCompleteInput, ProviderMcpSignInStartInput};
 use legion_protocol::rpc_codec::RpcExit;
+use legion_providers::core::usage_scan::{
+    UsageDateWindow, WindowedUsageFile, collect_windowed_deduped_usage,
+};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tokio::process::Command;
@@ -30,6 +34,8 @@ pub(crate) async fn dispatch(state: &Arc<AppState>, tag: &str, payload: Value) -
         "provider.uploadFeedback" => RpcExit::Success {
             value: json!({ "feedbackId": format!("fb-{}", uuid::Uuid::new_v4()) }),
         },
+        "provider.mcpSignIn.start" => mcp_sign_in_start(state, payload),
+        "provider.mcpSignIn.complete" => mcp_sign_in_complete(state, payload),
         "provider.consumeResetCredit" => consume_reset_credit(payload),
         "provider.auth.start"
         | "provider.auth.respond"
@@ -121,6 +127,38 @@ async fn update_provider(state: &AppState, payload: Value) -> RpcExit {
     }
 }
 
+fn mcp_sign_in_start(state: &AppState, payload: Value) -> RpcExit {
+    let input: ProviderMcpSignInStartInput = match parse_payload(payload) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+    match state.runtime_http.mcp_sign_in.start(&input) {
+        Ok(res) => RpcExit::Success { value: json!(res) },
+        Err(err) => rpc_fail_obj(json!({
+            "_tag": "ProviderMcpSignInError",
+            "server": err.server,
+            "detail": err.detail,
+            "message": err.detail,
+        })),
+    }
+}
+
+fn mcp_sign_in_complete(state: &AppState, payload: Value) -> RpcExit {
+    let input: ProviderMcpSignInCompleteInput = match parse_payload(payload) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+    match state.runtime_http.mcp_sign_in.complete(&input) {
+        Ok(res) => RpcExit::Success { value: json!(res) },
+        Err(err) => rpc_fail_obj(json!({
+            "_tag": "ProviderMcpSignInError",
+            "server": err.server,
+            "detail": err.detail,
+            "message": err.detail,
+        })),
+    }
+}
+
 fn get_usage_summary(payload: &Value) -> RpcExit {
     let since_day = payload
         .get("sinceDay")
@@ -130,10 +168,27 @@ fn get_usage_summary(payload: &Value) -> RpcExit {
         .get("untilDay")
         .and_then(Value::as_str)
         .unwrap_or("2026-12-31");
+    if since_day > until_day {
+        return rpc_fail_obj(json!({
+            "_tag": "UsageReadError",
+            "reason": "invalidWindow",
+            "detail": format!("sinceDay `{since_day}` follows untilDay `{until_day}`"),
+        }));
+    }
     let time_zone = payload
         .get("timeZone")
         .and_then(Value::as_str)
         .unwrap_or("UTC");
+    let window = UsageDateWindow {
+        since_time_ms: None,
+        until_time_ms: None,
+        since_day: since_day.to_owned(),
+        until_day: until_day.to_owned(),
+    };
+    let (_kept, _skipped_warnings) =
+        collect_windowed_deduped_usage::<()>(Vec::<WindowedUsageFile<()>>::new(), &window, |_| {
+            since_day.to_owned()
+        });
     RpcExit::Success {
         value: json!({
             "contractVersion": 6,

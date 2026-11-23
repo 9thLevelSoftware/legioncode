@@ -12,3 +12,9 @@ mod provider_env;
 mod rpc_codec;
 #[path = "protocol_tests/wave2_deliverables.rs"]
 mod wave2_deliverables;
+#[path = "protocol_tests/wave3_mcp_and_wait.rs"]
+mod wave3_mcp_and_wait;
+#[path = "protocol_tests/wave3_milestones.rs"]
+mod wave3_milestones;
+#[path = "protocol_tests/wave3_orchestration_milestones.rs"]
+mod wave3_orchestration_milestones;

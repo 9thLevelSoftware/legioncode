@@ -92,6 +92,11 @@ fn update_settings(state: &AppState, payload: &Value) -> RpcExit {
             "message": msg,
         }));
     }
+    if let Some(enabled) = current.get("workflowsEnabled").and_then(Value::as_bool)
+        && let Some(ref mgr) = state.runtime_http.workflow_manager
+    {
+        mgr.set_enabled(enabled);
+    }
     RpcExit::Success { value: current }
 }
 

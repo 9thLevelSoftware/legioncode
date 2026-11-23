@@ -84,9 +84,22 @@ pub(crate) fn dispatch_extra_bridge(
                 .unwrap_or(true);
             Some(Ok(Value::Null))
         }
-        "desktop.bridge.appActivation.complete"
-        | "desktop.bridge.cancelProviderAuthCallback"
-        | "desktop.bridge.showContextMenu" => Some(Ok(Value::Null)),
+        "desktop.bridge.appActivation.complete" | "desktop.bridge.cancelProviderAuthCallback" => {
+            Some(Ok(Value::Null))
+        }
+        "desktop.bridge.showContextMenu" => {
+            if let Some(raw_items) = params.get("items").filter(|v| !v.is_null()) {
+                match serde_json::from_value::<Vec<crate::browser_webview::NativeContextMenuItem>>(
+                    raw_items.clone(),
+                ) {
+                    Ok(items) => {
+                        let _escaped = crate::browser_webview::build_native_context_menu(&items);
+                    }
+                    Err(e) => return Some(Err(ipc_error("InvalidParams", e.to_string()))),
+                }
+            }
+            Some(Ok(Value::Null))
+        }
         "desktop.bridge.receiveProviderAuthCallback" => Some(Err(ipc_error(
             "ProviderAuthCancelled",
             "provider OAuth callback listener is not active in this host",

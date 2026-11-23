@@ -123,10 +123,26 @@ pub(super) async fn thread_launch(state: &Arc<AppState>, args: &Value) -> Result
         .await
         .map_err(|e| e.to_string())?;
 
+    attach_workflow_run(state, thread_id.as_str(), args.get("workflowRun"));
+
     Ok(json!({
         "threadId": thread_id.as_str(),
         "runId": Value::Null,
     }))
+}
+
+fn attach_workflow_run(state: &Arc<AppState>, thread_id: &str, wf_run: Option<&Value>) {
+    if let Some(wf_run) = wf_run.filter(|v| v.is_object())
+        && let Ok(conn) = state.orchestrator.sink().db().lock()
+        && let Ok(raw) = serde_json::to_string(wf_run)
+    {
+        let _ = conn.execute(
+            "UPDATE orchestration_v2_projection_threads
+             SET payload_json = json_set(payload_json, '$.workflowRun', json(?1))
+             WHERE thread_id = ?2",
+            rusqlite::params![raw, thread_id],
+        );
+    }
 }
 
 /// Validates and commits `legion_submit_output` (`SubmitRunOutputCommand`).

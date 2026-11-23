@@ -142,6 +142,24 @@ pub struct ProviderTurn {
     pub model: Option<String>,
 }
 
+/// Wire-extended `ProviderTurn` carrying `promptDropped` without breaking downstream literals.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderTurnWire {
+    /// Core provider turn record.
+    #[serde(flatten)]
+    pub base: ProviderTurn,
+    /// `Some(true)` when the provider never received the prompt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt_dropped: Option<bool>,
+}
+
+/// Returns `true` when the turn's prompt was delivered to the provider (`isDeliveredProviderTurn`).
+#[must_use]
+pub const fn is_delivered_provider_turn(prompt_dropped: Option<bool>) -> bool {
+    !matches!(prompt_dropped, Some(true))
+}
+
 /// Pending or resolved interactive runtime request (`orchestrationV2.ts:1322-1346`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

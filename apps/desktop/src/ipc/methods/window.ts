@@ -18,7 +18,6 @@ import {
 } from "@legioncode/contracts";
 import { PROJECT_FAVICON_EXTENSIONS } from "@legioncode/shared/projectFavicon";
 import { resolveEditorCommand } from "@legioncode/shared/editor";
-import { withPathDirectoryListings } from "@legioncode/shared/shell";
 import * as HostProcess from "@legioncode/shared/HostProcess";
 import { isRelayTracingEnabled } from "@legioncode/shared/otelEnvironment";
 import * as FileSystem from "effect/FileSystem";
@@ -447,7 +446,6 @@ export const probeRemoteEditors = DesktopIpc.makeIpcMethod({
   result: Schema.Array(EditorId),
   handler: Effect.fn("desktop.ipc.window.probeRemoteEditors")(function* () {
     const env = yield* HostProcess.Environment;
-    // Shared listings stop each editor re-stating every PATH entry x PATHEXT candidate on Windows.
     const resolved = yield* Effect.forEach(
       REMOTE_CAPABLE_EDITOR_IDS,
       (editorId) => {
@@ -457,7 +455,7 @@ export const probeRemoteEditors = DesktopIpc.makeIpcMethod({
           : Effect.succeed(false);
       },
       { concurrency: REMOTE_EDITOR_PROBE_CONCURRENCY },
-    ).pipe(withPathDirectoryListings);
+    );
     return REMOTE_CAPABLE_EDITOR_IDS.filter((_, index) => resolved[index]);
   }),
 });

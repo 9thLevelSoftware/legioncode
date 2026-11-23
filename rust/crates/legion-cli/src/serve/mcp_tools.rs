@@ -15,32 +15,57 @@ use legion_contracts::orchestration::{
     CreationSource, DispatchMode, MessageDispatchCommand, OrchestrationActor, OrchestrationCommand,
 };
 use legion_orchestrator::decider::output_ops::validate_output_request_for_message;
+use legion_workflows::feedback_types::FeedbackMode;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
 use super::AppState;
+use super::mcp_milestones::McpCallerContext;
+use super::mcp_wf_feedback::{feedback_tool, workflow_tool};
+use super::rpc::workflows_feedback::read_feedback_mode;
 use launch_output::{parse_output_schema_arg, submit_output, thread_launch};
-use queries::{project_list, read_run_output_for, run_status_for, thread_list, thread_read};
+use queries::{
+    evaluate_wait_wake_for_thread, project_list, read_run_output_for, run_status_for, thread_list,
+    thread_read,
+};
 
 /// Metadata returned for `tools/list` on `/mcp`.
-pub(super) fn list_tools_json() -> Value {
+pub(super) fn list_tools_json(state: &AppState, caller: &McpCallerContext) -> Value {
     let prefix = ACTIVE_BRAND.mcp_tool_prefix;
     let name = |suffix: &str| format!("{prefix}{suffix}");
-    json!({
-        "tools": [
-            { "name": name("project_list"), "description": format!("List active {} projects.", ACTIVE_BRAND.product_name), "inputSchema": { "type": "object" } },
-            { "name": name("thread_list"), "description": "List threads in a project.", "inputSchema": { "type": "object" } },
-            { "name": name("thread_read"), "description": "Read a thread and its messages.", "inputSchema": { "type": "object" } },
-            { "name": name("thread_launch"), "description": "Create a new top-level thread.", "inputSchema": { "type": "object" } },
-            { "name": name("thread_send"), "description": "Send a message to a thread.", "inputSchema": { "type": "object" } },
-            { "name": name("submit_output"), "description": "Submit a schema-checked JSON result for the active run.", "inputSchema": { "type": "object" } },
-            { "name": name("thread_wait"), "description": "Wait for a thread run to settle.", "inputSchema": { "type": "object" } }
-        ]
-    })
+    let mut tools = vec![
+        json!({ "name": name("project_list"), "description": format!("List active {} projects.", ACTIVE_BRAND.product_name), "inputSchema": { "type": "object" } }),
+        json!({ "name": name("thread_list"), "description": "List threads in a project.", "inputSchema": { "type": "object" } }),
+        json!({ "name": name("thread_read"), "description": "Read a thread and its messages.", "inputSchema": { "type": "object" } }),
+        json!({ "name": name("thread_launch"), "description": "Create a new top-level thread.", "inputSchema": { "type": "object" } }),
+        json!({ "name": name("thread_send"), "description": "Send a message to a thread.", "inputSchema": { "type": "object" } }),
+        json!({ "name": name("submit_output"), "description": "Submit a schema-checked JSON result for the active run.", "inputSchema": { "type": "object" } }),
+        json!({ "name": name("thread_wait"), "description": "Wait for a thread run to settle.", "inputSchema": { "type": "object" } }),
+    ];
+    if caller.shows_outside_only() {
+        tools.push(json!({
+            "name": name("workflow"),
+            "description": "Durable workflow runs on this server (start, list, read, questions, hooks, store, signal, resume, cancel).",
+            "inputSchema": { "type": "object" }
+        }));
+    }
+    if read_feedback_mode(state) != FeedbackMode::Off {
+        tools.push(json!({
+            "name": name("feedback"),
+            "description": "Record local feedback for a tool or command when agent feedback is enabled.",
+            "inputSchema": { "type": "object" }
+        }));
+    }
+    json!({ "tools": tools })
 }
 
-/// Executes one `/mcp` `tools/call` dispatching `legion_*` tool names.
-pub(super) async fn call_tool(state: &Arc<AppState>, name: &str, args: &Value) -> Value {
+/// Executes one `/mcp` `tools/call` dispatching `legion_*` (and `t3_*`) tool names.
+pub(super) async fn call_tool(
+    state: &Arc<AppState>,
+    caller: &McpCallerContext,
+    name: &str,
+    args: &Value,
+) -> Value {
     let canonical = canonical_mcp_tool_suffix(name);
     let outcome = match canonical {
         "project_list" => with_db(state, |conn| project_list(conn, args)),
@@ -52,7 +77,9 @@ pub(super) async fn call_tool(state: &Arc<AppState>, name: &str, args: &Value) -
         "thread_launch" => thread_launch(state, args).await,
         "thread_send" => thread_send(state, args).await,
         "submit_output" => submit_output(state, args).await,
-        "thread_wait" => thread_wait(state, args).await,
+        "thread_wait" => thread_wait(state, caller, args).await,
+        "workflow" => workflow_tool(state, caller, args).await,
+        "feedback" => feedback_tool(state, caller, args),
         _ => Err(format!("Unknown MCP tool `{name}`.")),
     };
 
@@ -171,7 +198,11 @@ async fn thread_send(state: &Arc<AppState>, args: &Value) -> Result<Value, Strin
     }))
 }
 
-async fn thread_wait(state: &Arc<AppState>, args: &Value) -> Result<Value, String> {
+async fn thread_wait(
+    state: &Arc<AppState>,
+    caller: &McpCallerContext,
+    args: &Value,
+) -> Result<Value, String> {
     let thread_id = required_str(args, "threadId")?.to_owned();
     let target_run_id = args.get("runId").and_then(Value::as_str).map(str::to_owned);
     let timeout_ms = args
@@ -214,12 +245,34 @@ async fn thread_wait(state: &Arc<AppState>, args: &Value) -> Result<Value, Strin
                 .await
                 .is_err()
         {
-            return Ok(json!({
+            let parent_tid = caller
+                .thread_id
+                .as_deref()
+                .or_else(|| args.get("parentThreadId").and_then(Value::as_str));
+            let wake = state.orchestrator.sink().db().lock().ok().and_then(|conn| {
+                evaluate_wait_wake_for_thread(
+                    &conn,
+                    parent_tid,
+                    &thread_id,
+                    run_id.as_deref(),
+                    &status,
+                )
+            });
+            let mut out = json!({
                 "threadId": thread_id,
                 "runId": run_id,
                 "status": status,
                 "timedOut": true,
-            }));
+            });
+            if let Some(decision) = wake
+                && let Some(obj) = out.as_object_mut()
+            {
+                obj.insert("wakesCaller".to_owned(), Value::Bool(decision.wakes_caller));
+                if let Some(hint) = decision.next_hint {
+                    obj.insert("nextHint".to_owned(), Value::String(hint.to_owned()));
+                }
+            }
+            return Ok(out);
         }
     }
 }

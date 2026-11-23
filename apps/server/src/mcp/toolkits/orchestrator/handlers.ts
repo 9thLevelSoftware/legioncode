@@ -229,7 +229,7 @@ const handlers = {
               new OrchestratorMcpFailure({ code: "orchestration_error", message: error.message }),
           ),
         );
-      return { environmentId, removed };
+      return { environmentId, removed, endedThere: false };
     }),
   ),
   legion_thread_interrupt: McpToolAccess.writesThreads(

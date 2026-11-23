@@ -3,9 +3,10 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use futures_util::future::join_all;
+use futures_util::future::{join_all, select_ok};
 use legion_contracts::brand::ACTIVE_BRAND;
 use legion_contracts::environment::ExecutionEnvironmentDescriptor;
+use legion_contracts::ids::EnvironmentId;
 use reqwest::header::ACCEPT;
 use reqwest::{Client, StatusCode};
 use rusqlite::Connection;
@@ -17,9 +18,12 @@ use super::types::{
 };
 use crate::peer::links::{
     InsertPeerLinkInput, PeerLink, PeerLinkError, PeerLinkErrorReason, PeerLinkStatus,
-    PeerLinkSummary, PeerLinksService, validate_peer_origin,
+    PeerLinkSummary, PeerLinksService, PeerUnlinkOutcome, validate_peer_origin,
 };
 use crate::secrets::FileSecretStore;
+
+/// Relative path for RFC 7009 MCP client token revocation (`#41005`).
+pub const OAUTH_MCP_REVOKE_ROUTE: &str = "/oauth/mcp/revoke";
 
 const DEFAULT_PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -279,6 +283,74 @@ impl LivePeerClient {
                 PeerLinkErrorReason::Incompatible,
                 format!("{origin} answered without a valid access token."),
             )
+        })
+    }
+
+    /// Best-effort RFC 7009 revocation at any candidate peer URL that still answers as
+    /// `expected_environment_id` (`#41005`).
+    pub async fn revoke_peer_token(
+        &self,
+        expected_environment_id: &EnvironmentId,
+        urls: &[String],
+        token: &str,
+    ) -> bool {
+        if urls.is_empty() || token.trim().is_empty() {
+            return false;
+        }
+        let futures: Vec<_> = urls
+            .iter()
+            .map(|url| {
+                Box::pin(async move {
+                    let (origin, descriptor) = self.probe_environment(url).await.map_err(|_| ())?;
+                    // An address can change hands after linking; only the linked peer may see the token.
+                    if descriptor.environment_id != *expected_environment_id {
+                        return Err(());
+                    }
+                    let resp = self
+                        .http
+                        .post(format!("{origin}{OAUTH_MCP_REVOKE_ROUTE}"))
+                        .header(ACCEPT, "application/json")
+                        .form(&[("token", token)])
+                        .timeout(self.probe_timeout)
+                        .send()
+                        .await
+                        .map_err(|_| ())?;
+                    if resp.status().is_success() {
+                        Ok(())
+                    } else {
+                        Err(())
+                    }
+                })
+            })
+            .collect();
+        select_ok(futures).await.is_ok()
+    }
+
+    /// Forgets `environment_id` locally and attempts to end its MCP session on the remote peer (`#41005`).
+    pub async fn unlink_peer_over_http(
+        &self,
+        conn: &Connection,
+        secrets: &FileSecretStore,
+        environment_id: &str,
+    ) -> Result<PeerUnlinkOutcome, PeerLinkError> {
+        let Some(target) = PeerLinksService::new(secrets.clone())
+            .unlink_with_revocation_target(conn, environment_id)?
+        else {
+            return Ok(PeerUnlinkOutcome {
+                removed: false,
+                ended_there: false,
+            });
+        };
+        let ended_there = match target.token.as_deref() {
+            Some(token) => {
+                self.revoke_peer_token(&target.environment_id, &target.urls, token)
+                    .await
+            }
+            None => false,
+        };
+        Ok(PeerUnlinkOutcome {
+            removed: true,
+            ended_there,
         })
     }
 }

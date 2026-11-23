@@ -216,3 +216,86 @@ pub fn wsl_home_launch_env(legioncode_home: Option<&str>) -> Option<(String, Str
         abs.to_owned(),
     ))
 }
+
+/// Registry keys registered by real Store/MSI (`WSLService`) or inbox (`LxssManager`) WSL installs
+/// — absent when only the Windows `System32\wsl.exe` install stub exists (`#40918`).
+pub const WSL_SERVICE_KEYS: [&str; 2] = [
+    r"HKLM\SYSTEM\CurrentControlSet\Services\WSLService",
+    r"HKLM\SYSTEM\CurrentControlSet\Services\LxssManager",
+];
+
+/// Returns `true` when at least one WSL service registry key is registered (`#40918`).
+pub fn is_wsl_service_registered_with<F>(mut query_key: F) -> bool
+where
+    F: FnMut(&str) -> bool,
+{
+    WSL_SERVICE_KEYS.iter().any(|key| query_key(key))
+}
+
+/// Probes the Windows Service Control registry via `reg.exe query` for installed WSL services
+/// (`#40918`). Always returns `false` on non-Windows targets.
+#[must_use]
+pub fn is_wsl_service_registered() -> bool {
+    if !cfg!(target_os = "windows") {
+        return false;
+    }
+    is_wsl_service_registered_with(|key| {
+        std::process::Command::new("reg.exe")
+            .args(["query", key])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success())
+    })
+}
+
+/// Evaluates whether WSL is actually usable on this machine, requiring `win32`, `wsl.exe`, a
+/// registered WSL service (`WSLService` or `LxssManager`), and no blocking managed policy (`#40918`).
+pub fn probe_wsl_availability_with<FExe, FReg, FPol>(
+    platform: &str,
+    windir: &str,
+    wsl_exe_exists: FExe,
+    reg_query_ok: FReg,
+    has_managed_policy: FPol,
+) -> bool
+where
+    FExe: FnOnce(&std::path::Path) -> bool,
+    FReg: FnMut(&str) -> bool,
+    FPol: FnOnce() -> bool,
+{
+    if platform != "win32" {
+        return false;
+    }
+    let wsl_exe = std::path::Path::new(windir)
+        .join("System32")
+        .join("wsl.exe");
+    if !wsl_exe_exists(&wsl_exe) {
+        return false;
+    }
+    if !is_wsl_service_registered_with(reg_query_ok) {
+        return false;
+    }
+    !has_managed_policy()
+}
+
+/// Host filesystem + Windows registry check implementing `DesktopWslEnvironment.makeIsAvailable` (`#40918`).
+#[must_use]
+pub fn is_wsl_available_on_host(platform: &str, windir: &str, has_managed_policy: bool) -> bool {
+    probe_wsl_availability_with(
+        platform,
+        windir,
+        std::path::Path::exists,
+        |key| {
+            cfg!(target_os = "windows")
+                && std::process::Command::new("reg.exe")
+                    .args(["query", key])
+                    .stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status()
+                    .is_ok_and(|status| status.success())
+        },
+        || has_managed_policy,
+    )
+}

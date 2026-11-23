@@ -117,21 +117,43 @@ fn task_folder_coordinator_plans_and_persists_with_sqlite_store() -> TestResult 
     }
 
     assert_eq!(
-        common_ancestor(&[PathBuf::from(r"C:\work\a"), PathBuf::from(r"D:\other\b")]),
+        common_ancestor(&[PathBuf::from("work/a"), PathBuf::from("other/b")]),
         None
     );
-    let anchor_res = layout_anchor(
-        &PathBuf::from(r"C:\work\project"),
-        &[
-            PathBuf::from(r"C:\shared\repo-a"),
-            PathBuf::from(r"D:\else\repo-b"),
-        ],
-    );
-    assert_eq!(anchor_res.anchor, PathBuf::from(r"C:\"));
-    assert_eq!(
-        anchor_res.unreachable,
-        vec![PathBuf::from(r"D:\else\repo-b")]
-    );
+    #[cfg(windows)]
+    {
+        assert_eq!(
+            common_ancestor(&[PathBuf::from(r"C:\work\a"), PathBuf::from(r"D:\other\b")]),
+            None
+        );
+        let anchor_res = layout_anchor(
+            &PathBuf::from(r"C:\work\project"),
+            &[
+                PathBuf::from(r"C:\shared\repo-a"),
+                PathBuf::from(r"D:\else\repo-b"),
+            ],
+        );
+        assert_eq!(anchor_res.anchor, PathBuf::from(r"C:\"));
+        assert_eq!(
+            anchor_res.unreachable,
+            vec![PathBuf::from(r"D:\else\repo-b")]
+        );
+    }
+    #[cfg(not(windows))]
+    {
+        let anchor_res = layout_anchor(
+            &PathBuf::from("/work/project"),
+            &[
+                PathBuf::from("/shared/repo-a"),
+                PathBuf::from("relative/repo-b"),
+            ],
+        );
+        assert_eq!(anchor_res.anchor, PathBuf::from("/"));
+        assert_eq!(
+            anchor_res.unreachable,
+            vec![PathBuf::from("relative/repo-b")]
+        );
+    }
 
     let pid = ProjectId::new("proj-multi")?;
     let plan = TaskFolderCoordinator::plan(pid.clone(), &root, &[], None)?

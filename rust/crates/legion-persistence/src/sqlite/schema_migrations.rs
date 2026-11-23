@@ -22,7 +22,7 @@ fn table_columns(conn: &Connection, table: &str) -> rusqlite::Result<HashSet<Str
 fn add_missing_columns(
     conn: &Connection,
     table: &str,
-    columns: &[(&str, &str)],
+    columns: &[(&'static str, &'static str)],
 ) -> rusqlite::Result<Vec<&'static str>> {
     let existing = table_columns(conn, table)?;
     let mut added = Vec::new();
@@ -30,22 +30,7 @@ fn add_missing_columns(
         if !existing.contains(name) {
             let alter = format!("ALTER TABLE {table} ADD COLUMN {name} {definition}");
             conn.execute_batch(&alter)?;
-            added.push(
-                // Static lifetimes originate from `columns` slice; leak-free via string compare.
-                if name == "search_text" {
-                    "search_text"
-                } else if name == "driver" {
-                    "driver"
-                } else if name == "provider_instance_id" {
-                    "provider_instance_id"
-                } else if name == "source_provider_instance_id" {
-                    "source_provider_instance_id"
-                } else if name == "target_provider_instance_id" {
-                    "target_provider_instance_id"
-                } else {
-                    ""
-                },
-            );
+            added.push(name);
         }
     }
     Ok(added)
@@ -139,37 +124,37 @@ const V2_INSTANCE_BACKFILLS: &[(&str, &[ColumnSpec], &str)] = &[
         "orchestration_v2_events",
         &[("driver", "TEXT"), ("provider_instance_id", "TEXT")],
         "UPDATE orchestration_v2_events SET
-           driver = COALESCE(driver, json_extract(payload_json, '$.driver'), provider),
-           provider_instance_id = COALESCE(provider_instance_id, json_extract(payload_json, '$.providerInstanceId'), provider);",
+           driver = COALESCE(driver, CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.driver') END, provider),
+           provider_instance_id = COALESCE(provider_instance_id, CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.providerInstanceId') END, provider);",
     ),
     (
         "orchestration_v2_projection_threads",
         &[("provider_instance_id", "TEXT")],
-        "UPDATE orchestration_v2_projection_threads SET provider_instance_id = COALESCE(json_extract(payload_json, '$.providerInstanceId'), default_provider);",
+        "UPDATE orchestration_v2_projection_threads SET provider_instance_id = COALESCE(CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.providerInstanceId') END, default_provider);",
     ),
     (
         "orchestration_v2_projection_runs",
         &[("provider_instance_id", "TEXT")],
-        "UPDATE orchestration_v2_projection_runs SET provider_instance_id = COALESCE(json_extract(payload_json, '$.providerInstanceId'), provider);",
+        "UPDATE orchestration_v2_projection_runs SET provider_instance_id = COALESCE(CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.providerInstanceId') END, provider);",
     ),
     (
         "orchestration_v2_projection_run_attempts",
         &[("provider_instance_id", "TEXT")],
-        "UPDATE orchestration_v2_projection_run_attempts SET provider_instance_id = COALESCE(json_extract(payload_json, '$.providerInstanceId'), provider);",
+        "UPDATE orchestration_v2_projection_run_attempts SET provider_instance_id = COALESCE(CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.providerInstanceId') END, provider);",
     ),
     (
         "orchestration_v2_projection_provider_sessions",
         &[("driver", "TEXT"), ("provider_instance_id", "TEXT")],
         "UPDATE orchestration_v2_projection_provider_sessions SET
-           driver = COALESCE(driver, json_extract(payload_json, '$.driver'), provider),
-           provider_instance_id = COALESCE(provider_instance_id, json_extract(payload_json, '$.providerInstanceId'), provider);",
+           driver = COALESCE(driver, CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.driver') END, provider),
+           provider_instance_id = COALESCE(provider_instance_id, CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.providerInstanceId') END, provider);",
     ),
     (
         "orchestration_v2_projection_provider_threads",
         &[("driver", "TEXT"), ("provider_instance_id", "TEXT")],
         "UPDATE orchestration_v2_projection_provider_threads SET
-           driver = COALESCE(driver, json_extract(payload_json, '$.driver'), provider),
-           provider_instance_id = COALESCE(provider_instance_id, json_extract(payload_json, '$.providerInstanceId'), provider);",
+           driver = COALESCE(driver, CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.driver') END, provider),
+           provider_instance_id = COALESCE(provider_instance_id, CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.providerInstanceId') END, provider);",
     ),
     (
         "orchestration_v2_projection_subagents",
@@ -179,8 +164,14 @@ const V2_INSTANCE_BACKFILLS: &[(&str, &[ColumnSpec], &str)] = &[
             ("completion_delivery_state", "TEXT"),
         ],
         "UPDATE orchestration_v2_projection_subagents SET
-           driver = COALESCE(driver, json_extract(payload_json, '$.driver')),
-           provider_instance_id = COALESCE(provider_instance_id, json_extract(payload_json, '$.providerInstanceId'), provider);",
+           driver = COALESCE(driver, CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.driver') END),
+           provider_instance_id = COALESCE(provider_instance_id, CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.providerInstanceId') END, provider),
+           completion_delivery_state = COALESCE(
+             completion_delivery_state,
+             CASE WHEN json_valid(payload_json) AND json_type(payload_json, '$.completionDelivery') IS NOT NULL
+               THEN json_extract(payload_json, '$.completionDelivery.state')
+             END
+           );",
     ),
     (
         "orchestration_v2_projection_context_transfers",
@@ -189,8 +180,8 @@ const V2_INSTANCE_BACKFILLS: &[(&str, &[ColumnSpec], &str)] = &[
             ("target_provider_instance_id", "TEXT"),
         ],
         "UPDATE orchestration_v2_projection_context_transfers SET
-           source_provider_instance_id = COALESCE(source_provider_instance_id, json_extract(payload_json, '$.sourceProviderInstanceId'), source_provider),
-           target_provider_instance_id = COALESCE(target_provider_instance_id, json_extract(payload_json, '$.targetProviderInstanceId'), target_provider);",
+           source_provider_instance_id = COALESCE(source_provider_instance_id, CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.sourceProviderInstanceId') END, source_provider),
+           target_provider_instance_id = COALESCE(target_provider_instance_id, CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.targetProviderInstanceId') END, target_provider);",
     ),
 ];
 
@@ -224,7 +215,10 @@ fn apply_v2_column_migrations(conn: &Connection) -> rusqlite::Result<ColumnMigra
     add_missing_columns(
         conn,
         "issue_tracker_bindings",
-        &[("additional_scopes", "TEXT NOT NULL DEFAULT '[]'")],
+        &[
+            ("additional_scopes", "TEXT NOT NULL DEFAULT '[]'"),
+            ("account_id", "TEXT"),
+        ],
     )?;
 
     backfill_item_counts_if_empty(conn)?;

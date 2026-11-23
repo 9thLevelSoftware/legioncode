@@ -328,3 +328,54 @@ pub(crate) async fn handle_mcp_token(
     }))
     .into_response())
 }
+
+/// `POST /oauth/mcp/revoke` — RFC 7009 token revocation scoped strictly to MCP OAuth sessions (`#41005`).
+pub(crate) async fn handle_mcp_revoke(
+    State(state): State<Arc<RuntimeHttpState>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let token = parse_revocation_token(&headers, &body);
+    if let Some(raw_token) = token.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        let token_hash = hex::encode(Sha256::digest(raw_token.as_bytes()));
+        let now_iso = crate::outbox_state::utc_now_iso();
+        if let Ok(conn) = state.db().lock() {
+            let _ = conn.execute(
+                "UPDATE auth_sessions
+                 SET revoked_at = ?1
+                 WHERE bearer_token_hash = ?2
+                   AND subject = 'mcp-oauth'
+                   AND method = 'bearer-access-token'
+                   AND revoked_at IS NULL",
+                rusqlite::params![now_iso, token_hash],
+            );
+        }
+    }
+    let mut resp = StatusCode::OK.into_response();
+    resp.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static("no-store"),
+    );
+    resp
+}
+
+fn parse_revocation_token(headers: &HeaderMap, body: &[u8]) -> Option<String> {
+    let is_form = headers
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|ct| ct.contains("application/x-www-form-urlencoded"));
+    if !is_form
+        && body.trim_ascii_start().starts_with(b"{")
+        && let Ok(val) = serde_json::from_slice::<serde_json::Value>(body)
+    {
+        return val.get("token").and_then(|v| v.as_str()).map(str::to_owned);
+    }
+    let raw = std::str::from_utf8(body).ok()?;
+    for pair in raw.split('&').filter(|s| !s.is_empty()) {
+        let (k, v) = pair.split_once('=').unwrap_or((pair, ""));
+        if percent_decode_form(k).ok().as_deref() == Some("token") {
+            return percent_decode_form(v).ok();
+        }
+    }
+    None
+}

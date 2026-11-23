@@ -81,6 +81,12 @@ describe("searchSettings", () => {
     expect(searchSettings("1password").map((item) => item.to)).not.toContain("/settings/secrets");
   });
 
+  it("finds where subagents and side chats open by any of its names", () => {
+    for (const query of ["side panel", "subagent", "side chat", "linked thread", "middle click"]) {
+      expect(searchSettings(query).map((item) => item.id)).toContain("side-thread-open-target");
+    }
+  });
+
   it("finds the Scheduled tasks page", () => {
     expect(searchSettings("scheduled tasks")[0]).toMatchObject({
       id: "scheduled-tasks",
@@ -149,6 +155,7 @@ describe("searchSettings", () => {
       "auto-settle-merged-threads",
       "days-before-auto-settle",
       "linked-environments",
+      "agent-feedback",
     ]);
     expect(available.map((item) => item.id).filter((id) => gatedIds.has(id))).toEqual([]);
   });

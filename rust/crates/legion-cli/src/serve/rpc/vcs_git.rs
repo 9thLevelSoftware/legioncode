@@ -1,15 +1,22 @@
 //! VCS RPC handlers (`vcs.*`, `worktreeSetup.cancel`, `review.*`, and delegation to `git.*`).
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 
 use legion_protocol::rpc_codec::RpcExit;
+use legion_scm::git_ref_cache::read_ref_snapshot;
 use serde::Deserialize;
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use tokio::process::Command;
 
 use super::{AppState, git_actions, parse_payload, rpc_fail, rpc_fail_obj, vcs_review};
+
+#[path = "vcs_git_refs.rs"]
+mod refs;
+pub(crate) use refs::current_branch;
+use refs::{vcs_create_ref, vcs_init, vcs_switch_ref};
 
 pub(crate) async fn dispatch(state: &Arc<AppState>, tag: &str, payload: Value) -> RpcExit {
     match tag {
@@ -19,8 +26,8 @@ pub(crate) async fn dispatch(state: &Arc<AppState>, tag: &str, payload: Value) -
         "vcs.listRefs" => vcs_list_refs(payload).await,
         "vcs.createWorktree" => git_actions::vcs_create_worktree(state, payload).await,
         "vcs.removeWorktree" => git_actions::vcs_remove_worktree(payload).await,
-        "vcs.createRef" => vcs_create_ref(payload).await,
-        "vcs.switchRef" => vcs_switch_ref(payload).await,
+        "vcs.createRef" => vcs_create_ref(state, payload).await,
+        "vcs.switchRef" => vcs_switch_ref(state, payload).await,
         "vcs.init" => vcs_init(payload).await,
         "worktreeSetup.cancel" => RpcExit::Success {
             value: json!({ "cancelled": false }),
@@ -36,7 +43,7 @@ pub(crate) async fn dispatch(state: &Arc<AppState>, tag: &str, payload: Value) -
     }
 }
 
-pub(crate) async fn run_git_cmd(cwd: &Path, args: &[&str]) -> Result<String, (String, String)> {
+pub(super) async fn run_git_cmd(cwd: &Path, args: &[&str]) -> Result<String, (String, String)> {
     let out = Command::new("git")
         .current_dir(cwd)
         .env("GIT_TERMINAL_PROMPT", "0")
@@ -59,7 +66,7 @@ pub(crate) async fn run_git_cmd(cwd: &Path, args: &[&str]) -> Result<String, (St
     }
 }
 
-pub(crate) fn git_err(op: &str, cwd: &str, detail: &str) -> RpcExit {
+pub(super) fn git_err(op: &str, cwd: &str, detail: &str) -> RpcExit {
     rpc_fail_obj(json!({
         "_tag": "GitCommandError",
         "operation": op,
@@ -72,8 +79,8 @@ pub(crate) fn git_err(op: &str, cwd: &str, detail: &str) -> RpcExit {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CwdPayload {
-    cwd: String,
+pub(super) struct CwdPayload {
+    pub(super) cwd: String,
 }
 
 async fn vcs_pull(payload: Value) -> RpcExit {
@@ -104,8 +111,16 @@ async fn vcs_pull(payload: Value) -> RpcExit {
     }
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RefreshStatusPayload {
+    cwd: String,
+    #[serde(default)]
+    local_only: Option<bool>,
+}
+
 async fn vcs_refresh_status(payload: Value) -> RpcExit {
-    let req: CwdPayload = match parse_payload(payload) {
+    let req: RefreshStatusPayload = match parse_payload(payload) {
         Ok(p) => p,
         Err(e) => return e,
     };
@@ -156,20 +171,52 @@ async fn vcs_refresh_status(payload: Value) -> RpcExit {
         Err(_) => (false, 0, 0),
     };
     let is_default = matches!(branch.as_deref(), Some("main" | "master"));
-    RpcExit::Success {
-        value: json!({
-            "isRepo": true,
-            "hasPrimaryRemote": has_origin,
-            "isDefaultRef": is_default,
-            "refName": branch,
-            "hasWorkingTreeChanges": !files.is_empty(),
-            "workingTree": { "files": files, "insertions": 0, "deletions": 0 },
-            "hasUpstream": has_upstream,
-            "aheadCount": ahead,
-            "behindCount": behind,
-            "pr": Value::Null,
-        }),
+    let refs_digest = if req.local_only == Some(true) {
+        None
+    } else {
+        compute_refs_digest(cwd).await
+    };
+    let mut out = json!({
+        "isRepo": true,
+        "hasPrimaryRemote": has_origin,
+        "isDefaultRef": is_default,
+        "refName": branch,
+        "hasWorkingTreeChanges": !files.is_empty(),
+        "workingTree": { "files": files, "insertions": 0, "deletions": 0 },
+        "hasUpstream": has_upstream,
+        "aheadCount": ahead,
+        "behindCount": behind,
+        "pr": Value::Null,
+    });
+    if let Some(digest) = refs_digest
+        && let Some(obj) = out.as_object_mut()
+    {
+        obj.insert("refsDigest".to_owned(), Value::String(digest));
     }
+    RpcExit::Success { value: out }
+}
+
+async fn compute_refs_digest(cwd: &Path) -> Option<String> {
+    use std::fmt::Write as _;
+    let raw = run_git_cmd(cwd, &["rev-parse", "--git-common-dir"])
+        .await
+        .ok()?;
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let common_dir = if Path::new(trimmed).is_absolute() {
+        PathBuf::from(trimmed)
+    } else {
+        cwd.join(trimmed)
+    };
+    let snapshot = read_ref_snapshot(&common_dir)?;
+    let digest = Sha256::digest(snapshot.as_bytes());
+    let mut hex = String::with_capacity(32);
+    for byte in &digest[..16] {
+        let _ = write!(&mut hex, "{byte:02x}");
+    }
+    Some(hex)
 }
 
 async fn collect_status_files(cwd: &Path) -> Vec<Value> {
@@ -268,69 +315,5 @@ async fn vcs_list_refs(payload: Value) -> RpcExit {
             "nextCursor": Value::Null,
             "totalCount": total,
         }),
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CreateRefPayload {
-    cwd: String,
-    #[serde(alias = "branch")]
-    ref_name: String,
-    #[serde(default)]
-    switch_ref: Option<bool>,
-}
-
-async fn vcs_create_ref(payload: Value) -> RpcExit {
-    let req: CreateRefPayload = match parse_payload(payload) {
-        Ok(p) => p,
-        Err(e) => return e,
-    };
-    let args: Vec<&str> = if req.switch_ref.unwrap_or(false) {
-        vec!["checkout", "-b", &req.ref_name]
-    } else {
-        vec!["branch", &req.ref_name]
-    };
-    match run_git_cmd(Path::new(&req.cwd), &args).await {
-        Ok(_) => RpcExit::Success {
-            value: json!({ "refName": req.ref_name }),
-        },
-        Err((op, detail)) => git_err(&op, &req.cwd, &detail),
-    }
-}
-
-async fn vcs_switch_ref(payload: Value) -> RpcExit {
-    let req: CreateRefPayload = match parse_payload(payload) {
-        Ok(p) => p,
-        Err(e) => return e,
-    };
-    match run_git_cmd(Path::new(&req.cwd), &["checkout", &req.ref_name]).await {
-        Ok(_) => RpcExit::Success {
-            value: json!({ "refName": req.ref_name }),
-        },
-        Err((op, detail)) => git_err(&op, &req.cwd, &detail),
-    }
-}
-
-async fn vcs_init(payload: Value) -> RpcExit {
-    let req: CwdPayload = match parse_payload(payload) {
-        Ok(p) => p,
-        Err(e) => return e,
-    };
-    match run_git_cmd(Path::new(&req.cwd), &["init"]).await {
-        Ok(_) => RpcExit::Success { value: Value::Null },
-        Err((op, detail)) => git_err(&op, &req.cwd, &detail),
-    }
-}
-
-pub(crate) async fn current_branch(cwd: &Path) -> Option<String> {
-    let txt = run_git_cmd(cwd, &["rev-parse", "--abbrev-ref", "HEAD"])
-        .await
-        .ok()?;
-    let trimmed = txt.trim();
-    if trimmed.is_empty() || trimmed == "HEAD" {
-        None
-    } else {
-        Some(trimmed.to_owned())
     }
 }

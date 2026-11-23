@@ -7,13 +7,13 @@ use regex::Regex;
 use serde_json::{Map, Value};
 
 const TOOL_TEXT_TRUNCATED: &str = "... [truncated]\n";
+/// Marker appended when truncating long Antigravity shell command lines (`#40702`).
+pub const COMMAND_LINE_TRUNCATED: &str = "\n\n[Command truncated]";
 const DEFAULT_TOOL_TEXT_LIMIT: usize = 8_000;
 
+const COMMAND_LINE_FIELDS: &[&str] = &["CommandLine", "command_line", "commandLine", "command"];
+
 const COMMAND_TEXT_FIELDS: &[&str] = &[
-    "CommandLine",
-    "command_line",
-    "commandLine",
-    "command",
     "aggregatedOutput",
     "combinedOutput",
     "combined_output",
@@ -110,13 +110,31 @@ pub fn bound_antigravity_command_text(text: &str, limit: usize) -> String {
     format!("{TOOL_TEXT_TRUNCATED}{tail}")
 }
 
-/// Bounds any command or output fields inside an Antigravity tool JSON object using
-/// Unicode-safe tail truncation (`df09ced768`).
+/// Keeps the valid Unicode head of long shell command lines up to `limit` UTF-16 units (`#40702`).
+#[must_use]
+pub fn bound_antigravity_command_line(text: &str, limit: usize) -> String {
+    let effective_limit = limit.max(1);
+    let total_u16 = utf8_len_to_utf16(text);
+    let suffix_u16 = utf8_len_to_utf16(COMMAND_LINE_TRUNCATED);
+    if total_u16 <= effective_limit
+        || (total_u16 <= effective_limit + suffix_u16 && text.ends_with(COMMAND_LINE_TRUNCATED))
+    {
+        return text.to_owned();
+    }
+    let head = utf16_slice_safe(text, 0, effective_limit);
+    format!("{head}{COMMAND_LINE_TRUNCATED}")
+}
+
+/// Bounds any command-line fields using head truncation (`#40702`) and output fields using
+/// Unicode-safe tail truncation (`df09ced768`) inside an Antigravity tool JSON object.
 #[must_use]
 pub fn sanitize_antigravity_command_fields(obj: &Map<String, Value>) -> Map<String, Value> {
     obj.iter()
         .map(|(key, val)| {
             let next = match val {
+                Value::String(s) if COMMAND_LINE_FIELDS.contains(&key.as_str()) => {
+                    Value::String(bound_antigravity_command_line(s, DEFAULT_TOOL_TEXT_LIMIT))
+                }
                 Value::String(s) if COMMAND_TEXT_FIELDS.contains(&key.as_str()) => {
                     Value::String(bound_antigravity_command_text(s, DEFAULT_TOOL_TEXT_LIMIT))
                 }

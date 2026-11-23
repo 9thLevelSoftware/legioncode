@@ -27,6 +27,8 @@ complete -c legioncode -n '__fish_use_subcommand' -f -a 'trace' -d 'Inspect the 
 complete -c legioncode -n '__fish_use_subcommand' -f -a 'doctor' -d 'Inspect this LegionCode data directory and repair it. Pauses and restarts the background service as needed.'
 complete -c legioncode -n '__fish_use_subcommand' -f -a 'policy' -d 'Inspect the administrator\'s managed policy.'
 complete -c legioncode -n '__fish_use_subcommand' -f -a 'triage' -d 'Investigate a LegionCode problem on this machine with Claude Code, Codex, or Antigravity, and help file a good issue.'
+complete -c legioncode -n '__fish_use_subcommand' -f -a 'workflow' -d 'Start, inspect and steer durable workflow runs on the running server.'
+complete -c legioncode -n '__fish_use_subcommand' -f -a 'feedback' -d 'Record and inspect local agent feedback reports.'
 complete -c legioncode -n '__fish_use_subcommand; and begin; not __fish_contains_opt mode; or contains -- (commandline -poc)[-1] --mode; end' -l mode -d 'Runtime mode. `desktop` keeps loopback defaults unless overridden.' -r -f -a 'web desktop'
 complete -c legioncode -n '__fish_use_subcommand; and begin; not __fish_contains_opt port; or contains -- (commandline -poc)[-1] --port; end' -l port -d 'Port for the HTTP/WebSocket server.' -r -f
 complete -c legioncode -n '__fish_use_subcommand; and begin; not __fish_contains_opt host; or contains -- (commandline -poc)[-1] --host; end' -l host -d 'Host/interface to bind (for example 127.0.0.1, 0.0.0.0, or a Tailnet IP).' -r -f
@@ -461,5 +463,7 @@ complete -c legioncode -n '__fish_seen_subcommand_from triage; and begin; not __
 complete -c legioncode -n '__fish_seen_subcommand_from triage; and not string match -q -- "-*" (commandline -ct); and not __fish_contains_opt base-dir' -f -a '--base-dir' -d 'Explicit LegionCode data directory; runtime state is stored under userdata (equivalent to LEGIONCODE_HOME).'
 complete -c legioncode -n '__fish_seen_subcommand_from triage; and not string match -q -- "-*" (commandline -ct); and not __fish_contains_opt agent' -f -a '--agent' -d 'Agent CLI to use. Default: ask when multiple are installed.'
 complete -c legioncode -n '__fish_seen_subcommand_from triage; and not string match -q -- "-*" (commandline -ct); and not __fish_contains_opt model' -f -a '--model' -d 'Model passed through to the agent CLI. Default: the agent\'s default.'
+complete -c legioncode -n '__fish_seen_subcommand_from workflow' -f -a 'start list show resume cancel signal questions hooks store' -d 'Workflow subcommand.'
+complete -c legioncode -n '__fish_seen_subcommand_from feedback' -f -a 'list' -d 'List local feedback reports.'
 
 ###-end-legioncode-completions-###

@@ -157,9 +157,7 @@ pub fn probe_remote_editors_in_path(path_env: Option<&std::ffi::OsStr>) -> Vec<S
         ("vscodium", &["codium"]),
         ("zed", &["zed", "zeditor"]),
     ];
-    let dirs: Vec<PathBuf> = path_env
-        .map(|val| env::split_paths(val).collect())
-        .unwrap_or_default();
+    let dirs: Vec<PathBuf> = path_env.map_or_default(|val| env::split_paths(val).collect());
 
     let mut found = Vec::new();
     for &(id, cmds) in REMOTE_EDITORS {

@@ -1,9 +1,27 @@
-//! Turn-item, checkpoint, context, subagent, feature indexes and item-count triggers (`085`/`102`).
+//! Turn-item, checkpoint, context, subagent, feature indexes and item-count triggers (`085`/`102`/`107`/`108`/`110`).
 
 use rusqlite::Connection;
 
 // Matches `apps/server/src/orchestration-v2/deferredCommandMessage.ts` verbatim so SQLite's planner uses the partial index.
-const JAVASCRIPT_TRIM_WHITESPACE: &str = " \t\n\r\u{000b}\u{000c}\u{00a0}\u{1680}\u{2000}\u{2001}\u{2002}\u{2003}\u{2004}\u{2005}\u{2006}\u{2007}\u{2008}\u{2009}\u{200a}\u{2028}\u{2029}\u{202f}\u{205f}\u{3000}\u{feff}";
+/// Whitespace characters trimmed by JavaScript `String.prototype.trim()` (`deferredCommandMessage.ts`).
+pub const JAVASCRIPT_TRIM_WHITESPACE: &str = " \t\n\r\u{000b}\u{000c}\u{00a0}\u{1680}\u{2000}\u{2001}\u{2002}\u{2003}\u{2004}\u{2005}\u{2006}\u{2007}\u{2008}\u{2009}\u{200a}\u{2028}\u{2029}\u{202f}\u{205f}\u{3000}\u{feff}";
+
+/// SQLite `WHERE` predicate matching every deferred slash command (`DEFERRED_COMMAND_MESSAGE_CONDITION`).
+pub fn deferred_command_message_condition() -> String {
+    format!(
+        "role = 'user' AND trim(json_extract(payload_json, '$.text'), '{JAVASCRIPT_TRIM_WHITESPACE}') GLOB '/*'"
+    )
+}
+
+pub(crate) fn deferred_command_index_sql(if_not_exists: bool) -> String {
+    let clause = if if_not_exists { "IF NOT EXISTS " } else { "" };
+    let condition = deferred_command_message_condition();
+    format!(
+        "CREATE INDEX {clause}orchestration_v2_projection_messages_deferred_command_idx
+         ON orchestration_v2_projection_messages(thread_id, created_at, message_id)
+         WHERE {condition};"
+    )
+}
 
 const STATIC_INDEXES_PART3_SQL: &str = "
 CREATE INDEX IF NOT EXISTS orchestration_v2_projection_turn_items_thread_ordinal_idx
@@ -139,6 +157,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_webhook_pending_key
 
 CREATE INDEX IF NOT EXISTS idx_task_folders_real_root
   ON task_folders(real_root);
+CREATE INDEX IF NOT EXISTS agent_feedback_run_idx
+  ON agent_feedback(run_id, user_requested);
 ";
 
 const ITEM_COUNT_TRIGGERS_SQL: &str = "
@@ -244,14 +264,8 @@ END;
 
 pub(crate) fn apply_extended_indexes_and_triggers(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(STATIC_INDEXES_PART3_SQL)?;
-    let deferred_sql = format!(
-        "CREATE INDEX IF NOT EXISTS orchestration_v2_projection_messages_deferred_command_idx
-         ON orchestration_v2_projection_messages(thread_id, created_at, message_id)
-         WHERE role = 'user' AND (
-           lower(trim(json_extract(payload_json, '$.text'), '{JAVASCRIPT_TRIM_WHITESPACE}')) = '/compact'
-           OR trim(json_extract(payload_json, '$.text'), '{JAVASCRIPT_TRIM_WHITESPACE}') GLOB '/goal*'
-         );"
-    );
+    super::schema_workflow_tables::create_workflow_indexes(conn)?;
+    let deferred_sql = deferred_command_index_sql(true);
     conn.execute_batch(&deferred_sql)?;
     conn.execute_batch(ITEM_COUNT_TRIGGERS_SQL)
 }

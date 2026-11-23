@@ -80,15 +80,13 @@ pub(crate) fn emit_table(node: &XmlNode, out: &mut Vec<TextPart>) -> Result<(), 
     let mut row_count = 0usize;
 
     for row in rows {
-        let mut cells: Vec<&XmlNode> = row
-            .child_elements()
-            .filter(|c| {
-                matches!(
-                    c.name.as_str(),
-                    "tc" | "table-cell" | "covered-table-cell" | "td" | "th"
-                )
-            })
-            .collect();
+        // Word nests a cell inside w:sdt when a content control wraps the whole cell (#40496).
+        let mut cells = Vec::new();
+        all_matching(
+            row,
+            &["tc", "table-cell", "covered-table-cell", "td", "th"],
+            &mut cells,
+        );
         while cells.last().is_some_and(|c| !has_cell_text(c)) {
             cells.pop();
         }

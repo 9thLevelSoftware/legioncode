@@ -251,6 +251,29 @@ fn is_sqlite_busy(err: &rusqlite::Error) -> bool {
     )
 }
 
+/// Returns whether a running server currently holds `server-owner.sqlite` (`#28256`).
+///
+/// Read-only so probing never creates the lock file when absent.
+pub fn is_server_ownership_held(path: impl AsRef<Path>) -> bool {
+    let (state_dir, _) = resolve_paths(path.as_ref());
+    let lock_path = state_dir.join("server-owner.sqlite");
+    let Ok(conn) = Connection::open_with_flags(
+        &lock_path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    ) else {
+        return false;
+    };
+    let _ = conn.busy_timeout(Duration::ZERO);
+    let mut stmt = match conn.prepare("SELECT 1 FROM sqlite_schema") {
+        Ok(stmt) => stmt,
+        Err(err) => return is_sqlite_busy(&err),
+    };
+    match stmt.exists([]) {
+        Ok(_) => false,
+        Err(err) => is_sqlite_busy(&err),
+    }
+}
+
 pub(super) fn check_lock_lost(lock_path: &Path, expected: FileIdentity) -> bool {
     match fs::metadata(lock_path) {
         Ok(meta) => FileIdentity::from_metadata(&meta) != expected,

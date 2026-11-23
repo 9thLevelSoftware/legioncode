@@ -4,6 +4,105 @@ use serde_json::{Value, json};
 
 use super::{NonAcpParseError, NonAcpTurnUpdate, id_to_string, str_field, u64_field};
 
+/// Change kind carried by a Codex `fileChange` completion item (`#40874`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CodexPatchChangeKind {
+    /// Newly added file (diff body contains raw file lines).
+    Add,
+    /// Deleted file (diff body contains raw file lines).
+    Delete,
+    /// Updated or moved file (`move_path` when renamed).
+    Update {
+        /// New relative path when renamed.
+        move_path: Option<String>,
+    },
+}
+
+/// One file entry inside a Codex multi-file `fileChange` notification (`#40874`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodexFileUpdateChange {
+    /// Original repository-relative path.
+    pub path: String,
+    /// File mutation kind (`Add`, `Delete`, `Update`).
+    pub kind: CodexPatchChangeKind,
+    /// Per-file diff/hunk text or raw content for additions/deletions.
+    pub diff: String,
+}
+
+/// Joins all entries of a Codex `fileChange` patch with per-file `diff --git` and
+/// `---`/`+++` headers so diff viewers split and render every file (`#40874`).
+#[must_use]
+pub fn codex_multi_file_patch(changes: &[CodexFileUpdateChange]) -> String {
+    let mut combined = String::new();
+    for change in changes {
+        let old_path = change.path.as_str();
+        let new_path = match &change.kind {
+            CodexPatchChangeKind::Update {
+                move_path: Some(dest),
+            } if !dest.is_empty() => dest.as_str(),
+            _ => old_path,
+        };
+        let git_header = format!(
+            "diff --git {} {}\n",
+            json!(format!("a/{old_path}")),
+            json!(format!("b/{new_path}"))
+        );
+        let section = match &change.kind {
+            CodexPatchChangeKind::Update { .. } if change.diff.starts_with("diff --git ") => {
+                change.diff.clone()
+            }
+            CodexPatchChangeKind::Update { .. } if change.diff.starts_with("--- ") => {
+                format!("{git_header}{}", change.diff)
+            }
+            _ => {
+                let hunks = match &change.kind {
+                    CodexPatchChangeKind::Update { .. } => change.diff.clone(),
+                    CodexPatchChangeKind::Add | CodexPatchChangeKind::Delete => {
+                        let mut lines: Vec<&str> = change.diff.split('\n').collect();
+                        let has_final_newline = change.diff.ends_with('\n');
+                        if has_final_newline {
+                            lines.pop();
+                        }
+                        let added = matches!(change.kind, CodexPatchChangeKind::Add);
+                        let range = format!("1,{}", lines.len());
+                        let prefix = if added { '+' } else { '-' };
+                        let mut body = lines
+                            .into_iter()
+                            .map(|line| format!("{prefix}{line}"))
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        body.push('\n');
+                        if !has_final_newline {
+                            body.push_str("\\ No newline at end of file\n");
+                        }
+                        format!(
+                            "@@ -{} +{} @@\n{body}",
+                            if added { "0,0" } else { range.as_str() },
+                            if added { range.as_str() } else { "0,0" }
+                        )
+                    }
+                };
+                let before = if matches!(change.kind, CodexPatchChangeKind::Add) {
+                    "/dev/null".to_owned()
+                } else {
+                    json!(format!("a/{old_path}")).to_string()
+                };
+                let after = if matches!(change.kind, CodexPatchChangeKind::Delete) {
+                    "/dev/null".to_owned()
+                } else {
+                    json!(format!("b/{new_path}")).to_string()
+                };
+                format!("{git_header}--- {before}\n+++ {after}\n{hunks}")
+            }
+        };
+        combined.push_str(&section);
+        if !section.ends_with('\n') {
+            combined.push('\n');
+        }
+    }
+    combined
+}
+
 /// Parses one Codex app-server NDJSON line into normalized [`NonAcpTurnUpdate`] items.
 pub fn parse_codex_app_server_line(line: &str) -> Result<Vec<NonAcpTurnUpdate>, NonAcpParseError> {
     let trimmed = line.trim();

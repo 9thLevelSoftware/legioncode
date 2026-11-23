@@ -208,19 +208,10 @@ fn collect_scan_candidates(
     candidates
 }
 
-/// Discovers Git repositories inside `workspace_root`, filtering `legioncode.json` `ignoreRepositories` and
-/// external symlink escapes (`60863edc41` `#35925`).
+/// Reads configured `ignore_repositories` relative to `root` without walking directories (`#40664`).
 #[must_use]
-pub fn discover_project_folders(workspace_root: &Path) -> Vec<ProjectTrackedFolder> {
-    let input = WorkspaceScanFoldersInput {
-        workspace_root: workspace_root.to_string_lossy().into_owned(),
-    };
-    let Ok(scan) = scan_workspace_folders(&input, Some(usize::MAX)) else {
-        return Vec::new();
-    };
-    let root = PathBuf::from(&scan.workspace_root);
-    let real_root = real_path_or_self(&root);
-    let ignored: Vec<PathBuf> = fs::read_to_string(root.join(LEGION_PROJECT_FILE_NAME))
+pub fn load_ignored_repository_paths(root: &Path) -> Vec<PathBuf> {
+    fs::read_to_string(root.join(LEGION_PROJECT_FILE_NAME))
         .ok()
         .and_then(|raw| serde_json::from_str::<RawLegionProject>(&strip_lenient_jsonc(&raw)).ok())
         .map_or_default(|proj| {
@@ -228,7 +219,34 @@ pub fn discover_project_folders(workspace_root: &Path) -> Vec<ProjectTrackedFold
                 .into_iter()
                 .map(|entry| lexical_clean(&root.join(entry)))
                 .collect()
-        });
+        })
+}
+
+/// Returns `true` when any ignored repository entry covers `root` itself, making a walk futile (`#40664`).
+#[must_use]
+pub fn is_whole_project_ignored(root: &Path, ignored: &[PathBuf]) -> bool {
+    ignored.iter().any(|ign| is_within_root(root, ign))
+}
+
+/// Discovers Git repositories inside `workspace_root`, skipping the filesystem walk completely when
+/// `legioncode.json` `ignoreRepositories` ignores the whole project (`#40664`), and filtering
+/// external symlink escapes (`60863edc41` `#35925`).
+#[must_use]
+pub fn discover_project_folders(workspace_root: &Path) -> Vec<ProjectTrackedFolder> {
+    let root = lexical_clean(workspace_root);
+    let ignored = load_ignored_repository_paths(&root);
+    if is_whole_project_ignored(&root, &ignored) {
+        return Vec::new();
+    }
+
+    let input = WorkspaceScanFoldersInput {
+        workspace_root: workspace_root.to_string_lossy().into_owned(),
+    };
+    let Ok(scan) = scan_workspace_folders(&input, Some(usize::MAX)) else {
+        return Vec::new();
+    };
+    let scanned_root = PathBuf::from(&scan.workspace_root);
+    let real_root = real_path_or_self(&scanned_root);
 
     scan.folders
         .into_iter()
@@ -252,6 +270,23 @@ pub fn discover_project_folders(workspace_root: &Path) -> Vec<ProjectTrackedFold
             discovered: Some(true),
         })
         .collect()
+}
+
+/// Collects deduplicated git repository paths for checkpoint capture from pre-resolved thread
+/// folders and submodules so the project directory is walked only once per turn (`#40671`).
+#[must_use]
+pub fn collect_checkpoint_repository_paths(
+    thread_folders: &[WorkspaceFolder],
+    submodules: &[WorkspaceFolder],
+) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for folder in thread_folders.iter().chain(submodules.iter()) {
+        if matches!(folder.state, WorkspaceFolderState::Git) && seen.insert(folder.path.clone()) {
+            out.push(folder.path.clone());
+        }
+    }
+    out
 }
 
 /// Merges auto-discovered repos with user-added tracked folders up to [`PROJECT_TRACKED_FOLDERS_MAX`] (`60863edc41`).

@@ -35,7 +35,7 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 #[test]
 fn migrations_v105_apply_idempotently_and_guard_existing_columns() -> TestResult {
-    assert_eq!(BUILD_MIGRATION_HEAD, 105);
+    assert_eq!(BUILD_MIGRATION_HEAD, 110);
     let temp = tempfile::tempdir()?;
     let db_path = temp.path().join("preexisting.sqlite");
 
@@ -56,7 +56,7 @@ fn migrations_v105_apply_idempotently_and_guard_existing_columns() -> TestResult
     pre.close().map_err(|(_, e)| e)?;
 
     let store = SqliteStore::open(&db_path)?;
-    assert_eq!(store.recorded_migration_head()?, Some(105));
+    assert_eq!(store.recorded_migration_head()?, Some(110));
 
     // Verify migrations 103..=105 recorded cleanly and reopening stays idempotent.
     store.close()?;
@@ -296,6 +296,19 @@ fn cleanup_transcript_favicons_and_branded_paths_work_across_edge_cases() -> Tes
         .expect_err("directory cannot be unlinked as file");
     assert!(matches!(err, MaintenanceError::TranscriptCleanup { .. }));
     assert!(err.to_string().contains("filesystem remove failed:"));
+
+    // SQLite cleanup error surfaces the underlying SQLite reason (#40424).
+    let file_target = temp.path().join("transcript.jsonl");
+    fs::write(&file_target, b"{}")?;
+    let broken_conn = Connection::open_in_memory()?;
+    broken_conn.execute_batch("CREATE TABLE orchestration_v2_legacy_imports (wrong_col TEXT);")?;
+    let sqlite_err = cleanup_imported_transcript(&broken_conn, "t-1", &file_target)
+        .expect_err("broken legacy imports table fails sqlite delete");
+    assert!(matches!(
+        sqlite_err,
+        MaintenanceError::TranscriptCleanup { .. }
+    ));
+    assert!(sqlite_err.to_string().contains("SQLite cleanup failed:"));
 
     // Flutter web/favicon.png fallback + well-known priority + tracked folders persistence.
     let flutter_root = temp.path().join("flutter_app");

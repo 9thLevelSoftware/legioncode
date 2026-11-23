@@ -14,6 +14,10 @@ pub const VOICE_WS_PATH: &str = "/ws/voice";
 /// Default maximum `/ws/voice` session lifetime (`10` minutes = `600_000 ms`).
 pub const DEFAULT_MAX_SESSION_DURATION_MS: u64 = 600_000;
 
+/// Default `/ws/voice` inactivity deadline (`15` seconds = `15_000 ms`, `#41075`) so a
+/// dropped client behind a proxy releases the speech engine quickly.
+pub const DEFAULT_IDLE_TIMEOUT_MS: u64 = 15_000;
+
 /// Default maximum single binary audio chunk size (`16_000 * 4 = 64_000` bytes).
 pub const DEFAULT_MAX_CHUNK_BYTES: usize = (SPEECH_SAMPLE_RATE_HZ as usize) * 4;
 
@@ -104,6 +108,8 @@ pub struct VoiceWsConfig {
     pub audio_encoding: Option<AudioSampleEncoding>,
     /// Whether accepted audio bytes are retained inside `VoiceWsSession` (`false` saves memory).
     pub retain_audio: bool,
+    /// Optional client inactivity timeout in milliseconds once received frames are answered.
+    pub idle_timeout_ms: Option<u64>,
 }
 
 impl Default for VoiceWsConfig {
@@ -115,7 +121,17 @@ impl Default for VoiceWsConfig {
             max_audio_buffer_bytes: DEFAULT_MAX_AUDIO_BUFFER_BYTES,
             audio_encoding: None,
             retain_audio: true,
+            idle_timeout_ms: None,
         }
+    }
+}
+
+impl VoiceWsConfig {
+    /// Returns a copy of this configuration enforcing an inactivity timeout in milliseconds.
+    #[must_use]
+    pub fn with_idle_timeout_ms(mut self, idle_timeout_ms: u64) -> Self {
+        self.idle_timeout_ms = Some(idle_timeout_ms);
+        self
     }
 }
 

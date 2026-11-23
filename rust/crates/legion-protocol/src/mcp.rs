@@ -55,6 +55,7 @@
 mod http_gate;
 mod mode_limit;
 mod sse;
+mod thread_wait;
 mod tool_prefix;
 
 pub use http_gate::{
@@ -70,7 +71,14 @@ pub use sse::{
     DEFAULT_WAIT_TIMEOUT_MS, MAX_WAIT_TIMEOUT_MS, McpSseError, PeerMcpSessionMap,
     PeerMcpSessionState, PeerSessionKey, clamp_wait_timeout_ms, parse_sse_json_rpc_response,
 };
+pub use thread_wait::{
+    ORCHESTRATOR_MCP_RUNNING_TASK_NEXT, ParentSubagentRecord, PendingChildRequest,
+    ResponseCapabilityKind, ThreadWaitWakeDecision, ThreadWaitWakeInput, evaluate_thread_wait_wake,
+    extract_forked_node_id, has_live_pending_user_input, is_live_pending_request,
+    oldest_live_pending_approval,
+};
 pub use tool_prefix::{
-    canonical_mcp_tool_name, has_branded_mcp_tool_prefix, is_branded_mcp_tool, matches_mcp_header,
-    mcp_header_candidates, mcp_tool_candidates, mcp_tool_candidates_for,
+    DualToolPresentation, canonical_mcp_tool_name, has_branded_mcp_tool_prefix,
+    is_branded_mcp_tool, is_dual_branded_mcp_tool, matches_mcp_header, mcp_header_candidates,
+    mcp_tool_candidates, mcp_tool_candidates_for, present_dual_tool, present_mcp_tool_name,
 };

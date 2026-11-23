@@ -16,7 +16,7 @@ use serde_json::json;
 use crate::cmd_pair::exchange_local_bearer;
 use crate::fallback::write_stdout_line;
 
-pub(super) async fn acquire_local_thread_auth(
+pub(crate) async fn acquire_local_thread_auth(
     db_path: &Path,
     origin: &str,
 ) -> Result<(String, Option<String>), String> {
@@ -45,7 +45,7 @@ fn issue_fallback_thread_session(db_path: &Path) -> Result<IssuedSession, String
     Ok(issued)
 }
 
-pub(super) fn revoke_fallback_thread_session(
+pub(crate) fn revoke_fallback_thread_session(
     local_db_session: Option<&(std::path::PathBuf, String)>,
 ) {
     let Some((db_path, session_id)) = local_db_session else {
@@ -205,6 +205,7 @@ pub(super) async fn finish_wait(
 }
 
 pub(super) async fn run_read(
+    mcp: &legion_remote::acp_mcp_bridge::McpHttpClient,
     client: &ThreadMcpClient,
     thread_id: &str,
     view: Option<String>,
@@ -212,18 +213,39 @@ pub(super) async fn run_read(
     after_position: Option<i64>,
     json: bool,
 ) -> Result<i32, ThreadClientError> {
-    let result = client
-        .read_thread(&ThreadReadRequest {
-            thread_id: thread_id.to_owned(),
-            view,
-            after_position,
-            limit,
-            ..ThreadReadRequest::default()
-        })
-        .await?;
+    let mut read_args = json!({ "threadId": thread_id });
+    if let Some(obj) = read_args.as_object_mut() {
+        if let Some(ref v) = view {
+            obj.insert("view".to_owned(), serde_json::Value::String(v.clone()));
+        }
+        if let Some(l) = limit {
+            obj.insert("limit".to_owned(), serde_json::Value::from(l));
+        }
+        if let Some(after) = after_position {
+            obj.insert("afterPosition".to_owned(), serde_json::Value::from(after));
+        }
+    }
+    let raw = mcp
+        .call_tool("legion_thread_read", &read_args)
+        .await
+        .map_err(|err| ThreadClientError::ToolFailed {
+            tool: "legion_thread_read".to_owned(),
+            detail: err.to_string(),
+        })?;
+    let structured = raw
+        .get("structuredContent")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    let result: legion_remote::thread_client::ThreadReadResult =
+        serde_json::from_value(structured.clone()).map_err(|err| {
+            ThreadClientError::ToolFailed {
+                tool: "legion_thread_read".to_owned(),
+                detail: err.to_string(),
+            }
+        })?;
     let run_error = client.latest_run_error(&result.thread).await?;
     if json {
-        let mut payload = serde_json::to_value(&result).unwrap_or_else(|_| json!({}));
+        let mut payload = structured;
         if let Some(obj) = payload.as_object_mut() {
             obj.insert(
                 "error".to_owned(),
@@ -274,7 +296,7 @@ pub(super) fn read_message_text(arg: &str) -> Result<String, String> {
     Ok(text)
 }
 
-pub(super) fn print_json_value<T: serde::Serialize>(val: &T) -> i32 {
+pub(crate) fn print_json_value<T: serde::Serialize>(val: &T) -> i32 {
     match serde_json::to_string(val) {
         Ok(s) => write_stdout_line(&s, "thread json"),
         Err(err) => {
@@ -282,4 +304,28 @@ pub(super) fn print_json_value<T: serde::Serialize>(val: &T) -> i32 {
             1
         }
     }
+}
+
+/// Unwraps `structuredContent` from an `/mcp` `tools/call` payload, propagating `isError: true`.
+pub(crate) fn extract_mcp_tool_structured(
+    raw: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    if raw.get("isError").and_then(serde_json::Value::as_bool) == Some(true) {
+        let text = raw
+            .get("content")
+            .and_then(serde_json::Value::as_array)
+            .and_then(|arr| arr.first())
+            .and_then(|item| item.get("text"))
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("MCP tool call failed.");
+        let parsed_msg = serde_json::from_str::<serde_json::Value>(text)
+            .ok()
+            .and_then(|v| {
+                v.get("message")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_owned)
+            });
+        return Err(parsed_msg.unwrap_or_else(|| text.to_owned()));
+    }
+    Ok(raw.get("structuredContent").cloned().unwrap_or(raw))
 }

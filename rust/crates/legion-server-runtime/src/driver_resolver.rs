@@ -7,18 +7,24 @@ use legion_contracts::orchestration::Run;
 use legion_contracts::policy::RuntimeMode;
 use legion_protocol::provider_env::SanitizedEnv;
 use legion_providers::core::resolve_cli_model_arg;
+use legion_providers::drivers::claude_lifecycle::{
+    ClaudeHistoryEntry, claude_resume_interrupted_turn_env,
+};
 use legion_providers::drivers::{
     AntigravityInstallTarget, CLAUDE_HOST_SESSION_VARIABLES, ProviderLaunchSpec,
     build_antigravity_launch_spec, build_child_env, build_claude_env, build_grok_launch_spec,
     codex_app_server_args, find_executable_on_path, fx_launch_spec, kiro_launch_spec,
     normalize_driver_slug, pi_launch_args, resolve_antigravity_instance_directories,
-    resolve_claude_executable, resolve_cli_probe_command, tokenize_cli_args,
+    resolve_claude_executable, resolve_cli_probe_command,
 };
-use serde_json::Value;
 
 use crate::acp_registry::AcpDriverSpec;
 use crate::error::ServerRuntimeError;
 use crate::outbox_turn_dispatch::ProviderDriverMode;
+
+#[path = "driver_resolver_config.rs"]
+mod config;
+use config::{InstanceConfig, read_instance_config};
 
 /// Resolves a launch executable and arguments into OS-spawnable `(program, args)`.
 ///
@@ -48,125 +54,6 @@ pub(crate) fn resolve_spawn_program_args(
         cfg!(windows),
     )
     .unwrap_or_else(|| (trimmed.to_owned(), args.to_vec()))
-}
-
-struct InstanceConfig {
-    driver: String,
-    binary_path: Option<String>,
-    home_path: Option<String>,
-    base_url: Option<String>,
-    api_key: Option<String>,
-    extra_args: Vec<String>,
-    env: BTreeMap<String, String>,
-}
-
-fn read_instance_config(settings_path: Option<&Path>, instance_id: &str) -> InstanceConfig {
-    let mut cfg = InstanceConfig {
-        driver: normalize_driver_slug(instance_id).to_owned(),
-        binary_path: None,
-        home_path: None,
-        base_url: None,
-        api_key: None,
-        extra_args: Vec::new(),
-        env: BTreeMap::new(),
-    };
-    let Some(path) = settings_path else {
-        return cfg;
-    };
-    let Ok(raw) = std::fs::read_to_string(path) else {
-        return cfg;
-    };
-    let Ok(root) = serde_json::from_str::<Value>(&raw) else {
-        return cfg;
-    };
-    if let Some(inst) = root
-        .get("providerInstances")
-        .and_then(|m| m.get(instance_id))
-    {
-        if let Some(drv) = inst.get("driver").and_then(Value::as_str) {
-            normalize_driver_slug(drv).clone_into(&mut cfg.driver);
-        }
-        collect_instance_env(inst.get("environment"), &mut cfg.env);
-        if let Some(inner) = inst.get("config") {
-            apply_inner_config(inner, &mut cfg);
-        }
-        apply_inner_config(inst, &mut cfg);
-    } else if let Some(legacy) = root.get("providers").and_then(|m| m.get(&cfg.driver)) {
-        apply_inner_config(legacy, &mut cfg);
-    }
-    cfg
-}
-
-fn collect_instance_env(env_val: Option<&Value>, out: &mut BTreeMap<String, String>) {
-    match env_val {
-        Some(Value::Array(items)) => {
-            for item in items {
-                let Some(name) = item
-                    .get("name")
-                    .and_then(Value::as_str)
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-                else {
-                    continue;
-                };
-                if let Some(val) = item.get("value").and_then(Value::as_str) {
-                    out.insert(name.to_owned(), val.to_owned());
-                }
-            }
-        }
-        Some(Value::Object(map)) => {
-            for (k, v) in map {
-                if let Some(s) = v.as_str() {
-                    out.insert(k.clone(), s.to_owned());
-                }
-            }
-        }
-        _ => {}
-    }
-}
-
-fn push_arg_list(val: Option<&Value>, out: &mut Vec<String>) {
-    match val {
-        Some(Value::String(s)) if !s.trim().is_empty() => {
-            out.extend(tokenize_cli_args(s));
-        }
-        Some(Value::Array(arr)) => {
-            for item in arr {
-                if let Some(s) = item.as_str().map(str::trim).filter(|s| !s.is_empty()) {
-                    out.push(s.to_owned());
-                }
-            }
-        }
-        _ => {}
-    }
-}
-
-fn apply_inner_config(val: &Value, cfg: &mut InstanceConfig) {
-    let pick_str = |key: &str| {
-        val.get(key)
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-            .map(ToOwned::to_owned)
-    };
-    if cfg.binary_path.is_none() {
-        cfg.binary_path = pick_str("binaryPath")
-            .or_else(|| pick_str("commandPath"))
-            .or_else(|| pick_str("executable"));
-    }
-    if cfg.home_path.is_none() {
-        cfg.home_path = pick_str("homePath");
-    }
-    if cfg.base_url.is_none() {
-        cfg.base_url = pick_str("baseUrl");
-    }
-    if cfg.api_key.is_none() {
-        cfg.api_key = pick_str("apiKey");
-    }
-    push_arg_list(
-        val.get("launchArgs").or_else(|| val.get("commandArgs")),
-        &mut cfg.extra_args,
-    );
 }
 
 fn resolve_binary(
@@ -481,94 +368,20 @@ fn resolve_http_or_registry_driver(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    fn sample_run() -> Result<Run, serde_json::Error> {
-        serde_json::from_value(json!({
-            "id": "run-test-1",
-            "threadId": "th-test-1",
-            "ordinal": 1,
-            "providerInstanceId": "devReplay",
-            "modelSelection": { "instanceId": "devReplay", "model": "showcase" },
-            "providerThreadId": null,
-            "userMessageId": "msg-test-1",
-            "rootNodeId": null,
-            "activeAttemptId": null,
-            "status": "running",
-            "requestedAt": "2026-11-22T00:00:00.000Z",
-            "startedAt": null,
-            "completedAt": null,
-            "checkpointId": null,
-            "contextHandoffId": null
-        }))
-    }
-
-    #[test]
-    fn resolves_dev_replay_before_legacy_acp_settings() -> Result<(), Box<dyn std::error::Error>> {
-        let dir = tempfile::tempdir()?;
-        let settings_path = dir.path().join("settings.json");
-        std::fs::write(
-            &settings_path,
-            json!({
-                "providerInstances": {
-                    "devReplay": {
-                        "driver": "acpRegistry",
-                        "config": { "source": "local", "commandPath": "node", "commandArgs": ["x.ts"] }
-                    }
-                }
-            })
-            .to_string(),
-        )?;
-        let run = sample_run()?;
-        let resolved = resolve_dynamic_driver(
-            "devReplay",
-            &run,
-            RuntimeMode::FullAccess,
-            Some(&settings_path),
-        )?;
-        assert!(matches!(resolved, ProviderDriverMode::DevReplay));
-        Ok(())
-    }
-
-    #[test]
-    fn resolves_acp_registry_command_path_and_command_args()
-    -> Result<(), Box<dyn std::error::Error>> {
-        let dir = tempfile::tempdir()?;
-        let fake_bin = dir.path().join("custom-acp.exe");
-        std::fs::write(&fake_bin, b"stub")?;
-        let settings_path = dir.path().join("settings.json");
-        std::fs::write(
-            &settings_path,
-            json!({
-                "providerInstances": {
-                    "custom-acp": {
-                        "driver": "acpRegistry",
-                        "config": {
-                            "source": "local",
-                            "commandPath": fake_bin,
-                            "commandArgs": ["--acp", "--stdio"]
-                        }
-                    }
-                }
-            })
-            .to_string(),
-        )?;
-        let run = sample_run()?;
-        let resolved = resolve_dynamic_driver(
-            "custom-acp",
-            &run,
-            RuntimeMode::FullAccess,
-            Some(&settings_path),
-        )?;
-        match resolved {
-            ProviderDriverMode::AcpCli(spec) => {
-                assert_eq!(spec.args, vec!["--acp", "--stdio"]);
-            }
-            other => return Err(format!("expected AcpCli, got {other:?}").into()),
+/// Applies interrupted-turn resume environment variables for Claude only when the persisted
+/// history does not end on a failed `<synthetic>` placeholder (`#41120`).
+pub fn apply_claude_resume_env(
+    env: &mut BTreeMap<String, String>,
+    is_resume: bool,
+    history: &[ClaudeHistoryEntry],
+) {
+    if let Some(pairs) = claude_resume_interrupted_turn_env(is_resume, history) {
+        for (key, value) in pairs {
+            env.insert(key.to_owned(), value.to_owned());
         }
-        Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "driver_resolver_tests.rs"]
+mod tests;

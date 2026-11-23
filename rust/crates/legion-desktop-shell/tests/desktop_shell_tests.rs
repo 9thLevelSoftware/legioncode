@@ -8,5 +8,6 @@ mod desktop_shell_tests {
     mod preload_bridge_tests;
     mod sidecar_tests;
     mod wave5_desktop_tests;
+    mod wave6_desktop_tests;
     mod window_control_tests;
 }

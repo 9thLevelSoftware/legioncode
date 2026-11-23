@@ -21,7 +21,7 @@ fn before_position_refusal_regex() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
         let compiled = Regex::new(
-            r#"^Invalid parameters for tool 'legion_thread_read': Unknown arguments? (?:"[^"]+", )*"beforePosition"(?:, "[^"]+")*\. Accepted arguments: "#,
+            r#"^Invalid parameters for tool '(?:legion|t3)_thread_read': Unknown arguments? (?:"[^"]+", )*"beforePosition"(?:, "[^"]+")*\. Accepted arguments: "#,
         );
         // INFALLIBLE: constant compile-time validated MCP parameter refusal pattern (#40003).
         compiled.expect("beforePosition refusal regex must compile")

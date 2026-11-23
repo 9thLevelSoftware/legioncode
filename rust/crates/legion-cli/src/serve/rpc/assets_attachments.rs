@@ -45,10 +45,17 @@ fn create_asset_url(state: &AppState, payload: Value) -> RpcExit {
         Ok(pair) => pair,
         Err(e) => return e,
     };
-    let signed = match state.runtime_http.create_signed_asset_url(
+    let as_attachment = req.resource.get("disposition").and_then(Value::as_str)
+        == Some("attachment")
+        && matches!(
+            req.resource.get("_tag").and_then(Value::as_str),
+            Some("media-file" | "draft-workspace-file")
+        );
+    let signed = match state.runtime_http.create_signed_asset_url_with_disposition(
         &target_path,
         display_name.as_deref(),
         Some(ASSET_TOKEN_TTL_MS),
+        as_attachment,
     ) {
         Ok(url) => url,
         Err(err) => {

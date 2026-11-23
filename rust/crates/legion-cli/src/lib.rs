@@ -20,6 +20,7 @@ mod cmd_connect_ops;
 pub mod cmd_doctor;
 pub mod cmd_environment;
 mod cmd_environment_ops;
+pub mod cmd_feedback;
 pub mod cmd_help;
 mod cmd_help_catalog;
 pub mod cmd_install;
@@ -47,6 +48,7 @@ pub mod cmd_up;
 pub mod cmd_update;
 mod cmd_update_net;
 pub mod cmd_workers;
+pub mod cmd_workflow;
 pub mod fallback;
 pub mod invocation;
 mod pipe_ipc;
@@ -222,6 +224,8 @@ fn unit_name_for_command(cmd: &str) -> Option<&'static str> {
         "install" => cmd_install::UNIT_INSTALL,
         "uninstall" => cmd_uninstall::UNIT_UNINSTALL,
         "update" => cmd_update::UNIT_UPDATE,
+        "workflow" => cmd_workflow::UNIT_WORKFLOW,
+        "feedback" => cmd_feedback::UNIT_FEEDBACK,
         _ => return None,
     })
 }
@@ -256,6 +260,8 @@ fn run_known_sync_command(args: &[String]) -> Option<i32> {
         "install" => cmd_install::run(args),
         "uninstall" => cmd_uninstall::run(args),
         "update" => cmd_update::run(args),
+        "workflow" => cmd_workflow::run(args),
+        "feedback" => cmd_feedback::run(args),
         _ => return None,
     })
 }

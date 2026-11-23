@@ -9,8 +9,8 @@ use crate::core::discovery::ParsedRemote;
 use crate::core::rate_limit::SourceControlRateLimit;
 pub use crate::forges::linear::LinearIssueDetails;
 use crate::forges::linear::{
-    LinearErrorCode, build_linear_api_key_request, classify_linear_graphql_errors,
-    parse_linear_issue_details,
+    LinearAuth, LinearErrorCode, build_linear_api_key_request, build_linear_viewer_request,
+    classify_linear_graphql_errors, parse_linear_issue_details, parse_linear_viewer_identity,
 };
 use crate::forges::{CliCommandSpec, ForgeError, HttpRequestSpec, NormalizedPullRequest};
 pub use crate::live_forge_ops::{
@@ -25,7 +25,10 @@ use crate::live_git_cli::{
     LiveCliOutput, collect_safe_base_env, compute_live_git_diff, discover_workspace_remote,
     execute_cli_spec,
 };
-use crate::live_http::{LiveClientError, LiveHttpResponse, build_http_client, execute_http_spec};
+use crate::live_http::{
+    DEFAULT_MAX_GRAPHQL_RESPONSE_BYTES, LiveClientError, LiveHttpResponse, build_http_client,
+    execute_http_spec, execute_http_spec_with_max_bytes,
+};
 
 /// Async live execution adapter for HTTP forge requests, CLI commands, and real `git` operations.
 ///
@@ -241,5 +244,46 @@ impl LiveForgeClient {
             .into());
         }
         Ok(parse_linear_issue_details(&body_json)?)
+    }
+
+    /// Overlaps `Linear` issue detail and viewer identity GraphQL reads concurrently, aborting if
+    /// the issue request fails while tolerating viewer failure cleanly (`#39801`).
+    pub async fn fetch_linear_issue_with_viewer(
+        &self,
+        api_key: &str,
+        identifier: &str,
+    ) -> Result<(LinearIssueDetails, Option<String>), LiveClientError> {
+        let mut viewer_spec = build_linear_viewer_request(&LinearAuth::ApiKey(api_key.to_owned()))?;
+        if let Some(override_url) = &self.linear_endpoint_url {
+            viewer_spec.url = override_url.clone();
+        }
+        let issue_fut = self.fetch_linear_issue(api_key, identifier);
+        let viewer_fut = async {
+            let resp = self.execute_http(&viewer_spec).await.ok()?;
+            if !resp.status.is_success() {
+                return None;
+            }
+            let json = resp.json().ok()?;
+            parse_linear_viewer_identity(&json).and_then(|(id, _)| id)
+        };
+        let (issue_res, viewer_id) = tokio::join!(issue_fut, viewer_fut);
+        Ok((issue_res?, viewer_id))
+    }
+
+    /// Executes an [`HttpRequestSpec`] capped by `max_bytes` (defaults to [`DEFAULT_MAX_GRAPHQL_RESPONSE_BYTES`])
+    /// so oversized `GitHub` GraphQL payloads are rejected before UTF-8/JSON decode (`#39928`).
+    pub async fn execute_graphql_bounded(
+        &self,
+        spec: &HttpRequestSpec,
+        max_bytes: Option<usize>,
+    ) -> Result<LiveHttpResponse, LiveClientError> {
+        execute_http_spec_with_max_bytes(
+            &self.http,
+            &self.rate_limit,
+            spec,
+            self.allow_reserve,
+            Some(max_bytes.unwrap_or(DEFAULT_MAX_GRAPHQL_RESPONSE_BYTES)),
+        )
+        .await
     }
 }

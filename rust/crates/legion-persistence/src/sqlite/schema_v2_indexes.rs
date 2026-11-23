@@ -1,6 +1,15 @@
-//! V1/V2 SQLite index suite for projects, threads, events, runs, nodes, and providers (`001..=102`).
+//! V1/V2 SQLite index suite for projects, threads, events, runs, nodes, and providers (`001..=106`).
 
 use rusqlite::Connection;
+
+pub(crate) const WORKTREE_PATH_KEY_INDEX_SQL: &str = "
+CREATE INDEX IF NOT EXISTS orchestration_v2_projection_threads_worktree_path_key_idx
+  ON orchestration_v2_projection_threads(
+    CASE WHEN json_valid(payload_json)
+      THEN lower(rtrim(replace(trim(json_extract(payload_json, '$.worktreePath')), '\\', '/'), '/'))
+    END
+  );
+";
 
 const STATIC_INDEXES_SQL: &str = "
 DROP INDEX IF EXISTS idx_orch_events_correlation_id;
@@ -233,6 +242,7 @@ CREATE INDEX IF NOT EXISTS orchestration_v2_projection_plans_run_idx
 
 pub(crate) fn apply_indexes_and_count_triggers(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(STATIC_INDEXES_SQL)?;
+    conn.execute_batch(WORKTREE_PATH_KEY_INDEX_SQL)?;
     conn.execute_batch(STATIC_INDEXES_PART2_SQL)?;
     super::schema_v2_triggers::apply_extended_indexes_and_triggers(conn)
 }

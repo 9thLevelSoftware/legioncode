@@ -384,7 +384,7 @@ pub(crate) fn derive_blocked_on_thread_wait(
         }
         let tool = str_at(item, "toolName").unwrap_or("");
         let base = tool.rsplit("__").next().unwrap_or(tool);
-        let is_wait = base == "legion_thread_wait"
+        let is_wait = matches!(base, "legion_thread_wait" | "t3_thread_wait")
             || (base == "delegate_task"
                 && item.get("input").and_then(|i| str_at(i, "mode")) == Some("wait"));
         if !is_wait {

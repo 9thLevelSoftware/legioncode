@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Deserializer};
 
-use super::skills_pattern::SkillPatternMatcher;
 pub use super::skills_sync::{ANTIGRAVITY_USER_RULE_FILES, sync_antigravity_user_rule_copies};
 
 const MAX_INHERIT_DEPTH: usize = 10;
@@ -58,45 +57,31 @@ pub struct AntigravityDiscoveredSkill {
 
 #[derive(Debug, Clone, Default)]
 struct SkillEntryFilter {
-    include_groups: Vec<Vec<SkillPatternMatcher>>,
-    exclude_patterns: Vec<SkillPatternMatcher>,
+    include_groups: Vec<Vec<String>>,
+    exclude_names: Vec<String>,
 }
 
 impl SkillEntryFilter {
     fn narrow(&self, entry: &SkillConfigEntry) -> Self {
         let mut include_groups = self.include_groups.clone();
         if !entry.include_only.is_empty() {
-            include_groups.push(
-                entry
-                    .include_only
-                    .iter()
-                    .map(|pat| SkillPatternMatcher::compile(pat))
-                    .collect(),
-            );
+            include_groups.push(entry.include_only.clone());
         }
-        let mut exclude_patterns = self.exclude_patterns.clone();
+        let mut exclude_names = self.exclude_names.clone();
         if !entry.exclude.is_empty() {
-            exclude_patterns.extend(
-                entry
-                    .exclude
-                    .iter()
-                    .map(|pat| SkillPatternMatcher::compile(pat)),
-            );
+            exclude_names.extend(entry.exclude.iter().cloned());
         }
         Self {
             include_groups,
-            exclude_patterns,
+            exclude_names,
         }
     }
 
     fn matches(&self, entry_name: &str) -> bool {
         self.include_groups
             .iter()
-            .all(|group| group.iter().any(|matcher| matcher.matches(entry_name)))
-            && !self
-                .exclude_patterns
-                .iter()
-                .any(|matcher| matcher.matches(entry_name))
+            .all(|group| group.iter().any(|name| name == entry_name))
+            && !self.exclude_names.iter().any(|name| name == entry_name)
     }
 }
 

@@ -16,6 +16,12 @@ pub const MAX_THREAD_TITLE_CHARS: usize = 80;
 /// Maximum sanitized commit subject length in UTF-16 code units.
 pub const MAX_COMMIT_SUBJECT_CHARS: usize = 72;
 
+/// Commit-subject instructions from `conventionalCommitsTextGenerationPolicy`.
+pub const CONVENTIONAL_COMMITS_COMMIT_INSTRUCTIONS: &str = "Use Conventional Commits when generating commit subjects. Prefer the narrowest accurate type and include a scope only when it is obvious from the diff. Start the description after the colon with a lowercase word, never a proper noun or acronym, because commitlint rejects a capitalized description.";
+
+/// Pull/merge-request title instructions from `conventionalCommitsTextGenerationPolicy` (`#40571`).
+pub const CONVENTIONAL_COMMITS_CHANGE_REQUEST_INSTRUCTIONS: &str = "Keep the change request title concise. When the listed commits use Conventional Commits, write the title as a Conventional Commit subject too, for example 'feat(web): add a recorder', with the narrowest accurate type, a scope only when obvious, and a lowercase description. Otherwise do not force Conventional Commit syntax into the title.";
+
 /// Role label for messages passed into [`TextGenerationPrompts::build_thread_title_prompt`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TitleContextRole {
@@ -151,16 +157,34 @@ impl TextGenerationPrompts {
     /// Builds a pull-request title and summary prompt from commits and bounded diff.
     #[must_use]
     pub fn build_pr_content_prompt(input: &PrContentPromptInput) -> GeneratedTextPrompt {
+        Self::build_pr_content_prompt_with_instructions(input, None)
+    }
+
+    /// Builds a pull-request prompt appending custom preset instructions (e.g.
+    /// [`CONVENTIONAL_COMMITS_CHANGE_REQUEST_INSTRUCTIONS`]) (`#40571`).
+    #[must_use]
+    pub fn build_pr_content_prompt_with_instructions(
+        input: &PrContentPromptInput,
+        change_request_instructions: Option<&str>,
+    ) -> GeneratedTextPrompt {
         let bounded_commits = limit_section(&input.commit_summary, TEXT_GEN_SECTION_MAX_CHARS);
         let bounded_diff = limit_section(&input.diff_summary, TEXT_GEN_SECTION_MAX_CHARS);
         let prompt = format!(
             "Base branch: {}\nHead branch: {}\n\nCommits:\n{}\n\nDiff summary:\n{}",
             input.base_branch, input.head_branch, bounded_commits, bounded_diff
         );
-        GeneratedTextPrompt {
-            system: "Draft a clear pull request title and Markdown body covering what changed and why. Respond with JSON {\"title\": string, \"body\": string}.".to_owned(),
-            prompt,
+        let mut system =
+            "Draft a clear pull request title and Markdown body covering what changed and why."
+                .to_owned();
+        if let Some(extra) = change_request_instructions
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            system.push(' ');
+            system.push_str(extra);
         }
+        system.push_str(" Respond with JSON {\"title\": string, \"body\": string}.");
+        GeneratedTextPrompt { system, prompt }
     }
 
     /// Builds a git branch name suggestion prompt.

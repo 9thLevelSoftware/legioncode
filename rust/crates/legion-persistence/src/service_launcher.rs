@@ -44,6 +44,7 @@
 
 mod locks;
 mod plan;
+mod prune;
 mod state;
 mod update_marker;
 mod version;
@@ -63,6 +64,7 @@ pub use plan::{
     LauncherChildPlan, LauncherChildRole, LauncherStartupDecision, plan_launcher_startup,
     runtime_entry_paths, runtime_exists,
 };
+pub use prune::{PINNED_RUNTIME_PRUNE_GRACE_MS, prune_pinned_runtimes, prune_pinned_runtimes_at};
 pub use state::{
     ServiceLauncherContext, ServiceState, ServiceUpdateRecord, decode_service_launcher_context,
     parse_legacy_service_state, parse_service_state, read_service_state, write_service_state,

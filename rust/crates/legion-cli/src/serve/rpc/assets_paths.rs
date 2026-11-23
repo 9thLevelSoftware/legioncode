@@ -69,8 +69,7 @@ fn resolve_thread_root(state: &AppState, thread_id: Option<&str>) -> PathBuf {
         .lock()
         .ok()
         .and_then(|conn| query_wire_projects(&conn).ok())
-        .map(|snap| snap.projects)
-        .unwrap_or_default();
+        .map_or_default(|snap| snap.projects);
     if let Some(tid) = thread_id
         && let Ok(parsed) = ThreadId::new(tid)
         && let Ok(decider) = state.orchestrator.load_thread_state(&parsed)

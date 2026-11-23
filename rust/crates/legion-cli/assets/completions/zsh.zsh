@@ -34,6 +34,8 @@ _legioncode() {
     'doctor:Inspect this LegionCode data directory and repair it. Pauses and restarts the background service as needed.'
     'policy:Inspect the administrator'\''s managed policy.'
     'triage:Investigate a LegionCode problem on this machine with Claude Code, Codex, or Antigravity, and help file a good issue.'
+    'workflow:Start, inspect and steer durable workflow runs on the running server.'
+    'feedback:Record and inspect local agent feedback reports.'
   )
 
   local -a specs
@@ -132,6 +134,12 @@ _legioncode() {
           ;;
         triage)
           _legioncode_triage
+          ;;
+        workflow)
+          _legioncode_workflow
+          ;;
+        feedback)
+          _legioncode_feedback
           ;;
       esac
       ;;
@@ -1081,6 +1089,35 @@ _legioncode_triage() {
     '(--base-dir)--base-dir[Explicit LegionCode data directory; runtime state is stored under userdata (equivalent to LEGIONCODE_HOME).]:value:'
     '(--agent)--agent[Agent CLI to use. Default\: ask when multiple are installed.]:value:(claude codex antigravity)'
     '(--model)--model[Model passed through to the agent CLI. Default\: the agent'\''s default.]:value:'
+  )
+  _arguments "${specs[@]}"
+}
+
+_legioncode_workflow() {
+  local -a subcommands
+  subcommands=(
+    'start:Start a workflow run and print it.'
+    'list:List workflow runs, newest first.'
+    'show:Show a run and its steps.'
+    'resume:Run a paused run'\''s failed step again.'
+    'cancel:Cancel a run.'
+    'signal:Wake a waiting run, or answer its question.'
+    'questions:List open human workflow questions.'
+    'hooks:List registered webhook paths.'
+    'store:Read and modify workflow store keys.'
+  )
+  _describe -t subcommands 'legioncode workflow subcommands' subcommands
+}
+
+_legioncode_feedback() {
+  local -a specs
+  specs=(
+    '--kind[What went wrong.]:value:(bug confusing missing_capability wrong_docs other)'
+    '--subject[Tool name, command, or general.]:value:'
+    '--expected[What you expected.]:value:'
+    '--actual[What happened instead.]:value:'
+    '--workaround[What you did instead.]:value:'
+    '--base-dir[Explicit LegionCode data directory.]:value:'
   )
   _arguments "${specs[@]}"
 }

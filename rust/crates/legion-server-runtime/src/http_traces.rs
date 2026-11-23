@@ -20,7 +20,7 @@ pub fn format_redacted_access_log(
     request_target: &str,
     status: StatusCode,
 ) -> String {
-    let safe_target = redact_http_request_target(request_target);
+    let safe_target = redact_webhook_path(&redact_http_request_target(request_target));
     format!("{} {} -> {}", method.as_str(), safe_target, status.as_u16())
 }
 
@@ -49,9 +49,30 @@ fn redact_span_or_url_text(raw: &str) -> String {
         )
         && (rest.starts_with('/') || rest.starts_with("http://") || rest.starts_with("https://"))
     {
-        return format!("{verb} {}", redact_http_request_target(rest));
+        return format!(
+            "{verb} {}",
+            redact_webhook_path(&redact_http_request_target(rest))
+        );
     }
-    redact_http_request_target(raw)
+    redact_webhook_path(&redact_http_request_target(raw))
+}
+
+fn redact_webhook_path(raw: &str) -> String {
+    if let Some(pos) = raw.find("/webhooks/") {
+        let head = &raw[..pos + "/webhooks/".len()];
+        let tail = &raw[pos + "/webhooks/".len()..];
+        let (path_part, suffix) = tail
+            .find(['?', '#'])
+            .map_or((tail, ""), |i| (&tail[..i], &tail[i..]));
+        if let Some((hook_id, _secret)) = path_part.split_once('/')
+            && !hook_id.is_empty()
+        {
+            return format!("{head}{hook_id}/REDACTED{suffix}");
+        }
+        raw.to_owned()
+    } else {
+        raw.to_owned()
+    }
 }
 
 fn redact_trace_value(value: Value) -> Value {

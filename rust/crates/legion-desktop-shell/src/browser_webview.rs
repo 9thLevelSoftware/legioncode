@@ -6,7 +6,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub use crate::browser_webview_controls::{
     BrowserContextMenuItem, ContextMenuEditFlags, FocusedWebviewShortcutAction,
-    build_browser_context_menu, match_focused_browser_webview_shortcut,
+    NativeContextMenuItem, build_browser_context_menu, build_native_context_menu,
+    escape_native_menu_label, match_focused_browser_webview_shortcut,
 };
 
 /// Mockable web contents handle representing an Electron/WRY guest or main window webview.

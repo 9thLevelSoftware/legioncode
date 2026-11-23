@@ -8,7 +8,7 @@ import {
 } from "@legioncode/client-runtime/pull-request-editing";
 import { squashAtomCommandFailure } from "@legioncode/client-runtime/state/runtime";
 import type { PullRequestDetail } from "@legioncode/contracts";
-import { setMarkdownTaskChecked } from "@legioncode/shared/markdownTaskList";
+import { setMarkdownTaskChecked } from "@legioncode/shared/markdownTaskEdits";
 import { AsyncResult } from "effect/reactivity";
 import { useGT } from "gt-react-native";
 import { useRef, useState } from "react";

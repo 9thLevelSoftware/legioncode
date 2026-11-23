@@ -1212,6 +1212,8 @@ export function applyToProjection(
         ...base,
         contextTransfers: upsertById(base.contextTransfers, event.payload),
       };
+    case "run.output-submitted":
+      return base;
   }
 }
 

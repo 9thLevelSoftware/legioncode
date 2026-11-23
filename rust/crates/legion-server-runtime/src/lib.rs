@@ -42,6 +42,7 @@ pub mod preview_browser_catalog;
 pub mod preview_browser_diag;
 mod preview_browser_resize;
 pub mod preview_cdp;
+pub mod project_setup_output;
 pub mod provider_probe;
 pub mod replay_driver;
 pub mod startup_auto_pull;
@@ -53,10 +54,14 @@ pub mod terminal_session;
 pub mod turn_events;
 pub mod turn_events_builders;
 pub mod turn_events_updates;
+pub mod workflow_driver;
+pub mod workflow_driver_forge;
+pub mod workflow_driver_pump;
 
 pub use acp_registry::{AcpDriverSpec, AcpProcessRegistry};
 pub use acp_subprocess::{AcpTurnInput, execute_acp_turn};
 pub use device_hub::{DeviceHubBackend, DeviceHubProcessState, LocalDeviceHubManager};
+pub use driver_resolver::apply_claude_resume_env;
 pub use error::ServerRuntimeError;
 pub use git_checkpoints::{
     CaptureCheckpointRequest, CapturedCheckpoint, GitCheckpointEngine, RollbackExecutionOutcome,
@@ -95,6 +100,9 @@ pub use preview_browser_catalog::{
     chrome_archive_spec,
 };
 pub use preview_cdp::{CdpConnection, CdpKeyEventParams, CdpMouseEventParams};
+pub use project_setup_output::{
+    OUTPUT_LINE_MAX_LENGTH, PARTIAL_LINE_MAX_LENGTH, SetupScriptLineBuffer,
+};
 pub use provider_probe::{ProviderProbeResult, ProviderProbeService, ProviderProbeTarget};
 pub use replay_driver::{ReplayTurnInput, execute_dev_replay_turn, select_dev_replay_scenario};
 pub use startup_auto_pull::{
@@ -113,6 +121,9 @@ pub use storage_cleanup::{
 pub use terminal_runtime::TerminalRuntime;
 pub use terminal_session::{TerminalOpenRequest, TerminalOpenResult, TerminalSnapshotResult};
 pub use turn_events::{TurnEmitContext, commit_runtime_events};
+pub use workflow_driver::OrchestratorWorkflowAgentDriver;
+pub use workflow_driver_forge::ScmWorkflowForgeDriver;
+pub use workflow_driver_pump::{MilestoneHubWorkflowSink, start_orchestration_milestone_pump};
 
 /// Crate version reported by `legion-server-runtime`.
 pub const SERVER_RUNTIME_VERSION: &str = env!("CARGO_PKG_VERSION");

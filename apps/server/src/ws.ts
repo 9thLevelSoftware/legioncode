@@ -26,7 +26,13 @@ import { rpcInitialItems } from "./rpcInitialItems.ts";
 import { subscribeChatGptHandoff } from "./provider/CodexChatGptHandoff.ts";
 import {
   AcpRegistryOperationError,
+  AgentFeedbackRequestError,
   CommandId,
+  PeerLinkError,
+  PeerLinkThreadReadError,
+  ProviderMcpSignInError,
+  TaskFolderError,
+  WorkflowRequestError,
   authScopeResponse,
   AuthAccessStreamError,
   type AuthAccessStreamEvent,
@@ -3540,6 +3546,101 @@ export const layerWsRpc = (
               Stream.concat(Stream.make(latest), changes),
             ),
           ),
+        [WS_METHODS.workspaceListFolders]: () => Effect.succeed({ folders: [] }),
+        [WS_METHODS.workspaceScanFolders]: (input) =>
+          Effect.succeed({
+            workspaceRoot: input.workspaceRoot,
+            isGitRepository: false,
+            codeWorkspaceFile: null,
+            folders: [],
+          }),
+        [WS_METHODS.workspaceTaskFolder]: () => Effect.succeed({ taskFolder: null }),
+        [WS_METHODS.workspaceAddTaskFolderRepository]: () =>
+          Effect.fail(
+            new TaskFolderError({
+              operation: "add-repository",
+              detail: "Task folders are handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.providerMcpSignInStart]: (input) =>
+          Effect.fail(
+            new ProviderMcpSignInError({
+              server: input.server,
+              detail: "MCP sign-in is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.providerMcpSignInComplete]: (input) =>
+          Effect.fail(
+            new ProviderMcpSignInError({
+              server: input.server,
+              detail: "MCP sign-in is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.peerLinksNames]: () => Effect.succeed({ links: [] }),
+        [WS_METHODS.peerLinksSubscribeThread]: () => Stream.empty,
+        [WS_METHODS.peerLinksThreadHistoryPage]: () =>
+          Effect.fail(
+            new PeerLinkThreadReadError({
+              reason: "disabled",
+              label: null,
+              message: "Linked threads are handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.peerLinksThreadItem]: () =>
+          Effect.fail(
+            new PeerLinkThreadReadError({
+              reason: "disabled",
+              label: null,
+              message: "Linked threads are handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.peerLinksPairClient]: () =>
+          Effect.fail(
+            new PeerLinkError({
+              reason: "disabled",
+              message: "Peer client pairing is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.peerLinksPairLink]: () =>
+          Effect.fail(
+            new PeerLinkError({
+              reason: "disabled",
+              message: "Peer link pairing is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowsSubscribe]: () => Stream.empty,
+        [WS_METHODS.workflowsCounts]: () => Stream.empty,
+        [WS_METHODS.workflowsGet]: () =>
+          Effect.fail(
+            new WorkflowRequestError({ message: "Workflows are handled by the Rust server." }),
+          ),
+        [WS_METHODS.workflowsAnswer]: () =>
+          Effect.fail(
+            new WorkflowRequestError({ message: "Workflows are handled by the Rust server." }),
+          ),
+        [WS_METHODS.workflowsResume]: () =>
+          Effect.fail(
+            new WorkflowRequestError({ message: "Workflows are handled by the Rust server." }),
+          ),
+        [WS_METHODS.workflowsCancel]: () =>
+          Effect.fail(
+            new WorkflowRequestError({ message: "Workflows are handled by the Rust server." }),
+          ),
+        [WS_METHODS.workflowsGetDefinition]: () =>
+          Effect.succeed({
+            directory: "",
+            single: false,
+            files: [],
+            problems: [],
+            revision: 0,
+            problem: null,
+          }),
+        [WS_METHODS.workflowsSaveDefinition]: () =>
+          Effect.succeed({ changed: false, problems: [] }),
+        [WS_METHODS.workflowsDeleteDefinition]: () =>
+          Effect.succeed({ changed: false, problems: [] }),
+        [WS_METHODS.agentFeedbackAnswerRequest]: () =>
+          Effect.fail(new AgentFeedbackRequestError({ reason: "feedback_off" })),
       });
       const splitHandlers: Pick<typeof handlers, SplitWsRpc["_tag"]> = handlers;
       const otherHandlers: Pick<typeof handlers, Exclude<ServerWsRpc, SplitWsRpc>["_tag"]> =

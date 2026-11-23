@@ -6,12 +6,14 @@
 pub(crate) mod auth_peer_schema;
 mod migration_head;
 mod migrations_v105;
+mod migrations_v110;
 pub(crate) mod schema;
 mod schema_feature_tables;
 mod schema_migrations;
 mod schema_v2_indexes;
 mod schema_v2_tables;
 mod schema_v2_triggers;
+mod schema_workflow_tables;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -20,12 +22,13 @@ use rusqlite::Connection;
 use thiserror::Error;
 
 pub use migration_head::{RecordedMigration, read_migration_head, read_recorded_migrations};
+pub use schema_v2_triggers::{JAVASCRIPT_TRIM_WHITESPACE, deferred_command_message_condition};
 
 /// Maximum WAL size retained after checkpoints (`128 MiB`, matching `Sqlite.ts:16`).
 pub const WAL_SIZE_LIMIT_BYTES: i64 = 128 * 1024 * 1024;
 
-/// Latest migration ID known to this build (`Migrations.ts:217`).
-pub const BUILD_MIGRATION_HEAD: i64 = 105;
+/// Latest migration ID known to this build (`Migrations.ts:233`).
+pub const BUILD_MIGRATION_HEAD: i64 = 110;
 
 /// Primary SQLite error codes indicating database file corruption or a non-SQLite file.
 ///
@@ -251,6 +254,8 @@ impl SqliteStore {
             schema::apply_core_v2_ddl(&self.conn)
                 .map_err(|err| map_sqlite_error(display_path, err))?;
             migrations_v105::apply(&self.conn)
+                .map_err(|err| map_sqlite_error(display_path, err))?;
+            migrations_v110::apply(&self.conn)
                 .map_err(|err| map_sqlite_error(display_path, err))?;
         }
         self.drop_planner_statistics()

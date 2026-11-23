@@ -5,6 +5,7 @@ mod edge_tests {
     mod cf_bindings;
     mod desktop_updates;
     mod i18n;
+    mod notification_text;
     mod relay_hooks;
     mod task_cache;
 }

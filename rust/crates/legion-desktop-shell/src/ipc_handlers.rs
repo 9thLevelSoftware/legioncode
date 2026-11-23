@@ -218,14 +218,13 @@ pub(crate) fn build_update_state(machine: &DesktopUpdateMachine) -> DesktopUpdat
     let release_notes = machine
         .pending_check()
         .filter(|pending| !pending.release_notes.is_empty())
-        .map(|pending| {
+        .map_or_default(|pending| {
             vec![DesktopUpdateReleaseNotePayload {
                 version: pending.version.clone(),
                 total_items: pending.release_notes.len(),
                 items: pending.release_notes.clone(),
             }]
-        })
-        .unwrap_or_default();
+        });
     let arch = current_runtime_arch().to_owned();
     DesktopUpdateStatePayload {
         enabled: machine.status() != UpdateStatus::Disabled,

@@ -20,6 +20,7 @@ pub const INTERNAL_COMMAND_TYPES: &[&str] = &[
     "thread.interrupt.unresponsive",
     "thread.background-work.settle",
     "secret_request.record",
+    "feedback_request.record",
     "link_request.record",
     "run.output.submit",
 ];

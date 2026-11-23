@@ -171,3 +171,76 @@ pub fn resolve_usage_limits_after_probe(
         }
     }
 }
+
+/// Machine-readable reason why provider quota/usage limits could not be fetched (`#40340`, `#40481`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum UsageLimitsUnavailableReason {
+    /// Provider or account has no quota-limits integration (unless `message` explains why).
+    Unsupported,
+    /// Quota probe request or parser failed.
+    ProbeFailed,
+    /// Credentials are missing or expired.
+    AuthRequired,
+    /// Upstream rate-limited the quota probe itself.
+    RateLimited,
+}
+
+/// Unavailable state accompanying a quota probe failure (`#40340`, `#40481`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageLimitsUnavailable {
+    /// Structured reason category.
+    pub reason: UsageLimitsUnavailableReason,
+    /// Optional human-readable diagnostic explaining why limits are unavailable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+/// Outcome of probing quota limits without breaking legacy [`UsageLimitsSnapshot`] consumers (`#40340`, `#40481`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageLimitsProbeResult {
+    /// Normalized windows when available (empty when unavailable).
+    pub snapshot: UsageLimitsSnapshot,
+    /// Populated when reading quota windows failed or was unavailable for this account.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unavailable: Option<UsageLimitsUnavailable>,
+}
+
+/// Formats the user-visible notice for unavailable quota limits (`#40481`).
+///
+/// Bare `"unsupported"` without a message, or `"unsupported"` when external usage is linked,
+/// produces `None`; explicit unsupported reasons (such as `"Sign in with Google..."`) and
+/// probe/auth failures are surfaced with `provider_display_name`.
+#[must_use]
+pub fn format_usage_limit_notice(
+    provider_display_name: &str,
+    unavailable: Option<&UsageLimitsUnavailable>,
+    has_external_usage: bool,
+) -> Option<String> {
+    let info = unavailable?;
+    let msg = info
+        .message
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    if info.reason == UsageLimitsUnavailableReason::Unsupported
+        && (msg.is_none() || has_external_usage)
+    {
+        return None;
+    }
+    let detail = msg.unwrap_or(match info.reason {
+        UsageLimitsUnavailableReason::AuthRequired => "Authentication required to read limits.",
+        UsageLimitsUnavailableReason::RateLimited => "Rate-limited while reading limits.",
+        UsageLimitsUnavailableReason::ProbeFailed | UsageLimitsUnavailableReason::Unsupported => {
+            "Could not read limits."
+        }
+    });
+    let label = provider_display_name.trim();
+    if label.is_empty() {
+        Some(detail.to_owned())
+    } else {
+        Some(format!("{label}: {detail}"))
+    }
+}

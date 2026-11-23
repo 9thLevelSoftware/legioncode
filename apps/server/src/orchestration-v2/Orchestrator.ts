@@ -701,6 +701,8 @@ function commandThreadId(command: OrchestrationV2ServerCommand): ThreadId {
       return command.parentThreadId;
     case "secret_request.record":
     case "link_request.record":
+    case "run.output.submit":
+    case "feedback_request.record":
       return command.threadId;
     case "thread.fork":
     case "thread.merge_back":

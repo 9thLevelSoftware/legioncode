@@ -12,9 +12,14 @@ use legion_contracts::policy::RuntimeMode;
 use legion_orchestrator::sink::EventSink;
 use legion_process_ffi::supervisor::{JobProcessSupervisor, ProcessToken};
 use legion_providers::drivers::ProviderLaunchSpec;
+use legion_providers::drivers::codex_lifecycle::CodexIdleThreadUnloadRegistry;
 use legion_providers::non_acp::codex_app_server::CodexAppServerCodec;
 use legion_providers::non_acp::cursor_and_pi::build_pi_prompt_command;
 use tokio::sync::Notify;
+
+#[path = "non_acp_subprocess_idle.rs"]
+mod idle;
+use idle::check_silent_exit_failure;
 
 use crate::error::ServerRuntimeError;
 use crate::non_acp_subprocess_loop::{
@@ -73,6 +78,7 @@ struct ActiveNonAcpEntry {
 #[derive(Default, Clone)]
 pub struct NonAcpProcessRegistry {
     active: Arc<StdMutex<Vec<ActiveNonAcpEntry>>>,
+    idle_unload: Arc<StdMutex<CodexIdleThreadUnloadRegistry>>,
 }
 
 impl NonAcpProcessRegistry {
@@ -374,28 +380,4 @@ pub async fn execute_non_acp_subprocess_turn(
         spawned.stderr_capture.as_ref(),
         was_interrupted,
     )
-}
-
-fn check_silent_exit_failure(
-    driver_slug: &str,
-    early_exit_status: Option<std::process::ExitStatus>,
-    stderr_capture: Option<&Arc<StdMutex<String>>>,
-    ctx: &TurnEmitContext,
-) -> Result<(), ServerRuntimeError> {
-    if let Some(status) = early_exit_status
-        && !status.success()
-    {
-        return Err(ServerRuntimeError::Process(format!(
-            "provider `{driver_slug}` exited with status {status}"
-        )));
-    }
-    let has_stderr = stderr_capture
-        .and_then(|s| s.lock().ok())
-        .is_some_and(|s| !s.trim().is_empty());
-    if has_stderr && ctx.assistant_text.is_empty() && ctx.tool_items.is_empty() {
-        return Err(ServerRuntimeError::Process(format!(
-            "provider `{driver_slug}` exited before producing output"
-        )));
-    }
-    Ok(())
 }

@@ -21,6 +21,7 @@ mod doc_extractor_legacy;
 mod doc_extractor_odf_ws;
 mod doc_extractor_office;
 mod doc_extractor_rtf;
+mod doc_extractor_rtf_cp;
 mod doc_extractor_xlsx;
 mod doc_extractor_xml;
 mod triage_prompt;
@@ -31,6 +32,7 @@ pub mod auth_mutations;
 pub mod auth_records;
 pub mod claude_history;
 pub mod doc_extractor;
+pub mod issue_tracker_store;
 pub mod maintenance;
 pub mod ownership;
 pub mod pairing_tokens;
@@ -42,6 +44,7 @@ pub mod service_preflight;
 pub mod sqlite;
 pub mod task_folder_store;
 pub mod triage_session;
+pub mod worktree_lookup;
 
 pub use auth_connect_devices::{
     ConnectApproveOutcome, ConnectRevokeOutcome, TrustedConnectDevice, WaitingConnectDevice,
@@ -73,17 +76,24 @@ pub use doc_extractor::{
     DOC_MAX_XML_NODES, DOC_TRUNCATED_SUFFIX, DocExtractError, extract_document_text,
     extract_html_fragment_text,
 };
+pub use issue_tracker_store::{
+    IssueTrackerAccountEntry, IssueTrackerBindingEntry, IssueTrackerStoreError,
+    add_issue_tracker_account, ensure_issue_tracker_schema, get_issue_tracker_binding,
+    list_issue_tracker_accounts, list_issue_tracker_bindings, remove_issue_tracker_account,
+    set_issue_tracker_binding,
+};
 pub use maintenance::{
     CompactDatabaseResult, DATABASE_COMPACTION_RECOMMENDED_BYTES, DatabaseCompactStep,
     DatabaseInspection, DoctorOptions, DoctorRepair, DoctorRepairId, LegacyOnlyRecords,
-    MaintenanceError, cleanup_imported_transcript, compact_database, compact_database_with_steps,
-    format_bytes, inspect_database, plan_doctor_repairs, remove_legacy_database,
-    render_doctor_report,
+    MaintenanceError, StorageFileCleanupResult, clean_expired_storage_files,
+    cleanup_imported_transcript, compact_database, compact_database_with_steps, format_bytes,
+    inspect_database, plan_doctor_repairs, remove_legacy_database, render_doctor_report,
 };
 pub use ownership::{
     CancellationToken, ManagedPolicyRecord, ManagedPolicyState, OwnershipError,
     PersistedServerRuntimeState, SERVER_EXIT_CODE_STATE_DIR_OWNED, ServerOwnerLock,
-    format_epoch_millis_utc, is_process_alive, read_live_server_runtime_state,
+    format_epoch_millis_utc, is_process_alive, is_server_ownership_held,
+    read_contending_server_runtime_state, read_live_server_runtime_state,
     read_persisted_server_runtime_state,
 };
 pub use pairing_tokens::{
@@ -107,14 +117,15 @@ pub use project_store::{
 pub use service_env::{parse_service_env, upsert_service_env, upsert_service_env_map};
 pub use service_launcher::{
     DESKTOP_UPDATE_IN_PROGRESS_TTL_MS, DesktopUpdateMarker, LauncherChildPlan, LauncherChildRole,
-    LauncherOptions, LauncherStartupDecision, SERVICE_ENV_FILE, SERVICE_LAUNCHER_CONTEXT_ENV,
-    SERVICE_LAUNCHER_LOCK_FILE, SERVICE_RESTART_PENDING_FILE, SERVICE_SERVING_LOCK_FILE,
-    SERVICE_STATE_FILE, SERVICE_STOP_MARKER_FILE, SERVICE_UNIT_ENV, ServiceLauncherContext,
-    ServiceLauncherError, ServiceLockGuard, ServiceState, ServiceUpdateRecord,
-    compare_exact_service_versions, decode_service_launcher_context, is_exact_service_version,
-    parse_legacy_service_state, parse_service_launcher_args, parse_service_state,
-    plan_launcher_startup, publish_update_marker, read_service_state, remaining_update_wait_ms,
-    runtime_entry_paths, runtime_exists, service_launcher_is_running, service_launcher_is_serving,
+    LauncherOptions, LauncherStartupDecision, PINNED_RUNTIME_PRUNE_GRACE_MS, SERVICE_ENV_FILE,
+    SERVICE_LAUNCHER_CONTEXT_ENV, SERVICE_LAUNCHER_LOCK_FILE, SERVICE_RESTART_PENDING_FILE,
+    SERVICE_SERVING_LOCK_FILE, SERVICE_STATE_FILE, SERVICE_STOP_MARKER_FILE, SERVICE_UNIT_ENV,
+    ServiceLauncherContext, ServiceLauncherError, ServiceLockGuard, ServiceState,
+    ServiceUpdateRecord, compare_exact_service_versions, decode_service_launcher_context,
+    is_exact_service_version, parse_legacy_service_state, parse_service_launcher_args,
+    parse_service_state, plan_launcher_startup, prune_pinned_runtimes, prune_pinned_runtimes_at,
+    publish_update_marker, read_service_state, remaining_update_wait_ms, runtime_entry_paths,
+    runtime_exists, service_launcher_is_running, service_launcher_is_serving,
     service_launcher_lock_path, service_serving_lock_path, service_state_path, state_dir_owned,
     write_service_state,
 };
@@ -135,4 +146,8 @@ pub use triage_session::{
     TriageSourceClone, WriteTriageSessionInput, build_triage_app_prompt, build_triage_context,
     build_triage_launch_prompt, build_triage_seed_prompt, describe_server_process,
     serialize_composer_file_link, triage_source_cache_dir, write_triage_session,
+};
+pub use worktree_lookup::{
+    list_thread_ids_by_worktree_path, list_threads_by_worktree_path, loose_worktree_path_sql_key,
+    normalize_project_path_for_comparison, normalize_project_path_for_dispatch,
 };

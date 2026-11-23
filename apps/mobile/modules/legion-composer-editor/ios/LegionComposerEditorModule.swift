@@ -117,6 +117,7 @@ public class LegionComposerEditorModule: Module {
         "onComposerBlur",
         "onComposerSubmit",
         "onComposerPasteImages",
+        "onComposerPasteImagesPending",
         "onComposerContextPress",
         "onComposerPasteContext",
         "onComposerPasteText",

@@ -166,12 +166,37 @@ pub fn read_persisted_server_runtime_state(
     Ok(Some(state))
 }
 
-/// Reads `server-runtime.json` only if present, valid, and its recorded PID is currently alive.
+/// Reads `server-runtime.json` only if present, valid, its recorded PID is alive, and—when
+/// lock-aware (`owner_id` set)—the ownership lock is actively held (`#28256`).
 pub fn read_live_server_runtime_state(
     path: impl AsRef<Path>,
 ) -> Option<PersistedServerRuntimeState> {
+    let path = path.as_ref();
     let state = read_persisted_server_runtime_state(path).ok().flatten()?;
-    is_process_alive(state.pid).then_some(state)
+    if !is_process_alive(state.pid) {
+        return None;
+    }
+    if state.owner_id.is_some() && !super::is_server_ownership_held(path) {
+        return None;
+    }
+    Some(state)
+}
+
+/// Reads `server-runtime.json` when another live process currently owns this server runtime
+/// (`pid > 0 && pid != current_pid`, alive, and lock held when `owner_id` is set, `#28256`).
+pub fn read_contending_server_runtime_state(
+    path: impl AsRef<Path>,
+) -> Option<PersistedServerRuntimeState> {
+    let path = path.as_ref();
+    let state = read_persisted_server_runtime_state(path).ok().flatten()?;
+    if state.pid <= 0 || state.pid == i64::from(std::process::id()) || !is_process_alive(state.pid)
+    {
+        return None;
+    }
+    if state.owner_id.is_some() && !super::is_server_ownership_held(path) {
+        return None;
+    }
+    Some(state)
 }
 
 /// Atomically writes `server-runtime.json` via a sibling temp file, `sync_all`, and rename.

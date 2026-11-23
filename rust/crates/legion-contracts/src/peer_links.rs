@@ -200,6 +200,17 @@ pub struct PeerLinkLinkPairingInput {
     pub access: PeerMcpClientAccess,
 }
 
+/// Summary result returned by `peerLinks.unlink` (`PeerLinkRemoveResult`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PeerLinkRemoveResult {
+    /// Whether the link existed and was removed locally.
+    pub removed: bool,
+    /// Whether the peer ended the link's session there (omitted by older servers).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ended_there: Option<bool>,
+}
+
 /// Request sent to a linked peer to mint either a client pairing code or a link pairing code (`#40036`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

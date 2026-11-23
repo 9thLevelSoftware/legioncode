@@ -75,5 +75,6 @@ pub mod boot_service_units;
 pub mod cf_bindings;
 pub mod desktop_updates;
 pub mod i18n;
+pub mod notification_text;
 pub mod relay_hooks;
 pub mod task_cache;

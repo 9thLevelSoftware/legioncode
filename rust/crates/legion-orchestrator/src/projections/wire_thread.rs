@@ -58,6 +58,19 @@ pub(crate) fn project_thread_projection_for_wire(
             row
         })
         .collect();
+    p.messages = p
+        .messages
+        .into_iter()
+        .map(|mut msg| {
+            // Internal compact-before-send `/compact` turns belong to the system, never the user (#40934).
+            if msg.get("idleCompaction").is_some_and(|v| !v.is_null())
+                && let Some(obj) = msg.as_object_mut()
+            {
+                obj.insert("createdBy".to_owned(), Value::String("system".to_owned()));
+            }
+            msg
+        })
+        .collect();
     p
 }
 

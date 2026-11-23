@@ -72,6 +72,7 @@ export interface SettingsSearchItem {
   readonly managedTunnelOnly?: boolean;
   readonly peerLinksOnly?: boolean;
   readonly fastWorktreeCheckoutOnly?: boolean;
+  readonly agentFeedbackOnly?: boolean;
   readonly textGeneratorsOnly?: boolean;
   readonly secondary?: boolean;
   readonly requiresThreadAutoSettlement?: boolean;
@@ -88,6 +89,7 @@ export interface SettingsSearchAvailability {
   readonly managedTunnelActive?: boolean;
   readonly hasPeerLinkHost?: boolean;
   readonly hasFastWorktreeCheckoutEnvironment?: boolean;
+  readonly hasAgentFeedbackEnvironment?: boolean;
   /** An environment without a provider allow-list, which hides text generators. */
   readonly hasTextGeneratorsEnvironment?: boolean;
   readonly hasPrimaryEnvironment?: boolean;
@@ -546,6 +548,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("beta link another machine vps peer agents work there delegate")],
   },
   {
+    id: "workflows-beta",
+    title: msg("Workflows"),
+    to: "/settings/labs",
+    scope: "environment",
+    searchTerms: [msg("beta workflow durable runs automation steps schedule webhook folder")],
+  },
+  {
     id: "prompt-suggestions-beta",
     title: msg("Suggest next prompt"),
     to: "/settings/labs",
@@ -806,6 +815,16 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("queue steer running turn send default behavior composer")],
   },
   {
+    id: "side-thread-open-target",
+    title: msg("Open subagents and side chats in"),
+    to: "/settings/chat",
+    searchTerms: [
+      msg(
+        "subagent side chat linked thread click right panel side panel main view command ctrl middle click",
+      ),
+    ],
+  },
+  {
     id: "provider-update-checks",
     title: msg("Provider update checks"),
     to: "/settings/maintenance",
@@ -975,6 +994,16 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: msg("Diagnostics"),
     to: "/settings/maintenance",
     searchTerms: [msg("logs traces processes resource history failures spans cpu memory")],
+  },
+  {
+    id: "agent-feedback",
+    title: msg("Agent feedback"),
+    to: "/settings/labs",
+    scope: "environment-defaults",
+    agentFeedbackOnly: true,
+    searchTerms: [
+      msg("report bug problem local device feedback save agents tools automatic when i ask"),
+    ],
   },
   {
     id: "open-source-licenses",
@@ -1309,6 +1338,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    id: "project-repositories",
+    title: msg("Repositories"),
+    to: "/settings/projects",
+    searchTerms: [msg("tracked folders multi repo workspace code-workspace rescan add folder")],
+  },
+  {
     id: "environment-icon",
     title: msg("Environment icon"),
     to: "/settings/access",
@@ -1392,6 +1427,15 @@ export const SETTINGS_SEARCH_ITEMS = [
     targetId: "connections-environment",
     searchTerms: [msg("mobile push notifications live activities cloud tunnel")],
     cloudOnly: true,
+  },
+  {
+    id: "preview-tunnel",
+    title: msg("Preview tunnel"),
+    to: "/settings/access",
+    targetId: "connections-environment",
+    searchTerms: [
+      msg("localhost loopback port forwarding open on this device browser tabs stream security"),
+    ],
   },
   {
     id: "connections-environment",
@@ -1529,6 +1573,7 @@ export function getSettingsSearchTargetScope(targetId: string) {
         title: item.title,
         scope: item.scope ?? SETTINGS_CATEGORY_SCOPES[item.to],
         ...(item.requiresThreadAutoSettlement ? { requiresThreadAutoSettlement: true } : {}),
+        ...(item.agentFeedbackOnly ? { agentFeedbackOnly: true } : {}),
       }
     : null;
 }
@@ -1621,6 +1666,7 @@ export function filterAvailableSettingsSearchItems(
       (!item.peerLinksOnly || availability.hasPeerLinkHost === true) &&
       (!item.fastWorktreeCheckoutOnly ||
         availability.hasFastWorktreeCheckoutEnvironment === true) &&
+      (!item.agentFeedbackOnly || availability.hasAgentFeedbackEnvironment === true) &&
       (!item.textGeneratorsOnly || availability.hasTextGeneratorsEnvironment === true),
   );
 }

@@ -5,7 +5,8 @@ import * as NodePath from "node:path";
 
 import { assert } from "@effect/vitest";
 import {
-  EnvironmentId,
+  IsoDateTime,
+  MilestoneId,
   milestoneMatches,
   OrchestrationV2RpcSchemas,
   PEER_LINK_THREAD_HISTORY_ROUTE,
@@ -15,6 +16,7 @@ import {
   ProviderInstanceId,
   RunId,
   ThreadId,
+  TrimmedNonEmptyString,
   WsRpcGroup,
 } from "@legioncode/contracts";
 import { pastedUrl } from "@legioncode/shared/oauthCallback";
@@ -55,7 +57,10 @@ interface ParityRpcHarness {
 
 interface WsRpcEntry {
   readonly payloadSchema: Schema.Codec<unknown>;
-  readonly successSchema: Schema.Codec<unknown> & { readonly success?: Schema.Codec<unknown> };
+  readonly successSchema: Schema.Codec<unknown> & {
+    readonly success?: Schema.Codec<unknown>;
+    readonly error?: Schema.Codec<unknown>;
+  };
   readonly errorSchema: Schema.Codec<unknown>;
 }
 
@@ -68,6 +73,7 @@ interface CompiledRpcCodecs {
 const decodeThreadProjection = Schema.decodeUnknownSync(
   Schema.toCodecJson(OrchestrationV2RpcSchemas.getThreadProjection.output),
 );
+const decodeIsoDateTime = Schema.decodeSync(IsoDateTime);
 
 function isStreamEntry(rpcDef: WsRpcEntry): boolean {
   return (
@@ -89,10 +95,14 @@ for (const [tag, rpcDef] of rpcEntries) {
     isStreamEntry(rpcDef) && rpcDef.successSchema.success
       ? rpcDef.successSchema.success
       : rpcDef.successSchema;
+  const targetErrorSchema =
+    isStreamEntry(rpcDef) && rpcDef.successSchema.error
+      ? rpcDef.successSchema.error
+      : rpcDef.errorSchema;
   compiledRpcCodecs.set(tag, {
     decodePayload: Schema.decodeUnknownSync(Schema.toCodecJson(rpcDef.payloadSchema)),
     decodeSuccess: Schema.decodeUnknownSync(Schema.toCodecJson(targetSuccessSchema)),
-    decodeError: Schema.decodeUnknownSync(Schema.toCodecJson(rpcDef.errorSchema)),
+    decodeError: Schema.decodeUnknownSync(Schema.toCodecJson(targetErrorSchema)),
   });
 }
 
@@ -682,23 +692,26 @@ export async function runFullRpcAndProviderParityChecks(
   assert.strictEqual(normalizedCallback.origin, "http://127.0.0.1:1455");
 
   const sampleMilestone = {
-    id: "m-1",
-    at: "2026-01-01T00:00:00.000Z" as never,
-    type: "run_completed" as const,
-    environmentId: EnvironmentId.make(ctx.environmentId),
+    id: MilestoneId.make("m-1"),
+    occurredAt: decodeIsoDateTime("2026-01-01T00:00:00.000Z"),
+    type: "thread.run_settled" as const,
     projectId: ProjectId.make(ctx.projectId),
     threadId: ThreadId.make(ctx.threadId),
-    runId: RunId.make("run-1"),
-    status: "completed" as const,
+    parentThreadId: null,
+    actor: { type: "agent" as const },
     isSubagentChild: false,
+    runId: RunId.make("run-1"),
+    outcome: "completed" as const,
   };
   assert.isTrue(
     milestoneMatches(sampleMilestone, {
-      types: ["run_completed"],
+      types: ["thread.run_settled"],
       projectIds: [ProjectId.make(ctx.projectId)],
     }),
   );
-  assert.isFalse(milestoneMatches(sampleMilestone, { workflows: ["nightly"] }));
+  assert.isFalse(
+    milestoneMatches(sampleMilestone, { workflows: [TrimmedNonEmptyString.make("nightly")] }),
+  );
 
   const claudeProvider = ProviderInstanceId.make("claudeAgent");
   assert.isFalse(hasPendingBackgroundSubagent([], claudeProvider));
@@ -706,11 +719,8 @@ export async function runFullRpcAndProviderParityChecks(
     hasPendingBackgroundSubagent(
       [
         {
-          id: "bg-1",
-          kind: "subagent",
-          label: "Worker",
-          detail: null,
-          status: "running",
+          kind: "subagent" as const,
+          taskId: TrimmedNonEmptyString.make("bg-1"),
           providerInstanceId: claudeProvider,
         },
       ],

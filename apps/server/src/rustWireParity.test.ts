@@ -467,7 +467,7 @@ it.live(
           (
             db
               .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
-              .all() as ReadonlyArray<{ readonly name: string }>
+              .all() as unknown as ReadonlyArray<{ readonly name: string }>
           ).map((row) => row.name),
         );
         for (const requiredTable of [

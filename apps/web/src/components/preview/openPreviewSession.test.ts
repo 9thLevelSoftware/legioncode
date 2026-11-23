@@ -79,7 +79,7 @@ describe("openPreviewSession", () => {
       environmentId: threadRef.environmentId,
       input: {
         threadId: threadRef.threadId,
-        url: "https://t3.chat/",
+        url: "https://legion.codes/",
         profileId: "work",
         viewport: source.viewport,
         runtime: "server",

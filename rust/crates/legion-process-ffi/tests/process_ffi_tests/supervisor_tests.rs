@@ -51,13 +51,13 @@ fn child_role_entrypoint() -> Result<(), String> {
             let mut hold = [0u8; 8];
             let _ = stream.read(&mut hold);
         }
+        "early_pipe_drop" => verify_scoped_pipe_set_early_drop()?,
         _ => {}
     }
     Ok(())
 }
 
-#[test]
-fn scoped_pipe_set_closes_child_descriptors_on_early_drop_before_spawn() -> Result<(), String> {
+fn verify_scoped_pipe_set_early_drop() -> Result<(), String> {
     let pipes = ScopedPipeSet::new(PipeSetConfig {
         stdin: StdioMode::Piped,
         stdout: StdioMode::Piped,
@@ -90,6 +90,30 @@ fn scoped_pipe_set_closes_child_descriptors_on_early_drop_before_spawn() -> Resu
         .err()
         .ok_or("expected BrokenPipe on closed stdin")?;
     assert_eq!(write_err.kind(), ErrorKind::BrokenPipe);
+    Ok(())
+}
+
+#[test]
+fn scoped_pipe_set_closes_child_descriptors_on_early_drop_before_spawn() -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let output = Command::new(exe)
+        .args([
+            "--exact",
+            "process_ffi_tests::supervisor_tests::child_role_entrypoint",
+            "--test-threads=1",
+        ])
+        .env("LEGION_PROCESS_FFI_CHILD_ROLE", "early_pipe_drop")
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(format!(
+            "isolated early_pipe_drop child failed ({:?}):\nstdout: {}\nstderr: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
     Ok(())
 }
 

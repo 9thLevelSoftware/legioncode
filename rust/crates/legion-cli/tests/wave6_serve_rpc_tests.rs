@@ -12,6 +12,8 @@ use legion_contracts::orchestration::{
     ProviderInteractionMode, ThreadCreateCommand,
 };
 use legion_contracts::policy::RuntimeMode;
+use legion_orchestrator::decider::decide_command;
+use legion_orchestrator::sink::projection_apply::DeciderThreadState;
 use legion_persistence::project_store::{
     CreateProjectInput, create_project, ensure_project_store_schema,
 };
@@ -298,7 +300,12 @@ async fn vcs_switch_ref_guards_active_checkout() -> TestResult {
             workspace_strategy: None,
         }),
     });
-    let _ = server.orchestrator().dispatch_now(&cmd).await?;
+    // Seed the active run without enqueuing a real provider turn that can finish before the RPC.
+    let now = "2026-01-01T00:00:00.000Z";
+    let decision = decide_command(&DeciderThreadState::default(), &cmd, now)?;
+    let mut input = decision.into_commit_input("server", now);
+    input.outbox_effects.clear();
+    server.orchestrator().sink().commit_command(&input)?;
     let switch_refused = call_ws(
         &mut ws,
         "v3",
@@ -306,7 +313,10 @@ async fn vcs_switch_ref_guards_active_checkout() -> TestResult {
         json!({ "cwd": repo, "refName": "other" }),
     )
     .await?;
-    assert!(matches!(switch_refused, RpcExit::Failure { .. }));
+    let RpcExit::Failure { cause } = switch_refused else {
+        return Err("expected the busy checkout to refuse the switch".into());
+    };
+    assert!(format!("{cause:?}").contains("'Busy Agent' is still working in this checkout"));
 
     server.shutdown().await?;
     Ok(())

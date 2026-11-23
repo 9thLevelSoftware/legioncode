@@ -51,7 +51,7 @@ pub fn common_ancestor(folders: &[PathBuf]) -> Option<PathBuf> {
         let cleaned = lexical_clean(folder);
         while !is_within_root(&cleaned, &ancestor) {
             let parent = ancestor.parent()?.to_path_buf();
-            if parent == ancestor {
+            if parent.as_os_str().is_empty() || parent == ancestor {
                 return None;
             }
             ancestor = parent;

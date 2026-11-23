@@ -124,17 +124,6 @@ fn open_master_and_slave(cols: u16, rows: u16) -> Result<(File, File), PtyError>
         return Err(PtyError::SpawnFailed(io::Error::last_os_error()));
     }
 
-    let ws = Winsize {
-        row: rows,
-        col: cols,
-        xpixel: 0,
-        ypixel: 0,
-    };
-    // SAFETY: `master_fd` is live and `TIOCSWINSZ` reads the initialized `Winsize` struct.
-    if unsafe { ioctl(master_fd.as_raw_fd(), TIOCSWINSZ, &raw const ws) } == -1 {
-        return Err(PtyError::SpawnFailed(io::Error::last_os_error()));
-    }
-
     let slave_path = slave_tty_path(master_fd.as_raw_fd()).map_err(PtyError::SpawnFailed)?;
     let slave_cstr = std::ffi::CString::new(slave_path.as_os_str().as_encoded_bytes())
         .map_err(|e| PtyError::SpawnFailed(io::Error::new(io::ErrorKind::InvalidInput, e)))?;
@@ -146,6 +135,18 @@ fn open_master_and_slave(cols: u16, rows: u16) -> Result<(File, File), PtyError>
     // SAFETY: `raw_slave` is a newly opened, uniquely owned file descriptor.
     let slave_fd = unsafe { OwnedFd::from_raw_fd(raw_slave) };
     set_cloexec(slave_fd.as_raw_fd()).map_err(PtyError::SpawnFailed)?;
+
+    // Configure initial window size only after opening the slave device: XNU clears `TS_IOCTL_NOT_OK` in `ptsopen`.
+    let ws = Winsize {
+        row: rows,
+        col: cols,
+        xpixel: 0,
+        ypixel: 0,
+    };
+    // SAFETY: `master_fd` and `slave_fd` are open and `TIOCSWINSZ` reads the initialized `Winsize` struct.
+    if unsafe { ioctl(master_fd.as_raw_fd(), TIOCSWINSZ, &raw const ws) } == -1 {
+        return Err(PtyError::SpawnFailed(io::Error::last_os_error()));
+    }
 
     Ok((File::from(master_fd), File::from(slave_fd)))
 }

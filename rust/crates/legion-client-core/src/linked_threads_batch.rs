@@ -254,3 +254,102 @@ impl LinkBatchQueue {
         self.statuses.get(environment_id)
     }
 }
+
+/// Why linking the target machine back to the source cannot be offered (`#40036`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LinkBackBlock {
+    /// Target environment has linked environments disabled.
+    TargetLinksOff,
+    /// Client session on target lacks `access:write`.
+    TargetNoAccess,
+    /// Client session on source lacks `access:write`.
+    SourceNoAccess,
+    /// Client knows no reachable address for source.
+    SourceNoAddress,
+}
+
+/// Whether linking `source` to `target` can also offer a bidirectional link back (`#40036`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum LinkBackOffer {
+    /// Bidirectional link back is offered.
+    Offered,
+    /// Both machines are connected, with a visible blocker explaining why it cannot link back.
+    Blocked {
+        /// Specific permission, setting, or address blocker.
+        reason: LinkBackBlock,
+    },
+    /// Either machine is unknown/disconnected or an active link already exists.
+    Hidden,
+}
+
+/// Target environment state evaluated by [`link_back_offer`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LinkBackTarget<'a> {
+    /// Whether this client is connected to the target environment.
+    pub connected: bool,
+    /// Whether linked environments are enabled on the target.
+    pub offers_links: bool,
+    /// Whether this client session can write access links on the target.
+    pub writable: bool,
+    /// Target links (`None` while unknown; `(environment_id, is_expired)` pairs).
+    pub links: Option<&'a [(&'a EnvironmentId, bool)]>,
+}
+
+/// Source environment state evaluated by [`link_back_offer`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LinkBackSource<'a> {
+    /// Identifier of the source environment.
+    pub environment_id: &'a EnvironmentId,
+    /// Whether this client is connected to the source environment.
+    pub connected: bool,
+    /// Whether this client session can mint pairing codes on the source.
+    pub writable: bool,
+    /// Known reachable URLs for the source environment.
+    pub urls: &'a [String],
+}
+
+/// Evaluates whether a one-way link flow can offer linking `target` back to `source` (`#40036`).
+#[must_use]
+pub fn link_back_offer(
+    target: Option<&LinkBackTarget<'_>>,
+    source: &LinkBackSource<'_>,
+) -> LinkBackOffer {
+    let Some(target) = target else {
+        return LinkBackOffer::Hidden;
+    };
+    if !target.connected || !source.connected {
+        return LinkBackOffer::Hidden;
+    }
+    if !target.offers_links {
+        return LinkBackOffer::Blocked {
+            reason: LinkBackBlock::TargetLinksOff,
+        };
+    }
+    if !target.writable {
+        return LinkBackOffer::Blocked {
+            reason: LinkBackBlock::TargetNoAccess,
+        };
+    }
+    if !source.writable {
+        return LinkBackOffer::Blocked {
+            reason: LinkBackBlock::SourceNoAccess,
+        };
+    }
+    if source.urls.is_empty() {
+        return LinkBackOffer::Blocked {
+            reason: LinkBackBlock::SourceNoAddress,
+        };
+    }
+    let Some(links) = target.links else {
+        return LinkBackOffer::Hidden;
+    };
+    if links
+        .iter()
+        .any(|(env_id, expired)| *env_id == source.environment_id && !*expired)
+    {
+        return LinkBackOffer::Hidden;
+    }
+    LinkBackOffer::Offered
+}

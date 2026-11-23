@@ -8,9 +8,9 @@ use legion_contracts::peer_links::{PeerLinkThreadReadError, PeerLinkThreadReadRe
 use serde::{Deserialize, Serialize};
 
 pub use crate::linked_threads_batch::{
-    LINK_BATCH_CONCURRENCY, LinkBatchCandidate, LinkBatchItemStatus, LinkBatchQueue,
-    LinkBatchSummary, LinkBlockReason, LinkListState, LinkableMachine, link_batch_candidates,
-    link_list_state,
+    LINK_BATCH_CONCURRENCY, LinkBackBlock, LinkBackOffer, LinkBackSource, LinkBackTarget,
+    LinkBatchCandidate, LinkBatchItemStatus, LinkBatchQueue, LinkBatchSummary, LinkBlockReason,
+    LinkListState, LinkableMachine, link_back_offer, link_batch_candidates, link_list_state,
 };
 pub use crate::linked_threads_repos::{
     PinnedThreadRepository, RepositorySectionOrigin, ThreadRepositoryRef, ThreadRepositorySection,
@@ -101,7 +101,7 @@ pub fn classify_linked_thread_failure(
             detail: format!(
                 "{via_label} returned an unsupported response for linked thread reads."
             ),
-            retryable: false,
+            retryable: true,
         };
     };
     let label = err.label.as_deref().unwrap_or(peer_label);
@@ -262,4 +262,25 @@ impl LinkedThreadViewState {
         }
         self.failure = Some(failure);
     }
+}
+
+/// Snapshot window cursor and sequence (`#40545`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkedHistoryWindow {
+    /// Snapshot sequence number for the window.
+    pub sequence: u64,
+    /// Pagination cursor for older history before the window.
+    pub cursor: String,
+}
+
+/// Returns whether a reopened snapshot still sits on the same history window (`#40545`).
+#[must_use]
+pub fn should_keep_loaded_history_on_snapshot(
+    kept_sequence: u64,
+    loaded: &LinkedHistoryWindow,
+    next: &LinkedHistoryWindow,
+) -> bool {
+    kept_sequence == next.sequence
+        && (next.sequence > loaded.sequence || next.cursor == loaded.cursor)
 }

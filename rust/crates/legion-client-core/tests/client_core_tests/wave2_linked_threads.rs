@@ -2,13 +2,15 @@ use std::collections::BTreeSet;
 use std::error::Error;
 
 use legion_client_core::linked_threads::{
-    LINK_BATCH_CONCURRENCY, LinkBatchQueue, LinkBlockReason, LinkListState, LinkableMachine,
+    LINK_BATCH_CONCURRENCY, LinkBackBlock, LinkBackOffer, LinkBackSource, LinkBackTarget,
+    LinkBatchQueue, LinkBlockReason, LinkListState, LinkableMachine, LinkedHistoryWindow,
     LinkedThreadOpen, LinkedThreadViewState, PinnedThreadRepository, RepositorySectionOrigin,
     RewindFileRestoreOutcome, ThreadRepositoryRef, addable_task_folder_repositories,
-    append_tracked_folders, classify_linked_thread_failure, link_batch_candidates, link_list_state,
-    pin_thread_repository, pinnable_thread_repositories, resolve_linked_thread_open,
-    resolve_rewind_file_restore, resolve_worktree_repository_selection, suggested_tracked_folders,
-    thread_repository_sections, unpin_thread_repository,
+    append_tracked_folders, classify_linked_thread_failure, link_back_offer, link_batch_candidates,
+    link_list_state, pin_thread_repository, pinnable_thread_repositories,
+    resolve_linked_thread_open, resolve_rewind_file_restore, resolve_worktree_repository_selection,
+    should_keep_loaded_history_on_snapshot, suggested_tracked_folders, thread_repository_sections,
+    unpin_thread_repository,
 };
 use legion_contracts::ids::{CheckpointScopeId, EnvironmentId, ProjectId};
 use legion_contracts::peer_links::{
@@ -54,6 +56,20 @@ fn linked_thread_stream_opening_failure_and_history_dedup() -> Result<(), Box<dy
     };
     let fatal = classify_linked_thread_failure(Some(&expired), "Local", "Peer");
     assert!(!fatal.retryable);
+    // Older host returning an unknown-method error stays retryable (#40545/#41020).
+    let unknown = classify_linked_thread_failure(None, "Local", "Peer");
+    assert!(unknown.retryable);
+
+    let loaded = LinkedHistoryWindow {
+        sequence: 1,
+        cursor: "cur-1".to_owned(),
+    };
+    let same = LinkedHistoryWindow {
+        sequence: 2,
+        cursor: "cur-2".to_owned(),
+    };
+    assert!(should_keep_loaded_history_on_snapshot(2, &loaded, &same));
+    assert!(!should_keep_loaded_history_on_snapshot(1, &loaded, &same));
 
     let mut view = LinkedThreadViewState::default();
     view.apply_snapshot(
@@ -241,6 +257,58 @@ fn multi_repo_pin_sections_worktrees_and_rewind_restore() -> Result<(), Box<dyn 
     assert_eq!(
         resolve_rewind_file_restore(true, None, false),
         RewindFileRestoreOutcome::Files
+    );
+    Ok(())
+}
+
+#[test]
+fn link_back_offer_evaluates_eligibility() -> Result<(), Box<dyn Error>> {
+    let src_env = EnvironmentId::new("env-source")?;
+    let urls = vec!["https://source.example".to_owned()];
+    let source = LinkBackSource {
+        environment_id: &src_env,
+        connected: true,
+        writable: true,
+        urls: &urls,
+    };
+    assert_eq!(link_back_offer(None, &source), LinkBackOffer::Hidden);
+    assert_eq!(
+        link_back_offer(
+            Some(&LinkBackTarget {
+                connected: true,
+                offers_links: false,
+                writable: true,
+                links: Some(&[]),
+            }),
+            &source
+        ),
+        LinkBackOffer::Blocked {
+            reason: LinkBackBlock::TargetLinksOff
+        }
+    );
+    assert_eq!(
+        link_back_offer(
+            Some(&LinkBackTarget {
+                connected: true,
+                offers_links: true,
+                writable: true,
+                links: Some(&[(&src_env, true)]),
+            }),
+            &source
+        ),
+        LinkBackOffer::Offered
+    );
+    assert_eq!(
+        link_back_offer(
+            Some(&LinkBackTarget {
+                connected: true,
+                offers_links: true,
+                writable: true,
+                links: Some(&[(&src_env, false)]),
+            }),
+            &source
+        ),
+        LinkBackOffer::Hidden
     );
     Ok(())
 }

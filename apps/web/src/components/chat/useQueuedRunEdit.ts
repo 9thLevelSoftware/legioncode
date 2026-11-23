@@ -81,6 +81,7 @@ import type { ChatComposerHandle } from "./ChatComposer";
 import { fileAttachmentCapabilityBlockReason } from "./composerAttachmentFiles";
 import { composerDraftContentChanged } from "./composerSend.logic";
 import {
+  attachmentContextIdsForRecord,
   discardQueuedEditDraft,
   prepareQueuedEditAttachments,
   recoverQueuedMessageEdit,
@@ -92,10 +93,9 @@ interface EditingQueuedRun {
   readonly runId: RunId;
   readonly messageId: MessageId;
   readonly originalText: string;
+  readonly originalAttachments: ReadonlyArray<ChatAttachment>;
   readonly existingAttachments: ReadonlyArray<ChatAttachment>;
   readonly context?: OrchestrationMessageContext | undefined;
-  /** Removing a server attachment changes the message even when the draft looks untouched. */
-  readonly removedExistingAttachment?: true;
 }
 
 // Keyed by the route thread, so an edit survives navigating away and back.
@@ -311,13 +311,34 @@ export function useQueuedRunEdit(input: {
   const urlByAttachmentId = new Map(
     imageResources.map((resource, index) => [resource.attachmentId, imageUrls[index] ?? null]),
   );
+  const originalReferencedContextIds =
+    editing === null ? null : new Set(collectInlineContextIds(editing.originalText));
+  const attachmentContextIds = (attachment: ChatAttachment) =>
+    editing === null
+      ? []
+      : attachmentContextIdsForRecord(editing.context, attachment).filter((contextId) =>
+          originalReferencedContextIds!.has(contextId),
+        );
   const editingAttachments =
     editing === null
       ? null
       : editing.existingAttachments.map((attachment) => ({
           attachment,
           url: urlByAttachmentId.get(attachment.id) ?? null,
+          contextIds: attachmentContextIds(attachment),
         }));
+  const existingAttachmentIds = new Set(
+    (editing?.existingAttachments ?? []).map((attachment) => attachment.id),
+  );
+  const removedEditingAttachments =
+    editing === null
+      ? []
+      : editing.originalAttachments
+          .filter((attachment) => !existingAttachmentIds.has(attachment.id))
+          .map((attachment) => ({
+            attachment,
+            contextIds: attachmentContextIds(attachment),
+          }));
 
   const focusComposerSoon = () => {
     window.requestAnimationFrame(() => composerRef.current?.focusAtEnd());
@@ -388,6 +409,7 @@ export function useQueuedRunEdit(input: {
         runId: request.runId,
         messageId: request.messageId,
         originalText,
+        originalAttachments: request.attachments,
         existingAttachments: request.attachments,
         context,
       },
@@ -410,7 +432,14 @@ export function useQueuedRunEdit(input: {
             editTarget: queuedRunEditDraftId(routeThreadRef, edit.runId),
             threadTarget: threadDraftTarget,
             originalText: edit.originalText,
-            removedExistingAttachment: edit.removedExistingAttachment === true,
+            originalReplyTo: reply ?? null,
+            removedExistingAttachment:
+              edit.existingAttachments.length < edit.originalAttachments.length,
+            existingAttachmentContextIds: (edit.context?.records ?? []).flatMap((record) =>
+              (record.kind === "image" || record.kind === "file") && "attachmentId" in record
+                ? [record.contextId]
+                : [],
+            ),
             environmentId,
             existingAttachments: edit.existingAttachments,
             context: edit.context,
@@ -450,12 +479,9 @@ export function useQueuedRunEdit(input: {
       const removedAttachment = current.existingAttachments.find(
         (attachment) => attachment.id === attachmentId,
       );
-      const contextIds = new Set<string>();
-      for (const record of current.context?.records ?? []) {
-        if ("attachmentId" in record && record.attachmentId === attachmentId) {
-          contextIds.add(record.contextId);
-        }
-      }
+      const contextIds = new Set<string>(
+        removedAttachment ? attachmentContextIdsForRecord(current.context, removedAttachment) : [],
+      );
       if (removedAttachment?.type === "image" || removedAttachment?.type === "file") {
         contextIds.add(toKindScopedComposerContextId(removedAttachment.type, attachmentId));
       }
@@ -476,11 +502,23 @@ export function useQueuedRunEdit(input: {
     }
     queuedRunEdits.update(editKey, (currentEdit) => ({
       ...currentEdit,
-      removedExistingAttachment: true,
       existingAttachments: currentEdit.existingAttachments.filter(
         (attachment) => attachment.id !== attachmentId,
       ),
     }));
+  });
+  const restoreEditingAttachment = useStableCallback((attachment: ChatAttachment) => {
+    queuedRunEdits.update(editKey, (current) => {
+      const keptIds = new Set([
+        ...current.existingAttachments.map((entry) => entry.id),
+        attachment.id,
+      ]);
+      // Filtering the originals keeps the restored attachment in its original position.
+      return {
+        ...current,
+        existingAttachments: current.originalAttachments.filter((entry) => keptIds.has(entry.id)),
+      };
+    });
   });
 
   // The same move as the queued row's "Send now" while a turn runs.
@@ -607,9 +645,11 @@ export function useQueuedRunEdit(input: {
     isSaving,
     draftTarget,
     editingAttachments,
+    removedEditingAttachments,
     beginEdit,
     cancelEdit,
     removeEditingAttachment,
+    restoreEditingAttachment,
     saveEdit,
   };
 }

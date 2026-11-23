@@ -1,6 +1,6 @@
 import { findThreadSearchOccurrences } from "@legioncode/shared/threadSearch";
 import { useEffect, useEffectEvent, useRef } from "react";
-import { THREAD_FIND_BLOCK_TAGS } from "@legioncode/shared/threadFindText";
+import { THREAD_FIND_BLOCK_TAGS } from "@legioncode/shared/threadFindBlockTags";
 
 import { observeResize } from "~/lib/observeResize";
 

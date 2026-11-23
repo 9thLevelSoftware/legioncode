@@ -2766,12 +2766,14 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
     // POSIX node-pty can return a PTY before exec fails, so validate before accepting a candidate.
     const executable =
       platform !== "win32"
-        ? resolveExecutable(
-            candidate.shell.includes("/")
-              ? path.resolve(session.cwd, candidate.shell)
-              : candidate.shell,
-            platform,
-            lookupEnv,
+        ? yield* Effect.promise(async () =>
+            resolveExecutable(
+              candidate.shell.includes("/")
+                ? path.resolve(session.cwd, candidate.shell)
+                : candidate.shell,
+              platform,
+              lookupEnv,
+            ),
           )
         : candidate.shell;
     if (executable === undefined) {

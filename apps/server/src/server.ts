@@ -15,7 +15,11 @@ import * as NodeHttp from "node:http";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { EnvironmentHttpApi, type RepositoryIdentity } from "@legioncode/contracts";
+import {
+  EnvironmentHttpApi,
+  EnvironmentHttpForbiddenError,
+  type RepositoryIdentity,
+} from "@legioncode/contracts";
 import * as HostProcess from "@legioncode/shared/HostProcess";
 import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
@@ -849,6 +853,17 @@ const layerMakeRoutes = Layer.mergeAll(
       Layer.provide(speechHttpApiLayer),
       Layer.provide(ServerHttp.layerServerEnvironmentHttpApi),
       Layer.provide(WebhookRoute.layer.pipe(Layer.provide(RelayDeliveryProof.layer))),
+      Layer.provide(
+        HttpApiBuilder.group(EnvironmentHttpApi, "peerLink", (handlers) =>
+          handlers.handle("clientPairing", () =>
+            Effect.fail(
+              new EnvironmentHttpForbiddenError({
+                message: "Peer client pairing is handled by the Rust server.",
+              }),
+            ),
+          ),
+        ),
+      ),
       Layer.provide(AuthHttp.layerAuthenticatedAuth),
     ),
     ServerHttp.layerOtlpTracesProxyRoute,

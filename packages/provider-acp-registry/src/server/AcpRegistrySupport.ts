@@ -674,6 +674,8 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
   const architecture = yield* HostProcess.Architecture;
   const hostEnvironment = yield* HostProcess.Environment;
   const resolveExecutable = yield* SpawnExecutableResolution;
+  const resolveExecutableEffect = (command: string, environment: NodeJS.ProcessEnv) =>
+    Effect.promise(async () => resolveExecutable(command, platform, environment));
   const platformTarget = resolveAcpRegistryPlatformTarget(platform, architecture);
   const registryUrl = input.registryUrl ?? ACP_REGISTRY_URL;
   const registryDirectory = path.join(input.cacheDir, "acp-registry");
@@ -1240,9 +1242,8 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
       const commandName = npmCommandName(agent, packageIdentity.name, manifest.value);
       if (commandName === undefined) return Option.none<AcpRegistryPackageInstallReceipt>();
       const binDirectory = platform === "win32" ? globalPrefix : path.join(globalPrefix, "bin");
-      const executablePath = resolveExecutable(
+      const executablePath = yield* resolveExecutableEffect(
         path.join(binDirectory, commandName),
-        platform,
         environment,
       );
       return executablePath === undefined
@@ -1289,9 +1290,14 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
         truncatedOutputReason: "install_failed",
       }).pipe(Effect.flatMap((output) => parsePackageManagerPath(managerPath, output)));
       const managedBinEnvironment = { ...environment, PATH: binDirectory };
-      const executablePath = packageCommandCandidates(agent, packageIdentity.name)
-        .map((candidate) => resolveExecutable(candidate, platform, managedBinEnvironment))
-        .find((candidate): candidate is string => candidate !== undefined);
+      let executablePath: string | undefined;
+      for (const candidate of packageCommandCandidates(agent, packageIdentity.name)) {
+        const resolved = yield* resolveExecutableEffect(candidate, managedBinEnvironment);
+        if (resolved !== undefined) {
+          executablePath = resolved;
+          break;
+        }
+      }
       return executablePath === undefined
         ? Option.none<AcpRegistryPackageInstallReceipt>()
         : Option.some<AcpRegistryPackageInstallReceipt>({
@@ -1314,7 +1320,7 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
     environment: NodeJS.ProcessEnv,
   ) {
     const managerName = packageManagerFor(distribution)!;
-    const managerPath = resolveExecutable(managerName, platform, environment);
+    const managerPath = yield* resolveExecutableEffect(managerName, environment);
     if (managerPath === undefined) {
       return yield* new AcpRegistryError({
         reason: "runner_unavailable",
@@ -1740,6 +1746,17 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
   const search: AcpRegistryCatalog["Service"]["search"] = Effect.fn("AcpRegistryCatalog.search")(
     function* (input) {
       const registry = yield* recentRegistry();
+      const availableManagers = new Map<string, boolean>();
+      for (const agent of registry.agents) {
+        const d = resolveAcpRegistryDistribution({ agent, preference: "auto", platformTarget });
+        const pm = d === undefined ? undefined : packageManagerFor(d.kind);
+        if (pm !== undefined && !availableManagers.has(pm)) {
+          availableManagers.set(
+            pm,
+            (yield* resolveExecutableEffect(pm, hostEnvironment)) !== undefined,
+          );
+        }
+      }
       const ranked = registry.agents.flatMap((agent) => {
         const distribution = resolveAcpRegistryDistribution({
           agent,
@@ -1750,8 +1767,7 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
         const packageManager =
           distribution === undefined ? undefined : packageManagerFor(distribution.kind);
         const packageManagerAvailable =
-          packageManager === undefined ||
-          resolveExecutable(packageManager, platform, hostEnvironment) !== undefined;
+          packageManager === undefined || (availableManagers.get(packageManager) ?? false);
         return distribution === undefined || rank === undefined || !packageManagerAvailable
           ? []
           : [{ agent, distribution, rank }];
@@ -1826,7 +1842,7 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
       if (settings.source === "local") {
         const command = settings.commandPath.trim();
         if (!command) return { status: "unconfigured" } as const;
-        const executable = resolveExecutable(command, platform, environment ?? hostEnvironment);
+        const executable = yield* resolveExecutableEffect(command, environment ?? hostEnvironment);
         if (executable !== undefined) yield* validateLocalExecutable(executable);
         return executable === undefined
           ? ({
@@ -1854,7 +1870,7 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
       const commandOverride = settings.commandPath.trim();
       if (commandOverride.length > 0) {
         const available =
-          resolveExecutable(commandOverride, platform, environment ?? hostEnvironment) !==
+          (yield* resolveExecutableEffect(commandOverride, environment ?? hostEnvironment)) !==
           undefined;
         return available
           ? ({
@@ -1919,7 +1935,7 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
 
       const runner = packageManagerFor(distribution.kind)!;
       const available =
-        resolveExecutable(runner, platform, environment ?? hostEnvironment) !== undefined;
+        (yield* resolveExecutableEffect(runner, environment ?? hostEnvironment)) !== undefined;
       return available
         ? ({
             status: "ready",
@@ -1949,7 +1965,7 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
           });
         }
         const env = environment ?? hostEnvironment;
-        const command = resolveExecutable(executable, platform, env);
+        const command = yield* resolveExecutableEffect(executable, env);
         if (command === undefined) {
           return yield* new AcpRegistryError({
             reason: "runner_unavailable",
@@ -1979,7 +1995,10 @@ export const makeAcpRegistryCatalog = Effect.fn("AcpRegistryCatalog.make")(funct
       const effectiveEnvironment = environment ?? hostEnvironment;
       const commandOverride = settings.commandPath.trim();
       if (commandOverride.length > 0) {
-        const resolvedOverride = resolveExecutable(commandOverride, platform, effectiveEnvironment);
+        const resolvedOverride = yield* resolveExecutableEffect(
+          commandOverride,
+          effectiveEnvironment,
+        );
         if (resolvedOverride === undefined) {
           return yield* new AcpRegistryError({
             reason: "runner_unavailable",

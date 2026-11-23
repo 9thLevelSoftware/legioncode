@@ -4,7 +4,21 @@ import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 
 import { assert } from "@effect/vitest";
-import { OrchestrationV2RpcSchemas, WsRpcGroup } from "@legioncode/contracts";
+import {
+  EnvironmentId,
+  milestoneMatches,
+  OrchestrationV2RpcSchemas,
+  PEER_LINK_THREAD_HISTORY_ROUTE,
+  PEER_LINK_THREAD_ITEM_ROUTE,
+  PEER_LINK_THREAD_STREAM_ROUTE,
+  ProjectId,
+  ProviderInstanceId,
+  RunId,
+  ThreadId,
+  WsRpcGroup,
+} from "@legioncode/contracts";
+import { pastedUrl } from "@legioncode/shared/oauthCallback";
+import { hasPendingBackgroundSubagent } from "@legioncode/shared/orchestrationV2PendingBackgroundWork";
 import * as Schema from "effect/Schema";
 import { fetch } from "undici";
 
@@ -382,7 +396,7 @@ export async function runFullRpcAndProviderParityChecks(
     commandId: nextCmd,
   };
 
-  // 1. Verify 100% WsRpcGroup.requests coverage across all 235 methods.
+  // 1. Verify 100% WsRpcGroup.requests coverage across all methods.
   const fixtures = buildWsRpcFixtures(ctx);
   assert.strictEqual(
     Object.keys(fixtures).length,
@@ -622,4 +636,85 @@ export async function runFullRpcAndProviderParityChecks(
     "failed",
   );
   assert.isTrue(failProj.turnItems.some((item) => item.type === "error"));
+
+  // 4. Verify v0.1.12 HTTP endpoints (/oauth/mcp/revoke, /api/peer-link/client-pairing, /api/links/thread/*).
+  const oauthMetaRes = await fetch(`${origin}/.well-known/oauth-authorization-server`);
+  assert.strictEqual(oauthMetaRes.status, 200);
+  const oauthMeta = (await oauthMetaRes.json()) as { readonly revocation_endpoint?: string };
+  assert.isTrue(oauthMeta.revocation_endpoint?.endsWith("/oauth/mcp/revoke") === true);
+
+  const revokeRes = await fetch(`${origin}/oauth/mcp/revoke`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: "token=nonexistent-parity-token",
+  });
+  assert.strictEqual(revokeRes.status, 200);
+  assert.strictEqual(revokeRes.headers.get("cache-control"), "no-store");
+
+  const unauthPairingRes = await fetch(`${origin}/api/peer-link/client-pairing`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ scopes: ["orchestration:read"], clientLabel: "Parity" }),
+  });
+  assert.strictEqual(unauthPairingRes.status, 401);
+
+  const originPairingRes = await fetch(`${origin}/api/peer-link/client-pairing`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      origin: "http://evil.example",
+    },
+    body: JSON.stringify({ scopes: ["orchestration:read"], clientLabel: "Parity" }),
+  });
+  assert.strictEqual(originPairingRes.status, 403);
+
+  for (const peerThreadPath of [
+    `${PEER_LINK_THREAD_STREAM_ROUTE}?thread=${encodeURIComponent(primaryThreadId)}`,
+    `${PEER_LINK_THREAD_HISTORY_ROUTE}?thread=${encodeURIComponent(primaryThreadId)}&cursor=1`,
+    `${PEER_LINK_THREAD_ITEM_ROUTE}?thread=${encodeURIComponent(primaryThreadId)}&item=${encodeURIComponent(ctx.itemId)}`,
+  ]) {
+    const peerRes = await fetch(`${origin}${peerThreadPath}`);
+    assert.strictEqual(peerRes.status, 401);
+  }
+
+  // 5. Exercise Wave 1/7 shared & contract helpers.
+  const normalizedCallback = pastedUrl("127.0.0.1:1455/cb?code=abc&state=s1");
+  assert.strictEqual(normalizedCallback.origin, "http://127.0.0.1:1455");
+
+  const sampleMilestone = {
+    id: "m-1",
+    at: "2026-01-01T00:00:00.000Z" as never,
+    type: "run_completed" as const,
+    environmentId: EnvironmentId.make(ctx.environmentId),
+    projectId: ProjectId.make(ctx.projectId),
+    threadId: ThreadId.make(ctx.threadId),
+    runId: RunId.make("run-1"),
+    status: "completed" as const,
+    isSubagentChild: false,
+  };
+  assert.isTrue(
+    milestoneMatches(sampleMilestone, {
+      types: ["run_completed"],
+      projectIds: [ProjectId.make(ctx.projectId)],
+    }),
+  );
+  assert.isFalse(milestoneMatches(sampleMilestone, { workflows: ["nightly"] }));
+
+  const claudeProvider = ProviderInstanceId.make("claudeAgent");
+  assert.isFalse(hasPendingBackgroundSubagent([], claudeProvider));
+  assert.isTrue(
+    hasPendingBackgroundSubagent(
+      [
+        {
+          id: "bg-1",
+          kind: "subagent",
+          label: "Worker",
+          detail: null,
+          status: "running",
+          providerInstanceId: claudeProvider,
+        },
+      ],
+      claudeProvider,
+    ),
+  );
 }

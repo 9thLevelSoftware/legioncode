@@ -246,6 +246,26 @@ export function buildWsRpcFixtures(ctx: ParityFixtureContext): Record<string, Rp
     },
     "server.probe": { payload: {} },
     "server.getConfig": { payload: {} },
+    "workspace.listFolders": { payload: { projectId: ctx.projectId } },
+    "workspace.scanFolders": { payload: { workspaceRoot: ctx.cwd } },
+    "workspace.taskFolder": { payload: { worktreePath: ctx.cwd } },
+    "workspace.addTaskFolderRepository": {
+      payload: { threadId: ctx.threadId, repositoryPath: ctx.secondaryCwd },
+      allowFailureTags: ["TaskFolderError"],
+    },
+    "provider.mcpSignIn.start": {
+      payload: { threadId: ctx.threadId, providerThreadId: "prov-thread-1", server: "github" },
+      allowFailureTags: ["ProviderMcpSignInError"],
+    },
+    "provider.mcpSignIn.complete": {
+      payload: {
+        threadId: ctx.threadId,
+        providerThreadId: "prov-thread-1",
+        server: "github",
+        callbackUrl: `${ctx.serverUrl}/cb`,
+      },
+      allowFailureTags: ["ProviderMcpSignInError"],
+    },
     "server.refreshProviders": { payload: { modelCatalogOnly: true } },
     "server.updateProvider": {
       payload: { provider: "codex", targetVersion: "latest", instanceId: "codex" },
@@ -340,6 +360,7 @@ export function buildWsRpcFixtures(ctx: ParityFixtureContext): Record<string, Rp
     "server.reclaimDatabaseSpace": { payload: {} },
     "server.updateSettings": { payload: { patch: {} } },
     "peerLinks.list": { payload: {} },
+    "peerLinks.names": { payload: {} },
     "peerLinks.link": {
       payload: {
         url: "https://127.0.0.1:9",
@@ -352,6 +373,27 @@ export function buildWsRpcFixtures(ctx: ParityFixtureContext): Record<string, Rp
       allowFailureTags: ["PeerLinkError"],
     },
     "peerLinks.unlink": { payload: { environmentId: "env-missing" } },
+    "peerLinks.subscribeThread": {
+      payload: { environmentId: "env-missing", threadId: ctx.threadId },
+      allowFailureTags: ["PeerLinkThreadReadError"],
+      allowZeroChunks: true,
+    },
+    "peerLinks.threadHistoryPage": {
+      payload: { environmentId: "env-missing", threadId: ctx.threadId, cursor: "cursor-1" },
+      allowFailureTags: ["PeerLinkThreadReadError"],
+    },
+    "peerLinks.threadItem": {
+      payload: { environmentId: "env-missing", threadId: ctx.threadId, itemId: ctx.itemId },
+      allowFailureTags: ["PeerLinkThreadReadError"],
+    },
+    "peerLinks.pairClient": {
+      payload: { environmentId: "env-missing" },
+      allowFailureTags: ["PeerLinkError"],
+    },
+    "peerLinks.pairLink": {
+      payload: { environmentId: "env-missing", access: "read-only" },
+      allowFailureTags: ["PeerLinkError"],
+    },
     "peerLinks.answerRequest": {
       payload: {
         threadId: ctx.threadId,
@@ -437,6 +479,33 @@ export function buildWsRpcFixtures(ctx: ParityFixtureContext): Record<string, Rp
     },
     "server.refreshUsageRates": { payload: {} },
     "server.signalProcess": { payload: { pid: 999999, startTimeMs: 0, signal: "SIGINT" } },
+    "workflows.subscribe": { payload: {} },
+    "workflows.counts": { payload: {} },
+    "workflows.get": {
+      payload: { runId: "run-missing" },
+      allowFailureTags: ["WorkflowRequestError"],
+    },
+    "workflows.answer": {
+      payload: { runId: "run-missing", name: "ask-1", choice: "approve" },
+      allowFailureTags: ["WorkflowRequestError"],
+    },
+    "workflows.resume": {
+      payload: { runId: "run-missing" },
+      allowFailureTags: ["WorkflowRequestError"],
+    },
+    "workflows.cancel": {
+      payload: { runId: "run-missing" },
+      allowFailureTags: ["WorkflowRequestError"],
+    },
+    "workflows.getDefinition": { payload: {} },
+    "workflows.saveDefinition": {
+      payload: { name: "parity.ts", source: "export default {};" },
+    },
+    "workflows.deleteDefinition": { payload: { name: "parity.ts" } },
+    "agentFeedback.answerRequest": {
+      payload: { threadId: ctx.threadId, turnItemId: ctx.itemId, answer: "decline" },
+      allowFailureTags: ["AgentFeedbackRequestError"],
+    },
     "scheduledTasks.subscribe": { payload: {} },
     "scheduledTasks.upsert": {
       payload: {

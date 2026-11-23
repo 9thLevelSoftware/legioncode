@@ -141,6 +141,7 @@ function shouldPublishAgentAwarenessEvent(
     case "context-handoff.updated":
     case "context-transfer.created":
     case "context-transfer.updated":
+    case "run.output-submitted":
       return false;
   }
 }

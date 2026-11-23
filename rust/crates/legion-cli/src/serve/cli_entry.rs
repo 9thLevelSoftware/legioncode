@@ -43,7 +43,7 @@ pub(crate) async fn run_entry(
     if parsed.auto_bootstrap && parsed.config.cwd.is_dir() {
         let paths = ServerDerivedPaths::derive(
             &parsed.config.base_dir,
-            false,
+            parsed.dev_url.is_some(),
             parsed.config.base_dir_is_explicit,
         );
         if ensure_server_directories(&paths).is_ok() {

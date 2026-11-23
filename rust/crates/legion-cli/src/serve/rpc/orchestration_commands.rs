@@ -111,7 +111,7 @@ fn dispatch_project_command(
                 "message": err.to_string(),
             })));
         }
-        let seq = append_project_shell_event(conn, &target_id, deleted, command_id, &now_iso)
+        publish_project_shell_event(state, conn, &target_id, deleted, command_id, &now_iso)
             .map_err(|err| {
                 rpc_fail_obj(json!({
                     "_tag": "ProjectMutationError",
@@ -119,17 +119,30 @@ fn dispatch_project_command(
                     "projectId": target_id,
                     "message": err.to_string(),
                 }))
-            })?;
-        state
-            .orchestrator
-            .sink()
-            .pubsub()
-            .notify_external_sequence(seq);
-        Ok(RpcExit::Success {
-            value: json!({ "sequence": seq }),
-        })
+            })
+            .map(|seq| RpcExit::Success {
+                value: json!({ "sequence": seq }),
+            })
     })
     .unwrap_or_else(|e| e)
+}
+
+/// Appends a synthetic project shell event to `orchestration_events` and wakes live `subscribeShell` streams.
+pub(crate) fn publish_project_shell_event(
+    state: &AppState,
+    conn: &Connection,
+    project_id: &str,
+    deleted: bool,
+    command_id: &str,
+    now_iso: &str,
+) -> Result<i64, rusqlite::Error> {
+    let seq = append_project_shell_event(conn, project_id, deleted, command_id, now_iso)?;
+    state
+        .orchestrator
+        .sink()
+        .pubsub()
+        .notify_external_sequence(seq);
+    Ok(seq)
 }
 
 fn append_project_shell_event(

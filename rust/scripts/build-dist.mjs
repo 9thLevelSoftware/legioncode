@@ -157,6 +157,7 @@ const wantDesktop = buildAll || requested.has("desktop");
 const wantMobileNative = buildAll || requested.has("mobile");
 const wantMobileSdk = wantMobileNative || requested.has("mobile-sdk");
 const wantWebApp = buildAll || requested.has("web-app");
+const needWebBundle = wantWebApp || wantCli || wantDesktop;
 const wantCloudflareWorkers = buildAll || requested.has("cloudflare-workers");
 const wantWasm = buildAll || requested.has("wasm") || wantWebApp || wantCloudflareWorkers;
 
@@ -175,7 +176,7 @@ const skipWebBuild = Boolean(values["skip-web-build"]);
 
 fs.mkdirSync(outDir, { recursive: true });
 
-if (wantWebApp) {
+if (needWebBundle) {
   if (skipWebBuild && fs.existsSync(webDistIndex)) {
     process.stdout.write(`[build-dist] Reusing existing @legioncode/web build at ${webDistDir}\n`);
   } else {

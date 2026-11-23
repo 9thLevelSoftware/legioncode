@@ -16,8 +16,9 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use super::{
-    AppState, fs_browse, parse_optional_payload, parse_payload, projects_create, projects_files,
-    projects_search, rpc_fail, rpc_fail_obj, utc_now_iso, with_db_mut,
+    AppState, fs_browse, orchestration_commands::publish_project_shell_event,
+    parse_optional_payload, parse_payload, projects_create, projects_files, projects_search,
+    rpc_fail, rpc_fail_obj, utc_now_iso, with_db_mut,
 };
 
 pub(crate) async fn dispatch(state: &Arc<AppState>, tag: &str, payload: Value) -> RpcExit {
@@ -52,6 +53,7 @@ struct MutatePayload {
     id: Option<String>,
     title: Option<String>,
     workspace_root: Option<String>,
+    create_workspace_root_if_missing: Option<bool>,
     scripts: Option<Value>,
     #[serde(default)]
     default_model_selection: PatchValue<Value>,
@@ -97,6 +99,9 @@ fn mutate_project(state: &AppState, payload: Value) -> RpcExit {
             .or(req.id.as_deref())
             .unwrap_or("");
         let affected_id = apply_project_mutation(conn, op, &command_id, target_id, &req, &now_iso)?;
+        let is_deleted = matches!(op, "delete" | "project.delete" | "remove");
+        publish_project_shell_event(state, conn, &affected_id, is_deleted, &command_id, &now_iso)
+            .map_err(|e| mutate_err(&command_id, &affected_id, &e.to_string()))?;
         let project = list_projects(&*conn)
             .map_err(|e| mutate_err(&command_id, target_id, &e.to_string()))?
             .into_iter()
@@ -131,6 +136,11 @@ fn apply_project_mutation(
                         "workspaceRoot is required for project.create",
                     )
                 })?;
+            if req.create_workspace_root_if_missing == Some(true)
+                && let Err(err) = fs::create_dir_all(root)
+            {
+                return Err(mutate_err(command_id, target_id, &err.to_string()));
+            }
             let mut input = CreateProjectInput::new(root);
             if !target_id.is_empty() {
                 input = input.with_project_id(target_id);
@@ -248,13 +258,14 @@ fn ensure_scratch(state: &AppState, payload: Value) -> RpcExit {
     with_db_mut(state, |conn| {
         ensure_project_store_schema(conn)
             .map_err(|e| rpc_fail("OrchestrationDispatchCommandError", &e.to_string()))?;
-        let record = if let Some(existing) = find_project_by_id_or_workspace(&*conn, &root_str)
-            .ok()
-            .flatten()
+        let (record, created) = if let Some(existing) =
+            find_project_by_id_or_workspace(&*conn, &root_str)
+                .ok()
+                .flatten()
         {
-            existing
+            (existing, false)
         } else {
-            create_project(
+            let created_record = create_project(
                 &*conn,
                 &CreateProjectInput::new(&root_str)
                     .with_project_id("project-scratch")
@@ -267,8 +278,28 @@ fn ensure_scratch(state: &AppState, payload: Value) -> RpcExit {
                     "commandType": "project.create",
                     "message": e.to_string(),
                 }))
-            })?
+            })?;
+            (created_record, true)
         };
+        if created {
+            let now_iso = utc_now_iso();
+            publish_project_shell_event(
+                state,
+                conn,
+                &record.id,
+                false,
+                "cmd-ensure-scratch",
+                &now_iso,
+            )
+            .map_err(|e| {
+                rpc_fail_obj(json!({
+                    "_tag": "OrchestrationDispatchCommandError",
+                    "commandId": "cmd-ensure-scratch",
+                    "commandType": "project.create",
+                    "message": e.to_string(),
+                }))
+            })?;
+        }
         Ok(RpcExit::Success {
             value: json!({ "projectId": record.id }),
         })

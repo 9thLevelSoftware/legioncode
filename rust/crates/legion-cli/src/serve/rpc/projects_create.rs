@@ -15,8 +15,9 @@ use serde_json::{Value, json};
 use tokio::process::Command;
 use uuid::Uuid;
 
+use super::orchestration_commands::publish_project_shell_event;
 use super::projects_fs::base_dir_from_state;
-use super::{AppState, parse_payload, rpc_fail, rpc_fail_obj, with_db, with_db_mut};
+use super::{AppState, parse_payload, rpc_fail, rpc_fail_obj, utc_now_iso, with_db, with_db_mut};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -63,10 +64,27 @@ pub(crate) async fn create_new(state: &Arc<AppState>, payload: Value) -> RpcExit
         ensure_project_store_schema(conn)
             .map_err(|e| rpc_fail("OrchestrationDispatchCommandError", &e.to_string()))?;
         let record = create_project(
-            conn,
+            &*conn,
             &CreateProjectInput::new(&root_str)
                 .with_project_id(&project_id)
                 .with_title(req.name.trim()),
+        )
+        .map_err(|e| {
+            rpc_fail_obj(json!({
+                "_tag": "OrchestrationDispatchCommandError",
+                "commandId": "cmd-create-project",
+                "commandType": "project.create",
+                "message": e.to_string(),
+            }))
+        })?;
+        let now_iso = utc_now_iso();
+        publish_project_shell_event(
+            state,
+            conn,
+            &record.id,
+            false,
+            "cmd-create-project",
+            &now_iso,
         )
         .map_err(|e| {
             rpc_fail_obj(json!({

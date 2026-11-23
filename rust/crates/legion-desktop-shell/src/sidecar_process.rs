@@ -66,8 +66,7 @@ impl ManagedDesktopSidecar {
     pub fn captured_output(&self) -> String {
         self.output_tail
             .lock()
-            .map(|guard| guard.clone())
-            .unwrap_or_default()
+            .map_or_default(|guard| guard.clone())
     }
 }
 
@@ -273,7 +272,7 @@ pub fn poll_environment_ready(
     wait_until_environment_ready(http_base_url, timeout, move || {
         match supervisor.try_wait(token) {
             Ok(Some(status)) => {
-                let tail = output_tail.lock().map(|g| g.clone()).unwrap_or_default();
+                let tail = output_tail.lock().map_or_default(|g| g.clone());
                 Err(format!(
                     "legioncode sidecar exited prematurely with {status} before becoming ready\n{tail}"
                 ))

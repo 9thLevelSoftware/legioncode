@@ -222,7 +222,6 @@ impl CodexIdleThreadUnloadRegistry {
     pub fn pending_for_session(&self, provider_session_id: &str) -> Vec<IdleThreadUnloadEntry> {
         self.by_session
             .get(provider_session_id)
-            .map(|m| m.values().cloned().collect())
-            .unwrap_or_default()
+            .map_or_default(|m| m.values().cloned().collect())
     }
 }

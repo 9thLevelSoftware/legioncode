@@ -115,14 +115,13 @@ fn normalize_acp_registry_agent(entry: &Value) -> Option<Value> {
     let authors: Vec<String> = entry
         .get("authors")
         .and_then(Value::as_array)
-        .map(|arr| {
+        .map_or_default(|arr| {
             arr.iter()
                 .filter_map(Value::as_str)
                 .map(ToOwned::to_owned)
                 .take(16)
                 .collect()
-        })
-        .unwrap_or_default();
+        });
     let license = entry
         .get("license")
         .and_then(Value::as_str)

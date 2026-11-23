@@ -6,6 +6,7 @@ use std::collections::{BTreeSet, HashSet};
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{MAIN_SEPARATOR, Path, PathBuf};
+#[cfg(not(target_os = "linux"))]
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 

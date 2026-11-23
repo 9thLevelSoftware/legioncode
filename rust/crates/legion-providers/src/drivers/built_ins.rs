@@ -249,13 +249,20 @@ where
         return Ok(trimmed.to_owned());
     }
 
+    let sep = if trimmed.contains('\\') {
+        '\\'
+    } else if trimmed.contains('/') {
+        '/'
+    } else {
+        '\\'
+    };
     let dir = trimmed
         .rsplit_once(['\\', '/'])
         .map_or(".", |(parent, _)| parent);
     let candidates = [
-        format!(r"{dir}\claude.exe"),
-        format!(r"{dir}\node_modules\@anthropic-ai\claude-code\bin\claude.exe"),
-        format!(r"{dir}\node_modules\@anthropic-ai\claude-code\cli.js"),
+        format!("{dir}{sep}claude.exe"),
+        format!("{dir}{sep}node_modules{sep}@anthropic-ai{sep}claude-code{sep}bin{sep}claude.exe"),
+        format!("{dir}{sep}node_modules{sep}@anthropic-ai{sep}claude-code{sep}cli.js"),
     ];
     for candidate in candidates {
         if path_exists(&candidate) {

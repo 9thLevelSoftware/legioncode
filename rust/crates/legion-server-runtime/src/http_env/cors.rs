@@ -259,14 +259,13 @@ pub(crate) fn resolve_initial_dev_url() -> Option<String> {
 pub(crate) fn resolve_dev_allowed_origins() -> Vec<String> {
     std::env::var("LEGIONCODE_DEV_ALLOWED_ORIGINS")
         .ok()
-        .map(|raw| {
+        .map_or_default(|raw| {
             raw.split(',')
                 .map(str::trim)
                 .filter(|s| !s.is_empty())
                 .map(str::to_owned)
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 pub(crate) fn resolve_initial_auth_policy() -> String {

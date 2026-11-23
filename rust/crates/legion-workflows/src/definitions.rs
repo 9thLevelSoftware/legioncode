@@ -99,34 +99,23 @@ impl WorkflowDefinitionsManager {
         let g = self.inner.lock().unwrap_or_else(PoisonError::into_inner);
         let mut all_names: BTreeMap<String, String> = g.disk_sources.clone();
         for name in g.loaded.keys() {
-            all_names.entry(name.clone()).or_insert_with(|| {
-                g.loaded
-                    .get(name)
-                    .map(|r| r.source.clone())
-                    .unwrap_or_default()
-            });
+            all_names
+                .entry(name.clone())
+                .or_insert_with(|| g.loaded.get(name).map_or_default(|r| r.source.clone()));
         }
         let mut files = Vec::new();
         let mut problems = Vec::new();
         for (name, source) in all_names {
-            let file_probs = g
-                .failed
-                .get(&name)
-                .map(|f| f.problems.clone())
-                .unwrap_or_default();
+            let file_probs = g.failed.get(&name).map_or_default(|f| f.problems.clone());
             problems.extend(file_probs.clone());
-            let wf_names: Vec<String> = g
-                .loaded
-                .get(&name)
-                .map(|r| {
-                    let mut seen = HashSet::new();
-                    r.defs
-                        .iter()
-                        .filter(|d| seen.insert(d.name.clone()))
-                        .map(|d| d.name.clone())
-                        .collect()
-                })
-                .unwrap_or_default();
+            let wf_names: Vec<String> = g.loaded.get(&name).map_or_default(|r| {
+                let mut seen = HashSet::new();
+                r.defs
+                    .iter()
+                    .filter(|d| seen.insert(d.name.clone()))
+                    .map(|d| d.name.clone())
+                    .collect()
+            });
             files.push(WorkflowDefinitionFile {
                 name,
                 source,

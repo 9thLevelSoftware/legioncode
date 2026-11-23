@@ -160,8 +160,7 @@ pub(crate) fn read_turn_settlement(
     let detail_msg = run
         .get("errorMessage")
         .and_then(Value::as_str)
-        .map(str::to_owned)
-        .unwrap_or(status);
+        .map_or(status, str::to_owned);
     Ok(Some(AgentResult {
         ending,
         detail: detail_msg,

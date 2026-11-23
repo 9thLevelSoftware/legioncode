@@ -207,9 +207,37 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Install wasm-bindgen-cli
+        id: install_wasm_bindgen
+        continue-on-error: true
         uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2
         with:
           tool: wasm-bindgen-cli@0.2.130
+
+      - name: Fallback install wasm-bindgen-cli via GitHub CLI
+        if: steps.install_wasm_bindgen.outcome != 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BIN_DIR="${CARGO_HOME:-$HOME/.cargo}/bin"
+          mkdir -p "$BIN_DIR"
+          TMP_DIR="$(mktemp -d)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+          ARCHIVE="wasm-bindgen-0.2.130-x86_64-unknown-linux-musl.tar.gz"
+          EXPECTED_SHA256="9687f3bb551b9f66f37ed32a40d7913a00f7962db653054e56857bc306c3227f"
+          if gh release download 0.2.130 --repo wasm-bindgen/wasm-bindgen --pattern "$ARCHIVE" --dir "$TMP_DIR"; then
+            printf '%s  %s/%s\n' "$EXPECTED_SHA256" "$TMP_DIR" "$ARCHIVE" | sha256sum -c -
+            tar -xzf "$TMP_DIR/$ARCHIVE" -C "$TMP_DIR"
+            BIN_PATH="$(find "$TMP_DIR" -type f -name wasm-bindgen | head -n 1)"
+            if [[ -n "$BIN_PATH" ]]; then
+              install -m 0755 "$BIN_PATH" "$BIN_DIR/wasm-bindgen"
+              echo "$BIN_DIR" >> "$GITHUB_PATH"
+              "$BIN_DIR/wasm-bindgen" --version
+              exit 0
+            fi
+          fi
+          cargo install --locked wasm-bindgen-cli --version 0.2.130
 
       - name: Cache Cargo dependencies
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

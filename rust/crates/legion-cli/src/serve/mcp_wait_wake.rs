@@ -38,54 +38,51 @@ pub(in crate::serve) fn evaluate_wait_wake_for_thread(
     let parent_subagents = parent_tid
         .as_ref()
         .and_then(|pid| query_wire_thread_detail(conn, pid.as_str()).ok())
-        .map(|d| {
+        .map_or_default(|d| {
             d.projection
                 .subagents
                 .into_iter()
                 .filter_map(|v| serde_json::from_value::<Subagent>(v).ok())
                 .map(|s| ParentSubagentRecord::from_subagent(&s))
                 .collect()
-        })
-        .unwrap_or_default();
-    let child_requests = target_detail
-        .map(|d| {
-            d.projection
-                .runtime_requests
-                .into_iter()
-                .filter_map(|req| {
-                    let id = req
-                        .get("id")
-                        .and_then(Value::as_str)
-                        .and_then(|s| RuntimeRequestId::new(s).ok())?;
-                    let kind = req
-                        .get("kind")
-                        .and_then(Value::as_str)
-                        .unwrap_or("unknown")
-                        .to_owned();
-                    let status = req
-                        .get("status")
-                        .and_then(Value::as_str)
-                        .unwrap_or("pending")
-                        .to_owned();
-                    let node_id = req
-                        .get("nodeId")
-                        .and_then(Value::as_str)
-                        .and_then(|s| NodeId::new(s).ok());
-                    let response_capability = req.get("responseCapability").map_or(
-                        ResponseCapabilityKind::Unknown,
-                        ResponseCapabilityKind::from_wire_value,
-                    );
-                    Some(PendingChildRequest {
-                        id,
-                        node_id,
-                        kind,
-                        status,
-                        response_capability,
-                    })
+        });
+    let child_requests = target_detail.map_or_default(|d| {
+        d.projection
+            .runtime_requests
+            .into_iter()
+            .filter_map(|req| {
+                let id = req
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .and_then(|s| RuntimeRequestId::new(s).ok())?;
+                let kind = req
+                    .get("kind")
+                    .and_then(Value::as_str)
+                    .unwrap_or("unknown")
+                    .to_owned();
+                let status = req
+                    .get("status")
+                    .and_then(Value::as_str)
+                    .unwrap_or("pending")
+                    .to_owned();
+                let node_id = req
+                    .get("nodeId")
+                    .and_then(Value::as_str)
+                    .and_then(|s| NodeId::new(s).ok());
+                let response_capability = req.get("responseCapability").map_or(
+                    ResponseCapabilityKind::Unknown,
+                    ResponseCapabilityKind::from_wire_value,
+                );
+                Some(PendingChildRequest {
+                    id,
+                    node_id,
+                    kind,
+                    status,
+                    response_capability,
                 })
-                .collect()
-        })
-        .unwrap_or_default();
+            })
+            .collect()
+    });
     let run_status =
         serde_json::from_value::<RunStatus>(Value::String(run_status_str.to_owned())).ok();
     Some(evaluate_thread_wait_wake(&ThreadWaitWakeInput {

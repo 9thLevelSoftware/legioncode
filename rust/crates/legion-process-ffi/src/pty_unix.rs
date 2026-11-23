@@ -48,10 +48,10 @@ const TIOCSCTTY: c_ulong = 0x2000_7461;
 #[repr(C)]
 #[derive(Clone, Copy, Default)]
 struct Winsize {
-    ws_row: u16,
-    ws_col: u16,
-    ws_xpixel: u16,
-    ws_ypixel: u16,
+    row: u16,
+    col: u16,
+    xpixel: u16,
+    ypixel: u16,
 }
 
 // SAFETY: Standard POSIX libc entrypoints called only with valid file descriptors and buffers.
@@ -125,10 +125,10 @@ fn open_master_and_slave(cols: u16, rows: u16) -> Result<(File, File), PtyError>
     }
 
     let ws = Winsize {
-        ws_row: rows,
-        ws_col: cols,
-        ws_xpixel: 0,
-        ws_ypixel: 0,
+        row: rows,
+        col: cols,
+        xpixel: 0,
+        ypixel: 0,
     };
     // SAFETY: `master_fd` is live and `TIOCSWINSZ` reads the initialized `Winsize` struct.
     if unsafe { ioctl(master_fd.as_raw_fd(), TIOCSWINSZ, &raw const ws) } == -1 {
@@ -238,10 +238,10 @@ impl PlatformPty {
 
     pub(crate) fn resize(&self, cols: u16, rows: u16) -> Result<(), PtyError> {
         let ws = Winsize {
-            ws_row: rows,
-            ws_col: cols,
-            ws_xpixel: 0,
-            ws_ypixel: 0,
+            row: rows,
+            col: cols,
+            xpixel: 0,
+            ypixel: 0,
         };
         // SAFETY: `self.master` is a live PTY master and `ws` is an initialized `Winsize`.
         if unsafe { ioctl(self.master.as_raw_fd(), TIOCSWINSZ, &raw const ws) } == -1 {

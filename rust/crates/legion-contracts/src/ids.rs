@@ -104,6 +104,28 @@ fn validate_lowercase_kind(kind: &'static str, raw: &str) -> Result<String, IdEr
     Ok(trimmed)
 }
 
+fn validate_tracker_account_id(kind: &'static str, raw: &str) -> Result<String, IdError> {
+    let trimmed = trim_non_empty(kind, raw)?;
+    if trimmed.chars().count() > SLUG_MAX_CHARS {
+        return Err(IdError::TooLong {
+            kind,
+            max: SLUG_MAX_CHARS,
+        });
+    }
+    let mut chars = trimmed.chars();
+    let first_ok = chars
+        .next()
+        .is_some_and(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit());
+    let rest_ok = chars.all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-');
+    if !(first_ok && rest_ok) {
+        return Err(IdError::InvalidFormat {
+            kind,
+            expected: "lowercase ASCII letter or digit followed by lowercase ASCII letters, digits, or '-'",
+        });
+    }
+    Ok(trimmed)
+}
+
 macro_rules! define_id_type {
     ($(#[$meta:meta])* $name:ident, $validator:ident) => {
         $(#[$meta])*
@@ -323,4 +345,14 @@ define_id_type!(
     /// Slug identifying an issue tracker kind (`^[a-z][a-z0-9-]*$`, max 64 chars).
     IssueTrackerKind,
     validate_lowercase_kind
+);
+define_id_type!(
+    /// Slug identifying an additional saved standalone tracker account (`^[a-z0-9][a-z0-9-]*$`, max 64 chars).
+    IssueTrackerAccountId,
+    validate_tracker_account_id
+);
+define_id_type!(
+    /// Unique identifier for a coarse server milestone notification.
+    MilestoneId,
+    trim_non_empty
 );

@@ -113,6 +113,11 @@ const LEGION_MCP_SERVER_ALIASES = new Set([
   "legioncode",
   "legion-code-direct",
   "legion_code_direct",
+  "t3-code",
+  "t3_code",
+  "t3code",
+  "t3-code-direct",
+  "t3_code_direct",
 ]);
 
 const LEGION_MCP_TOOLS: Readonly<Record<string, LegionMcpToolDefinition>> = {
@@ -365,6 +370,8 @@ const LEGION_MCP_TOOLS: Readonly<Record<string, LegionMcpToolDefinition>> = {
     ["Handle", "Handling", "Handled", "pending questions"],
     "question-respond",
   ),
+  legion_workflow: tool(["Use", "Using", "Used", "workflow runs"], "thread-send"),
+  legion_submit_output: tool(["Submit", "Submitting", "Submitted", "the result"], "thread-send"),
   legion_queue_list: tool(["List", "Listing", "Listed", "queued messages"], "queue-list"),
   legion_queue_read: tool(["Read", "Reading", "Read", "a queued message"], "queue-read"),
   legion_queue_edit: tool(["Edit", "Editing", "Edited", "a queued message"], "queue-edit"),
@@ -502,6 +509,14 @@ function resolveLegionMcpToolName(value: string): string | null {
   return name;
 }
 
+function canonicalizeMcpToolName(toolName: string): string {
+  if (toolName.startsWith("t3_")) {
+    const legionName = `legion_${toolName.slice(3)}`;
+    if (Object.hasOwn(LEGION_MCP_TOOLS, legionName)) return legionName;
+  }
+  return toolName;
+}
+
 // ACP tool prefixes vary; match loosely but require a known display-name entry.
 function parseLegionMcpToolName(value: string): string | null {
   const label = normalizeLegionMcpToolLabel(value);
@@ -511,26 +526,36 @@ function parseLegionMcpToolName(value: string): string | null {
     return server !== undefined &&
       tool !== undefined &&
       LEGION_MCP_SERVER_ALIASES.has(server.toLowerCase())
-      ? tool
+      ? canonicalizeMcpToolName(tool)
       : null;
   }
 
   const namespaceMatch =
-    /^(?<server>legion[-_]code[-_]direct|legion-code|legion_code|legioncode)(?:[.:/]|\s*·\s*)(?<tool>.+)$/i.exec(
+    /^(?<server>(?:legion|t3)[-_]code[-_]direct|(?:legion|t3)-code|(?:legion|t3)_code|(?:legion|t3)code)(?:[.:/]|\s*·\s*)(?<tool>.+)$/i.exec(
       label,
     );
   if (namespaceMatch?.groups) {
-    return namespaceMatch.groups.tool ?? null;
+    return namespaceMatch.groups.tool ? canonicalizeMcpToolName(namespaceMatch.groups.tool) : null;
   }
 
-  const prefixed = /^(?:mcp[-_]{1,2})?legion[-_ ]?code(?:__|[-_.:/ ])(?<tool>.+)$/i.exec(label);
-  const candidate = prefixed?.groups?.tool ?? label;
+  const prefixed = /^(?:mcp[-_]{1,2})?(?:legion|t3)[-_ ]?code(?:__|[-_.:/ ])(?<tool>.+)$/i.exec(
+    label,
+  );
+  const candidate = canonicalizeMcpToolName(prefixed?.groups?.tool ?? label);
   if (Object.hasOwn(LEGION_MCP_TOOLS, candidate)) return candidate;
   // OpenCode 2 thread prefixes can contain underscores; choose the longest known tool-name suffix.
-  if (!/^legion-code-/i.test(label)) return null;
+  if (!/^(?:legion|t3)-code-/i.test(label)) return null;
   let longest: string | null = null;
+  let longestLength = 0;
   for (const tool of Object.keys(LEGION_MCP_TOOLS)) {
-    if (label.endsWith(`_${tool}`) && tool.length > (longest?.length ?? 0)) longest = tool;
+    const alias = tool.startsWith("legion_") ? `t3_${tool.slice(7)}` : null;
+    if (label.endsWith(`_${tool}`) && tool.length > longestLength) {
+      longest = tool;
+      longestLength = tool.length;
+    } else if (alias !== null && label.endsWith(`_${alias}`) && alias.length > longestLength) {
+      longest = tool;
+      longestLength = alias.length;
+    }
   }
   return longest;
 }

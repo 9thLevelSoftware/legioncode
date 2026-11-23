@@ -109,6 +109,35 @@ pub struct Checkpoint {
     pub captured_at: String,
 }
 
+/// Returns the checkpoint a file rewind to `target_ordinal` restores a tracked repository to (`repositoryRewindCheckpoint`).
+#[must_use]
+pub fn repository_rewind_checkpoint(
+    checkpoints: &[Checkpoint],
+    target_ordinal: u64,
+) -> Option<&Checkpoint> {
+    let mut first: Option<&Checkpoint> = None;
+    for checkpoint in checkpoints {
+        if checkpoint.status != "ready" || checkpoint.ordinal_within_scope < target_ordinal {
+            continue;
+        }
+        if first.is_none_or(|cur| checkpoint.ordinal_within_scope < cur.ordinal_within_scope) {
+            first = Some(checkpoint);
+        }
+    }
+    let first = first?;
+    if first.ordinal_within_scope != target_ordinal && first.run_id.is_some() {
+        return None;
+    }
+    let end = first.ordinal_within_scope;
+    let unrecorded = checkpoints.iter().any(|checkpoint| {
+        checkpoint.run_id.is_some()
+            && (checkpoint.status == "error" || checkpoint.status == "missing")
+            && checkpoint.ordinal_within_scope > target_ordinal
+            && checkpoint.ordinal_within_scope < end
+    });
+    if unrecorded { None } else { Some(first) }
+}
+
 /// Payload for `checkpoint.rollback-requested` (`orchestrationV2.ts:1553-1557`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

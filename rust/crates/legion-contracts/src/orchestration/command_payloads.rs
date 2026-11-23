@@ -18,6 +18,7 @@ use super::model_selection::{
     LimitRecoveryUpdate, ModelSelection, OrchestrationNotification, WorkspaceStrategy,
 };
 use super::run_output::RunOutputSchema;
+use super::state_models::WorkflowOrigin;
 
 /// Provider interaction mode (`providerPolicy.ts:45`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -125,6 +126,21 @@ pub struct ThreadCreateCommand {
     /// Optional atomic initial message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub initial_message: Option<InitialThreadMessage>,
+}
+
+/// Wire-extended `thread.create` payload carrying `titleRenamed` and `workflowRun`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowThreadCreateCommand {
+    /// Core `thread.create` command fields.
+    #[serde(flatten)]
+    pub base: ThreadCreateCommand,
+    /// Whether the thread title was explicitly chosen by the user.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title_renamed: Option<bool>,
+    /// Workflow run provenance for workflow agent steps.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow_run: Option<WorkflowOrigin>,
 }
 
 /// Queued continuation message embedded in `thread.metadata.update`.

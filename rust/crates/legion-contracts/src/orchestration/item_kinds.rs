@@ -1,8 +1,9 @@
-//! Variant payloads for the 25 known [`TurnItemKind`] kinds (`orchestrationV2.ts:1750-1979`).
+//! Variant payloads for the 26 known [`TurnItemKind`] kinds (`orchestrationV2.ts:1750-1979`).
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::agent_feedback::{AgentFeedbackPreview, AgentFeedbackRequestStatus, AgentFeedbackTrace};
 use crate::ids::{
     CheckpointId, CheckpointScopeId, ContextHandoffId, EnvironmentId, MessageId, NodeId, PlanId,
     ProviderDriverKind, ProviderInstanceId, ProviderThreadId, RunId, RuntimeRequestId,
@@ -55,7 +56,7 @@ impl SecretRequestField {
     }
 }
 
-/// All 25 known `TurnItem` variants (`orchestrationV2.ts:1750-1979`).
+/// All 26 known `TurnItem` variants (`orchestrationV2.ts:1750-1979`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum TurnItemKind {
@@ -345,6 +346,14 @@ pub enum TurnItemKind {
         output: Option<Value>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         output_omitted: Option<bool>,
+    },
+    /// Agent feedback report card awaiting user approval (`feedback_request`).
+    #[serde(rename_all = "camelCase")]
+    FeedbackRequest {
+        preview: AgentFeedbackPreview,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        conversation_trace: Option<AgentFeedbackTrace>,
+        feedback_status: AgentFeedbackRequestStatus,
     },
 }
 

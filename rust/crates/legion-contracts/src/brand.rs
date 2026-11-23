@@ -85,20 +85,45 @@ impl BrandConfig {
         self.read_env_from(suffix, |key| std::env::var(key).ok())
     }
 
-    /// Strips known `LegionCode` MCP namespaces and tool prefixes (`mcp__legion_code__`, `mcp__legion-code__`, `legion_`).
+    /// Strips known `LegionCode` / legacy `t3` MCP namespaces, `OpenCode` aliases, and tool prefixes (`mcp__legion_code__`, `mcp__t3_code__`, `legion_`, `t3_`).
     pub fn canonical_mcp_tool_suffix<'a>(&self, tool_name: &'a str) -> &'a str {
         let mut s = tool_name;
         for ns in [
             self.mcp_namespace,
             "mcp__legion_code__",
             "mcp__legion-code__",
+            "mcp__legioncode__",
+            "mcp__legion_code_direct__",
+            "mcp__legion-code-direct__",
+            "mcp__t3_code__",
+            "mcp__t3-code__",
+            "mcp__t3code__",
+            "mcp__t3_code_direct__",
+            "mcp__t3-code-direct__",
         ] {
             if let Some(rest) = s.strip_prefix(ns) {
                 s = rest;
                 break;
             }
         }
-        for prefix in [self.mcp_tool_prefix, "legion_"] {
+        for alias in [
+            "legion-code_",
+            "legion_code_",
+            "legioncode_",
+            "legion-code-direct_",
+            "legion_code_direct_",
+            "t3-code_",
+            "t3_code_",
+            "t3code_",
+            "t3-code-direct_",
+            "t3_code_direct_",
+        ] {
+            if let Some(rest) = s.strip_prefix(alias) {
+                s = rest;
+                break;
+            }
+        }
+        for prefix in [self.mcp_tool_prefix, "legion_", "t3_"] {
             if let Some(rest) = s.strip_prefix(prefix) {
                 s = rest;
                 break;

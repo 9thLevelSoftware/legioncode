@@ -1,4 +1,4 @@
-//! WebSocket RPC method identifiers covering all 235 methods of `WsRpcGroup` plus unknown custom tags.
+//! WebSocket RPC method identifiers covering all 257 known methods of `WsRpcGroup` plus unknown custom tags.
 
 use thiserror::Error;
 
@@ -352,5 +352,15 @@ define_ws_methods!(
         (OrchestrationSubscribeThread, "orchestration.subscribeThread"),
         (OrchestrationSubscribeCommandOutput, "orchestration.subscribeCommandOutput"),
         (OrchestrationSubscribePromptSuggestion, "orchestration.subscribePromptSuggestion"),
+        (WorkflowsSubscribe, "workflows.subscribe"),
+        (WorkflowsCounts, "workflows.counts"),
+        (WorkflowsGet, "workflows.get"),
+        (WorkflowsAnswer, "workflows.answer"),
+        (WorkflowsResume, "workflows.resume"),
+        (WorkflowsCancel, "workflows.cancel"),
+        (WorkflowsGetDefinition, "workflows.getDefinition"),
+        (WorkflowsSaveDefinition, "workflows.saveDefinition"),
+        (WorkflowsDeleteDefinition, "workflows.deleteDefinition"),
+        (AgentFeedbackAnswerRequest, "agentFeedback.answerRequest"),
     ],
 );

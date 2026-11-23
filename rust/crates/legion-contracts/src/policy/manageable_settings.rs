@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 fn push_general_settings(entries: &mut Vec<(&'static str, Option<Value>)>) {
     entries.extend([
         ("addProjectBaseDirectory", Some(json!(""))),
+        ("agentFeedback.mode", Some(json!("off"))),
         ("autoResumeLimitedThreads", Some(json!(false))),
         ("automaticGitFetchInterval", Some(json!(30_000))),
         ("backgroundActivity.baseProfile", None),
@@ -143,6 +144,7 @@ fn push_feature_settings(entries: &mut Vec<(&'static str, Option<Value>)>) {
         ("usageModelAliases", Some(json!({}))),
         ("usageModelFilter", None),
         ("usagePriceOverrides", Some(json!({}))),
+        ("workflowsEnabled", Some(json!(false))),
         ("worktreeCleanup", Some(Value::Null)),
         ("worktreeSubmodules", Some(Value::Null)),
         ("worktreesDirectory", Some(json!(""))),

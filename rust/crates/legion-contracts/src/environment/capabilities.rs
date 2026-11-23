@@ -56,7 +56,7 @@ pub struct FileAttachmentsCapability {
     pub max_upload_bytes: NonZeroU64,
 }
 
-/// Capability flags advertised by an execution environment (82 fields on wire).
+/// Capability flags advertised by an execution environment (87 fields on wire).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvironmentCapabilities {
@@ -319,7 +319,22 @@ pub struct EnvironmentCapabilities {
     /// Serves linked environment threads to authorized peer links.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub linked_thread_read: Option<bool>,
+    /// Serves a thread's stream, history pages, and item detail over peer links.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link_thread_stream: Option<bool>,
+    /// Allows a full-access peer link to mint one-time client pairing credentials.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link_client_pairing: Option<bool>,
+    /// Allows the client-pairing route to mint pairing credentials for third-party peer links.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link_pairing_for_link: Option<bool>,
     /// Supports minting peer link pairing codes transitively through a full-access peer link.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transitive_peer_linking: Option<bool>,
+    /// Honors the `agentFeedback` setting and `feedback_request` turn items.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_feedback: Option<bool>,
+    /// Supports multiple saved accounts per standalone issue tracker.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issue_tracker_accounts: Option<bool>,
 }

@@ -6,16 +6,20 @@
 //! while eliminating runtime defects around permissions, unknown stream event
 //! tags, legacy pull-request unlinking, and ID-table expansion.
 
+pub mod agent_feedback;
 pub mod brand;
 pub mod environment;
 pub mod id_table;
 pub mod ids;
 pub mod ipc;
+pub mod issue;
 pub mod mcp_sign_in;
+pub mod milestones;
 pub mod orchestration;
 pub mod peer_links;
 pub mod permissions;
 pub mod policy;
 pub mod pull_requests;
 pub mod secrets;
+pub mod workflows;
 pub mod workspace_folders;

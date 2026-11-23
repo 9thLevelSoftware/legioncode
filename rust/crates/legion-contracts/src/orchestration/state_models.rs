@@ -3,7 +3,9 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
-use crate::ids::{CommandId, ProjectId, ProviderInstanceId, ProviderThreadId, ThreadId};
+use crate::ids::{
+    CommandId, EnvironmentId, ProjectId, ProviderInstanceId, ProviderThreadId, ThreadId,
+};
 use crate::policy::RuntimeMode;
 use crate::pull_requests::{ThreadLinkedPullRequest, ThreadPullRequestLink};
 
@@ -189,6 +191,66 @@ pub struct RollbackUnrestored {
     pub request_id: CommandId,
     /// Repository display names whose files could not be restored.
     pub repositories: Vec<String>,
+}
+
+/// Workflow run provenance attached to an agent-step thread (`OrchestrationV2WorkflowOrigin`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowOrigin {
+    /// Environment hosting the workflow run.
+    pub environment_id: EnvironmentId,
+    /// Workflow run ID.
+    pub run_id: String,
+    /// Registered workflow name.
+    pub workflow: String,
+    /// Agent step name.
+    pub step: String,
+}
+
+/// Wire-extended thread lineage carrying `workflowStep` without breaking downstream `ThreadLineage` literals.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowThreadLineage {
+    /// Core thread lineage coordinates.
+    #[serde(flatten)]
+    pub base: ThreadLineage,
+    /// True when the thread is an agent step inside a workflow run.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow_step: Option<bool>,
+}
+
+/// Returns `true` when a thread with these lineage attributes appears in thread lists (`isListedThreadLineage`).
+#[must_use]
+pub fn is_listed_lineage(
+    relationship_to_parent: Option<&str>,
+    side_chat: Option<bool>,
+    workflow_step: Option<bool>,
+) -> bool {
+    relationship_to_parent != Some("subagent")
+        && side_chat != Some(true)
+        && workflow_step != Some(true)
+}
+
+/// Returns `true` when `lineage` represents a top-level listed thread (`isListedThreadLineage`).
+#[must_use]
+pub fn is_listed_thread_lineage(lineage: &WorkflowThreadLineage) -> bool {
+    is_listed_lineage(
+        lineage.base.relationship_to_parent.as_deref(),
+        lineage.base.side_chat,
+        lineage.workflow_step,
+    )
+}
+
+/// Wire-extended `AppThread` carrying `workflowRun` without breaking downstream `AppThread` literals.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowAppThread {
+    /// Core thread aggregate.
+    #[serde(flatten)]
+    pub base: AppThread,
+    /// Workflow run provenance when the thread is a workflow agent step.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow_run: Option<WorkflowOrigin>,
 }
 
 /// Lightweight visit update payload (`orchestrationV2.ts:554-557`).

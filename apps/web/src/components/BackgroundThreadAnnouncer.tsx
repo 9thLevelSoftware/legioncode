@@ -1,6 +1,6 @@
-import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
-import { effectiveSnoozed } from "@t3tools/client-runtime/state/thread-settled";
-import { isListedThreadLineage } from "@t3tools/contracts";
+import { scopeThreadRef, scopedThreadKey } from "@legioncode/client-runtime/environment";
+import { effectiveSnoozed } from "@legioncode/client-runtime/state/thread-settled";
+import { isListedThreadLineage } from "@legioncode/contracts";
 import type { AnyRouter } from "@tanstack/react-router";
 import type { AtomRegistry } from "effect/reactivity";
 

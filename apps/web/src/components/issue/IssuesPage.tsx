@@ -7,9 +7,9 @@ import {
   issueFilterScopes,
   issueTrackerKey,
   type HeldIssuePage,
-} from "@t3tools/client-runtime/issue-list";
-import { issueTrackerDetailText } from "@t3tools/client-runtime/state/issue-trackers";
-import { issueEntryKey } from "@t3tools/client-runtime/state/issues";
+} from "@legioncode/client-runtime/issue-list";
+import { issueTrackerDetailText } from "@legioncode/client-runtime/state/issue-trackers";
+import { issueEntryKey } from "@legioncode/client-runtime/state/issues";
 import type {
   EnvironmentId,
   IssueInvolvement,
@@ -19,7 +19,7 @@ import type {
   IssueTrackerKind,
   IssueTrackerSummary,
   ProjectId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   ArrowDownUpIcon,
@@ -91,7 +91,7 @@ import {
   type RightPanelSurface,
 } from "~/rightPanelStore";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import { squashAtomCommandFailure } from "@legioncode/client-runtime/state/runtime";
 import { useProjects } from "~/state/entities";
 import { useEnvironments, useIssuesSupported } from "~/state/environments";
 import { issueEnvironment, useIssueList, type IssueListTarget } from "~/state/issues";
@@ -401,7 +401,7 @@ export function IssuesPage() {
   };
 
   // A link into the page names an issue before any row was pressed.
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- opens the URL-linked issue in the right panel store
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- opens the URL-linked issue in the right panel store
   useEffect(() => {
     if (
       rightPanelRef === null ||
@@ -461,7 +461,7 @@ export function IssuesPage() {
     if (!event.repeat) toggleRightPanel();
   });
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to the document right panel shortcut
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- subscribes to the document right panel shortcut
   useEffect(() => {
     document.addEventListener("keydown", onRightPanelKeyDown);
     return () => document.removeEventListener("keydown", onRightPanelKeyDown);
@@ -475,7 +475,7 @@ export function IssuesPage() {
   const listBody: ReactNode = !issuesSupported ? (
     <PullRequestsUnavailableState
       title={gt("Issues unavailable")}
-      error={gt("Update this environment's T3 Code server to browse issues.")}
+      error={gt("Update this environment's LegionCode server to browse issues.")}
     />
   ) : noneAnswered && list.isPending ? (
     <PullRequestListGhost />
@@ -749,7 +749,7 @@ export function IssuesPage() {
             open={rightPanelState.isOpen}
             keybindings={keybindings}
             getShortcutContext={getShortcutContext}
-            widthStorageKey="t3code:issue-panel-width"
+            widthStorageKey="legioncode:issue-panel-width"
             defaultWidth={typeof window === "undefined" ? 640 : Math.floor(window.innerWidth / 2)}
             surfaces={presence.value?.surfaces ?? []}
             environmentId={panelEnvironmentId}

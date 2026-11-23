@@ -1,6 +1,6 @@
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
-import { TrimmedNonEmptyString } from "@t3tools/contracts";
+import { TrimmedNonEmptyString } from "@legioncode/contracts";
 import type {
   IssueActor,
   IssueComment,
@@ -12,9 +12,9 @@ import type {
   IssueTemplate,
   IssueViewerPermissions,
   PullRequestState,
-} from "@t3tools/contracts";
-import { decodeJsonResult } from "@t3tools/shared/schemaJson";
-import type { TrackerIssueSummary } from "@t3tools/source-control-core/server/IssueTracker";
+} from "@legioncode/contracts";
+import { decodeJsonResult } from "@legioncode/shared/schemaJson";
+import type { TrackerIssueSummary } from "@legioncode/source-control-core/server/IssueTracker";
 
 import type * as Issues from "./issues.graphql.ts";
 import { toReactions } from "./gitHubPullRequestJson.ts";

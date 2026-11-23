@@ -343,9 +343,9 @@ export const DesktopCliCommandStateSchema = Schema.Struct({
   installedPath: Schema.NullOr(Schema.String),
   onPath: Schema.Boolean,
   shadowedBy: Schema.optionalKey(Schema.String),
-  /** For an installed `t3` that is off PATH: the shell startup file that adds it, and whether it has. */
+  /** For an installed `legioncode` that is off PATH: the shell startup file that adds it, and whether it has. */
   pathSetup: Schema.optionalKey(Schema.Struct({ file: Schema.String, added: Schema.Boolean })),
-  /** The app's bundled `t3` launcher, which runs without Node or a PATH entry. */
+  /** The app's bundled `legioncode` launcher, which runs without Node or a PATH entry. */
   launcherPath: Schema.NullOr(Schema.String),
 });
 export type DesktopCliCommandState = typeof DesktopCliCommandStateSchema.Type;
@@ -1123,7 +1123,7 @@ export interface DesktopBridge {
   getLocalEnvironmentBootstraps: () => readonly DesktopEnvironmentBootstrap[];
   getLocalEnvironmentEnabled: () => boolean;
   setLocalEnvironmentEnabled: (enabled: boolean) => Promise<void>;
-  /** The environment ID recorded in this app's T3 home, such as its own machine's background service. */
+  /** The environment ID recorded in this app's LegionCode home, such as its own machine's background service. */
   getHostEnvironmentId?: () => Promise<string | null>;
   getLocalEnvironmentBearerToken: (options?: LocalEnvironmentBearerTokenOptions) => Promise<string>;
   getClientSettings: () => Promise<ClientSettings | null>;
@@ -1233,7 +1233,7 @@ export interface DesktopBridge {
 }
 
 /** Renderer callback invoked by Electron with a fresh user gesture before display-media capture. */
-export const DESKTOP_PREVIEW_RECORDING_CAPTURE_TRIGGER = "__t3DesktopPreviewRecordingCapture";
+export const DESKTOP_PREVIEW_RECORDING_CAPTURE_TRIGGER = "__legionDesktopPreviewRecordingCapture";
 
 /**
  * Dictation for the annotation editor drawn inside a preview guest. The guest only shows

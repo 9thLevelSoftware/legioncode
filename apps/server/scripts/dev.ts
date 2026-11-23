@@ -21,7 +21,7 @@ const resolveLaunchTarget = () => {
   if (!legacyForced) {
     const rustBinary = resolveRustCliBinary({
       repoRoot,
-      // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone Node watch launcher has no Effect runtime.
+      // oxlint-disable-next-line legioncode/no-global-process-runtime -- Standalone Node watch launcher has no Effect runtime.
       platform: process.platform,
       env: process.env,
     });

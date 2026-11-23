@@ -1,6 +1,6 @@
 import * as Dialog from "../../components/ui/Dialog";
-import type { ServerProvider } from "@t3tools/contracts";
-import { CHATGPT_USAGE_URL, usesChatGptSharing } from "@t3tools/shared/usageLimits";
+import type { ServerProvider } from "@legioncode/contracts";
+import { CHATGPT_USAGE_URL, usesChatGptSharing } from "@legioncode/shared/usageLimits";
 import { T, useGT } from "gt-react-native";
 import { Linking, Pressable, View } from "react-native";
 import { AppText as Text } from "../../components/ui/AppText";
@@ -42,7 +42,7 @@ export function ChatGptSharingStatus({ provider }: { provider: ServerProvider | 
         className="min-h-11 justify-center"
         onPress={() => void Linking.openURL(CHATGPT_USAGE_URL).catch(() => undefined)}
       >
-        <Text className="text-xs font-t3-medium text-primary">
+        <Text className="text-xs font-legion-medium text-primary">
           <T>Manage usage</T>
         </Text>
       </Pressable>

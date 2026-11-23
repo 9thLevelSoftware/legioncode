@@ -1,14 +1,17 @@
 // @effect-diagnostics nodeBuiltinImport:off - Effect has no incremental digest or free-space query.
-import { expandHomePath } from "@t3tools/provider-core/server/pathExpansion";
+import { expandHomePath } from "@legioncode/provider-core/server/pathExpansion";
 import * as ModelManifest from "./ModelManifest.ts";
 import { resolveProviderCompatibility } from "./providerCompatibility.ts";
-import { cliArchiveTarCommand } from "@t3tools/shared/cliRelease";
-import { compareSemverVersions } from "@t3tools/shared/semver";
+import { cliArchiveTarCommand } from "@legioncode/shared/cliRelease";
+import { compareSemverVersions } from "@legioncode/shared/semver";
 import * as EffectNodeStream from "@effect/platform-node/NodeStream";
-import { ProviderDriverKind, type ProviderInstallState } from "@t3tools/contracts";
-import * as HostProcess from "@t3tools/shared/HostProcess";
-import { resolveNodeExecutable, nodeRuntimeUnavailableMessage } from "@t3tools/shared/nodeRuntime";
-import { resolveCommandPath } from "@t3tools/shared/shell";
+import { ProviderDriverKind, type ProviderInstallState } from "@legioncode/contracts";
+import * as HostProcess from "@legioncode/shared/HostProcess";
+import {
+  resolveNodeExecutable,
+  nodeRuntimeUnavailableMessage,
+} from "@legioncode/shared/nodeRuntime";
+import { resolveCommandPath } from "@legioncode/shared/shell";
 import * as Clock from "effect/Clock";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
@@ -137,7 +140,7 @@ interface AntigravityInstallationService {
 export class AntigravityInstallation extends Context.Service<
   AntigravityInstallation,
   AntigravityInstallationService
->()("t3/provider/AntigravityInstallation") {
+>()("legioncode/provider/AntigravityInstallation") {
   static readonly layer = Layer.effect(
     AntigravityInstallation,
     Effect.gen(function* () {
@@ -447,7 +450,7 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
         if (yield* isWithdrawn(installed.version))
           return yield* installationError(
             "resolve",
-            `Antigravity ${installed.version} no longer works with this T3 Code release. Update it in Antigravity setup.`,
+            `Antigravity ${installed.version} no longer works with this LegionCode release. Update it in Antigravity setup.`,
           );
         return installed;
       }
@@ -510,7 +513,7 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
       function* (executable: AntigravityExecutable, expectedVersion: string) {
         const validationScope = yield* Effect.scope;
         const profileDirectory = yield* Effect.acquireRelease(
-          fs.makeTempDirectory({ prefix: "t3-antigravity-validate-" }),
+          fs.makeTempDirectory({ prefix: "legion-antigravity-validate-" }),
           (directory) =>
             fs
               .remove(directory, { recursive: true, force: true })

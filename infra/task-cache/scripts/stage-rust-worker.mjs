@@ -7,8 +7,8 @@ const REQUIRED_WORKER_FILES = [
   "worker.mjs",
   "worker_runtime.mjs",
   "wrangler.toml",
-  "t3_wasm_ffi.js",
-  "t3_wasm_ffi_bg.wasm",
+  "legion_wasm_ffi.js",
+  "legion_wasm_ffi_bg.wasm",
 ];
 
 const scriptDir = NodePath.dirname(NodeURL.fileURLToPath(import.meta.url));
@@ -23,7 +23,7 @@ const { values } = NodeUtil.parseArgs({
   },
 });
 
-const legacyWorkerFlag = process.env.T3CODE_LEGACY_WORKER?.trim().toLowerCase();
+const legacyWorkerFlag = process.env.LEGIONCODE_LEGACY_WORKER?.trim().toLowerCase();
 const isLegacyWorker = legacyWorkerFlag === "1" || legacyWorkerFlag === "true";
 
 function assertValidWorkerDist(sourceDir) {
@@ -55,7 +55,9 @@ if (values.check) {
     `Verified ${REQUIRED_WORKER_FILES.length} Rust worker artifacts in ${rustWorkersDistDir}\n`,
   );
 } else if (isLegacyWorker) {
-  process.stdout.write("Skipping Rust worker staging because T3CODE_LEGACY_WORKER is enabled.\n");
+  process.stdout.write(
+    "Skipping Rust worker staging because LEGIONCODE_LEGACY_WORKER is enabled.\n",
+  );
 } else {
   assertValidWorkerDist(rustWorkersDistDir);
   const targetDir = values["out-dir"]

@@ -6,15 +6,15 @@ import {
   ThreadId,
   type OrchestrationMessageContext,
   type ServerProviderSkill,
-} from "@t3tools/contracts";
-import { collectComposerInlineTokens } from "@t3tools/shared/composerInlineTokens";
-import { serializeAssistantCitation } from "@t3tools/shared/assistantCitations";
+} from "@legioncode/contracts";
+import { collectComposerInlineTokens } from "@legioncode/shared/composerInlineTokens";
+import { serializeAssistantCitation } from "@legioncode/shared/assistantCitations";
 import {
   ATTACHMENT_ONLY_BOOTSTRAP_PROMPT,
   collectComposerContextReferences,
   formatComposerContextReference,
   projectComposerContextForProvider,
-} from "@t3tools/shared/composerContextReferences";
+} from "@legioncode/shared/composerContextReferences";
 import { describe, expect, it } from "vite-plus/test";
 import {
   assistantCitationDraftWithinLimit,

@@ -6,7 +6,7 @@ import {
   SourceControlProviderKind,
   type PullRequestDetailView,
   type PullRequestStack,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import { expect, it, vi } from "vite-plus/test";
 import { page, userEvent } from "vite-plus/test/browser";
 import { DraftId, useComposerDraftStore } from "~/composerDraftStore";

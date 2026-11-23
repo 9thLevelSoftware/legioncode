@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 
-import { EnvironmentId, IssueInvolvement, IssueListState, ProjectId } from "@t3tools/contracts";
+import { EnvironmentId, IssueInvolvement, IssueListState, ProjectId } from "@legioncode/contracts";
 
 /**
  * What the issues page remembers between visits; the selection in the URL is not part of it.
@@ -26,7 +26,7 @@ const DEFAULT_ISSUE_LIST_PREFERENCES = {
   status: "open",
 } as const satisfies IssueListPreferences;
 
-const STORAGE_KEY = "t3.issues.preferences";
+const STORAGE_KEY = "legion.issues.preferences";
 
 const BoundedPreference = Schema.String.check(Schema.isMaxLength(200));
 export const IssueListPreferencesSchema = Schema.Struct({

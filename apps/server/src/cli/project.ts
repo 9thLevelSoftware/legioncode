@@ -5,7 +5,7 @@ import {
   type ProjectMutation,
   type ProjectSnapshot,
   ProjectId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Console from "effect/Console";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
@@ -29,7 +29,7 @@ import * as ProjectFaviconResolver from "../project/ProjectFaviconResolver.ts";
 import * as RepositoryIdentityResolver from "../project/RepositoryIdentityResolver.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import { projectMutationOperation } from "../project/ProjectMutation.ts";
-import * as T3ProjectFileLoader from "../project/T3ProjectFileLoader.ts";
+import * as LegionProjectFileLoader from "../project/LegionProjectFileLoader.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as ManagedPolicy from "../policy/ManagedPolicy.ts";
 import * as WorkspacePaths from "../workspace/WorkspacePaths.ts";
@@ -186,7 +186,7 @@ const makeProjectCliRuntimeLayer = (layerProjectService: typeof RuntimeLayer.lay
     Layer.provideMerge(
       ProjectFaviconResolver.layer.pipe(
         Layer.provide(WorkspacePaths.layer),
-        Layer.provide(T3ProjectFileLoader.layer),
+        Layer.provide(LegionProjectFileLoader.layer),
       ),
     ),
     Layer.provideMerge(WorkspacePaths.layer),

@@ -1,0 +1,21 @@
+DESCRIPTION
+  Issue a new client pairing token.
+
+USAGE
+  legioncode auth pairing create [flags]
+
+FLAGS
+  --base-dir string    Explicit LegionCode data directory; runtime state is stored under userdata (equivalent to LEGIONCODE_HOME).
+  --dev-url string     Dev web URL to proxy/redirect to (equivalent to VITE_DEV_SERVER_URL).
+  --scope choice       Authorization scope to grant. Repeat for multiple scopes; replaces the default set: orchestration:read, orchestration:operate, settings:write, providers:manage, environment:maintain, preview:operate, diagnostics:read, terminal:read, terminal:operate, source-control:write, filesystem:read, filesystem:write, relay:read, access:read, access:write, relay:write. (choices: orchestration:read, orchestration:operate, settings:write, providers:manage, environment:maintain, preview:operate, diagnostics:read, terminal:read, terminal:operate, filesystem:read, filesystem:write, source-control:write, access:read, access:write, relay:read, relay:write, relay:configure)
+  --ttl string         TTL, for example `5m`, `1h`, `30d`, or `15 minutes`.
+  --label string       Optional human-readable label.
+  --base-url string    Optional public base URL used to print a ready `/pair#token=...` link.
+  --json               Emit JSON instead of human-readable output.
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)

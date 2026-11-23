@@ -65,13 +65,13 @@ import {
   latestProviderTurnForAttempt,
   resolveProjectProviderInstanceEnabled,
   SECRET_REQUEST_UNSAVED_NOTE,
-} from "@t3tools/contracts";
-import { getProviderOptionCurrentValue, withLegacyUltracodeEffort } from "@t3tools/shared/model";
-import { backgroundWorkHoldsCompletion } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
-import { runRanAfter } from "@t3tools/shared/orchestrationV2ThreadError";
-import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
-import { formatThreadLink } from "@t3tools/shared/threadLinks";
-import { threadPullRequestUpdatedAtMs } from "@t3tools/shared/threadPullRequests";
+} from "@legioncode/contracts";
+import { getProviderOptionCurrentValue, withLegacyUltracodeEffort } from "@legioncode/shared/model";
+import { backgroundWorkHoldsCompletion } from "@legioncode/shared/orchestrationV2PendingBackgroundWork";
+import { runRanAfter } from "@legioncode/shared/orchestrationV2ThreadError";
+import { resolveProjectSettings } from "@legioncode/shared/projectSettings";
+import { formatThreadLink } from "@legioncode/shared/threadLinks";
+import { threadPullRequestUpdatedAtMs } from "@legioncode/shared/threadPullRequests";
 import {
   normalizeThreadPullRequestKey,
   visibleThreadPullRequests,
@@ -94,7 +94,7 @@ import {
   subagentResultForRun,
   delegatedTaskProgress,
   delegatedTaskReportRuns,
-} from "@t3tools/provider-core/server/subagentProjection";
+} from "@legioncode/provider-core/server/subagentProjection";
 import {
   DispatchModeLimit,
   type DispatchModeRefusal,
@@ -238,7 +238,7 @@ export interface OrchestratorMcpServiceShape {
 export class OrchestratorMcpService extends Context.Service<
   OrchestratorMcpService,
   OrchestratorMcpServiceShape
->()("t3/mcp/OrchestratorMcpService") {}
+>()("legioncode/mcp/OrchestratorMcpService") {}
 
 export const isThreadManagementError = Schema.is(ThreadManagementService.ThreadManagementError);
 
@@ -459,7 +459,7 @@ function providerConstraints(
   return constraints;
 }
 
-/** t3_thread_launch keeps a selection as given, so it can hold options its model does not have. */
+/** legion_thread_launch keeps a selection as given, so it can hold options its model does not have. */
 function knownOptions(
   options: ReadonlyArray<ProviderOptionSelection> | undefined,
   descriptors: ReadonlyArray<ProviderOptionDescriptor> | undefined,
@@ -1398,7 +1398,7 @@ const make = Effect.gen(function* () {
   const resolveProjectTarget = (
     parent: Pick<OrchestrationV2ThreadProjection, "thread"> | undefined,
     projectId: ProjectId | undefined,
-    missingMessage = "Pass projectId: this MCP client is not running inside a T3 thread.",
+    missingMessage = "Pass projectId: this MCP client is not running inside a LegionCode thread.",
   ) =>
     projectId !== undefined
       ? Effect.succeed(projectId)
@@ -2320,7 +2320,7 @@ const make = Effect.gen(function* () {
         return yield* failure(
           "invalid_request",
           parent === undefined
-            ? "bindToCurrentThread needs an agent running inside a T3 thread."
+            ? "bindToCurrentThread needs an agent running inside a LegionCode thread."
             : "bindToCurrentThread binds to this thread, which belongs to a different project.",
         );
       }
@@ -2404,7 +2404,7 @@ const make = Effect.gen(function* () {
           return yield* failure(
             "invalid_request",
             parent === undefined
-              ? "bindToCurrentThread needs an agent running inside a T3 thread."
+              ? "bindToCurrentThread needs an agent running inside a LegionCode thread."
               : "bindToCurrentThread binds to this thread, which belongs to a different project.",
           );
         }
@@ -3343,7 +3343,7 @@ const make = Effect.gen(function* () {
         : yield* resolveProjectTarget(
             parent,
             input.projectId,
-            "Pass projectId, or allProjects: true for every project. This MCP client is not running inside a T3 thread.",
+            "Pass projectId, or allProjects: true for every project. This MCP client is not running inside a LegionCode thread.",
           );
       if (!input.allProjects && input.projectId !== undefined) {
         yield* requireProject(input.projectId);

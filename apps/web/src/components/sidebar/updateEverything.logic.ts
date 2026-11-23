@@ -1,16 +1,16 @@
 import {
   managedNightlyDeniedMessage,
   managedUpdatesDenial,
-} from "@t3tools/client-runtime/contract-labels";
-import type { ServerUpdateState } from "@t3tools/client-runtime/state/server";
+} from "@legioncode/client-runtime/contract-labels";
+import type { ServerUpdateState } from "@legioncode/client-runtime/state/server";
 import {
   type DesktopUpdateChannel,
   type EnvironmentId,
   type ServerConfig,
   type ServerSelfUpdateCapability,
-} from "@t3tools/contracts";
-import { cliReleaseChannelOf, desktopUpdateChannelOf } from "@t3tools/shared/cliRelease";
-import { compareSemverVersions } from "@t3tools/shared/semver";
+} from "@legioncode/contracts";
+import { cliReleaseChannelOf, desktopUpdateChannelOf } from "@legioncode/shared/cliRelease";
+import { compareSemverVersions } from "@legioncode/shared/semver";
 import { msg } from "gt-react";
 
 import { m, type MessageResolver } from "~/i18n/messages";
@@ -383,7 +383,7 @@ export function collectChannelSwitchTargets(
       skip(
         resolve(
           msg("run `{command}` there", {
-            command: `t3 update --channel ${release.channel === "nightly" ? "nightly" : "stable"} --allow-downgrade`,
+            command: `legioncode update --channel ${release.channel === "nightly" ? "nightly" : "stable"} --allow-downgrade`,
           }),
         ),
       );

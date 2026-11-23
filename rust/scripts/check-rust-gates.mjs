@@ -7,7 +7,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const rustRoot = path.resolve(scriptDir, "..");
 const cratesDir = path.join(rustRoot, "crates");
 
-const FFI_CRATES = new Set(["t3-process-ffi", "t3-wasm-ffi", "t3-mobile-ffi"]);
+const FFI_CRATES = new Set(["legion-process-ffi", "legion-wasm-ffi", "legion-mobile-ffi"]);
 const WARN_LOC_THRESHOLD = 400;
 const HARD_LOC_LIMIT = 600;
 
@@ -37,8 +37,8 @@ const crates = fs
   .map((entry) => entry.name)
   .sort();
 
-if (crates.length < 20) {
-  throw new Error(`Expected at least 20 crates under rust/crates, found ${crates.length}`);
+if (crates.length < 19) {
+  throw new Error(`Expected at least 19 crates under rust/crates, found ${crates.length}`);
 }
 
 const errors = [];

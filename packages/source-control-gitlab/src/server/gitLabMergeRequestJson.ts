@@ -1,4 +1,4 @@
-import { trimOptionalString as trimmed } from "@t3tools/source-control-core/server/pullRequestUtils";
+import { trimOptionalString as trimmed } from "@legioncode/source-control-core/server/pullRequestUtils";
 import * as Cause from "effect/Cause";
 import * as Exit from "effect/Exit";
 import * as Result from "effect/Result";
@@ -21,11 +21,11 @@ import type {
   PullRequestConversationThread,
   PullRequestReviewerCandidate,
   PullRequestState,
-} from "@t3tools/contracts";
-import { TrimmedNonEmptyString } from "@t3tools/contracts";
-import { quoteGitPatchPath } from "@t3tools/shared/gitPatchPath";
-import { decodeJsonResult } from "@t3tools/shared/schemaJson";
-import type { ProviderChangeRequestWatchFingerprint } from "@t3tools/source-control-core/server/PullRequestProvider";
+} from "@legioncode/contracts";
+import { TrimmedNonEmptyString } from "@legioncode/contracts";
+import { quoteGitPatchPath } from "@legioncode/shared/gitPatchPath";
+import { decodeJsonResult } from "@legioncode/shared/schemaJson";
+import type { ProviderChangeRequestWatchFingerprint } from "@legioncode/source-control-core/server/PullRequestProvider";
 
 /** Unknown pipeline or merge status values must not fail the whole payload. */
 const RawUserSchema = Schema.Struct({

@@ -1,9 +1,12 @@
-import type { ProjectId } from "@t3tools/contracts";
-import type { SidebarProjectSortOrder, SidebarThreadSortOrder } from "@t3tools/contracts/settings";
-import { generateSpreadPinOrderKeys, pinOrderKeyBetween } from "@t3tools/shared/pinOrderKey";
+import type { ProjectId } from "@legioncode/contracts";
+import type {
+  SidebarProjectSortOrder,
+  SidebarThreadSortOrder,
+} from "@legioncode/contracts/settings";
+import { generateSpreadPinOrderKeys, pinOrderKeyBetween } from "@legioncode/shared/pinOrderKey";
 import type { EnvironmentThreadShell } from "./models.ts";
 
-export { generateSpreadPinOrderKeys, pinOrderKeyBetween } from "@t3tools/shared/pinOrderKey";
+export { generateSpreadPinOrderKeys, pinOrderKeyBetween } from "@legioncode/shared/pinOrderKey";
 
 export interface ThreadSortInput {
   readonly createdAt: string;

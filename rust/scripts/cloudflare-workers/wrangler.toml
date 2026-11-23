@@ -1,4 +1,4 @@
-name = "t3code-edge-worker"
+name = "legioncode-edge-worker"
 main = "worker.mjs"
 compatibility_date = "2026-11-01"
 
@@ -8,21 +8,21 @@ globs = ["**/*.wasm"]
 
 [[d1_databases]]
 binding = "INDEX"
-database_name = "t3-task-cache-index"
+database_name = "legioncode-task-cache-index"
 database_id = "00000000-0000-0000-0000-000000000001"
 
 [[d1_databases]]
 binding = "SAVINGS"
-database_name = "t3-task-cache-savings"
+database_name = "legioncode-task-cache-savings"
 database_id = "00000000-0000-0000-0000-000000000002"
 
 [[r2_buckets]]
 binding = "ARTIFACTS"
-bucket_name = "t3-task-cache-artifacts"
+bucket_name = "legioncode-task-cache-artifacts"
 
 [[r2_buckets]]
 binding = "CLIENTS"
-bucket_name = "t3-mobile-dev-clients"
+bucket_name = "legioncode-mobile-dev-clients"
 
 [[hyperdrive]]
 binding = "RELAY_DB"

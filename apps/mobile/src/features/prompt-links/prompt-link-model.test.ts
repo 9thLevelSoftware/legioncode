@@ -1,4 +1,4 @@
-import { parseNewThreadLink } from "@t3tools/shared/promptLinks";
+import { parseNewThreadLink } from "@legioncode/shared/promptLinks";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
@@ -11,7 +11,7 @@ describe("promptLinkSearchFromParams", () => {
   it("round-trips decoded route params into the shared parser", () => {
     const search = promptLinkSearchFromParams({
       prompt: "Fix the bug & add tests = done?",
-      repo: ["pingdotgg/t3code", "ignored/second"],
+      repo: ["9thLevelSoftware/legioncode", "ignored/second"],
       provider: "codex",
       screen: "NewTask",
     });
@@ -21,7 +21,7 @@ describe("promptLinkSearchFromParams", () => {
       value: {
         kind: "new",
         prompt: { text: "Fix the bug & add tests = done?", hiddenCharacters: 0 },
-        repository: { owner: "pingdotgg", name: "t3code" },
+        repository: { owner: "9thLevelSoftware", name: "legioncode" },
         provider: "codex",
         model: null,
       },
@@ -30,7 +30,7 @@ describe("promptLinkSearchFromParams", () => {
 });
 
 describe("stepPendingPromptLink", () => {
-  const waiting = "repo=t3tools%2Ft3code";
+  const waiting = "repo=9thLevelSoftware%2Flegioncode";
 
   it("drops a link whose screen is missing from the first state after it was parsed", () => {
     expect(stepPendingPromptLink(waiting, { screenOnStack: false, ready: true })).toEqual({

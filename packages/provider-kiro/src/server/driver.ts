@@ -1,29 +1,29 @@
-import { ProviderDriverKind, TextGenerationError } from "@t3tools/contracts";
+import { ProviderDriverKind, TextGenerationError } from "@legioncode/contracts";
 import { KiroSettings } from "../settings.ts";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 
-import type * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
+import type * as ProviderHost from "@legioncode/provider-core/server/ProviderHost";
 import {
   defaultProviderContinuationIdentity,
   type ProviderDriver,
   type ProviderInstance,
-} from "@t3tools/provider-core/server/driver";
-import { ProviderDriverError } from "@t3tools/provider-core/server/errors";
-import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/instanceEnvironment";
-import { expandHomePath } from "@t3tools/provider-core/server/pathExpansion";
-import { withInstanceIdentity } from "@t3tools/provider-core/server/instanceIdentity";
-import { makeManualOnlyProviderMaintenanceCapabilities } from "@t3tools/provider-core/server/maintenanceResolver";
-import { makeManagedServerProvider } from "@t3tools/provider-core/server/managedProvider";
+} from "@legioncode/provider-core/server/driver";
+import { ProviderDriverError } from "@legioncode/provider-core/server/errors";
+import { mergeProviderInstanceEnvironment } from "@legioncode/provider-core/server/instanceEnvironment";
+import { expandHomePath } from "@legioncode/provider-core/server/pathExpansion";
+import { withInstanceIdentity } from "@legioncode/provider-core/server/instanceIdentity";
+import { makeManualOnlyProviderMaintenanceCapabilities } from "@legioncode/provider-core/server/maintenanceResolver";
+import { makeManagedServerProvider } from "@legioncode/provider-core/server/managedProvider";
 import {
   haveProviderSnapshotSettingsChanged,
   makeProviderSnapshotSettingsSource,
   type ProviderSnapshotSettings,
-} from "@t3tools/provider-core/server/snapshotSettings";
-import type { ProviderTextGeneration } from "@t3tools/provider-core/server/textGeneration";
+} from "@legioncode/provider-core/server/snapshotSettings";
+import type { ProviderTextGeneration } from "@legioncode/provider-core/server/textGeneration";
 import { type KiroAdapterV2DriverEnv, makeKiroAdapterV2Driver } from "./adapter.ts";
 import {
   buildInitialKiroProviderSnapshot,
@@ -34,7 +34,7 @@ import {
 const DRIVER_KIND = ProviderDriverKind.make("kiro");
 const decodeKiroSettings = Schema.decodeSync(KiroSettings);
 // Kiro updates itself in the background (`kiro-cli update` reports only), so
-// T3 offers no one-click update.
+// LegionCode offers no one-click update.
 const MAINTENANCE = makeManualOnlyProviderMaintenanceCapabilities({
   provider: DRIVER_KIND,
   packageName: null,

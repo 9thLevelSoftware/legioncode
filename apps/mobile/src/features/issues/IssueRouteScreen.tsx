@@ -1,9 +1,9 @@
 import { RegistryContext, useAtomValue } from "@effect/atom-react";
 import { StackActions, useNavigation, type StaticScreenProps } from "@react-navigation/native";
-import { issueEventSentence } from "@t3tools/client-runtime/issue-presentation";
-import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
-import { createIssueCommentPager } from "@t3tools/client-runtime/state/issues";
-import { visibleLinkedThreads } from "@t3tools/client-runtime/state/threads";
+import { issueEventSentence } from "@legioncode/client-runtime/issue-presentation";
+import { sourceControlClients } from "@legioncode/client-runtime/source-control-clients";
+import { createIssueCommentPager } from "@legioncode/client-runtime/state/issues";
+import { visibleLinkedThreads } from "@legioncode/client-runtime/state/threads";
 import type {
   IssueComment,
   IssueEvent,
@@ -11,7 +11,7 @@ import type {
   IssueReaction,
   IssueState,
   IssueSummary,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import { AsyncResult } from "effect/reactivity";
 import { T, useGT, useMessages, Var } from "gt-react-native";
 import { useContext, useState } from "react";
@@ -117,7 +117,7 @@ function IssueStateControl(props: {
       className="min-h-8 flex-row items-center gap-1.5 active:opacity-70"
     >
       <SymbolView name={status.icon} size={14} tintColorClassName={status.tint} />
-      <Text className={`text-xs font-t3-medium ${status.text}`}>{status.label}</Text>
+      <Text className={`text-xs font-legion-medium ${status.text}`}>{status.label}</Text>
       {moves.length ? (
         <SymbolView name="chevron.down" size={9} tintColorClassName="accent-icon-muted" />
       ) : null}
@@ -162,12 +162,12 @@ function IssueIdentity(props: {
         busy={props.busy}
         onMove={props.onMove}
       />
-      <Text selectable className="text-xl font-t3-bold leading-7">
+      <Text selectable className="text-xl font-legion-bold leading-7">
         {issue.title}
       </Text>
       <View className="flex-row items-center gap-2">
         <PullRequestAvatar actor={issue.author} size={20} />
-        <Text className="min-w-0 flex-1 text-xs font-t3-medium" numberOfLines={1}>
+        <Text className="min-w-0 flex-1 text-xs font-legion-medium" numberOfLines={1}>
           {issue.author?.login ?? gt("Unknown author")}
         </Text>
         <Text className="shrink text-right text-2xs text-foreground-muted" numberOfLines={1}>
@@ -222,7 +222,7 @@ function IssueIdentity(props: {
         {issue.assignees.map((actor) => (
           <View key={actor.login} className="flex-row items-center gap-1.5">
             <PullRequestAvatar actor={actor} size={18} />
-            <Text className="text-xs font-t3-medium">{actor.login}</Text>
+            <Text className="text-xs font-legion-medium">{actor.login}</Text>
           </View>
         ))}
         {canAssign ? (
@@ -383,7 +383,7 @@ function IssueCommentCard(props: {
     <View className="gap-3 rounded-2xl bg-grouped-card p-3">
       <View className="flex-row items-center gap-2">
         <PullRequestAvatar actor={comment.author} size={22} />
-        <Text className="min-w-0 flex-1 text-sm font-t3-medium" numberOfLines={1}>
+        <Text className="min-w-0 flex-1 text-sm font-legion-medium" numberOfLines={1}>
           {comment.author?.login ?? gt("Unknown author")}
         </Text>
         <Text className="text-2xs text-foreground-tertiary">
@@ -410,7 +410,7 @@ function IssueEventRow({ event }: { readonly event: IssueEvent }) {
     <View className="flex-row items-center gap-2 px-1">
       <PullRequestAvatar actor={event.actor} size={18} />
       <Text className="min-w-0 flex-1 text-xs text-foreground-muted">
-        <Text className="text-xs font-t3-medium">
+        <Text className="text-xs font-legion-medium">
           {event.actor?.login ?? gt("Someone", { $context: "an unknown person" })}
         </Text>{" "}
         {issueEventSentence(event, messages)}

@@ -1,4 +1,4 @@
-import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { thrownErrorMessage } from "@legioncode/client-runtime/errors";
 import {
   AuthOrchestrationOperateScope,
   AuthSettingsWriteScope,
@@ -6,12 +6,12 @@ import {
   type ProjectScript,
   type ProjectScriptIcon,
   type ResolvedKeybindingsConfig,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
   type AtomCommandResult,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@legioncode/client-runtime/state/runtime";
 import {
   BugIcon,
   FlaskConicalIcon,
@@ -299,7 +299,7 @@ function ProjectScriptEditorForm({
   const pendingSubmissionRef = useRef<object | null>(null);
   // A save that settles after this form is replaced must not close or error
   // the request that replaced it.
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- drops the pending save on unmount so a late result cannot close or fail the next request
+  // oxlint-disable-next-line legioncode/no-unreasoned-state-sync -- drops the pending save on unmount so a late result cannot close or fail the next request
   useEffect(
     () => () => {
       pendingSubmissionRef.current = null;
@@ -504,7 +504,7 @@ function ProjectScriptEditorForm({
               </Label>
               <Textarea
                 id="script-command"
-                // oxlint-disable-next-line t3code/no-untranslated-copy -- example shell command
+                // oxlint-disable-next-line legioncode/no-untranslated-copy -- example shell command
                 placeholder="bun test"
                 value={command}
                 onChange={(event) => setCommand(event.target.value)}

@@ -6,10 +6,10 @@ import {
   type RunId,
   OrchestratorMcpFailure,
   type OrchestrationV2Command,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Effect from "effect/Effect";
-import { modelSelectionCommandType } from "@t3tools/shared/model";
-import { topOfPinnedRunOrderKey } from "@t3tools/shared/pinOrderKey";
+import { modelSelectionCommandType } from "@legioncode/shared/model";
+import { topOfPinnedRunOrderKey } from "@legioncode/shared/pinOrderKey";
 
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import * as McpToolAccess from "../../McpToolAccess.ts";
@@ -141,7 +141,7 @@ export const layer = McpToolAccess.toLayer(ThreadToolkit, {
       };
     }),
   ),
-  t3_thread_search: McpToolAccess.reads((input) =>
+  legion_thread_search: McpToolAccess.reads((input) =>
     Effect.gen(function* () {
       const { caller } = yield* readCaller();
       const scope = yield* McpInvocationContext.McpInvocationContext;
@@ -158,7 +158,7 @@ export const layer = McpToolAccess.toLayer(ThreadToolkit, {
       };
     }),
   ),
-  t3_thread_transfer: McpToolAccess.either(
+  legion_thread_transfer: McpToolAccess.either(
     (input) => input.action === "status",
     McpToolAccess.reads((input) =>
       Effect.gen(function* () {
@@ -215,7 +215,7 @@ export const layer = McpToolAccess.toLayer(ThreadToolkit, {
         }),
     ),
   ),
-  t3_thread_configure: McpToolAccess.either(
+  legion_thread_configure: McpToolAccess.either(
     (input) => input.modelSelection === undefined,
     McpToolAccess.reads((input) =>
       Effect.gen(function* () {
@@ -245,7 +245,7 @@ export const layer = McpToolAccess.toLayer(ThreadToolkit, {
       }),
     ),
   ),
-  t3_pending_request: McpToolAccess.either(
+  legion_pending_request: McpToolAccess.either(
     (input) => input.action !== "respond",
     McpToolAccess.reads((input) =>
       Effect.gen(function* () {
@@ -283,7 +283,7 @@ export const layer = McpToolAccess.toLayer(ThreadToolkit, {
       }),
     ),
   ),
-  t3_queue: McpToolAccess.either(
+  legion_queue: McpToolAccess.either(
     (input) => input.action === "list" || input.action === "read",
     McpToolAccess.reads((input) =>
       Effect.gen(function* () {
@@ -374,7 +374,7 @@ export const layer = McpToolAccess.toLayer(ThreadToolkit, {
       }),
     ),
   ),
-  t3_thread_organize: writesThread((input) =>
+  legion_thread_organize: writesThread((input) =>
     Effect.gen(function* () {
       const { threads, projection, caller } = yield* readThread(input.threadId);
       const common = { commandId: yield* newCommandId(), threadId: projection.thread.id };

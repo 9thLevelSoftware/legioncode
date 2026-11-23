@@ -5,7 +5,7 @@ import {
   type OrchestrationV2CheckpointScope,
   type OrchestrationV2ProviderThread,
   type OrchestrationV2ThreadShell,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Effect from "effect/Effect";
 import type * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";

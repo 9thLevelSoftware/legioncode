@@ -1,5 +1,5 @@
-import type { ClientConnectionMethod, EnvironmentId } from "@t3tools/contracts";
-import type { RelayProtectedError } from "@t3tools/contracts/relay";
+import type { ClientConnectionMethod, EnvironmentId } from "@legioncode/contracts";
+import type { RelayProtectedError } from "@legioncode/contracts/relay";
 import type { ManagedRelayClientError } from "../relay/managedRelay.ts";
 import { msg } from "gt-i18n";
 import { dpopFailureText, relayProtectedErrorText } from "../relay/errorPresentation.ts";
@@ -145,7 +145,7 @@ function relayProtectedError(error: RelayProtectedError): ConnectionAttemptError
         detail,
         i18nMessage,
         traceId,
-        // The tunnel carried the request when T3 Code is what failed to answer.
+        // The tunnel carried the request when LegionCode is what failed to answer.
         hop:
           endpointFailure === "origin_unreachable" || endpointFailure === "invalid_response"
             ? "server"
@@ -232,7 +232,7 @@ export function mapRemoteEnvironmentError(
       ? { detail: `${cause.message} ${NETWORK_BLOCKING_HINT}` }
       : translatableDetail(...text, NETWORK_BLOCKING_HINT);
   };
-  // Over T3 Connect the relay already reached the host, so a request that never
+  // Over Legion Connect the relay already reached the host, so a request that never
   // arrives was blocked between this device and the tunnel.
   const unreachableHop = connectionMethod === "relay" ? "tunnel" : "server";
   const via = connectionMethod === "relay" ? "relay" : "direct";

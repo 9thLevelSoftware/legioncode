@@ -1,6 +1,6 @@
-import type { ScopedProjectRef } from "@t3tools/contracts";
-import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
-import { resolveNewThreadModelSelection } from "@t3tools/shared/usageLimits";
+import type { ScopedProjectRef } from "@legioncode/contracts";
+import { resolveProjectSettings } from "@legioncode/shared/projectSettings";
+import { resolveNewThreadModelSelection } from "@legioncode/shared/usageLimits";
 
 import { type DraftId, useComposerDraftStore } from "../composerDraftStore";
 import { resolveProjectDefaultProviderModelSelection } from "../providerInstances";

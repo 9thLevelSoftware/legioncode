@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["LegionComposerEditorModule"]
+  },
+  "android": {
+    "modules": ["dev.legioncode.composereditor.LegionComposerEditorModule"]
+  }
+}

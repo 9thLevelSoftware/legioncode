@@ -1,17 +1,17 @@
-import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
-import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { AuthOrchestrationOperateScope } from "@legioncode/contracts";
+import { thrownErrorMessage } from "@legioncode/client-runtime/errors";
 import { m as resolveMessage } from "~/i18n/messages";
 import { settingsScopeEnvironmentLabels } from "./settingsScopeAxis";
 import { Spinner } from "~/components/ui/spinner";
 import { ArchiveIcon, ArchiveX, Trash2Icon } from "lucide-react";
-import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
-import { presentThreadShell } from "@t3tools/client-runtime/state/shell";
+import { scopeThreadRef, scopedThreadKey } from "@legioncode/client-runtime/environment";
+import { presentThreadShell } from "@legioncode/client-runtime/state/shell";
 import {
   type AtomCommandResult,
   isAtomCommandInterrupted,
   settlePromise,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@legioncode/client-runtime/state/runtime";
 import { readEnvironmentScope, useEnvironmentScope } from "../../state/session";
 import { useSettingsScope } from "./SettingsScopeContext";
 import { useThreadActions } from "../../hooks/useThreadActions";

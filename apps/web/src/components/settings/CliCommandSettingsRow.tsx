@@ -1,4 +1,4 @@
-import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { thrownErrorMessage } from "@legioncode/client-runtime/errors";
 import { msg, T, useMessages } from "gt-react";
 import { useState } from "react";
 
@@ -15,12 +15,12 @@ import { SettingsRow } from "./settingsLayout";
 import { useSearchableSetting } from "./settingsSearch";
 
 const FAILURE_TITLES = {
-  install: msg("Could not install t3"),
-  uninstall: msg("Could not remove t3"),
-  addToPath: msg("Could not add t3 to PATH"),
+  install: msg("Could not install legioncode"),
+  uninstall: msg("Could not remove legioncode"),
+  addToPath: msg("Could not add legioncode to PATH"),
 } as const;
 
-/** The desktop `t3` command's state, and its actions with a toast on failure. */
+/** The desktop `legioncode` command's state, and its actions with a toast on failure. */
 export function useDesktopCliCommand() {
   const bridge = getDesktopCliCommandBridge();
   const query = useEnvironmentQuery(bridge ? desktopCliCommandStateAtom : null);
@@ -62,12 +62,15 @@ export function CliCommandSettingsRow() {
   const installed = state.installedPath !== null;
   const description = state.shadowedBy
     ? resolve(
-        msg("Another t3 at {path} runs first in a new terminal. Remove it to use T3 Code's.", {
-          path: state.shadowedBy,
-        }),
+        msg(
+          "Another legioncode at {path} runs first in a new terminal. Remove it to use LegionCode's.",
+          {
+            path: state.shadowedBy,
+          },
+        ),
       )
     : !installed
-      ? resolve(msg("Run T3 Code's CLI as `t3` from any terminal."))
+      ? resolve(msg("Run LegionCode's CLI as `legioncode` from any terminal."))
       : state.onPath
         ? resolve(
             msg("Installed at {path}. Open a new terminal to use it.", {
@@ -89,7 +92,7 @@ export function CliCommandSettingsRow() {
               )
             : resolve(
                 msg(
-                  "Installed at {path}, which is not on your PATH yet. Add its folder to your PATH to run `t3`.",
+                  "Installed at {path}, which is not on your PATH yet. Add its folder to your PATH to run `legioncode`.",
                   { path: state.installedPath },
                 ),
               );
@@ -112,8 +115,8 @@ export function CliCommandSettingsRow() {
             onClick={() => run(installed ? "uninstall" : "install")}
           >
             {installed
-              ? resolve(msg("Remove", { $context: "verb, uninstalls the t3 command" }))
-              : resolve(msg("Install", { $context: "verb, installs the t3 command" }))}
+              ? resolve(msg("Remove", { $context: "verb, uninstalls the legioncode command" }))
+              : resolve(msg("Install", { $context: "verb, installs the legioncode command" }))}
           </Button>
         </div>
       }

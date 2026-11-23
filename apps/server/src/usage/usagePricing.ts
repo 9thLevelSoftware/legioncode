@@ -3,9 +3,9 @@ import type {
   UsageCostSource,
   UsageModelPriceOverride,
   UsageTokenTotals,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 
-import type { UsageRecord, UsageSpeed } from "@t3tools/provider-core/server/usage";
+import type { UsageRecord, UsageSpeed } from "@legioncode/provider-core/server/usage";
 
 export interface TokenRates {
   readonly inputCostPerToken: number;

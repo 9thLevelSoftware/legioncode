@@ -9,11 +9,11 @@ import {
   type OrchestrationV2LinkedSender,
   type RuntimeMode,
   type ThreadId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
-import { formatThreadLink, hostedThreadLink } from "@t3tools/shared/threadLinks";
+import { formatThreadLink, hostedThreadLink } from "@legioncode/shared/threadLinks";
 
 const ALL_MCP_CAPABILITIES = [
   "preview",
@@ -38,35 +38,35 @@ export interface McpClientCaller {
   readonly label: string;
   readonly access: AuthMcpClientAccess;
   /**
-   * Another T3 Code environment's peer link. What it starts here carries its
+   * Another LegionCode environment's peer link. What it starts here carries its
    * session as `linkOrigin`, and it changes only that work (`linkOrigin.ts`).
    */
   readonly linked?: boolean | undefined;
   /**
-   * Narrower modes the client asked for on this request (`T3-Mode-Limit`):
+   * Narrower modes the client asked for on this request (`x-legioncode-mode-limit`):
    * another environment passing on the limits of the agent it calls for.
    */
   readonly narrowedTo?: ClientModes | undefined;
-  /** A linked environment's thread this request is made for (`T3-Sender-Thread`). */
+  /** A linked environment's thread this request is made for (`x-legioncode-sender-thread`). */
   readonly senderThread?: OrchestrationV2LinkedSender | undefined;
   /** An outside client's thread links go through this hosted app, as Copy thread's do. */
   readonly hostedAppUrl?: string | undefined;
 }
 
 /**
- * `T3-Mode-Limit: <runtimeMode>/<interactionMode>` lets an OAuth client cap
+ * `x-legioncode-mode-limit: <runtimeMode>/<interactionMode>` lets an OAuth client cap
  * a request below what it was approved with: another environment passes on
  * the limits of the agent it calls for. It can only narrow (see
  * `clientModeCeiling`), so a client gains nothing by sending a broad one.
  */
-export const MODE_LIMIT_HEADER = "t3-mode-limit";
+export const MODE_LIMIT_HEADER = "x-legioncode-mode-limit";
 
 /**
- * `T3-Sender-Thread: <environmentId>/<threadId>/<title>`, each URI-encoded: the
+ * `x-legioncode-sender-thread: <environmentId>/<threadId>/<title>`, each URI-encoded: the
  * thread another environment makes a request for, so what it sends here can name
  * it. Read only from a linked client.
  */
-export const SENDER_THREAD_HEADER = "t3-sender-thread";
+export const SENDER_THREAD_HEADER = "x-legioncode-sender-thread";
 
 export interface ClientModes {
   readonly runtimeMode: RuntimeMode;
@@ -143,16 +143,16 @@ export interface McpInvocationScope {
   /** False while the Linked environments beta is off here; `/mcp` reads it per request. */
   readonly linkedEnvironments?: boolean;
   /**
-   * The origin this `/mcp` request reached, e.g. a T3 Connect tunnel. Hosted clients cannot
+   * The origin this `/mcp` request reached, e.g. a Legion Connect tunnel. Hosted clients cannot
    * see the URL they were configured with, so links they must fetch carry it. Unset in-process.
    */
   readonly origin?: string | undefined;
-  /** False when the calling thread's project is on no forge T3 reads; `/mcp` reads it per request. */
+  /** False when the calling thread's project is on no forge LegionCode reads; `/mcp` reads it per request. */
   readonly forge?: boolean;
 }
 
 /**
- * T3 Code renders `t3-thread://` links as thread chips. Other MCP clients cannot open them, so
+ * LegionCode renders `legion-thread://` links as thread chips. Other MCP clients cannot open them, so
  * they get the hosted link Copy thread copies, which opens the thread in either app or a browser.
  * A known `title` labels the chip for clients that cannot load this environment's threads.
  */
@@ -171,11 +171,11 @@ export const threadLinkFor = (
 export class McpInvocationContext extends Context.Service<
   McpInvocationContext,
   McpInvocationScope
->()("t3/mcp/McpInvocationContext") {}
+>()("legioncode/mcp/McpInvocationContext") {}
 
 /**
  * `McpSchema.EnabledWhen` for tools a delegated child must not see or call.
- * EnabledWhen only receives the MCP client profile, so read the T3 caller from the request fiber.
+ * EnabledWhen only receives the MCP client profile, so read the LegionCode caller from the request fiber.
  */
 export const hiddenFromSubagents = (): boolean => {
   const fiber = Fiber.getCurrent();
@@ -257,7 +257,7 @@ export const requireThreadMcpCapability = <const C extends "preview" | "device">
 const threadCallerRequired = (operation: string) =>
   new OrchestratorMcpFailure({
     code: "thread_credential_required",
-    message: `${operation} acts as the calling T3 thread, so it needs an agent running inside T3 Code. This MCP client signed in from outside a thread.`,
+    message: `${operation} acts as the calling LegionCode thread, so it needs an agent running inside LegionCode. This MCP client signed in from outside a thread.`,
   });
 
 export type McpThreadInvocationScope = McpInvocationScope & { readonly thread: McpThreadCaller };

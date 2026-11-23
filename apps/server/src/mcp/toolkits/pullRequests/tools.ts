@@ -20,7 +20,7 @@ import {
   ThreadPullRequestLinkSource,
   TrimmedNonEmptyString,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Schema from "effect/Schema";
 import * as McpSchema from "effect/ai/McpSchema";
 import * as Tool from "effect/ai/Tool";
@@ -88,7 +88,7 @@ export class PullRequestThreadRequiredError extends Schema.TaggedError<PullReque
   {},
 ) {
   override get message(): string {
-    return "Pass threadId: this MCP client is not running inside a T3 thread.";
+    return "Pass threadId: this MCP client is not running inside a LegionCode thread.";
   }
 }
 
@@ -124,7 +124,7 @@ export class PullRequestProjectNotFoundError extends Schema.TaggedError<PullRequ
   { repository: Schema.String },
 ) {
   override get message(): string {
-    return `No project in this environment is a checkout of ${this.repository}, so its pull requests cannot be read here. Add one with t3_project_create.`;
+    return `No project in this environment is a checkout of ${this.repository}, so its pull requests cannot be read here. Add one with legion_project_create.`;
   }
 }
 
@@ -297,7 +297,7 @@ export type ListThreadPullRequestsResult = typeof ListThreadPullRequestsResult.T
 
 const LinkPullRequestTool = Tool.make("link_pull_request", {
   description:
-    "Link a PR to this thread. T3 shows its status and settles the thread on merge. For several PRs, use `link_pull_requests`.",
+    "Link a PR to this thread. LegionCode shows its status and settles the thread on merge. For several PRs, use `link_pull_requests`.",
   parameters: PullRequestTargetInput,
   success: LinkPullRequestResult,
   failure: PullRequestToolError,
@@ -390,7 +390,7 @@ const WatchPullRequestInput = Schema.Struct({
 
 const WatchPullRequestTool = Tool.make("watch_pull_request", {
   description:
-    "Watch an open PR for this thread, linking it first if needed. T3 wakes you on failed checks, passed required checks, new comments or reviews, or conflicts. Handle old comments first. Only later ones wake you. After this call, end your turn. The watch stays on after each wake, so do not call this again on a wake. A wake is not a merge decision. Check readiness yourself.",
+    "Watch an open PR for this thread, linking it first if needed. LegionCode wakes you on failed checks, passed required checks, new comments or reviews, or conflicts. Handle old comments first. Only later ones wake you. After this call, end your turn. The watch stays on after each wake, so do not call this again on a wake. A wake is not a merge decision. Check readiness yourself.",
   parameters: WatchPullRequestInput,
   success: WatchPullRequestResult,
   failure: PullRequestToolError,

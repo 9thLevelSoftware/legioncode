@@ -1,0 +1,19 @@
+DESCRIPTION
+  Set the environment's theme. The web app this server serves and the desktop app on this machine switch to it; a desktop app connected from another machine does not.
+
+USAGE
+  legioncode theme set [flags] <theme>
+
+ARGUMENTS
+  theme string    A theme id (a built-in, or one this machine publishes, where themes/nightfall.json is "nightfall"), or a path to a theme JSON file to publish and set in one step.
+
+FLAGS
+  --base-dir string    Explicit LegionCode data directory; runtime state is stored under userdata (equivalent to LEGIONCODE_HOME).
+  --id string          Theme id to publish a file under, instead of its filename.
+
+GLOBAL FLAGS
+  --help, -h                                                          Show help information
+  --version, -v                                                       Show version information
+  --wizard                                                            Start wizard mode for a command
+  --completions <bash|zsh|fish|powershell|sh|pwsh>                    Print shell completion script (choices: bash, zsh, fish, powershell, sh, pwsh)
+  --log-level <all|trace|debug|info|warn|warning|error|fatal|none>    Sets the minimum log level (choices: all, trace, debug, info, warn, warning, error, fatal, none)

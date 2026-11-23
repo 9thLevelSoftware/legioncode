@@ -1,7 +1,7 @@
-import { errorDisplayMessage } from "@t3tools/client-runtime/errors";
+import { errorDisplayMessage } from "@legioncode/client-runtime/errors";
 import * as Dialog from "../../components/ui/Dialog";
 import { RegistryContext, useAtomMount, useAtomValue } from "@effect/atom-react";
-import { normalizeProviderAccentColor } from "@t3tools/client-runtime/state/provider-instance-display";
+import { normalizeProviderAccentColor } from "@legioncode/client-runtime/state/provider-instance-display";
 import {
   AuthProvidersManageScope,
   type EnvironmentId,
@@ -10,15 +10,19 @@ import {
   type ServerProvider,
   type ServerProviderResetCredits,
   type ServerProviderUsageWindow,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   type ResetCreditChoice,
   paceOf,
   paceRemainingPercent,
   remainingPercent,
   resetCountdown,
-} from "@t3tools/shared/usageLimits";
-import { formatDuration, limitsNotice, resetCreditChoices } from "@t3tools/shared/usageLimitsCopy";
+} from "@legioncode/shared/usageLimits";
+import {
+  formatDuration,
+  limitsNotice,
+  resetCreditChoices,
+} from "@legioncode/shared/usageLimitsCopy";
 import { msg, T, useGT, useMessages, Var } from "gt-react-native";
 import { type ReactNode, useContext, useRef, useState } from "react";
 import { Atom } from "effect/reactivity";
@@ -95,7 +99,7 @@ function WindowRow(props: {
     <View className="gap-1">
       <View className="flex-row items-baseline justify-between gap-3">
         <Text className="text-sm text-foreground">{window.label}</Text>
-        <Text className="text-sm font-t3-medium tabular-nums text-foreground">
+        <Text className="text-sm font-legion-medium tabular-nums text-foreground">
           <T>
             <Var>{remaining}</Var>% left
           </T>
@@ -199,7 +203,7 @@ export function AccountLimits(props: {
       <View className="flex-row items-center gap-2">
         <ProviderIcon provider={props.driver} size={16} />
         <View className="min-w-0 flex-1 flex-row items-baseline gap-2">
-          <Text className="text-base font-t3-medium text-foreground">{props.label}</Text>
+          <Text className="text-base font-legion-medium text-foreground">{props.label}</Text>
           {props.instanceLabel !== props.label ? (
             <AccountInstanceLabel key={props.instanceLabel} value={props.instanceLabel} />
           ) : null}
@@ -226,7 +230,7 @@ export function AccountLimits(props: {
           className="min-h-11 justify-center"
           onPress={() => void Linking.openURL(externalUsage.url).catch(() => undefined)}
         >
-          <Text className="text-sm font-t3-medium text-primary">
+          <Text className="text-sm font-legion-medium text-primary">
             <T>Manage usage</T>
           </Text>
         </Pressable>
@@ -306,8 +310,8 @@ export function ResetCredits(props: {
               <Text
                 className={
                   dense
-                    ? "text-xs font-t3-medium text-foreground"
-                    : "text-sm font-t3-medium text-foreground"
+                    ? "text-xs font-legion-medium text-foreground"
+                    : "text-sm font-legion-medium text-foreground"
                 }
               >
                 {busy

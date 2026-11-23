@@ -1,7 +1,7 @@
-import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
-import { managedCapabilityDenial } from "@t3tools/client-runtime/contract-labels";
+import { thrownErrorMessage } from "@legioncode/client-runtime/errors";
+import { managedCapabilityDenial } from "@legioncode/client-runtime/contract-labels";
 import { useAtomValue } from "@effect/atom-react";
-import { connectionStatusTitle } from "@t3tools/client-runtime/connection";
+import { connectionStatusTitle } from "@legioncode/client-runtime/connection";
 import { AsyncResult } from "effect/reactivity";
 import {
   ChevronDownIcon,
@@ -27,7 +27,7 @@ import type {
   ScheduledTaskUpsertInput,
   ScheduledTaskWebhookDeliverySummary,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   DEFAULT_WEBHOOK_PROMPT,
   emptyWebhookFilterDraft,
@@ -35,9 +35,9 @@ import {
   removeWebhookFilterDraft,
   WEBHOOK_FILTER_OPS,
   type WebhookFilterDraft,
-} from "@t3tools/client-runtime/scheduled-task-webhook";
-import { scheduleTimeZoneLabel } from "@t3tools/client-runtime/scheduled-task-time-zone";
-import { scheduledTaskWorktreeBaseRef } from "@t3tools/client-runtime/scheduled-task-worktree";
+} from "@legioncode/client-runtime/scheduled-task-webhook";
+import { scheduleTimeZoneLabel } from "@legioncode/client-runtime/scheduled-task-time-zone";
+import { scheduledTaskWorktreeBaseRef } from "@legioncode/client-runtime/scheduled-task-worktree";
 import {
   MAX_WEBHOOK_DELIVERY_AGE_MINUTES,
   MAX_WEBHOOK_FILTERS,
@@ -45,11 +45,11 @@ import {
   ProviderInstanceId,
   resolveEnvironmentMachineKind,
   scheduledTaskThreadMode,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@legioncode/client-runtime/state/runtime";
 import { msg, T, useGT, useLocale, useMessages, Var } from "gt-react";
 import { m, type MessageResolver } from "../../i18n/messages";
 
@@ -59,7 +59,7 @@ import { getCustomModelOptionsByInstance } from "../../modelSelection";
 import { providerInstanceEntriesFor } from "../../providerInstances";
 import { usePrimaryCloudLinkState } from "../../cloud/cloudLinkState";
 import { requestConfirmDialog } from "../../confirmDialog";
-import { webhookAddress } from "@t3tools/client-runtime/webhook-address";
+import { webhookAddress } from "@legioncode/client-runtime/webhook-address";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { useNowMinute } from "../../hooks/useNowMinute";
@@ -75,7 +75,7 @@ import {
   useVisibleThreadShells,
 } from "../../state/entities";
 import { buildThreadRouteParams } from "../../threadRoutes";
-import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { scopeThreadRef } from "@legioncode/client-runtime/environment";
 import { environmentAtomList, environmentIdsKey } from "../../state/environmentAtomList";
 import { usePaginatedBranches, useThreadSearch } from "../../state/queries";
 import { formatEnvironmentQueryError, useEnvironmentQuery } from "../../state/query";
@@ -85,8 +85,8 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { WorktreeBaseBranchPicker } from "../WorktreeBaseBranchPicker";
 import { EnvironmentMachineIcon } from "../EnvironmentMachineIcon";
 import { ConnectionStatusDot, connectionPhaseDotClassName } from "../ConnectionStatusDot";
-import { AuthOrchestrationOperateScope, clampManagedRuntimeMode } from "@t3tools/contracts";
-import { resolvePastedPath } from "@t3tools/shared/path";
+import { AuthOrchestrationOperateScope, clampManagedRuntimeMode } from "@legioncode/contracts";
+import { resolvePastedPath } from "@legioncode/shared/path";
 import { useManagedPolicy } from "~/state/managedPolicy";
 import { ManagedNotice } from "../ManagedPolicy";
 import { readEnvironmentScope } from "~/state/session";
@@ -303,7 +303,7 @@ function WebhookFiltersField({
               <div className="grid min-w-0 flex-1 grid-cols-1">
                 <Input
                   aria-label={gt("Filter {number} value", { number: index + 1 })}
-                  // oxlint-disable-next-line t3code/no-untranslated-copy -- webhook action values, matched literally
+                  // oxlint-disable-next-line legioncode/no-untranslated-copy -- webhook action values, matched literally
                   placeholder={filter.op === "in" ? "opened, reopened" : "opened"}
                   value={filter.value}
                   onChange={(event) => update(index, { value: event.target.value })}
@@ -1643,7 +1643,7 @@ function ScheduledTaskEditorForm({
       reportFailure(
         gt("Once is not available here"),
         gt(
-          "This environment runs an older T3 Code. Update it to schedule a one-time task, or pick another schedule.",
+          "This environment runs an older LegionCode. Update it to schedule a one-time task, or pick another schedule.",
         ),
       );
       return;

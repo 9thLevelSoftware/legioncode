@@ -1,7 +1,7 @@
-import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { thrownErrorMessage } from "@legioncode/client-runtime/errors";
 import { useRouter } from "@tanstack/react-router";
-import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import type { ScopedProjectRef } from "@t3tools/contracts";
+import { squashAtomCommandFailure } from "@legioncode/client-runtime/state/runtime";
+import type { ScopedProjectRef } from "@legioncode/contracts";
 import { msg } from "gt-react";
 
 import { useComposerDraftStore } from "../composerDraftStore";

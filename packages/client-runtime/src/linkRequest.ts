@@ -8,8 +8,8 @@ import {
   type PeerLinkSummary,
   resolveEnvironmentMachineKind,
   type ServerConfig,
-} from "@t3tools/contracts";
-import { isLocalLoopbackHost } from "@t3tools/shared/hostClassification";
+} from "@legioncode/contracts";
+import { isLocalLoopbackHost } from "@legioncode/shared/hostClassification";
 import * as Option from "effect/Option";
 
 import type { EnvironmentPresentation } from "./connection/presentation.ts";
@@ -83,13 +83,13 @@ export interface LinkableMachine {
   readonly label: string;
   readonly machine: EnvironmentMachineKind;
   readonly connected: boolean;
-  /** Found on the user's T3 Connect account rather than saved in this client. */
+  /** Found on the user's Legion Connect account rather than saved in this client. */
   readonly connectOnly: boolean;
   /** Whether the thread's environment already has a link to it. */
   readonly linked: boolean;
   /**
    * Where the client knows it answers, most preferred first: the addresses it
-   * reports, then its saved routes, then its T3 Connect address. The server
+   * reports, then its saved routes, then its Legion Connect address. The server
    * keeps only those that answer as this machine. Empty for a machine reached
    * only over SSH or loopback, which name this client's device.
    */
@@ -103,7 +103,7 @@ const isLoopbackUrl = (url: string) => {
 };
 
 /**
- * The catalog's machines other than the thread's own, in catalog order, then those only T3
+ * The catalog's machines other than the thread's own, in catalog order, then those only Legion
  * Connect knows. `links` are the thread environment's; an expired one no longer counts as
  * linked. `connect` is what relay discovery found, and a server reaches a machine there as a
  * browser does, so its Connect address is usable.

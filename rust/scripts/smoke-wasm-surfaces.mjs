@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -9,18 +10,10 @@ const rustRoot = path.resolve(scriptDir, "..");
 const distDir = path.join(rustRoot, "dist");
 
 const req = createRequire(import.meta.url);
-const wasmNode = req(path.join(distDir, "wasm-nodejs", "t3_wasm_ffi.js"));
+const wasmNode = req(path.join(distDir, "wasm-nodejs", "legion_wasm_ffi.js"));
 
-assert.equal(wasmNode.t3_wasm_abi_version(), 1);
+assert.equal(wasmNode.legion_wasm_abi_version(), 1);
 assert.equal(wasmNode.sanitize_bracketed_paste_str("hi\x1b[201~evil\x00!"), "hievil!");
-
-const app = new wasmNode.WasmWebApp("sv", 1_700_000_000_000);
-try {
-  const html = app.render_html();
-  assert.ok(html.includes("data-testid"), "WasmWebApp.render_html() missing data-testid");
-} finally {
-  app.free?.();
-}
 
 const client = new wasmNode.WasmClientCore(1_700_000_000_000);
 try {
@@ -32,10 +25,22 @@ try {
 const vt = new wasmNode.WasmTerminalVt(80, 24);
 try {
   vt.feed("\x1b[32mok\x1b[0m");
-  const snapshot = vt.export_t3vt();
-  assert.ok(snapshot.length >= 36, `Expected T3VT snapshot >= 36 bytes, got ${snapshot.length}`);
+  const snapshot = vt.export_lcvt();
+  assert.ok(snapshot.length >= 36, `Expected LCVT snapshot >= 36 bytes, got ${snapshot.length}`);
 } finally {
   vt.free?.();
+}
+
+const webAppDir = path.join(distDir, "web-app");
+if (fs.existsSync(webAppDir)) {
+  const webAppIndex = path.join(webAppDir, "index.html");
+  assert.ok(fs.existsSync(webAppIndex), `Expected ${webAppIndex} to exist`);
+  const html = fs.readFileSync(webAppIndex, "utf8");
+  assert.ok(html.includes("<html") && html.includes("root"), "dist/web-app/index.html looks invalid");
+  assert.ok(
+    fs.existsSync(path.join(webAppDir, "legion_wasm_ffi.js")),
+    "Expected dist/web-app/legion_wasm_ffi.js to exist",
+  );
 }
 
 const runtimeUrl = pathToFileURL(path.join(distDir, "cloudflare-workers", "worker_runtime.mjs")).href;

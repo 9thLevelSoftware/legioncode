@@ -5,7 +5,7 @@ import type {
   OrchestrationV2ThreadProjection,
   ScopedThreadRef,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { T, Var } from "gt-react";
 import { Atom } from "effect/reactivity";

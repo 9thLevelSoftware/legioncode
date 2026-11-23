@@ -2,7 +2,7 @@
 
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import * as Console from "effect/Console";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -12,11 +12,18 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { Command, Flag } from "effect/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import sharp from "sharp";
 
 import { BRAND_ASSET_PATHS, DEVELOPMENT_PUBLIC_ICON_OVERRIDES } from "./lib/brand-assets.ts";
 import { encodePngIco, readPngDimensions, WINDOWS_ICON_SIZES } from "./lib/icon-export.ts";
 
 const DESIGN_GENERATION = 26;
+const COMPOSER_CANVAS_PT = 1024;
+const MACOS_BODY_SIZE = 824;
+const MACOS_BODY_INSET = 100;
+const IOS_CORNER_RADIUS = 230;
+const MACOS_CORNER_RADIUS = 185;
+const SHARP_SVG_DENSITY = 300;
 const ICON_COMPOSER_EXECUTABLE_PARTS = [
   "Contents",
   "Applications",
@@ -32,6 +39,8 @@ const STANDALONE_ICON_COMPOSER_EXECUTABLE_PARTS = [
   "ictool",
 ] as const;
 const NonNegativeInt = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+const RENDERERS = ["auto", "ictool", "sharp"] as const;
+type IconRenderer = (typeof RENDERERS)[number];
 
 const IconComposerVersion = Schema.Struct({
   "bundle-version": Schema.NonEmptyString,
@@ -40,6 +49,34 @@ const IconComposerVersion = Schema.Struct({
 const decodeIconComposerVersion = Schema.decodeUnknownEffect(
   Schema.fromJsonString(IconComposerVersion),
 );
+
+const IconJsonLayer = Schema.Struct({
+  hidden: Schema.optional(Schema.Boolean),
+  "image-name": Schema.String,
+  name: Schema.optional(Schema.String),
+  opacity: Schema.optional(Schema.Number),
+  position: Schema.optional(
+    Schema.Struct({
+      scale: Schema.optional(Schema.Number),
+      "translation-in-points": Schema.optional(Schema.Tuple([Schema.Number, Schema.Number])),
+    }),
+  ),
+});
+
+const IconJson = Schema.Struct({
+  fill: Schema.optional(
+    Schema.Struct({
+      solid: Schema.optional(Schema.String),
+      "automatic-gradient": Schema.optional(Schema.String),
+    }),
+  ),
+  groups: Schema.Array(
+    Schema.Struct({
+      layers: Schema.Array(IconJsonLayer),
+    }),
+  ),
+});
+const decodeIconJson = Schema.decodeUnknownEffect(Schema.fromJsonString(IconJson));
 
 type IconPlatform = "iOS";
 
@@ -178,6 +215,19 @@ export class IconExportRenditionError extends Schema.TaggedError<IconExportRendi
         ? "an invalid PNG"
         : `${this.actualWidth}x${this.actualHeight}`;
     return `Icon Composer produced ${actual}; expected ${this.expectedSize}x${this.expectedSize} for ${this.sourcePath}.`;
+  }
+}
+
+export class IconExportSharpRenderError extends Schema.TaggedError<IconExportSharpRenderError>()(
+  "IconExportSharpRenderError",
+  {
+    variant: Schema.String,
+    stage: Schema.String,
+    cause: Schema.Defect(),
+  },
+) {
+  override get message(): string {
+    return `Sharp compositor failed for ${this.variant} during ${this.stage}.`;
   }
 }
 
@@ -475,6 +525,283 @@ const resolveIconComposerTool = Effect.fn("iconExport.resolveIconComposerTool")(
   });
 });
 
+const parseComposerColor = (
+  fill:
+    | { readonly solid?: string | undefined; readonly "automatic-gradient"?: string | undefined }
+    | undefined,
+): { readonly r: number; readonly g: number; readonly b: number; readonly alpha: number } => {
+  const raw = fill?.solid ?? fill?.["automatic-gradient"];
+  const match = raw
+    ? /^(?:display-p3|srgb):([^,]+),([^,]+),([^,]+),([^,]+)$/u.exec(raw.trim())
+    : null;
+  if (!match) {
+    return { r: 0, g: 0, b: 0, alpha: 1 };
+  }
+  const clampByte = (value: string | undefined) =>
+    Math.max(0, Math.min(255, Math.round(Number.parseFloat(value ?? "0") * 255)));
+  const clampAlpha = (value: string | undefined) =>
+    Math.max(0, Math.min(1, Number.parseFloat(value ?? "1")));
+  return {
+    r: clampByte(match[1]),
+    g: clampByte(match[2]),
+    b: clampByte(match[3]),
+    alpha: clampAlpha(match[4]),
+  };
+};
+
+const parseSvgNaturalDimensions = (
+  svg: string,
+): { readonly width: number; readonly height: number } => {
+  const widthMatch = /\bwidth="([\d.]+)"/u.exec(svg);
+  const heightMatch = /\bheight="([\d.]+)"/u.exec(svg);
+  if (widthMatch?.[1] && heightMatch?.[1]) {
+    return {
+      width: Number.parseFloat(widthMatch[1]),
+      height: Number.parseFloat(heightMatch[1]),
+    };
+  }
+  const viewBoxMatch = /\bviewBox="[^"]*?\s+[^"]*?\s+([\d.]+)\s+([\d.]+)"/u.exec(svg);
+  if (viewBoxMatch?.[1] && viewBoxMatch?.[2]) {
+    return {
+      width: Number.parseFloat(viewBoxMatch[1]),
+      height: Number.parseFloat(viewBoxMatch[2]),
+    };
+  }
+  return { width: 128, height: 128 };
+};
+
+const normalizeLayerSvg = (
+  imageName: string,
+  source: string,
+  opacity: number | undefined,
+): string => {
+  // Remove per-layer rounded-corner clips on backgrounds and librsvg-smeared cloud blur so the icon mask stays crisp.
+  let normalized = source
+    .replace(/<rect width="128" height="128" rx="10"\/>/u, '<rect width="128" height="128"/>')
+    .replace(/ filter="url\(#soft\)"/gu, "");
+  if (opacity !== undefined && opacity < 1) {
+    normalized = normalized.replace(/(<svg\b[^>]*>)/u, `$1<g opacity="${opacity.toFixed(4)}">`);
+    normalized = normalized.replace(/<\/svg>\s*$/u, "</g></svg>");
+  }
+  void imageName;
+  return normalized;
+};
+
+const sharpRenderError = (variant: string, stage: string) => (cause: unknown) =>
+  new IconExportSharpRenderError({ variant, stage, cause });
+
+const renderCanvasWithSharp = Effect.fn("iconExport.renderCanvasWithSharp")(function* (
+  variantLabel: string,
+  assetDir: string,
+  iconJson: typeof IconJson.Type,
+  canvasSize: number,
+  cornerRadius: number,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const k = canvasSize / COMPOSER_CANVAS_PT;
+  const backgroundColor = parseComposerColor(iconJson.fill);
+  const backToFrontLayers = [...iconJson.groups]
+    .reverse()
+    .flatMap((group) => [...group.layers].reverse())
+    .filter((layer) => layer.hidden !== true);
+
+  const overlays: Array<{ readonly input: Buffer; readonly left: number; readonly top: number }> =
+    [];
+
+  for (const layer of backToFrontLayers) {
+    const svgPath = path.join(assetDir, layer["image-name"]);
+    const rawSvg = yield* fs.readFileString(svgPath).pipe(
+      Effect.mapError(
+        (cause) =>
+          new IconExportFileSystemError({
+            operation: "read-file",
+            path: svgPath,
+            cause,
+          }),
+      ),
+    );
+    const natural = parseSvgNaturalDimensions(rawSvg);
+    const scale = layer.position?.scale ?? 1;
+    const [tx, ty] = layer.position?.["translation-in-points"] ?? [0, 0];
+    const layerWidth = Math.max(1, Math.round(natural.width * scale * k));
+    const layerHeight = Math.max(1, Math.round(natural.height * scale * k));
+    const left = Math.round((COMPOSER_CANVAS_PT / 2 + tx) * k - layerWidth / 2);
+    const top = Math.round((COMPOSER_CANVAS_PT / 2 + ty) * k - layerHeight / 2);
+
+    const x0 = Math.max(0, left);
+    const y0 = Math.max(0, top);
+    const x1 = Math.min(canvasSize, left + layerWidth);
+    const y1 = Math.min(canvasSize, top + layerHeight);
+    if (x1 <= x0 || y1 <= y0) continue;
+
+    const svgBuffer = Buffer.from(normalizeLayerSvg(layer["image-name"], rawSvg, layer.opacity));
+    const rasterized = yield* Effect.tryPromise({
+      try: () =>
+        sharp(svgBuffer, { density: SHARP_SVG_DENSITY })
+          .resize(layerWidth, layerHeight)
+          .png({ compressionLevel: 9 })
+          .toBuffer(),
+      catch: sharpRenderError(variantLabel, `rasterize-${layer["image-name"]}-${canvasSize}`),
+    });
+    const clipped =
+      x0 === left && y0 === top && x1 - x0 === layerWidth && y1 - y0 === layerHeight
+        ? rasterized
+        : yield* Effect.tryPromise({
+            try: () =>
+              sharp(rasterized)
+                .extract({
+                  left: x0 - left,
+                  top: y0 - top,
+                  width: x1 - x0,
+                  height: y1 - y0,
+                })
+                .png({ compressionLevel: 9 })
+                .toBuffer(),
+            catch: sharpRenderError(variantLabel, `crop-${layer["image-name"]}-${canvasSize}`),
+          });
+    overlays.push({ input: clipped, left: x0, top: y0 });
+  }
+
+  const composed = yield* Effect.tryPromise({
+    try: () =>
+      sharp({
+        create: {
+          width: canvasSize,
+          height: canvasSize,
+          channels: 4,
+          background: backgroundColor,
+        },
+      })
+        .composite(overlays)
+        .png({ compressionLevel: 9 })
+        .toBuffer(),
+    catch: sharpRenderError(variantLabel, `composite-${canvasSize}`),
+  });
+
+  const maskSvg = Buffer.from(
+    `<svg width="${canvasSize}" height="${canvasSize}" viewBox="0 0 ${canvasSize} ${canvasSize}" xmlns="http://www.w3.org/2000/svg"><rect width="${canvasSize}" height="${canvasSize}" rx="${cornerRadius}" fill="white"/></svg>`,
+  );
+  return yield* Effect.tryPromise({
+    try: () =>
+      sharp(composed)
+        .composite([{ input: maskSvg, blend: "dest-in" }])
+        .png({ compressionLevel: 9 })
+        .toBuffer(),
+    catch: sharpRenderError(variantLabel, `mask-${canvasSize}`),
+  });
+});
+
+const renderMacosPreTahoeWithSharp = Effect.fn("iconExport.renderMacosPreTahoeWithSharp")(
+  function* (variantLabel: string, assetDir: string, iconJson: typeof IconJson.Type) {
+    const body = yield* renderCanvasWithSharp(
+      variantLabel,
+      assetDir,
+      iconJson,
+      MACOS_BODY_SIZE,
+      MACOS_CORNER_RADIUS,
+    );
+    // Inset the shadow caster by 1px inside the 824x824 body so dark edges never bleed along anti-aliased corners.
+    const shadowSvg = Buffer.from(
+      `<svg width="${COMPOSER_CANVAS_PT}" height="${COMPOSER_CANVAS_PT}" viewBox="0 0 ${COMPOSER_CANVAS_PT} ${COMPOSER_CANVAS_PT}" xmlns="http://www.w3.org/2000/svg"><defs><filter id="macShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#000000" flood-opacity="0.28"/></filter></defs><rect x="${MACOS_BODY_INSET + 1}" y="${MACOS_BODY_INSET + 1}" width="${MACOS_BODY_SIZE - 2}" height="${MACOS_BODY_SIZE - 2}" rx="${MACOS_CORNER_RADIUS - 1}" fill="#000000" filter="url(#macShadow)"/></svg>`,
+    );
+    return yield* Effect.tryPromise({
+      try: () =>
+        sharp(shadowSvg, { density: 72 })
+          .resize(COMPOSER_CANVAS_PT, COMPOSER_CANVAS_PT)
+          .composite([{ input: body, left: MACOS_BODY_INSET, top: MACOS_BODY_INSET }])
+          .png({ compressionLevel: 9 })
+          .toBuffer(),
+      catch: sharpRenderError(variantLabel, "macos-pre-tahoe"),
+    });
+  },
+);
+
+const resizeSquarePngWithSharp = (variantLabel: string, master: Buffer, size: number) =>
+  Effect.tryPromise({
+    try: () => sharp(master).resize(size, size).png({ compressionLevel: 9 }).toBuffer(),
+    catch: sharpRenderError(variantLabel, `resize-${size}`),
+  });
+
+const renderVariantWithSharp = Effect.fn("iconExport.renderVariantWithSharp")(function* (
+  repositoryRoot: string,
+  variant: IconVariant,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const sourcePath = path.join(repositoryRoot, variant.source);
+  const iconJsonPath = path.join(sourcePath, "icon.json");
+  const sourceExists = yield* fs.exists(iconJsonPath).pipe(
+    Effect.mapError(
+      (cause) =>
+        new IconExportFileSystemError({
+          operation: "check-path",
+          path: iconJsonPath,
+          cause,
+        }),
+    ),
+  );
+  if (!sourceExists) {
+    return yield* new IconExportSourceMissingError({ sourcePath: variant.source });
+  }
+
+  const rawIconJson = yield* fs.readFileString(iconJsonPath).pipe(
+    Effect.mapError(
+      (cause) =>
+        new IconExportFileSystemError({
+          operation: "read-file",
+          path: iconJsonPath,
+          cause,
+        }),
+    ),
+  );
+  const iconJson = yield* decodeIconJson(rawIconJson).pipe(
+    Effect.mapError(sharpRenderError(variant.label, "parse-icon-json")),
+  );
+  const assetDir = path.join(sourcePath, "Assets");
+
+  const ios = yield* renderCanvasWithSharp(
+    variant.label,
+    assetDir,
+    iconJson,
+    COMPOSER_CANVAS_PT,
+    IOS_CORNER_RADIUS,
+  );
+  const macos = yield* renderMacosPreTahoeWithSharp(variant.label, assetDir, iconJson);
+
+  const renditionCache = new Map<number, Buffer>([[COMPOSER_CANVAS_PT, ios]]);
+  const resized = Effect.fn("iconExport.renderVariantWithSharp.resized")(function* (size: number) {
+    const cached = renditionCache.get(size);
+    if (cached) return cached;
+    const buffer = yield* resizeSquarePngWithSharp(variant.label, ios, size);
+    renditionCache.set(size, buffer);
+    return buffer;
+  });
+
+  const icoRenditions = yield* Effect.forEach(
+    WINDOWS_ICON_SIZES,
+    (size) => resized(size).pipe(Effect.map((contents) => ({ size, contents }))),
+    { concurrency: 1 },
+  );
+  const ico = yield* Effect.try({
+    try: () => encodePngIco(icoRenditions),
+    catch: (cause) => new IconExportEncodingError({ variant: variant.label, cause }),
+  });
+
+  return new Map<string, Buffer>([
+    [variant.outputs.ios, ios],
+    [variant.outputs.macos, macos],
+    [variant.outputs.universal, ios],
+    [variant.outputs.appleTouch, yield* resized(180)],
+    [variant.outputs.webIcon192, yield* resized(192)],
+    [variant.outputs.webIcon512, yield* resized(512)],
+    [variant.outputs.favicon16, yield* resized(16)],
+    [variant.outputs.favicon32, yield* resized(32)],
+    [variant.outputs.faviconIco, ico],
+    [variant.outputs.windowsIco, ico],
+  ]);
+});
+
 const renderIcon = Effect.fn("iconExport.renderIcon")(function* (
   toolPath: string,
   sourcePath: string,
@@ -631,7 +958,7 @@ const writeAtomically = Effect.fn("iconExport.writeAtomically")(function* (
   const temporaryPath = yield* fs
     .makeTempFileScoped({
       directory: targetDirectory,
-      prefix: ".t3-icon-export-",
+      prefix: ".legioncode-icon-export-",
       suffix: ".tmp",
     })
     .pipe(
@@ -699,39 +1026,73 @@ const isCurrent = Effect.fn("iconExport.isCurrent")(function* (
   return Buffer.from(actual).equals(expected);
 });
 
-export const exportBrandIcons = Effect.fn("exportBrandIcons")(function* (checkOnly: boolean) {
+const resolveSelectedBackend = Effect.fn("iconExport.resolveSelectedBackend")(function* (
+  renderer: IconRenderer,
+) {
+  if (renderer === "sharp") {
+    return Option.none<IconComposerTool>();
+  }
+  if (renderer === "ictool") {
+    return Option.some(yield* resolveIconComposerTool());
+  }
+  return yield* resolveIconComposerTool().pipe(
+    Effect.asSome,
+    Effect.catchTags({
+      IconExportToolResolutionError: (error) =>
+        error.reason === "not-found" ? Effect.succeedNone : Effect.fail(error),
+    }),
+  );
+});
+
+export const exportBrandIcons = Effect.fn("exportBrandIcons")(function* (
+  checkOnly: boolean,
+  renderer: IconRenderer = "auto",
+) {
   const fs = yield* FileSystem.FileSystem;
   const repositoryRoot = yield* RepositoryRoot;
-  const tool = yield* resolveIconComposerTool();
-  const temporaryDirectory = yield* fs
-    .makeTempDirectoryScoped({
-      prefix: "t3-icon-export-",
-    })
-    .pipe(
-      Effect.mapError(
-        (cause) =>
-          new IconExportFileSystemError({
-            operation: "make-temp-directory",
-            path: "system temporary directory",
-            cause,
-          }),
-      ),
-    );
-  yield* Console.log(
-    `Exporting icons with Icon Composer ${tool.version}, design generation ${DESIGN_GENERATION}.`,
-  );
+  const tool = yield* resolveSelectedBackend(renderer);
 
   const generated = new Map<string, Buffer>();
-  for (const variant of ICON_VARIANTS) {
-    yield* Console.log(`Rendering ${variant.label} from ${variant.source}...`);
-    const variantAssets = yield* renderVariant(
-      tool.path,
-      repositoryRoot,
-      temporaryDirectory,
-      variant,
+  if (Option.isSome(tool)) {
+    const temporaryDirectory = yield* fs
+      .makeTempDirectoryScoped({
+        prefix: "legioncode-icon-export-",
+      })
+      .pipe(
+        Effect.mapError(
+          (cause) =>
+            new IconExportFileSystemError({
+              operation: "make-temp-directory",
+              path: "system temporary directory",
+              cause,
+            }),
+        ),
+      );
+    yield* Console.log(
+      `Exporting icons with Icon Composer ${tool.value.version}, design generation ${DESIGN_GENERATION}.`,
     );
-    for (const [relativePath, contents] of variantAssets) {
-      generated.set(relativePath, contents);
+    for (const variant of ICON_VARIANTS) {
+      yield* Console.log(`Rendering ${variant.label} from ${variant.source}...`);
+      const variantAssets = yield* renderVariant(
+        tool.value.path,
+        repositoryRoot,
+        temporaryDirectory,
+        variant,
+      );
+      for (const [relativePath, contents] of variantAssets) {
+        generated.set(relativePath, contents);
+      }
+    }
+  } else {
+    yield* Console.log(
+      "Exporting icons with cross-platform sharp SVG compositor (Icon Composer ictool not used).",
+    );
+    for (const variant of ICON_VARIANTS) {
+      yield* Console.log(`Rendering ${variant.label} from ${variant.source}...`);
+      const variantAssets = yield* renderVariantWithSharp(repositoryRoot, variant);
+      for (const [relativePath, contents] of variantAssets) {
+        generated.set(relativePath, contents);
+      }
     }
   }
 
@@ -776,8 +1137,12 @@ export const exportBrandIconsCommand = Command.make(
       Flag.withDescription("Verify generated icon assets without modifying files."),
       Flag.withDefault(false),
     ),
+    renderer: Flag.Literals("renderer", RENDERERS).pipe(
+      Flag.withDescription("Icon renderer backend to use (auto, ictool, or sharp)."),
+      Flag.withDefault("auto" as const),
+    ),
   },
-  ({ check }) => exportBrandIcons(check).pipe(Effect.scoped),
+  ({ check, renderer }) => exportBrandIcons(check, renderer).pipe(Effect.scoped),
 ).pipe(
   Command.withDescription(
     "Export development, preview, and production assets from Icon Composer projects.",

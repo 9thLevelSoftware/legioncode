@@ -1,5 +1,5 @@
-import { ConnectionCatalogDocument } from "@t3tools/client-runtime/platform";
-import type { EnvironmentId } from "@t3tools/contracts";
+import { ConnectionCatalogDocument } from "@legioncode/client-runtime/platform";
+import type { EnvironmentId } from "@legioncode/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";

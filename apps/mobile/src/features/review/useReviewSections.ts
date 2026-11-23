@@ -1,10 +1,10 @@
 import { useAtomValue } from "@effect/atom-react";
-import { resolveFilesystemReadAccess } from "@t3tools/client-runtime/state/filesystem";
+import { resolveFilesystemReadAccess } from "@legioncode/client-runtime/state/filesystem";
 import { Atom } from "effect/reactivity";
 import { msg, useMessages } from "gt-react-native";
 
-import { deriveThreadCheckpointSummaries } from "@t3tools/client-runtime/state/thread-checkpoints";
-import type { EnvironmentId, ReviewDiffPreviewSource, ThreadId } from "@t3tools/contracts";
+import { deriveThreadCheckpointSummaries } from "@legioncode/client-runtime/state/thread-checkpoints";
+import type { EnvironmentId, ReviewDiffPreviewSource, ThreadId } from "@legioncode/contracts";
 
 import { useCheckpointDiff } from "../../state/queries";
 import { useEnvironmentQuery } from "../../state/query";

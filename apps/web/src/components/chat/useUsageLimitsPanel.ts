@@ -5,8 +5,8 @@ import type {
   ProviderInstanceId,
   ServerProvider,
   UsageLimitSourceSnapshots,
-} from "@t3tools/contracts";
-import { collectProviderUsageLimits, hasProviderUsageLimits } from "@t3tools/shared/usageLimits";
+} from "@legioncode/contracts";
+import { collectProviderUsageLimits, hasProviderUsageLimits } from "@legioncode/shared/usageLimits";
 import { useState } from "react";
 import { useStableCallback } from "../../hooks/useStableCallback";
 import { toastManager } from "../ui/toast";

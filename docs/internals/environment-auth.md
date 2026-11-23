@@ -2,7 +2,7 @@
 
 The environment issues its own sessions and enforces their capabilities. Cloud
 identity and relay credentials belong to a separate trust boundary, described in
-[T3 Connect](./t3-connect.md). A relay token is never an environment login.
+[Legion Connect](./legion-connect.md). A relay token is never an environment login.
 
 ## Authority survives transport changes
 
@@ -10,7 +10,7 @@ Pairing delegates a set of scopes. Exchanging a bootstrap credential can narrow
 that grant but cannot widen it. The default grant includes access and relay
 management: `terminal:operate` is a shell as the server's user and
 `orchestration:operate` can start a full-access agent, and either can mint a
-session with every scope through `t3 auth session issue`, so withholding
+session with every scope through `legioncode auth session issue`, so withholding
 management from the default would not be a boundary. A narrower client gets
 explicit scopes. Creating another pairing link requires both `access:write` and
 every scope being delegated. The
@@ -33,7 +33,7 @@ proof from the same key moves the session's expiry 30 days out and returns a
 fresh token for the same session. The session itself must still be unexpired
 and unrevoked, so a device idle past the window pairs again. Renewal stays in place rather than issuing a
 successor, so live sockets keep their session, Sharing & access shows one row
-per device for its whole renewal window, and one revoke ends it. T3 Connect,
+per device for its whole renewal window, and one revoke ends it. Legion Connect,
 CLI, desktop and peer sessions never renew, so unlinking Connect or rotating
 their credential still cuts a device off.
 
@@ -46,12 +46,12 @@ so nothing secret is stored. The share in the thread projection is the only
 state: replacing, closing, or archiving it revokes every token, and the
 orchestrator's serial commands make redeeming and sending happen once. Guest
 tokens never enter `SessionStore`, so no RPC, WebSocket, or MCP path can accept
-one. Guest routes also require T3 Connect to still serve the link's hostname;
+one. Guest routes also require Legion Connect to still serve the link's hostname;
 the request's Host header is not checked, because a LAN client can forge it.
 
 ### MCP clients are a separate audience
 
-Agents T3 Code did not launch sign in to `/mcp` through a narrow OAuth
+Agents LegionCode did not launch sign in to `/mcp` through a narrow OAuth
 authorization-code server ([McpOAuth](../../apps/server/src/auth/McpOAuth.ts)).
 It accepts loopback redirect URIs for agents on the user's machine and any
 HTTPS redirect for hosted agents (ChatGPT, bots). An HTTPS redirect means a
@@ -60,7 +60,7 @@ approval page names the host access goes to and approving stays the owner's
 call. Every client is public and proves itself with PKCE; a client that asks
 for a secret is registered without one. Client registration is stateless, so an unauthenticated caller cannot grow server
 state. Approval spends a one-time pairing code, or uses a browser session with
-`access:write`; proof-bound T3 Connect codes are refused without being spent.
+`access:write`; proof-bound Legion Connect codes are refused without being spent.
 
 The user grants either read-only access or a runtime-mode ceiling, not a
 scope list: MCP tools are all orchestration, and `orchestration:operate`
@@ -83,7 +83,7 @@ outside agent that needs a secret starts a thread and lets that agent ask.
 
 Issuer and resource URLs come from the request's Host and
 `X-Forwarded-Proto`, so one server answers over loopback, Tailscale Serve and a
-T3 Connect tunnel. A proxy that rewrites Host or drops the protocol header
+Legion Connect tunnel. A proxy that rewrites Host or drops the protocol header
 breaks sign-in.
 
 Bearer and DPoP clients obtain short-lived WebSocket tickets through authenticated
@@ -123,7 +123,7 @@ do not follow this replacement rule.
 
 ### Reusable dev credential
 
-Web development environments can accept one `T3CODE_DEV_AUTH_TOKEN` across
+Web development environments can accept one `LEGIONCODE_DEV_AUTH_TOKEN` across
 worktrees and ports on one hostname. The token and startup URLs that contain it
 grant administrative access. Desktop and non-development servers ignore it. See
 the [development runbook](../operations/development.md#reusable-dev-credential)

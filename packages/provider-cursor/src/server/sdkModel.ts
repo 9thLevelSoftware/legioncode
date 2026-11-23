@@ -1,6 +1,6 @@
 import type { ModelSelection as CursorSdkModelSelection, ModelParameterValue } from "@cursor/sdk";
-import type { ModelSelection, ServerProviderModel } from "@t3tools/contracts";
-import { getProviderOptionCurrentValue } from "@t3tools/shared/model";
+import type { ModelSelection, ServerProviderModel } from "@legioncode/contracts";
+import { getProviderOptionCurrentValue } from "@legioncode/shared/model";
 
 const CURSOR_SDK_PARAMETER_TO_PROVIDER_OPTION: Readonly<Record<string, string>> = {
   context: "contextWindow",
@@ -63,7 +63,7 @@ export function cursorSdkModelSelection(
   const descriptors =
     models.find((model) => model.slug === modelSelection.model)?.capabilities?.optionDescriptors ??
     [];
-  // Some Cursor plans reject runs that leave a catalog parameter unset; T3 keeps Fast off until picked.
+  // Some Cursor plans reject runs that leave a catalog parameter unset; LegionCode keeps Fast off until picked.
   const defaults = descriptors.flatMap((descriptor) => {
     if (explicit.some((option) => option.id === descriptor.id)) return [];
     const value = descriptor.id === "fastMode" ? false : getProviderOptionCurrentValue(descriptor);

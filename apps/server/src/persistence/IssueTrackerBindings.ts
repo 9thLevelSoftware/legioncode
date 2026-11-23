@@ -4,7 +4,7 @@ import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as SqlSchema from "effect/sql/SqlSchema";
-import { IssueTrackerKind, IssueTrackerProjectBinding, ProjectId } from "@t3tools/contracts";
+import { IssueTrackerKind, IssueTrackerProjectBinding, ProjectId } from "@legioncode/contracts";
 
 import {
   PersistenceDecodeError,
@@ -41,7 +41,7 @@ export class IssueTrackerBindingsRepository extends Context.Service<
       tracker: IssueTrackerKind,
     ) => Effect.Effect<void, IssueTrackerBindingsRepositoryError>;
   }
->()("t3/persistence/IssueTrackerBindings/IssueTrackerBindingsRepository") {}
+>()("legioncode/persistence/IssueTrackerBindings/IssueTrackerBindingsRepository") {}
 
 function toSqlOrDecodeError(sqlOperation: string, decodeOperation: string) {
   return (cause: unknown): IssueTrackerBindingsRepositoryError =>

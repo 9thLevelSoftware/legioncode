@@ -1,6 +1,6 @@
-import type { ThreadStructureRuntime } from "@t3tools/client-runtime/state/shell";
+import type { ThreadStructureRuntime } from "@legioncode/client-runtime/state/shell";
 import { msg } from "gt-react";
-import { resolveThreadWorkingStartedAt } from "@t3tools/client-runtime/state/models";
+import { resolveThreadWorkingStartedAt } from "@legioncode/client-runtime/state/models";
 import {
   type AssetResource,
   type OrchestrationV2Checkpoint,
@@ -15,30 +15,33 @@ import {
   type ToolActivitySource,
   type ThreadId,
   type TurnItemId,
-} from "@t3tools/contracts";
-import { extractToolActivityPresentation } from "@t3tools/client-runtime/work-log/tool-presentation";
-import { classifyToolActivity, collectToolFilePaths } from "@t3tools/shared/toolActivity";
-import { formatReadToolLabel, formatSearchToolLabel } from "@t3tools/shared/toolActivityCopy";
-import type { HtmlRenderReference } from "@t3tools/shared/htmlRender";
-import { turnItemDetailRevision } from "@t3tools/client-runtime/work-log/item-detail";
-import type { McpAppReference } from "@t3tools/shared/mcpApp";
+} from "@legioncode/contracts";
+import { extractToolActivityPresentation } from "@legioncode/client-runtime/work-log/tool-presentation";
+import { classifyToolActivity, collectToolFilePaths } from "@legioncode/shared/toolActivity";
+import { formatReadToolLabel, formatSearchToolLabel } from "@legioncode/shared/toolActivityCopy";
+import type { HtmlRenderReference } from "@legioncode/shared/htmlRender";
+import { turnItemDetailRevision } from "@legioncode/client-runtime/work-log/item-detail";
+import type { McpAppReference } from "@legioncode/shared/mcpApp";
 import {
   htmlRenderFromToolItem,
   mcpAppFromToolItem,
   sentMessageFromToolItem,
-} from "@t3tools/shared/toolOutput";
+} from "@legioncode/shared/toolOutput";
 import {
   contextCompactionLabel,
   workEntryIndicatesToolFailure,
-} from "@t3tools/client-runtime/work-log/presentation";
-import type { ThreadCheckpointSummary } from "@t3tools/client-runtime/state/thread-checkpoints";
+} from "@legioncode/client-runtime/work-log/presentation";
+import type { ThreadCheckpointSummary } from "@legioncode/client-runtime/state/thread-checkpoints";
 import type {
   ThreadPendingApproval,
   ThreadPendingUserInput,
-} from "@t3tools/client-runtime/state/thread-requests";
-import type { ThreadRunSummary, ThreadRuntimeSummary } from "@t3tools/client-runtime/state/shell";
-import { threadRuntimeHasInterruptibleRun } from "@t3tools/client-runtime/state/thread-execution";
-import { turnItemIsWorkspacePreparation } from "@t3tools/client-runtime/state/turn-item-presentation";
+} from "@legioncode/client-runtime/state/thread-requests";
+import type {
+  ThreadRunSummary,
+  ThreadRuntimeSummary,
+} from "@legioncode/client-runtime/state/shell";
+import { threadRuntimeHasInterruptibleRun } from "@legioncode/client-runtime/state/thread-execution";
+import { turnItemIsWorkspacePreparation } from "@legioncode/client-runtime/state/turn-item-presentation";
 
 import {
   isImageAttachment,
@@ -56,7 +59,7 @@ import { shallow } from "zustand/vanilla/shallow";
 export {
   workEntryDisplayIndicatesToolFailure,
   workEntryIndicatesToolFailure,
-} from "@t3tools/client-runtime/work-log/presentation";
+} from "@legioncode/client-runtime/work-log/presentation";
 
 export type WorkLogToolLifecycleStatus =
   | "idle"
@@ -67,7 +70,7 @@ export type WorkLogToolLifecycleStatus =
   | "stopped";
 
 export interface WorkLogEntry {
-  readonly questionAnswer?: import("@t3tools/contracts").UserInputAttachmentAnswerPayload;
+  readonly questionAnswer?: import("@legioncode/contracts").UserInputAttachmentAnswerPayload;
   readonly id: string;
   readonly createdAt: string;
   readonly runId?: RunId | null;

@@ -1,5 +1,5 @@
-import { runRanAfter } from "@t3tools/shared/orchestrationV2ThreadError";
-import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
+import { runRanAfter } from "@legioncode/shared/orchestrationV2ThreadError";
+import { resolveProjectSettings } from "@legioncode/shared/projectSettings";
 import {
   CommandId,
   isProviderNativeSubagentThread,
@@ -11,7 +11,7 @@ import {
   type OrchestrationV2ThreadProjection,
   isOrchestrationV2WorkActive,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
@@ -22,7 +22,7 @@ import * as Schema from "effect/Schema";
 
 import * as EffectOutbox from "./EffectOutbox.ts";
 import * as EventSink from "./EventSink.ts";
-import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import * as IdAllocator from "@legioncode/provider-core/server/IdAllocator";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import {
@@ -35,7 +35,7 @@ import { queuedRunsInDeliveryOrder } from "./QueuedRunOrder.ts";
 import {
   endOrphanedNativeSubagent,
   endRunlessRootTurns,
-} from "@t3tools/provider-core/server/subagentProjection";
+} from "@legioncode/provider-core/server/subagentProjection";
 import {
   awaitingProviderThreadId,
   cancelledRosterTaskWork,
@@ -86,7 +86,7 @@ export class ProviderRuntimeRecoveryService extends Context.Service<
     readonly prepareForShutdown: Effect.Effect<void, ProviderRuntimeRecoveryError>;
     readonly recover: Effect.Effect<ProviderRuntimeRecoverySummary, ProviderRuntimeRecoveryError>;
   }
->()("t3/orchestration-v2/ProviderRuntimeRecoveryService") {}
+>()("legioncode/orchestration-v2/ProviderRuntimeRecoveryService") {}
 
 function nonterminalRuns(projection: ProjectionStore.ProjectionRuntimeRecoveryState) {
   return projection.runs.filter((run) => {

@@ -3,8 +3,8 @@ import {
   EnvironmentId,
   makeProviderSettingsSchema,
   SourceControlProviderKind,
-} from "@t3tools/contracts";
-import { UNKNOWN_SOURCE_CONTROL_CLIENT } from "@t3tools/client-runtime/source-control-clients";
+} from "@legioncode/contracts";
+import { UNKNOWN_SOURCE_CONTROL_CLIENT } from "@legioncode/client-runtime/source-control-clients";
 import * as Schema from "effect/Schema";
 import { decodeMsg } from "gt-react";
 
@@ -141,7 +141,7 @@ describe("searchSettings", () => {
       "review-guide-model",
       "review-guide-instructions",
       "source-control-writing-style",
-      "t3-connect",
+      "legion-connect",
       "hold-webhooks-while-offline",
       "tailscale-https",
       "wsl-backend",

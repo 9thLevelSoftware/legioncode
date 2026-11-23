@@ -4,8 +4,8 @@ import type {
   PullRequestRef,
   PullRequestStack,
   PullRequestMergeMethod,
-} from "@t3tools/contracts";
-import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+} from "@legioncode/contracts";
+import { squashAtomCommandFailure } from "@legioncode/client-runtime/state/runtime";
 import { RefreshCwIcon, TriangleAlertIcon } from "lucide-react";
 import { msg, T, useGT, Var } from "gt-react";
 import { useState } from "react";

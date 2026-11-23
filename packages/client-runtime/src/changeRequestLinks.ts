@@ -3,8 +3,8 @@ import type {
   ProjectId,
   PullRequestRef,
   RepositoryIdentity,
-} from "@t3tools/contracts";
-import type { ChangeRequestLink } from "@t3tools/source-control-core/shared/definition";
+} from "@legioncode/contracts";
+import type { ChangeRequestLink } from "@legioncode/source-control-core/shared/definition";
 
 import { sourceControlClients } from "./sourceControlClients.ts";
 

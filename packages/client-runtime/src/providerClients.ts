@@ -4,17 +4,17 @@ import {
   CodexSettings,
   isProviderDriverKind,
   ProviderDriverKind,
-} from "@t3tools/contracts";
-import { acpRegistryClient } from "@t3tools/provider-acp-registry/client";
-import { makeProviderClientRegistry, type ProviderIcon } from "@t3tools/provider-core/client";
-import { modelShortName } from "@t3tools/provider-core/modelShortName";
-import { cursorClient } from "@t3tools/provider-cursor/client";
-import { fxClient } from "@t3tools/provider-fx/client";
-import { grokClient } from "@t3tools/provider-grok/client";
-import { kiroClient } from "@t3tools/provider-kiro/client";
-import { museClient } from "@t3tools/provider-muse/client";
-import { openCodeClient } from "@t3tools/provider-opencode/client";
-import { piClient } from "@t3tools/provider-pi/client";
+} from "@legioncode/contracts";
+import { acpRegistryClient } from "@legioncode/provider-acp-registry/client";
+import { makeProviderClientRegistry, type ProviderIcon } from "@legioncode/provider-core/client";
+import { modelShortName } from "@legioncode/provider-core/modelShortName";
+import { cursorClient } from "@legioncode/provider-cursor/client";
+import { fxClient } from "@legioncode/provider-fx/client";
+import { grokClient } from "@legioncode/provider-grok/client";
+import { kiroClient } from "@legioncode/provider-kiro/client";
+import { museClient } from "@legioncode/provider-muse/client";
+import { openCodeClient } from "@legioncode/provider-opencode/client";
+import { piClient } from "@legioncode/provider-pi/client";
 
 // OpenRouter's Ink and Cloud glyphs from https://openrouter.ai/brand.
 export const openRouterIcon: ProviderIcon = {

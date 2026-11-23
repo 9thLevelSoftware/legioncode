@@ -1,25 +1,25 @@
 import type {
   ThreadPendingApproval,
   ThreadPendingUserInput,
-} from "@t3tools/client-runtime/state/thread-requests";
-import { linkRequestTargetName } from "@t3tools/client-runtime/link-request";
-import { turnItemIsWorkspacePreparation } from "@t3tools/client-runtime/state/turn-item-presentation";
-import type { ThreadCheckpointSummary } from "@t3tools/client-runtime/state/thread-checkpoints";
-import { formatSubagentDisplayTitle } from "@t3tools/client-runtime/state/subagent-display";
+} from "@legioncode/client-runtime/state/thread-requests";
+import { linkRequestTargetName } from "@legioncode/client-runtime/link-request";
+import { turnItemIsWorkspacePreparation } from "@legioncode/client-runtime/state/turn-item-presentation";
+import type { ThreadCheckpointSummary } from "@legioncode/client-runtime/state/thread-checkpoints";
+import { formatSubagentDisplayTitle } from "@legioncode/client-runtime/state/subagent-display";
 import {
   isLiveSubagentTurnItem,
   waitingOnSubagentsLabel,
-} from "@t3tools/client-runtime/state/subagentRuntime";
-import { extractToolActivityPresentation } from "@t3tools/client-runtime/work-log/tool-presentation";
+} from "@legioncode/client-runtime/state/subagentRuntime";
+import { extractToolActivityPresentation } from "@legioncode/client-runtime/work-log/tool-presentation";
 import {
   turnItemDetailRevision,
   turnItemHasDetail,
   turnItemNeedsDetailFetch,
-} from "@t3tools/client-runtime/work-log/item-detail";
+} from "@legioncode/client-runtime/work-log/item-detail";
 import {
   commandDisplayText,
   commandProgramName,
-} from "@t3tools/client-runtime/work-log/command-label";
+} from "@legioncode/client-runtime/work-log/command-label";
 import {
   contextCompactionLabel,
   liveThoughtLine,
@@ -35,14 +35,14 @@ import {
   type WorkLogPresentationEntry,
   type WorkLogToolLifecycleStatus,
   workEntryHiddenByToolCallVisibility,
-} from "@t3tools/client-runtime/work-log/presentation";
-import type { ToolCallVisibility } from "@t3tools/contracts/settings";
+} from "@legioncode/client-runtime/work-log/presentation";
+import type { ToolCallVisibility } from "@legioncode/contracts/settings";
 import {
-  resolveT3McpToolDefinition,
-  type T3McpToolLogo,
-  type T3McpToolPresentation,
-} from "@t3tools/shared/t3McpToolPresentation";
-import { resolveT3McpToolPresentation } from "@t3tools/shared/t3McpToolPresentationCopy";
+  resolveLegionMcpToolDefinition,
+  type LegionMcpToolLogo,
+  type LegionMcpToolPresentation,
+} from "@legioncode/shared/legionMcpToolPresentation";
+import { resolveLegionMcpToolPresentation } from "@legioncode/shared/legionMcpToolPresentationCopy";
 import type {
   ChatAttachment,
   MessageId,
@@ -58,36 +58,41 @@ import type {
   RunAttemptId,
   ScheduledTaskId,
   TurnItemId,
-} from "@t3tools/contracts";
-import { idleCompactionOf, isCompactionCommandMessage, RunId, ThreadId } from "@t3tools/contracts";
+} from "@legioncode/contracts";
+import {
+  idleCompactionOf,
+  isCompactionCommandMessage,
+  RunId,
+  ThreadId,
+} from "@legioncode/contracts";
 import {
   classifyToolActivity,
   collectToolFilePaths,
   isJavaScriptReplTool,
-} from "@t3tools/shared/toolActivity";
+} from "@legioncode/shared/toolActivity";
 import {
   dynamicToolTitle,
   formatReadToolLabel,
   formatSearchToolLabel,
-} from "@t3tools/shared/toolActivityCopy";
-import { claudeResumeCompactionAge } from "@t3tools/shared/claudeCompaction";
-import { formatDuration } from "@t3tools/shared/orchestrationTimingCopy";
-import { truncate } from "@t3tools/shared/String";
-import type { HtmlRenderReference } from "@t3tools/shared/htmlRender";
-import type { McpAppReference } from "@t3tools/shared/mcpApp";
+} from "@legioncode/shared/toolActivityCopy";
+import { claudeResumeCompactionAge } from "@legioncode/shared/claudeCompaction";
+import { formatDuration } from "@legioncode/shared/orchestrationTimingCopy";
+import { truncate } from "@legioncode/shared/String";
+import type { HtmlRenderReference } from "@legioncode/shared/htmlRender";
+import type { McpAppReference } from "@legioncode/shared/mcpApp";
 import {
   compactDynamicToolOutput,
   htmlRenderFromToolItem,
   sentMessageFromToolItem,
   mcpAppFromToolItem,
-} from "@t3tools/shared/toolOutput";
+} from "@legioncode/shared/toolOutput";
 import * as DateTime from "effect/DateTime";
 import { msg } from "gt-react-native";
 import { m, type MessageResolver } from "../i18n/messages";
 import {
   IDLE_COMPACTION_TITLES,
   IDLE_COMPACTING_LABELS,
-} from "@t3tools/client-runtime/user-message";
+} from "@legioncode/client-runtime/user-message";
 
 export type PendingApproval = ThreadPendingApproval;
 export type PendingUserInput = ThreadPendingUserInput;
@@ -122,7 +127,7 @@ export interface ThreadFeedActivity {
     | "warning"
     | "wrench"
     | "zap";
-  readonly logo: T3McpToolLogo | null;
+  readonly logo: LegionMcpToolLogo | null;
   readonly toolLike: boolean;
   readonly prominent: boolean;
   readonly status: "success" | "failure" | "neutral" | null;
@@ -136,7 +141,7 @@ export interface ThreadFeedActivity {
 }
 
 export interface ThreadFeedMessage {
-  readonly context?: import("@t3tools/contracts").OrchestrationMessageContext | undefined;
+  readonly context?: import("@legioncode/contracts").OrchestrationMessageContext | undefined;
   readonly id: MessageId;
   readonly role: "user" | "assistant";
   readonly text: string;
@@ -148,8 +153,8 @@ export interface ThreadFeedMessage {
   readonly creationSource?: OrchestrationV2CreationSource;
   readonly scheduledTaskId?: ScheduledTaskId;
   readonly senderThreadId?: ThreadId;
-  readonly linkedSender?: import("@t3tools/contracts").OrchestrationV2LinkedSender;
-  readonly idleCompaction?: import("@t3tools/contracts").OrchestrationV2IdleCompaction;
+  readonly linkedSender?: import("@legioncode/contracts").OrchestrationV2LinkedSender;
+  readonly idleCompaction?: import("@legioncode/contracts").OrchestrationV2IdleCompaction;
   readonly visibility: OrchestrationV2ProjectedTurnItem["visibility"];
   readonly sourceThreadId: ThreadId;
   readonly createdAt: string;
@@ -235,7 +240,7 @@ type ThreadFeedEntryContent =
       readonly summaryKind: ToolGroupSummaryKind;
       readonly toolSurface?: WorkLogPresentationEntry["toolSurface"];
       readonly toolIcon?: WorkLogPresentationEntry["toolIcon"];
-      readonly summaryToolIcon?: "browser" | "device" | "t3-code" | "pull-request";
+      readonly summaryToolIcon?: "browser" | "device" | "legion-code" | "pull-request";
       readonly hasFailure: boolean;
       readonly live: boolean;
       readonly shimmer: boolean;
@@ -622,19 +627,19 @@ function itemIcon(item: OrchestrationV2TurnItem): ThreadFeedActivity["icon"] {
 function itemToolPresentation(
   item: OrchestrationV2TurnItem,
   resolve: MessageResolver,
-): T3McpToolPresentation | null {
+): LegionMcpToolPresentation | null {
   if (item.type !== "dynamic_tool") {
     return null;
   }
   return (
-    resolveT3McpToolPresentation(item.toolName, item.input, resolve) ??
-    resolveT3McpToolPresentation(item.title, item.input, resolve)
+    resolveLegionMcpToolPresentation(item.toolName, item.input, resolve) ??
+    resolveLegionMcpToolPresentation(item.title, item.input, resolve)
   );
 }
 
 function itemSummary(
   item: OrchestrationV2TurnItem,
-  toolPresentation: T3McpToolPresentation | null,
+  toolPresentation: LegionMcpToolPresentation | null,
   resolve: MessageResolver,
 ): string {
   if (item.type === "notification") return item.summary;
@@ -1005,7 +1010,7 @@ function groupAdjacentActivities(
         item.type === "dynamic_tool" &&
         item.runId !== null &&
         (item.status === "running" || item.status === "completed") &&
-        resolveT3McpToolDefinition(item.toolName)?.summaryAction === "delegate" &&
+        resolveLegionMcpToolDefinition(item.toolName)?.summaryAction === "delegate" &&
         !workEntryDisplayIndicatesToolFailure(entry.activity.workEntry)
       ) {
         const output = compactDynamicToolOutput(item.output);

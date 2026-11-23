@@ -15,7 +15,7 @@ import {
   RunId,
   ThreadId,
   TurnItemId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as DateTime from "effect/DateTime";
 
 import { applyOrchestrationV2ProjectionEvent } from "./orchestrationV2Projection.ts";
@@ -110,9 +110,9 @@ describe("applyOrchestrationV2ProjectionEvent", () => {
   it("applies a compact PR sync without replacing other links or thread metadata", () => {
     const link = (number: number): ThreadPullRequestLink => ({
       host: "github.com",
-      repository: "pingdotgg/t3code",
+      repository: "9thLevelSoftware/legioncode",
       number,
-      url: `https://github.com/pingdotgg/t3code/pull/${number}`,
+      url: `https://github.com/9thLevelSoftware/legioncode/pull/${number}`,
       source: "manual",
       linkedAt: DateTime.formatIso(now),
       snapshot: null,

@@ -8,13 +8,13 @@ import {
   type SourceControlProviderInfo,
   TrimmedNonEmptyString,
   TrimmedString,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   canonicalRepositoryPath,
   normalizeGitRemoteUrl,
   parseGitRemoteRepository,
-} from "@t3tools/shared/git";
-import { userlessScpRemoteHost } from "@t3tools/shared/sourceControl";
+} from "@legioncode/shared/git";
+import { userlessScpRemoteHost } from "@legioncode/shared/sourceControl";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SchemaTransformation from "effect/SchemaTransformation";
@@ -304,7 +304,7 @@ export interface SourceControlDefinition {
   readonly checkoutCommand: (changeRequest: ChangeRequestCheckoutInput) => string | null;
   /**
    * Matches a shell command that merges or closes a change request with this host's CLI, which
-   * sends T3 no notification of its own. Absent for a host with no such CLI.
+   * sends LegionCode no notification of its own. Absent for a host with no such CLI.
    */
   readonly changeRequestCloseCommand?: RegExp;
   /**
@@ -316,7 +316,7 @@ export interface SourceControlDefinition {
   /**
    * The references this host's own renderer links in plain text, such as `#12` or a commit SHA,
    * resolved against `repositoryUrl`, in the order they appear. Absent for a host whose grammar
-   * T3 does not apply.
+   * LegionCode does not apply.
    */
   readonly referenceAutolinks?: (
     text: string,
@@ -673,7 +673,7 @@ export interface SourceControlDefinitionRegistry {
   readonly findByPublicHost: (hostname: string) => SourceControlDefinition | undefined;
   /**
    * The host whose `publicHost` is `hostname` or a parent domain of it, such as GitHub for
-   * `gist.github.com`: which host a link is on, not one T3 can read from.
+   * `gist.github.com`: which host a link is on, not one LegionCode can read from.
    */
   readonly findByPublicDomain: (hostname: string) => SourceControlDefinition | undefined;
   /** The first host, in registry order, that reads `url` as one of its change requests. */

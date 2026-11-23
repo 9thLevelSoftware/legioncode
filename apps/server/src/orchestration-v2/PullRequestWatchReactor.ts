@@ -11,8 +11,8 @@ import {
   type ThreadPullRequestLink,
   type ThreadId,
   type ThreadPullRequestWatch,
-} from "@t3tools/contracts";
-import { commandIndicatesFailure } from "@t3tools/shared/toolOutput";
+} from "@legioncode/contracts";
+import { commandIndicatesFailure } from "@legioncode/shared/toolOutput";
 import {
   changeRequestsClosedBy,
   isChangeRequestCloseCommand,
@@ -40,7 +40,7 @@ import * as Stream from "effect/Stream";
 import {
   type ProviderChangeRequestWatchFingerprint,
   PullRequestProviderError,
-} from "@t3tools/source-control-core/server/PullRequestProvider";
+} from "@legioncode/source-control-core/server/PullRequestProvider";
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
 import { forkParked } from "../serverActivation.ts";
 import * as Orchestrator from "./Orchestrator.ts";
@@ -240,7 +240,7 @@ export class PullRequestWatchReactor extends Context.Service<
     readonly start: () => Effect.Effect<void, never, Scope.Scope>;
     readonly sweep: Effect.Effect<void>;
   }
->()("t3/orchestration-v2/PullRequestWatchReactor") {}
+>()("legioncode/orchestration-v2/PullRequestWatchReactor") {}
 
 /** @public */
 export const make = Effect.gen(function* () {
@@ -360,7 +360,7 @@ export const make = Effect.gen(function* () {
 
   const giveUp = (target: WatchTarget) =>
     record(target, null, {
-      text: `T3 Code stopped watching pull request #${target.link.number} (${target.link.url}) because it failed to read it from the host ${READ_FAILURE_LIMIT} times in a row. Check it yourself, and call watch_pull_request only if it is still open.`,
+      text: `LegionCode stopped watching pull request #${target.link.number} (${target.link.url}) because it failed to read it from the host ${READ_FAILURE_LIMIT} times in a row. Check it yourself, and call watch_pull_request only if it is still open.`,
       notification: {
         source: { kind: "monitor" },
         outcome: "failed",

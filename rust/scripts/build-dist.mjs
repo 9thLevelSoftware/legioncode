@@ -2,7 +2,6 @@
 import { spawnSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
-import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -22,10 +21,16 @@ const VALID_SURFACES = new Set([
   "cloudflare-workers",
 ]);
 
-function run(command, args, cwd = repoRoot) {
+const WASM_WEB_FILES = ["legion_wasm_ffi.js", "legion_wasm_ffi.d.ts", "legion_wasm_ffi_bg.wasm"];
+
+function run(command, args, cwd = repoRoot, options = {}) {
   const rendered = `${command} ${args.join(" ")}`;
   process.stdout.write(`[build-dist] ${rendered}\n`);
-  const result = spawnSync(command, args, { cwd, stdio: "inherit" });
+  const result = spawnSync(command, args, {
+    cwd,
+    stdio: "inherit",
+    ...(options.shell ? { shell: true } : {}),
+  });
   if (result.error) {
     throw result.error;
   }
@@ -72,14 +77,28 @@ function copyDirContents(srcDir, destDir) {
   fs.cpSync(srcDir, destDir, { recursive: true, force: true });
 }
 
+function replaceDirContents(srcDir, destDir) {
+  fs.rmSync(destDir, { recursive: true, force: true });
+  copyDirContents(srcDir, destDir);
+}
+
+function stageWebBundle(webDistDir, destDir, wasmSourceDir) {
+  replaceDirContents(webDistDir, destDir);
+  if (wasmSourceDir && fs.existsSync(path.join(wasmSourceDir, "legion_wasm_ffi.js"))) {
+    for (const fileName of WASM_WEB_FILES) {
+      copyFileEnsured(path.join(wasmSourceDir, fileName), path.join(destDir, fileName));
+    }
+  }
+}
+
 function writeWasmPackageJson(dir, name, version, moduleType) {
   const manifest = {
     name,
     version,
     type: moduleType,
-    main: "t3_wasm_ffi.js",
-    types: "t3_wasm_ffi.d.ts",
-    files: ["t3_wasm_ffi_bg.wasm", "t3_wasm_ffi.js", "t3_wasm_ffi.d.ts"],
+    main: "legion_wasm_ffi.js",
+    types: "legion_wasm_ffi.d.ts",
+    files: ["legion_wasm_ffi_bg.wasm", "legion_wasm_ffi.js", "legion_wasm_ffi.d.ts"],
   };
   fs.writeFileSync(path.join(dir, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 }
@@ -116,6 +135,7 @@ const { values } = parseArgs({
     surfaces: { type: "string", default: "all" },
     target: { type: "string" },
     "out-dir": { type: "string" },
+    "skip-web-build": { type: "boolean", default: false },
   },
 });
 
@@ -149,13 +169,29 @@ const exeExt = isWindowsTarget ? ".exe" : "";
 const targetReleaseDir = target
   ? path.join(rustRoot, "target", target, "release")
   : path.join(rustRoot, "target", "release");
+const webDistDir = path.join(repoRoot, "apps", "web", "dist");
+const webDistIndex = path.join(webDistDir, "index.html");
+const skipWebBuild = Boolean(values["skip-web-build"]);
 
 fs.mkdirSync(outDir, { recursive: true });
 
+if (wantWebApp) {
+  if (skipWebBuild && fs.existsSync(webDistIndex)) {
+    process.stdout.write(`[build-dist] Reusing existing @legioncode/web build at ${webDistDir}\n`);
+  } else {
+    run("pnpm", ["--filter", "@legioncode/web", "build"], repoRoot, {
+      shell: process.platform === "win32",
+    });
+  }
+  if (!fs.existsSync(webDistIndex)) {
+    throw new Error(`Missing built @legioncode/web bundle at ${webDistIndex}`);
+  }
+}
+
 const nativePackages = [
-  ...(wantCli ? ["t3-cli"] : []),
-  ...(wantDesktop ? ["t3-desktop-shell"] : []),
-  ...(wantMobileNative ? ["t3-mobile-ffi"] : []),
+  ...(wantCli ? ["legion-cli"] : []),
+  ...(wantDesktop ? ["legion-desktop-shell"] : []),
+  ...(wantMobileNative ? ["legion-mobile-ffi"] : []),
 ];
 
 if (nativePackages.length > 0) {
@@ -172,15 +208,15 @@ if (nativePackages.length > 0) {
 }
 
 if (wantCli) {
-  const cliSrc = path.join(targetReleaseDir, `t3${exeExt}`);
-  const cliDest = path.join(outDir, "bin", `t3${exeExt}`);
+  const cliSrc = path.join(targetReleaseDir, `legioncode${exeExt}`);
+  const cliDest = path.join(outDir, "bin", `legioncode${exeExt}`);
   copyFileEnsured(cliSrc, cliDest, !isWindowsTarget);
 }
 
 if (wantDesktop) {
   const desktopDir = path.join(outDir, "desktop");
-  const desktopSrc = path.join(targetReleaseDir, `t3-desktop${exeExt}`);
-  const desktopDest = path.join(desktopDir, `t3-desktop${exeExt}`);
+  const desktopSrc = path.join(targetReleaseDir, `legioncode-desktop${exeExt}`);
+  const desktopDest = path.join(desktopDir, `legioncode-desktop${exeExt}`);
   copyFileEnsured(desktopSrc, desktopDest, !isWindowsTarget);
 
   if (isHostCompatibleTarget(target)) {
@@ -189,7 +225,7 @@ if (wantDesktop) {
     if (fs.existsSync(desktopServicesDir)) {
       copyDirContents(desktopServicesDir, path.join(outDir, "services"));
     }
-    const launcherSh = path.join(desktopDir, "linux", "t3code-launcher.sh");
+    const launcherSh = path.join(desktopDir, "linux", "legioncode-launcher.sh");
     if (fs.existsSync(launcherSh) && process.platform !== "win32") {
       fs.chmodSync(launcherSh, 0o755);
     }
@@ -211,7 +247,7 @@ if (wantMobileSdk) {
       "--manifest-path",
       manifestPath,
       "-p",
-      "t3-mobile-ffi",
+      "legion-mobile-ffi",
       "--example",
       "emit_mobile_dist",
       "--",
@@ -227,11 +263,11 @@ if (wantMobileSdk) {
   }
   if (wantMobileNative) {
     const mobileArtifacts = [
-      "t3_mobile_ffi.dll",
-      "t3_mobile_ffi.dll.lib",
-      "libt3_mobile_ffi.so",
-      "libt3_mobile_ffi.dylib",
-      "libt3_mobile_ffi.a",
+      "legion_mobile_ffi.dll",
+      "legion_mobile_ffi.dll.lib",
+      "liblegion_mobile_ffi.so",
+      "liblegion_mobile_ffi.dylib",
+      "liblegion_mobile_ffi.a",
     ];
     for (const fileName of mobileArtifacts) {
       const candidate = path.join(targetReleaseDir, fileName);
@@ -241,6 +277,8 @@ if (wantMobileSdk) {
     }
   }
 }
+
+const wasmWebDir = path.join(outDir, "wasm-web");
 
 if (wantWasm) {
   run(
@@ -254,7 +292,7 @@ if (wantWasm) {
       "--target",
       "wasm32-unknown-unknown",
       "-p",
-      "t3-wasm-ffi",
+      "legion-wasm-ffi",
     ],
     repoRoot,
   );
@@ -263,13 +301,12 @@ if (wantWasm) {
     "target",
     "wasm32-unknown-unknown",
     "release",
-    "t3_wasm_ffi.wasm",
+    "legion_wasm_ffi.wasm",
   );
   if (!fs.existsSync(wasmBinary)) {
     throw new Error(`Missing built WASM binary at ${wasmBinary}`);
   }
 
-  const wasmWebDir = path.join(outDir, "wasm-web");
   const wasmNodeDir = path.join(outDir, "wasm-nodejs");
   fs.mkdirSync(wasmWebDir, { recursive: true });
   fs.mkdirSync(wasmNodeDir, { recursive: true });
@@ -282,22 +319,8 @@ if (wantWasm) {
     if (fs.existsSync(gitignore)) fs.rmSync(gitignore);
   }
 
-  writeWasmPackageJson(wasmWebDir, "@t3tools/t3-wasm-ffi", version, "module");
-  writeWasmPackageJson(wasmNodeDir, "@t3tools/t3-wasm-ffi-node", version, "commonjs");
-
-  if (wantWebApp) {
-    const webAppDir = path.join(outDir, "web-app");
-    fs.mkdirSync(webAppDir, { recursive: true });
-    const req = createRequire(import.meta.url);
-    const wasmNode = req(path.join(wasmNodeDir, "t3_wasm_ffi.js"));
-    const bundle = JSON.parse(wasmNode.emit_web_app_bundle_json());
-    fs.writeFileSync(path.join(webAppDir, "index.html"), bundle.indexHtml);
-    fs.writeFileSync(path.join(webAppDir, "styles.css"), bundle.stylesCss);
-    fs.writeFileSync(path.join(webAppDir, "app.mjs"), bundle.appMjs);
-    for (const fileName of ["t3_wasm_ffi.js", "t3_wasm_ffi.d.ts", "t3_wasm_ffi_bg.wasm"]) {
-      copyFileEnsured(path.join(wasmWebDir, fileName), path.join(webAppDir, fileName));
-    }
-  }
+  writeWasmPackageJson(wasmWebDir, "@legioncode/legion-wasm-ffi", version, "module");
+  writeWasmPackageJson(wasmNodeDir, "@legioncode/legion-wasm-ffi-node", version, "commonjs");
 
   if (wantCloudflareWorkers) {
     const workerDir = path.join(outDir, "cloudflare-workers");
@@ -306,10 +329,20 @@ if (wantWasm) {
     for (const fileName of ["worker.mjs", "worker_runtime.mjs", "wrangler.toml"]) {
       copyFileEnsured(path.join(workerTemplatesDir, fileName), path.join(workerDir, fileName));
     }
-    for (const fileName of ["t3_wasm_ffi.js", "t3_wasm_ffi.d.ts", "t3_wasm_ffi_bg.wasm"]) {
+    for (const fileName of WASM_WEB_FILES) {
       copyFileEnsured(path.join(wasmWebDir, fileName), path.join(workerDir, fileName));
     }
   }
+}
+
+if (wantWebApp) {
+  stageWebBundle(webDistDir, path.join(outDir, "web-app"), wasmWebDir);
+}
+if (wantCli && (wantWebApp || fs.existsSync(webDistIndex))) {
+  stageWebBundle(webDistDir, path.join(outDir, "bin", "client"), wasmWebDir);
+}
+if (wantDesktop && (wantWebApp || fs.existsSync(webDistIndex))) {
+  stageWebBundle(webDistDir, path.join(outDir, "desktop", "web-app"), wasmWebDir);
 }
 
 writeSha256Sums(outDir);

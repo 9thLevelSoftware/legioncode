@@ -1,8 +1,8 @@
-import { EnvironmentId } from "@t3tools/contracts";
+import { EnvironmentId } from "@legioncode/contracts";
 import {
   readHostCredentialSettings,
   sourceControlClients,
-} from "@t3tools/client-runtime/source-control-clients";
+} from "@legioncode/client-runtime/source-control-clients";
 import { T, Var } from "gt-react-native";
 import { Linking, Pressable, View } from "react-native";
 
@@ -55,7 +55,7 @@ export function SourceControlAppAccessNotice(props: {
         accessibilityRole="link"
         onPress={() => void Linking.openURL(appSignIn.installUrl).catch(() => undefined)}
       >
-        <Text className="text-sm font-t3-bold text-foreground">
+        <Text className="text-sm font-legion-bold text-foreground">
           <T>
             Install on <Var>{owner}</Var>
           </T>

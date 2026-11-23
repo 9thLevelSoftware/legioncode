@@ -9,7 +9,7 @@ import {
   EnvironmentHttpForbiddenError,
   EnvironmentHttpInternalServerError,
   EnvironmentHttpUnauthorizedError,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Effect from "effect/Effect";
 import * as HttpEffect from "effect/http/HttpEffect";
 import { HttpServerResponse } from "effect/http";
@@ -165,7 +165,7 @@ export const layer = HttpApiBuilder.group(
           Effect.tap(() => appendCloudCredentialResponseHeaders),
         ),
       )
-      .handle("t3MintCredential", ({ payload }) =>
+      .handle("legionMintCredential", ({ payload }) =>
         traceRelayRequest(
           toHttpError(cloudLink.mintCredential(payload)).pipe(
             Effect.tap(() => appendCloudCredentialResponseHeaders),

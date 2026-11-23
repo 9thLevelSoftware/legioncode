@@ -4,7 +4,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as NodeCrypto from "node:crypto";
 import * as EffectNodeCrypto from "@effect/platform-node/NodeCrypto";
 import { describe, expect, it } from "@effect/vitest";
-import { RelayApi, RelayHookDeliveryProofPayload } from "@t3tools/contracts/relay";
+import { RelayApi, RelayHookDeliveryProofPayload } from "@legioncode/contracts/relay";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -29,7 +29,7 @@ import * as ManagedEndpointAllocations from "../environments/ManagedEndpointAllo
 import { RELAY_HTTP_ROUTER_CONFIG, traceRelayHttpRequestWith } from "../http/Api.ts";
 import * as RelayHttpApi from "../http/Api.ts";
 import * as HookForwarder from "./HookForwarder.ts";
-import { RELAY_HOOK_DELIVERY_TYP, verifyRelayJwt } from "@t3tools/shared/relayJwt";
+import { RELAY_HOOK_DELIVERY_TYP, verifyRelayJwt } from "@legioncode/shared/relayJwt";
 import * as HeldHooks from "./HeldHooks.ts";
 import * as HookInbox from "./HookInbox.ts";
 import type { HeldHook } from "./HookInboxStore.ts";
@@ -44,7 +44,7 @@ const settings: RelayConfiguration.RelayConfiguration["Service"] = {
   apns: null,
   clerkSecretKey: Redacted.make("clerk-secret-key"),
   clerkPublishableKey: "pk_test_test",
-  clerkJwtAudience: "t3-code-relay",
+  clerkJwtAudience: "legioncode-relay",
   apnsDeliveryJobSigningSecret: Redacted.make("apns-delivery-secret"),
   cloudMintPrivateKey: Redacted.make(mintKeys.privateKey),
   cloudMintPublicKey: mintKeys.publicKey,
@@ -59,7 +59,7 @@ const readyAllocation: ManagedEndpointAllocations.ManagedEndpointAllocation = {
   environmentId,
   hostname: "env.example.test",
   tunnelId: "tunnel-id",
-  tunnelName: `t3coderelay-managedendpoint-dev-${endpointKey}`,
+  tunnelName: `legioncoderelay-managedendpoint-dev-${endpointKey}`,
   dnsRecordId: "dns-record-id",
   readyAt: "2026-05-25T00:00:00.000Z",
   tunnelReleasedAt: null,
@@ -272,25 +272,28 @@ describe("HookForwarder", () => {
       yield* harness.send(
         new Request(hookUrl("hook-1/tok"), {
           method: "POST",
-          headers: { "x-t3-relay-delivery": "forged", "x-t3-relay-delivery-id": "forged" },
+          headers: {
+            "x-legioncode-relay-delivery": "forged",
+            "x-legioncode-relay-delivery-id": "forged",
+          },
           body: "{}",
         }),
       );
       const sent = harness.sent[0]!;
       const payload = yield* verifyRelayJwt(RelayHookDeliveryProofPayload, {
         publicKey: mintKeys.publicKey,
-        token: sent.headers["x-t3-relay-delivery"]!,
+        token: sent.headers["x-legioncode-relay-delivery"]!,
         typ: RELAY_HOOK_DELIVERY_TYP,
         issuer: settings.relayIssuer,
-        audience: `t3-env:${environmentId}`,
+        audience: `legioncode-env:${environmentId}`,
       }).pipe(Effect.provide(EffectNodeCrypto.layerSignature));
       expect(payload).toMatchObject({
         environmentId,
         hookId: "hook-1",
-        deliveryId: sent.headers["x-t3-relay-delivery-id"],
-        receivedAt: sent.headers["x-t3-relay-received-at"],
+        deliveryId: sent.headers["x-legioncode-relay-delivery-id"],
+        receivedAt: sent.headers["x-legioncode-relay-received-at"],
       });
-      expect(sent.headers["x-t3-relay-delivery-id"]).not.toBe("forged");
+      expect(sent.headers["x-legioncode-relay-delivery-id"]).not.toBe("forged");
     }),
   );
 
@@ -565,7 +568,7 @@ describe("HookForwarder", () => {
           new Request(hookUrl("%68ook-1/tok%2Fen", "?a=1"), {
             method: "POST",
             body,
-            headers: { "x-t3-relay-delivery-id": "forged", "x-sig": "s" },
+            headers: { "x-legioncode-relay-delivery-id": "forged", "x-sig": "s" },
           }),
         );
         expect(response.status).toBe(202);
@@ -576,7 +579,7 @@ describe("HookForwarder", () => {
         expect([...(hook?.body ?? [])]).toEqual([0, 255, 10]);
         expect(hook?.headers["x-sig"]).toBe("s");
         expect(hook?.hookKey).toBe("hook-1");
-        expect(hook?.headers["x-t3-relay-delivery-id"]).toBeUndefined();
+        expect(hook?.headers["x-legioncode-relay-delivery-id"]).toBeUndefined();
         expect(hook?.id).not.toBe("forged");
       }),
     );

@@ -1,17 +1,17 @@
 import { useAtomValue } from "@effect/atom-react";
-import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
-import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { thrownErrorMessage } from "@legioncode/client-runtime/errors";
+import { scopeThreadRef } from "@legioncode/client-runtime/environment";
 import {
   AuthPreviewOperateScope,
   AuthTerminalOperateScope,
   type DiscoveredLocalServer,
   type EnvironmentId,
   type ThreadId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
-} from "@t3tools/client-runtime/state/runtime";
+} from "@legioncode/client-runtime/state/runtime";
 import { T, useGT, Var } from "gt-react";
 import { m } from "~/i18n/messages";
 import { CableIcon, GlobeIcon, SquareIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";

@@ -20,7 +20,7 @@ import {
   type OrchestrationV2ServerCommand,
   type OrchestrationV2StoredEvent,
   type UserInputAttachments,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -43,7 +43,7 @@ const dispatchCommand = (command: OrchestrationV2Command, sender = { managesProv
   ThreadMessageIntake.dispatchCommand(command, sender);
 
 const layerIntakeTest = ServerConfig.layerTest(process.cwd(), {
-  prefix: "t3-question-intake-",
+  prefix: "legion-question-intake-",
 }).pipe(
   Layer.provideMerge(DocumentText.layer.pipe(Layer.provideMerge(NodeServices.layer))),
   Layer.provideMerge(ServerSettings.layerTest()),

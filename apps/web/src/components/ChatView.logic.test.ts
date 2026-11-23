@@ -5,7 +5,7 @@ import {
   environmentContextReference,
   threadContextReference,
 } from "../lib/composerContextRecords";
-import { threadContextRecord } from "@t3tools/shared/composerContextReferences";
+import { threadContextRecord } from "@legioncode/shared/composerContextReferences";
 import {
   prepareRevertedMessageAttachments,
   boundAttachmentIds,
@@ -23,7 +23,7 @@ import {
   recallCheckoutIsRepo,
   rememberCheckoutIsRepo,
 } from "./ChatView.logic";
-import { ProviderDriverKind, type ServerProvider } from "@t3tools/contracts";
+import { ProviderDriverKind, type ServerProvider } from "@legioncode/contracts";
 import { deriveProviderInstanceEntries } from "../providerInstances";
 import { ensureInlineContextReferences } from "../lib/composerContextReferences";
 import {
@@ -45,7 +45,7 @@ import {
   TurnItemId,
   type OrchestrationV2ProjectedTurnItem,
   type WorktreeSetupSnapshot,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as DateTime from "effect/DateTime";
 import * as Option from "effect/Option";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
@@ -127,7 +127,7 @@ const readySession = {
 describe("deriveComposerSendState", () => {
   it("keeps text sendable while excluding expired terminal pills", () => {
     const state = deriveComposerSendState({
-      prompt: `yoo [Terminal 1](t3-context://v1/terminal/ctx-expired) waddup`,
+      prompt: `yoo [Terminal 1](legion-context://v1/terminal/ctx-expired) waddup`,
       imageCount: 0,
       terminalContexts: [
         {
@@ -1284,7 +1284,7 @@ describe("snapshotComposerSend", () => {
       replyTo,
     });
 
-    expect(snapshot.messageText).toContain(`t3-context://v1/response/${replyTo.contextId}`);
+    expect(snapshot.messageText).toContain(`legion-context://v1/response/${replyTo.contextId}`);
     expect(snapshot.draftText).toBe("why there?");
     expect(snapshot.replyTo).toBe(replyTo);
   });

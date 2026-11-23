@@ -1,26 +1,11 @@
-import { resolveLocale } from "../locales.ts";
-
 const DEFAULT_SOCKET_FRAME_PART_BYTES = 48 * 1024;
 const PART_PREFIX = "\u001e";
 const FALLBACK_ABI_VERSION = 1;
-const SUPPORTED_WEB_LOCALES = [
-  "en",
-  "de",
-  "es",
-  "fr",
-  "ja",
-  "ko",
-  "pt-BR",
-  "ru",
-  "sv",
-  "zh",
-] as const;
 
 interface WasmFfiExports {
-  readonly t3_wasm_abi_version: () => number;
+  readonly legion_wasm_abi_version: () => number;
   readonly sanitize_bracketed_paste_str: (raw: string) => string;
   readonly split_utf16_frame_parts_json: (inputJson: string) => string;
-  readonly emit_web_app_bundle_json: () => string;
   readonly translate_i18n_json?: (inputJson: string) => string;
   readonly normalize_nfd_filename?: (raw: string) => string;
   readonly strip_osc4_queries?: (raw: string) => string;
@@ -52,12 +37,6 @@ interface RuntimeProcessLike {
   readonly getBuiltinModule?: (id: string) => unknown;
 }
 
-interface WebAppBundleAssets {
-  readonly indexHtml: string;
-  readonly stylesCss: string;
-  readonly appMjs: string;
-}
-
 let cachedNodeWasm: WasmFfiExports | null | undefined;
 let cachedBrowserWasm: WasmFfiExports | undefined;
 
@@ -69,19 +48,18 @@ function isWasmFfiExports(value: unknown): value is WasmFfiExports {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Partial<Record<keyof WasmFfiExports, unknown>>;
   return (
-    typeof candidate.t3_wasm_abi_version === "function" &&
+    typeof candidate.legion_wasm_abi_version === "function" &&
     typeof candidate.sanitize_bracketed_paste_str === "function" &&
-    typeof candidate.split_utf16_frame_parts_json === "function" &&
-    typeof candidate.emit_web_app_bundle_json === "function"
+    typeof candidate.split_utf16_frame_parts_json === "function"
   );
 }
 
 export function isLegacyWebForced(env?: Readonly<Record<string, string | undefined>>): boolean {
   const proc = getRuntimeProcess();
   const raw =
-    env?.T3CODE_LEGACY_WEB ??
-    proc?.env?.T3CODE_LEGACY_WEB ??
-    (globalThis as { readonly T3CODE_LEGACY_WEB?: unknown }).T3CODE_LEGACY_WEB;
+    env?.LEGIONCODE_LEGACY_WEB ??
+    proc?.env?.LEGIONCODE_LEGACY_WEB ??
+    (globalThis as { readonly LEGIONCODE_LEGACY_WEB?: unknown }).LEGIONCODE_LEGACY_WEB;
   if (typeof raw !== "string" && typeof raw !== "number" && typeof raw !== "boolean") {
     return false;
   }
@@ -113,14 +91,14 @@ function loadNodeWasmExports(): WasmFfiExports | undefined {
     if (import.meta.url.startsWith("file:")) {
       const currentDir = nodePath.dirname(nodeUrl.fileURLToPath(import.meta.url));
       candidates.push(
-        nodePath.resolve(currentDir, "../../../../rust/dist/wasm-nodejs/t3_wasm_ffi.js"),
+        nodePath.resolve(currentDir, "../../../../rust/dist/wasm-nodejs/legion_wasm_ffi.js"),
       );
     }
     if (typeof proc.cwd === "function") {
       const cwd = proc.cwd();
       candidates.push(
-        nodePath.resolve(cwd, "rust/dist/wasm-nodejs/t3_wasm_ffi.js"),
-        nodePath.resolve(cwd, "../../rust/dist/wasm-nodejs/t3_wasm_ffi.js"),
+        nodePath.resolve(cwd, "rust/dist/wasm-nodejs/legion_wasm_ffi.js"),
+        nodePath.resolve(cwd, "../../rust/dist/wasm-nodejs/legion_wasm_ffi.js"),
       );
     }
 
@@ -170,7 +148,7 @@ export async function initRustCoreBridge(options?: {
     return true;
   }
 
-  const moduleUrl = options?.moduleUrl ?? "./t3_wasm_ffi.js";
+  const moduleUrl = options?.moduleUrl ?? "./legion_wasm_ffi.js";
   try {
     const imported: unknown = await import(/* @vite-ignore */ moduleUrl);
     if (typeof imported !== "object" || imported === null) {
@@ -193,7 +171,7 @@ export async function initRustCoreBridge(options?: {
 export function abiVersion(): number {
   const wasm = resolveActiveWasmExports();
   if (wasm) {
-    return wasm.t3_wasm_abi_version();
+    return wasm.legion_wasm_abi_version();
   }
   return FALLBACK_ABI_VERSION;
 }
@@ -446,73 +424,6 @@ export function splitSocketFrameParts(
   return splitSocketFramePartsFallback(payload, partBytes);
 }
 
-function resolveWasmBundleLocale(wasm: WasmFfiExports, locale?: string): string {
-  if (!locale || !wasm.translate_i18n_json) {
-    return "en";
-  }
-  try {
-    const translated = JSON.parse(
-      wasm.translate_i18n_json(JSON.stringify({ language: locale })),
-    ) as { readonly locale?: string; readonly bcp47Tag?: string };
-    return translated.bcp47Tag ?? translated.locale ?? "en";
-  } catch {
-    return "en";
-  }
-}
-
-function fallbackWebAppBundleJson(locale?: string): string {
-  const resolvedLocale = locale
-    ? resolveLocale(locale, [locale], SUPPORTED_WEB_LOCALES, "en")
-    : "en";
-  const bundle: WebAppBundleAssets = {
-    indexHtml: [
-      "<!doctype html>",
-      `<html lang="${resolvedLocale}">`,
-      "  <head>",
-      '    <meta charset="utf-8" />',
-      '    <meta name="viewport" content="width=device-width, initial-scale=1" />',
-      "    <title>T3 Code</title>",
-      '    <link rel="stylesheet" href="./styles.css" />',
-      "  </head>",
-      "  <body>",
-      '    <div id="app" data-testid="app-root"></div>',
-      '    <script type="module" src="./app.mjs"></script>',
-      "  </body>",
-      "</html>",
-      "",
-    ].join("\n"),
-    stylesCss: ":root { color-scheme: dark; }\n.t3-shell { display: grid; min-height: 100vh; }\n",
-    appMjs: [
-      'import init, { WasmWebApp } from "./t3_wasm_ffi.js";',
-      "await init();",
-      'const app = new WasmWebApp(navigator.language || "en", Date.now());',
-      'app.dispatch_json(JSON.stringify({ type: "setLocale", language: "system" }));',
-      "",
-    ].join("\n"),
-  };
-  return JSON.stringify(bundle);
-}
-
-export function emitWebAppBundleJson(locale?: string): string {
-  const wasm = resolveActiveWasmExports();
-  if (wasm) {
-    const rawJson = wasm.emit_web_app_bundle_json();
-    if (!locale) {
-      return rawJson;
-    }
-    const targetLang = resolveWasmBundleLocale(wasm, locale);
-    if (targetLang === "en") {
-      return rawJson;
-    }
-    const parsed = JSON.parse(rawJson) as WebAppBundleAssets;
-    return JSON.stringify({
-      ...parsed,
-      indexHtml: parsed.indexHtml.replace('<html lang="en">', `<html lang="${targetLang}">`),
-    });
-  }
-  return fallbackWebAppBundleJson(locale);
-}
-
 const TRAILING_SEPARATORS_RE = /[/\\]+$/;
 
 export interface PreviewTunnelPolicySummary {
@@ -531,17 +442,12 @@ export interface ActiveBrandConfig {
   readonly cliBinName: string;
   readonly desktopBinName: string;
   readonly primaryEnvPrefix: string;
-  readonly fallbackEnvPrefix: string;
   readonly homeDirName: string;
-  readonly fallbackHomeDirName: string;
   readonly urlScheme: string;
   readonly ipcPipePrefix: string;
   readonly httpHeaderPrefix: string;
-  readonly fallbackHttpHeaderPrefix: string;
   readonly mcpToolPrefix: string;
-  readonly fallbackMcpToolPrefix: string;
   readonly mcpNamespace: string;
-  readonly fallbackMcpNamespace: string;
   readonly systemdUnitName: string;
   readonly launchdLabel: string;
   readonly windowsTaskName: string;
@@ -550,27 +456,22 @@ export interface ActiveBrandConfig {
 }
 
 const ACTIVE_BRAND_FALLBACK: ActiveBrandConfig = {
-  productName: "T3 Code",
-  orgDomain: "t3.codes",
-  cliBinName: "t3",
-  desktopBinName: "t3-desktop",
-  primaryEnvPrefix: "T3CODE_",
-  fallbackEnvPrefix: "T3_",
-  homeDirName: ".t3",
-  fallbackHomeDirName: ".t3code",
-  urlScheme: "t3code",
-  ipcPipePrefix: "t3code",
-  httpHeaderPrefix: "x-t3-",
-  fallbackHttpHeaderPrefix: "t3-",
-  mcpToolPrefix: "t3_",
-  fallbackMcpToolPrefix: "legion_",
-  mcpNamespace: "mcp__t3_code__",
-  fallbackMcpNamespace: "mcp__legion_code__",
-  systemdUnitName: "t3code.service",
-  launchdLabel: "com.t3tools.t3code.service",
-  windowsTaskName: "t3code",
-  windowsPolicyKey: "SOFTWARE\\Policies\\T3Tools\\T3Code",
-  macosPolicyDomain: "com.t3tools.t3code",
+  productName: "LegionCode",
+  orgDomain: "legion.codes",
+  cliBinName: "legioncode",
+  desktopBinName: "legioncode-desktop",
+  primaryEnvPrefix: "LEGIONCODE_",
+  homeDirName: ".legioncode",
+  urlScheme: "legioncode",
+  ipcPipePrefix: "legioncode",
+  httpHeaderPrefix: "x-legioncode-",
+  mcpToolPrefix: "legion_",
+  mcpNamespace: "mcp__legion_code__",
+  systemdUnitName: "legioncode.service",
+  launchdLabel: "dev.legioncode.service",
+  windowsTaskName: "legioncode",
+  windowsPolicyKey: "SOFTWARE\\Policies\\LegionCode\\LegionCode",
+  macosPolicyDomain: "dev.legioncode",
 };
 
 function normalizeNfdFilenameFallback(path: string): string {

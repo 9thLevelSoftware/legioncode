@@ -1,0 +1,9 @@
+{
+  "name": "@legioncode/mobile-highlights-native",
+  "version": "0.0.0",
+  "private": true,
+  "types": "./src/LegionHighlights.nitro.ts",
+  "peerDependencies": {
+    "react-native-nitro-modules": "*"
+  }
+}

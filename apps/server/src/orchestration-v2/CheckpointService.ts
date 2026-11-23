@@ -8,7 +8,7 @@ import {
   ProviderThreadId,
   RunId,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Cache from "effect/Cache";
 import * as Context from "effect/Context";
 import * as Digest from "effect/crypto/Digest";
@@ -16,16 +16,16 @@ import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Base64Url from "effect/encoding/Base64Url";
 import * as Hex from "effect/encoding/Hex";
-import * as KeyedLock from "@t3tools/shared/KeyedLock";
+import * as KeyedLock from "@legioncode/shared/KeyedLock";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import { isGitImport, parseTurnDiffFilesFromNumstat } from "../checkpointing/Diffs.ts";
 import * as CheckpointStore from "../checkpointing/CheckpointStore.ts";
-import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import * as IdAllocator from "@legioncode/provider-core/server/IdAllocator";
 
-const CHECKPOINT_REFS_PREFIX = "refs/t3/orchestration-v2/checkpoints";
+const CHECKPOINT_REFS_PREFIX = "refs/legioncode/orchestration-v2/checkpoints";
 const ROOT_CHECKPOINT_SCOPE_NAME = "root";
 // The provider turn waits on the baseline, so a workspace too slow for this starts without one.
 // It bounds only the snapshot: waiting on the lock lets an in-flight capture finish the same ref.
@@ -151,7 +151,7 @@ export interface CheckpointServiceV2Shape {
 export class CheckpointServiceV2 extends Context.Service<
   CheckpointServiceV2,
   CheckpointServiceV2Shape
->()("t3/orchestration-v2/CheckpointService/CheckpointServiceV2") {}
+>()("legioncode/orchestration-v2/CheckpointService/CheckpointServiceV2") {}
 
 export const checkpointRefForScopeOrdinal = Effect.fn("checkpointRefForScopeOrdinal")(
   function* (input: { readonly scopeId: CheckpointScopeId; readonly ordinalWithinScope: number }) {

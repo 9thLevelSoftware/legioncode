@@ -38,22 +38,22 @@ function exitCodeFromChildExit(code: number | null, signal: NodeJS.Signals | nul
   return signalNumber !== undefined ? 128 + signalNumber : 1;
 }
 
-/** Returns true when `T3CODE_LEGACY_NODE` forces execution through the legacy Node server. */
+/** Returns true when `LEGIONCODE_LEGACY_NODE` forces execution through the legacy Node server. */
 export function isLegacyNodeForced(env: NodeJS.ProcessEnv = process.env): boolean {
-  const value = env.T3CODE_LEGACY_NODE?.trim().toLowerCase();
+  const value = env.LEGIONCODE_LEGACY_NODE?.trim().toLowerCase();
   return value === "1" || value === "true";
 }
 
-/** Resolves the Rust `t3` executable from `T3CODE_RUST_BIN`, `rust/dist/bin`, or `rust/target/release`. */
+/** Resolves the Rust `legioncode` executable from `LEGIONCODE_RUST_BIN`, `rust/dist/bin`, or `rust/target/release`. */
 export function resolveRustCliBinary(
   options: ResolveRustCliBinaryOptions = {},
 ): string | undefined {
   const env = options.env ?? process.env;
-  // oxlint-disable-next-line t3code/no-global-process-runtime -- Pre-Effect CLI bootstrap cannot import HostProcess.
+  // oxlint-disable-next-line legioncode/no-global-process-runtime -- Pre-Effect CLI bootstrap cannot import HostProcess.
   const platform = options.platform ?? process.platform;
   const repoRoot = options.repoRoot ?? defaultRepoRoot();
-  const binaryName = platform === "win32" ? "t3.exe" : "t3";
-  const overrideBin = env.T3CODE_RUST_BIN?.trim();
+  const binaryName = platform === "win32" ? "legioncode.exe" : "legioncode";
+  const overrideBin = env.LEGIONCODE_RUST_BIN?.trim();
 
   const candidates = [
     ...(overrideBin ? [NodePath.resolve(overrideBin)] : []),
@@ -64,8 +64,8 @@ export function resolveRustCliBinary(
 }
 
 /**
- * Runs the Rust `t3` binary with `argv.slice(2)` unless running inside a Node SEA,
- * `T3CODE_LEGACY_NODE` is forced, or no Rust binary is available.
+ * Runs the Rust `legioncode` binary with `argv.slice(2)` unless running inside a Node SEA,
+ * `LEGIONCODE_LEGACY_NODE` is forced, or no Rust binary is available.
  */
 export async function tryRunRustCliCutover(
   options: TryRunRustCliCutoverOptions = {},

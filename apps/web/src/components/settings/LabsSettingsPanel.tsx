@@ -1,10 +1,10 @@
-import { managedCapabilityDenial } from "@t3tools/client-runtime/contract-labels";
+import { managedCapabilityDenial } from "@legioncode/client-runtime/contract-labels";
 import { useAuth } from "@clerk/react";
 import { Link } from "@tanstack/react-router";
 import { T, useGT, useMessages } from "gt-react";
 
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
-import { useT3ConnectAuthPrompt } from "../clerk/useT3ConnectAuthPrompt";
+import { useLegionConnectAuthPrompt } from "../clerk/useLegionConnectAuthPrompt";
 import { Button } from "../ui/button";
 import { Switch } from "../ui/switch";
 import { ScopedSwitch } from "./ScopedSwitch";
@@ -21,7 +21,7 @@ export function LabsSettingsPanel() {
     <SettingsPageContainer>
       <SettingsSection id="beta" title={gt("Beta")}>
         <BoringSidebarRow />
-        {/* Clerk is only mounted when this build has T3 Connect. */}
+        {/* Clerk is only mounted when this build has Legion Connect. */}
         {hasCloudPublicConfig() ? <GuestLinksRowWithSignIn /> : <GuestLinksRow />}
         <LinkedEnvironmentsRow />
         <PromptSuggestionsRow />
@@ -85,19 +85,19 @@ function BoringSidebarMultilineRow() {
   );
 }
 
-/** Signed out of T3 Connect, the row offers to sign in instead of its switch. */
+/** Signed out of Legion Connect, the row offers to sign in instead of its switch. */
 function GuestLinksRowWithSignIn() {
   const searchableSetting = useSearchableSetting();
   const gt = useGT();
   const { isSignedIn } = useAuth();
-  const { openAuthPrompt } = useT3ConnectAuthPrompt();
+  const { openAuthPrompt } = useLegionConnectAuthPrompt();
   // `isSignedIn` is undefined until Clerk loads.
   if (isSignedIn !== false) return <GuestLinksRow />;
   return (
     <SettingsRow
       {...searchableSetting("guest-links")}
       description={gt(
-        "Share a thread with a guest who watches it live in a browser and sends messages you approve. Sign in to T3 Connect to use guest links.",
+        "Share a thread with a guest who watches it live in a browser and sends messages you approve. Sign in to Legion Connect to use guest links.",
       )}
       control={
         <Button size="sm" variant="outline" onClick={openAuthPrompt}>
@@ -116,7 +116,7 @@ function GuestLinksRow() {
   const messages = useMessages();
   const scope = useOptionalSettingsScope();
   const primaryPolicy = usePrimaryManagedPolicy();
-  // Guests arrive through T3 Connect, so a policy that turns Connect off turns this off too.
+  // Guests arrive through Legion Connect, so a policy that turns Connect off turns this off too.
   const connectDenial = firstManagedDenial(
     scope
       ? scope.connectedEnvironments.map((environment) => environment.serverConfig?.managedPolicy)
@@ -128,16 +128,16 @@ function GuestLinksRow() {
       serverScoped
       {...searchableSetting("guest-links")}
       settingKeys={["guestSharingEnabled"]}
-      // Turning guest links off still works without T3 Connect.
+      // Turning guest links off still works without Legion Connect.
       managed={settings.guestSharingEnabled ? undefined : connectDenial}
       description={
         <T>
           Share a thread with a guest who watches it live in a browser and sends messages you
-          approve. Needs T3 Connect: sign in and link this machine in{" "}
+          approve. Needs Legion Connect: sign in and link this machine in{" "}
           <Link to="/settings/access" className="underline underline-offset-2">
             Sharing & access
           </Link>
-          . Turning it off stops every guest link.
+          . Turning it off stops guest links.
         </T>
       }
       control={
@@ -238,7 +238,7 @@ function SimlockHostsRow() {
           <Link to="/settings/devices" className="underline underline-offset-2">
             Devices
           </Link>
-          . An alpha that may change or break. T3 Code never installs Simlock.
+          . An alpha that may change or break. LegionCode never installs Simlock.
         </T>
       }
       control={
@@ -278,7 +278,7 @@ function FastWorktreeCheckoutRow() {
       {...searchableSetting("worktree-fast-checkout")}
       settingKeys={["fastWorktreeCheckout"]}
       description={gt(
-        "On a Mac, clone new worktrees from a checkout cached in the T3 home folder instead of writing every file. Uses Git’s normal checkout when it can’t. Turning it off deletes the cache.",
+        "On a Mac, clone new worktrees from a checkout cached in the LegionCode home folder instead of writing every file. Uses Git’s normal checkout when it can’t. Turning it off deletes the cache.",
       )}
       control={
         <ScopedSwitch

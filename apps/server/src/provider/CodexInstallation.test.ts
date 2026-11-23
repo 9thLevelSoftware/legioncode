@@ -3,7 +3,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Layer from "effect/Layer";
 import * as ModelManifest from "./ModelManifest.ts";
 import { expect, it } from "@effect/vitest";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import * as Digest from "effect/crypto/Digest";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -47,7 +47,7 @@ const makeHarness = Effect.fn("test.makeCodexInstallation")(function* (
 ) {
   const fs = yield* FileSystem.FileSystem;
   const baseDir =
-    input.baseDir ?? (yield* fs.makeTempDirectoryScoped({ prefix: "t3-codex-install-test-" }));
+    input.baseDir ?? (yield* fs.makeTempDirectoryScoped({ prefix: "legion-codex-install-test-" }));
   const localDirectory = `${baseDir}/local`;
   const localBinaryPath = `${localDirectory}/codex${input.platform === "win32" ? ".exe" : ""}`;
   const probeLog = `${baseDir}/local-probes.txt`;
@@ -242,7 +242,7 @@ it.effect("rechecks a cached local executable when the shared manifest policy ch
       compatibility: [
         {
           driver: "codex",
-          t3CodeRange: ">=0.0.42",
+          legionCodeRange: ">=0.0.42",
           ranges: [
             { range: ">=0.156.1", status: "supported" },
             { range: "<0.156.1", status: "broken" },
@@ -447,7 +447,7 @@ it.effect(
   () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      const directory = yield* fs.makeTempDirectoryScoped({ prefix: "t3-codex-install-test-" });
+      const directory = yield* fs.makeTempDirectoryScoped({ prefix: "legion-codex-install-test-" });
       const baseDir = `${directory}/not-a-directory`;
       yield* fs.writeFileString(baseDir, "existing file");
       const h = yield* makeHarness({ baseDir });
@@ -466,7 +466,7 @@ it.effect.each(["cached update", "reverify"] as const)(
   (operation) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-codex-verify-test-" });
+      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "legion-codex-verify-test-" });
       const managed = `${baseDir}/tools/codex`;
       const installedVersion = operation === "cached update" ? "0.156.0" : asset.version;
       const target = "aarch64-pc-windows-msvc";
@@ -498,7 +498,7 @@ it.effect.each(["cached update", "reverify"] as const)(
           compatibility: [
             {
               driver: "codex",
-              t3CodeRange: ">=0.0.0",
+              legionCodeRange: ">=0.0.0",
               ranges: [{ range: ">=0.156.0", status: "supported" }],
             },
           ],
@@ -694,7 +694,7 @@ it.effect("does not install a cached update the manifest has since withdrawn", (
       compatibility: [
         {
           driver: "codex",
-          t3CodeRange: ">=0.0.42",
+          legionCodeRange: ">=0.0.42",
           ranges: [
             { range: ">=0.160.0", status: "unsupported" },
             { range: ">=0.156.0 <0.160.0", status: "supported" },
@@ -738,7 +738,7 @@ it.effect("returns a managed install the manifest withdraws to the pinned releas
       compatibility: [
         {
           driver: "codex",
-          t3CodeRange: ">=0.0.42",
+          legionCodeRange: ">=0.0.42",
           ranges: [
             { range: ">=0.160.0", status: "unsupported" },
             { range: ">=0.156.0 <0.160.0", status: "supported" },
@@ -783,7 +783,7 @@ it.effect.each(["update", "reinstall"] as const)(
                   compatibility: [
                     {
                       driver: "codex",
-                      t3CodeRange: ">=0.0.42",
+                      legionCodeRange: ">=0.0.42",
                       ranges: [
                         { range: ">=0.160.0", status: "unsupported" },
                         { range: ">=0.156.0 <0.160.0", status: "supported" },

@@ -4,9 +4,9 @@ import {
   type SecretProviderConfig,
   type SecretProviderId,
   type SecretProviderKind,
-} from "@t3tools/contracts";
-import { builtInSecretProviderDefinitions } from "@t3tools/secret-provider-definitions/registry";
-import { invalidSecretReferenceText } from "@t3tools/client-runtime/secret-request";
+} from "@legioncode/contracts";
+import { builtInSecretProviderDefinitions } from "@legioncode/secret-provider-definitions/registry";
+import { invalidSecretReferenceText } from "@legioncode/client-runtime/secret-request";
 import { useAtomValue } from "@effect/atom-react";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";

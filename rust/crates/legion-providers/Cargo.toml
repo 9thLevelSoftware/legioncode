@@ -1,0 +1,26 @@
+[package]
+name = "legion-providers"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+hex.workspace = true
+indexmap.workspace = true
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+legion-contracts = { path = "../legion-contracts" }
+legion-protocol = { path = "../legion-protocol" }
+legion-shared = { path = "../legion-shared" }
+thiserror.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+tempfile.workspace = true

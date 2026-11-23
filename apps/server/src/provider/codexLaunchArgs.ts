@@ -1,15 +1,15 @@
-import { tokenizeCliArgs } from "@t3tools/shared/cliArgs";
+import { tokenizeCliArgs } from "@legioncode/shared/cliArgs";
 
-const T3CODE_CODEX_LAUNCH_ARGS_ENV = "T3CODE_CODEX_LAUNCH_ARGS";
+const LEGIONCODE_CODEX_LAUNCH_ARGS_ENV = "LEGIONCODE_CODEX_LAUNCH_ARGS";
 
 export const resolveCodexLaunchArgs = (
   launchArgs?: string,
   environment: NodeJS.ProcessEnv = process.env,
-) => environment[T3CODE_CODEX_LAUNCH_ARGS_ENV]?.trim() || launchArgs?.trim() || "";
+) => environment[LEGIONCODE_CODEX_LAUNCH_ARGS_ENV]?.trim() || launchArgs?.trim() || "";
 
 const codexLaunchArgv = (launchArgs?: string): ReadonlyArray<string> => tokenizeCliArgs(launchArgs);
 
-// T3 unsubscribes only when it unloads a thread; Codex's own unload delay would stack on that.
+// LegionCode unsubscribes only when it unloads a thread; Codex's own unload delay would stack on that.
 export const codexAppServerArgs = (launchArgs?: string) => [
   "app-server",
   "-c",

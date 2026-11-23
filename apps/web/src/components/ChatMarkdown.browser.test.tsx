@@ -1,5 +1,5 @@
-import { MISSING_FILE_ACCESS_MESSAGE } from "@t3tools/client-runtime/state/assets";
-import { EnvironmentId, ThreadId } from "@t3tools/contracts";
+import { MISSING_FILE_ACCESS_MESSAGE } from "@legioncode/client-runtime/state/assets";
+import { EnvironmentId, ThreadId } from "@legioncode/contracts";
 import { AsyncResult } from "effect/reactivity";
 import { type ReactElement } from "react";
 import remarkGfm from "remark-gfm";
@@ -18,8 +18,8 @@ import {
 import {
   CHAT_USER_MARKDOWN_REMARK_PLUGINS,
   remarkEnableOrderedListNumbers,
-} from "@t3tools/shared/markdownPipeline";
-import { setMarkdownTaskChecked } from "@t3tools/shared/markdownTaskList";
+} from "@legioncode/shared/markdownPipeline";
+import { setMarkdownTaskChecked } from "@legioncode/shared/markdownTaskList";
 import { HostImageUrlContext } from "./chat/hostImageUrl";
 import { getSyntaxHighlighterPromise } from "~/lib/syntaxHighlighting";
 
@@ -73,7 +73,7 @@ vi.mock(import("../state/server"), async (original) => {
   };
 });
 vi.mock(import("../state/session"), async (original) => {
-  const { AuthStandardClientScopes } = await import("@t3tools/contracts");
+  const { AuthStandardClientScopes } = await import("@legioncode/contracts");
   const granted = new Set<string>(AuthStandardClientScopes);
   const hasScope = (environmentId: unknown, scope: string) =>
     environmentId !== null && granted.has(scope);
@@ -376,7 +376,7 @@ describe("ChatMarkdown favicon privacy", () => {
     }
     await rerender(markdown("https://example.com"));
     expect(container.querySelectorAll("img")).toHaveLength(1);
-    await rerender(markdown("https://github.com/pingdotgg/t3code/pull/1"));
+    await rerender(markdown("https://github.com/9thLevelSoftware/legioncode/pull/1"));
     expect(container.querySelectorAll("img")).toHaveLength(0);
     expect(container.querySelector("a svg")).not.toBeNull();
   });

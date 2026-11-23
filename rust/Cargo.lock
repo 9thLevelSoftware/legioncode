@@ -1542,6 +1542,338 @@ dependencies = [
 ]
 
 [[package]]
+name = "legion-cli"
+version = "0.1.11"
+dependencies = [
+ "axum",
+ "futures-util",
+ "http",
+ "legion-client-core",
+ "legion-contracts",
+ "legion-desktop-shell",
+ "legion-edge",
+ "legion-orchestrator",
+ "legion-persistence",
+ "legion-process-ffi",
+ "legion-protocol",
+ "legion-providers",
+ "legion-remote",
+ "legion-scm",
+ "legion-server-runtime",
+ "legion-shared",
+ "legion-speech",
+ "legion-surfaces",
+ "legion-terminal-vt",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "legion-client-core"
+version = "0.1.11"
+dependencies = [
+ "legion-contracts",
+ "legion-shared",
+ "proptest",
+ "serde",
+ "serde_json",
+ "similar",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "legion-contracts"
+version = "0.1.11"
+dependencies = [
+ "hex",
+ "indexmap",
+ "proptest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "legion-desktop-shell"
+version = "0.1.11"
+dependencies = [
+ "hex",
+ "http",
+ "legion-contracts",
+ "legion-edge",
+ "legion-persistence",
+ "legion-process-ffi",
+ "legion-shared",
+ "legion-speech",
+ "legion-surfaces",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tao",
+ "thiserror 2.0.21",
+ "tokio",
+ "wry",
+]
+
+[[package]]
+name = "legion-edge"
+version = "0.1.11"
+dependencies = [
+ "base64 0.22.1",
+ "hex",
+ "indexmap",
+ "legion-contracts",
+ "legion-shared",
+ "proptest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "legion-mobile-ffi"
+version = "0.1.11"
+dependencies = [
+ "legion-client-core",
+ "legion-contracts",
+ "legion-edge",
+ "legion-shared",
+ "legion-surfaces",
+ "legion-terminal-vt",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "legion-orchestrator"
+version = "0.1.11"
+dependencies = [
+ "legion-contracts",
+ "legion-persistence",
+ "legion-shared",
+ "proptest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+]
+
+[[package]]
+name = "legion-persistence"
+version = "0.1.11"
+dependencies = [
+ "legion-contracts",
+ "legion-shared",
+ "quick-xml",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
+ "zip",
+]
+
+[[package]]
+name = "legion-process-ffi"
+version = "0.1.11"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "legion-protocol"
+version = "0.1.11"
+dependencies = [
+ "legion-contracts",
+ "legion-shared",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+]
+
+[[package]]
+name = "legion-providers"
+version = "0.1.11"
+dependencies = [
+ "hex",
+ "indexmap",
+ "legion-contracts",
+ "legion-protocol",
+ "legion-shared",
+ "proptest",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "legion-remote"
+version = "0.1.11"
+dependencies = [
+ "futures-util",
+ "hex",
+ "legion-contracts",
+ "legion-persistence",
+ "legion-protocol",
+ "legion-shared",
+ "proptest",
+ "regex",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-tungstenite",
+ "uuid",
+]
+
+[[package]]
+name = "legion-scm"
+version = "0.1.11"
+dependencies = [
+ "hex",
+ "http",
+ "legion-contracts",
+ "legion-persistence",
+ "legion-shared",
+ "proptest",
+ "regex",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "similar",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+]
+
+[[package]]
+name = "legion-server-runtime"
+version = "0.1.11"
+dependencies = [
+ "axum",
+ "base64 0.22.1",
+ "futures-util",
+ "hex",
+ "http",
+ "legion-contracts",
+ "legion-orchestrator",
+ "legion-persistence",
+ "legion-process-ffi",
+ "legion-protocol",
+ "legion-providers",
+ "legion-remote",
+ "legion-scm",
+ "legion-shared",
+ "legion-speech",
+ "legion-terminal-vt",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-tungstenite",
+ "uuid",
+]
+
+[[package]]
+name = "legion-shared"
+version = "0.1.11"
+dependencies = [
+ "base64 0.22.1",
+ "legion-contracts",
+ "p256",
+ "proptest",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.21",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "legion-speech"
+version = "0.1.11"
+dependencies = [
+ "legion-contracts",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "legion-surfaces"
+version = "0.1.11"
+dependencies = [
+ "hex",
+ "legion-client-core",
+ "legion-contracts",
+ "legion-edge",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "legion-terminal-vt"
+version = "0.1.11"
+dependencies = [
+ "proptest",
+ "serde",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "legion-wasm-ffi"
+version = "0.1.11"
+dependencies = [
+ "legion-client-core",
+ "legion-contracts",
+ "legion-edge",
+ "legion-shared",
+ "legion-surfaces",
+ "legion-terminal-vt",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.191"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2964,356 +3296,6 @@ dependencies = [
  "pkg-config",
  "toml",
  "version-compare",
-]
-
-[[package]]
-name = "t3-cli"
-version = "0.1.11"
-dependencies = [
- "axum",
- "futures-util",
- "http",
- "reqwest",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
- "t3-client-core",
- "t3-contracts",
- "t3-desktop-shell",
- "t3-edge",
- "t3-orchestrator",
- "t3-persistence",
- "t3-process-ffi",
- "t3-protocol",
- "t3-providers",
- "t3-remote",
- "t3-scm",
- "t3-server-runtime",
- "t3-shared",
- "t3-speech",
- "t3-surfaces",
- "t3-terminal-vt",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "t3-client-core"
-version = "0.1.11"
-dependencies = [
- "proptest",
- "serde",
- "serde_json",
- "similar",
- "t3-contracts",
- "t3-shared",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "t3-contracts"
-version = "0.1.11"
-dependencies = [
- "hex",
- "indexmap",
- "proptest",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "t3-desktop-shell"
-version = "0.1.11"
-dependencies = [
- "hex",
- "http",
- "serde",
- "serde_json",
- "sha2",
- "t3-contracts",
- "t3-edge",
- "t3-persistence",
- "t3-process-ffi",
- "t3-shared",
- "t3-speech",
- "t3-surfaces",
- "tao",
- "thiserror 2.0.21",
- "tokio",
- "wry",
-]
-
-[[package]]
-name = "t3-edge"
-version = "0.1.11"
-dependencies = [
- "base64 0.22.1",
- "hex",
- "indexmap",
- "proptest",
- "serde",
- "serde_json",
- "sha2",
- "t3-contracts",
- "t3-shared",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "t3-mobile-ffi"
-version = "0.1.11"
-dependencies = [
- "serde",
- "serde_json",
- "t3-client-core",
- "t3-contracts",
- "t3-edge",
- "t3-shared",
- "t3-surfaces",
- "t3-terminal-vt",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "t3-orchestrator"
-version = "0.1.11"
-dependencies = [
- "proptest",
- "rusqlite",
- "serde",
- "serde_json",
- "t3-contracts",
- "t3-persistence",
- "t3-shared",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
-]
-
-[[package]]
-name = "t3-persistence"
-version = "0.1.11"
-dependencies = [
- "quick-xml",
- "rusqlite",
- "serde",
- "serde_json",
- "t3-contracts",
- "t3-shared",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "uuid",
- "zip",
-]
-
-[[package]]
-name = "t3-process-ffi"
-version = "0.1.11"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "t3-protocol"
-version = "0.1.11"
-dependencies = [
- "proptest",
- "serde",
- "serde_json",
- "t3-contracts",
- "t3-shared",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
-]
-
-[[package]]
-name = "t3-providers"
-version = "0.1.11"
-dependencies = [
- "hex",
- "indexmap",
- "proptest",
- "regex",
- "serde",
- "serde_json",
- "sha2",
- "t3-contracts",
- "t3-protocol",
- "t3-shared",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "t3-remote"
-version = "0.1.11"
-dependencies = [
- "futures-util",
- "hex",
- "proptest",
- "regex",
- "reqwest",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
- "t3-contracts",
- "t3-persistence",
- "t3-protocol",
- "t3-shared",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "tokio-tungstenite",
- "uuid",
-]
-
-[[package]]
-name = "t3-scm"
-version = "0.1.11"
-dependencies = [
- "hex",
- "http",
- "proptest",
- "regex",
- "reqwest",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
- "similar",
- "t3-contracts",
- "t3-persistence",
- "t3-shared",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
-]
-
-[[package]]
-name = "t3-server-runtime"
-version = "0.1.11"
-dependencies = [
- "axum",
- "base64 0.22.1",
- "futures-util",
- "hex",
- "http",
- "reqwest",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
- "t3-contracts",
- "t3-orchestrator",
- "t3-persistence",
- "t3-process-ffi",
- "t3-protocol",
- "t3-providers",
- "t3-remote",
- "t3-scm",
- "t3-shared",
- "t3-speech",
- "t3-terminal-vt",
- "tempfile",
- "thiserror 2.0.21",
- "tokio",
- "tokio-tungstenite",
- "uuid",
-]
-
-[[package]]
-name = "t3-shared"
-version = "0.1.11"
-dependencies = [
- "base64 0.22.1",
- "p256",
- "proptest",
- "regex",
- "serde",
- "serde_json",
- "sha2",
- "t3-contracts",
- "thiserror 2.0.21",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "t3-speech"
-version = "0.1.11"
-dependencies = [
- "serde",
- "serde_json",
- "t3-contracts",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "t3-surfaces"
-version = "0.1.11"
-dependencies = [
- "hex",
- "serde",
- "serde_json",
- "sha2",
- "t3-client-core",
- "t3-contracts",
- "t3-edge",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "t3-terminal-vt"
-version = "0.1.11"
-dependencies = [
- "proptest",
- "serde",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "t3-wasm-ffi"
-version = "0.1.11"
-dependencies = [
- "serde",
- "serde_json",
- "t3-client-core",
- "t3-contracts",
- "t3-edge",
- "t3-shared",
- "t3-surfaces",
- "t3-terminal-vt",
- "t3-web-ui",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "t3-web-ui"
-version = "0.1.11"
-dependencies = [
- "indexmap",
- "proptest",
- "serde",
- "serde_json",
- "t3-client-core",
- "t3-contracts",
- "t3-edge",
- "t3-shared",
- "t3-surfaces",
- "t3-terminal-vt",
- "thiserror 2.0.21",
 ]
 
 [[package]]

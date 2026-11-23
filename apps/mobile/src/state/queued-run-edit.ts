@@ -4,15 +4,15 @@ import type {
   OrchestrationMessageContext,
   RunId,
   UploadChatAttachment,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import { useAtomValue } from "@effect/atom-react";
 import { msg } from "gt-react-native";
-import { stripAttachmentOnlyBootstrapPrompt } from "@t3tools/shared/composerContextReferences";
+import { stripAttachmentOnlyBootstrapPrompt } from "@legioncode/shared/composerContextReferences";
 import {
   makeQueuedRunEditStore,
   resolveQueuedEditExit,
   type QueuedRunsAtom,
-} from "@t3tools/client-runtime/queued-run-edit";
+} from "@legioncode/client-runtime/queued-run-edit";
 
 import { m } from "../i18n/messages";
 import { uploadedComposerContext } from "../lib/composerContext";

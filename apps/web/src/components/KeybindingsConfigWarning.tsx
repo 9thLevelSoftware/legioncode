@@ -1,11 +1,11 @@
 import { m } from "../i18n/messages";
-import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
+import { thrownErrorMessage } from "@legioncode/client-runtime/errors";
 import {
   AuthOrchestrationOperateScope,
   type EditorId,
   type EnvironmentId,
-} from "@t3tools/contracts";
-import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+} from "@legioncode/contracts";
+import { squashAtomCommandFailure } from "@legioncode/client-runtime/state/runtime";
 import { T, useGT, Var } from "gt-react";
 
 import { useOpenInPreferredEditor } from "../editorPreferences";

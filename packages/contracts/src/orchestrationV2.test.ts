@@ -666,14 +666,22 @@ describe("withMessageSenderNote", () => {
     senderThreadId: ThreadId.make("t"),
   } as const;
   it.each([
-    [thread, "Hi", '[T3 Code: the agent in T3 thread "t" sent this message, not the user.]\n\nHi'],
-    [thread, "", '[T3 Code: the agent in T3 thread "t" sent this message, not the user.]'],
+    [
+      thread,
+      "Hi",
+      '[LegionCode: the agent in LegionCode thread "t" sent this message, not the user.]\n\nHi',
+    ],
+    [
+      thread,
+      "",
+      '[LegionCode: the agent in LegionCode thread "t" sent this message, not the user.]',
+    ],
     [thread, " /git/review staged", " /git/review staged"],
     [thread, "$deploy ship it", "$deploy ship it"],
     [
       thread,
       "$25 left",
-      '[T3 Code: the agent in T3 thread "t" sent this message, not the user.]\n\n$25 left',
+      '[LegionCode: the agent in LegionCode thread "t" sent this message, not the user.]\n\n$25 left',
     ],
     [
       {
@@ -686,17 +694,17 @@ describe("withMessageSenderNote", () => {
         },
       },
       "Hi",
-      '[T3 Code: the agent in T3 thread "r" on linked environment "e" sent this message, not the user.]\n\nHi',
+      '[LegionCode: the agent in LegionCode thread "r" on linked environment "e" sent this message, not the user.]\n\nHi',
     ],
     [
       { createdBy: "user", creationSource: "web", scheduledTaskId: ScheduledTaskId.make("s") },
       "Hi",
-      '[T3 Code: scheduled task "s" sent this prompt, not the user typing in this chat.]\n\nHi',
+      '[LegionCode: scheduled task "s" sent this prompt, not the user typing in this chat.]\n\nHi',
     ],
     [
       { createdBy: "agent", creationSource: "mcp" },
       "Hi",
-      "[T3 Code: this message came through T3 Code's tools, not from the user typing in this chat.]\n\nHi",
+      "[LegionCode: this message came through LegionCode's tools, not from the user typing in this chat.]\n\nHi",
     ],
     [{ createdBy: "user", creationSource: "web" }, "Hi", "Hi"],
     [{ createdBy: "agent", creationSource: "server" }, "Hi", "Hi"],

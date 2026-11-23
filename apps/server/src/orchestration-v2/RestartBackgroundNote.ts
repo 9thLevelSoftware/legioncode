@@ -9,10 +9,13 @@ import type {
   OrchestrationV2RunAttempt,
   OrchestrationV2Subagent,
   OrchestrationV2TurnItem,
-} from "@t3tools/contracts";
-import { subagentHoldsCompletion } from "@t3tools/provider-core/server/subagentProjection";
-import { backgroundWorkHoldsCompletion } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
-import { latestRootProviderFailure, runRanAfter } from "@t3tools/shared/orchestrationV2ThreadError";
+} from "@legioncode/contracts";
+import { subagentHoldsCompletion } from "@legioncode/provider-core/server/subagentProjection";
+import { backgroundWorkHoldsCompletion } from "@legioncode/shared/orchestrationV2PendingBackgroundWork";
+import {
+  latestRootProviderFailure,
+  runRanAfter,
+} from "@legioncode/shared/orchestrationV2ThreadError";
 
 type Work = OrchestrationV2RestartCancelledBackgroundWork;
 type Attempt = Pick<OrchestrationV2RunAttempt, "id" | "runId">;
@@ -137,7 +140,7 @@ const MAX_NOTE_ENTRIES = 10;
 export function restartCancelledBackgroundWorkNote(work: ReadonlyArray<Work>): string {
   const omitted = work.length - MAX_NOTE_ENTRIES;
   return [
-    "Note: the T3 server restarted, and this background work was cancelled before it finished. It will not report back on its own, so resume or restart what you still need and wait for its result:",
+    "Note: the LegionCode server restarted, and this background work was cancelled before it finished. It will not report back on its own, so resume or restart what you still need and wait for its result:",
     ...work.slice(0, MAX_NOTE_ENTRIES).map((entry) => `- ${entry.kind}: ${entry.label}`),
     ...(omitted > 0 ? [`- and ${omitted} more`] : []),
   ].join("\n");

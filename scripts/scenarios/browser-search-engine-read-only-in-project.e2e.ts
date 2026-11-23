@@ -1,13 +1,13 @@
 import { expect } from "e2e";
 
-import { test, WEB } from "./t3.ts";
+import { test, WEB } from "./legioncode.ts";
 
 test(
   "Browser's Search engine is read-only while a project is selected",
   WEB,
-  async ({ t3, app, browser, screen }) => {
-    await t3.project("demo");
-    await t3.open("/settings/browser");
+  async ({ legioncode, app, browser, screen }) => {
+    await legioncode.project("demo");
+    await legioncode.open("/settings/browser");
 
     await screen.getByRole("button", "Project scope: All projects").tap();
     await screen.getByRole("menuitemradio").filter({ hasText: "demo" }).tap();

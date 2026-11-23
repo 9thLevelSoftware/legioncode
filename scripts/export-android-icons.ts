@@ -14,9 +14,12 @@ import sharp from "sharp";
 type IconVariant = "dev" | "nightly" | "prod";
 
 const ADAPTIVE_CANVAS = 432;
+const NOTIFICATION_CANVAS = 96;
 const SPLASH_CANVAS = 1152;
-const TEXT = { x: 15.53, y: 37, width: 94.5, height: 57 };
+const TEXT = { x: 18, y: 34, width: 92, height: 60 };
 const WORDMARK_FRACTION = 0.48;
+const MONOCHROME_MARK_FRACTION = 0.64;
+const NOTIFICATION_MARK_FRACTION = 0.65;
 const COMPOSER_CANVAS_PT = 1024;
 const SVG_DENSITY = 300;
 const OUTPUT_DIRECTORY = "apps/mobile/assets";
@@ -27,8 +30,8 @@ export class AndroidIconRenderError extends Schema.TaggedError<AndroidIconRender
   { layer: Schema.String, cause: Schema.Defect() },
 ) {}
 
-const wordmarkTransform = (size: number) => {
-  const scale = (size * WORDMARK_FRACTION) / TEXT.width;
+const wordmarkTransform = (size: number, fraction = WORDMARK_FRACTION) => {
+  const scale = (size * fraction) / TEXT.width;
   const tx = (size - TEXT.width * scale) / 2 - TEXT.x * scale;
   const ty = (size - TEXT.height * scale) / 2 - TEXT.y * scale;
   return `translate(${tx.toFixed(3)} ${ty.toFixed(3)}) scale(${scale.toFixed(4)})`;
@@ -83,15 +86,17 @@ const readLayerSource = Effect.fn("androidIcons.readLayerSource")(function* (
   );
 });
 
-const renderForeground = Effect.fn("androidIcons.renderForeground")(function* (
+const renderWordmark = Effect.fn("androidIcons.renderWordmark")(function* (
   repositoryRoot: string,
   size: number,
+  fraction = WORDMARK_FRACTION,
+  layer = "foreground",
 ) {
   const text = yield* readLayerSource(repositoryRoot, "prod", "text.svg");
   const paths = text.match(/<path[^>]*\/>/g) ?? [];
   return yield* rasterize(
-    "foreground",
-    canvasSvg(size, `<g transform="${wordmarkTransform(size)}">${paths.join("")}</g>`),
+    layer,
+    canvasSvg(size, `<g transform="${wordmarkTransform(size, fraction)}">${paths.join("")}</g>`),
     size,
   );
 });
@@ -179,7 +184,7 @@ const renderSplashIcon = Effect.fn("androidIcons.renderSplashIcon")(function* (
   variant: IconVariant,
 ) {
   const background = yield* renderBackground(repositoryRoot, variant, SPLASH_CANVAS);
-  const foreground = yield* renderForeground(repositoryRoot, SPLASH_CANVAS);
+  const foreground = yield* renderWordmark(repositoryRoot, SPLASH_CANVAS);
   return yield* composite(`${variant}-splash`, background, [{ input: foreground }]);
 });
 
@@ -188,7 +193,20 @@ const exportAndroidIcons = Effect.gen(function* () {
   const path = yield* Path.Path;
   const repositoryRoot = path.resolve(import.meta.dirname, "..");
   const outputs = [
-    ["android-icon-foreground.png", yield* renderForeground(repositoryRoot, ADAPTIVE_CANVAS)],
+    ["android-icon-foreground.png", yield* renderWordmark(repositoryRoot, ADAPTIVE_CANVAS)],
+    [
+      "android-icon-mark.png",
+      yield* renderWordmark(repositoryRoot, ADAPTIVE_CANVAS, MONOCHROME_MARK_FRACTION, "mark"),
+    ],
+    [
+      "android-notification-icon.png",
+      yield* renderWordmark(
+        repositoryRoot,
+        NOTIFICATION_CANVAS,
+        NOTIFICATION_MARK_FRACTION,
+        "notification",
+      ),
+    ],
     [
       "android-icon-background-dev.png",
       yield* renderDevelopmentBackground(repositoryRoot, ADAPTIVE_CANVAS),

@@ -61,7 +61,7 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
-            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+            !/apps/mobile/modules/legion-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - name: Setup Rust
@@ -106,7 +106,7 @@ jobs:
         run: cargo doc --locked --manifest-path rust/Cargo.toml --workspace --no-deps
 
       - name: Check WASM crate compilation
-        run: cargo clippy --locked --manifest-path rust/Cargo.toml --target wasm32-unknown-unknown -p t3-wasm-ffi -- -D warnings
+        run: cargo clippy --locked --manifest-path rust/Cargo.toml --target wasm32-unknown-unknown -p legion-wasm-ffi -- -D warnings
 
   rust_test:
     name: Rust Clippy & Tests (${{ matrix.label }})
@@ -134,7 +134,7 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
-            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+            !/apps/mobile/modules/legion-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - name: Setup Rust
@@ -197,7 +197,7 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
-            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+            !/apps/mobile/modules/legion-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - name: Setup Rust
@@ -250,10 +250,10 @@ jobs:
           RUST_VERSION="$(node -e 'const fs = require("node:fs"); const m = fs.readFileSync("rust/Cargo.toml", "utf8").match(/\[workspace\.package\][\s\S]*?\nversion\s*=\s*"([^"]+)"/); if (!m) process.exit(1); console.log(m[1]);')"
           cargo build --locked --release --manifest-path native/resource-monitor/Cargo.toml
           mkdir -p apps/server/dist-exe apps/server/dist/resource-monitor
-          cp rust/dist/bin/t3 apps/server/dist-exe/t3-linux-x64
-          cp native/resource-monitor/target/release/t3-resource-monitor apps/server/dist/resource-monitor/t3-resource-monitor
+          cp rust/dist/bin/legioncode apps/server/dist-exe/legioncode-linux-x64
+          cp native/resource-monitor/target/release/legioncode-resource-monitor apps/server/dist/resource-monitor/legioncode-resource-monitor
           node scripts/build-cli-archive.ts --platform linux --arch x64 --version "$RUST_VERSION" --output-dir release-assets
-          node scripts/smoke-cli-archive.ts --archive "release-assets/t3-${RUST_VERSION}-linux-x64.tar.gz" --expect-version "$RUST_VERSION"
+          node scripts/smoke-cli-archive.ts --archive "release-assets/legioncode-${RUST_VERSION}-linux-x64.tar.gz" --expect-version "$RUST_VERSION"
 
   js_checks:
     name: Workspace & Bridge Checks
@@ -268,7 +268,7 @@ jobs:
           sparse-checkout: |
             /*
             !/.repos/
-            !/apps/mobile/modules/t3-terminal/Vendor/**/*.a
+            !/apps/mobile/modules/legion-terminal/Vendor/**/*.a
           sparse-checkout-cone-mode: false
 
       - name: Setup workspace dependencies

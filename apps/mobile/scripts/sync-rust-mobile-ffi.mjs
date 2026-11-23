@@ -4,10 +4,10 @@ import * as NodeURL from "node:url";
 import * as NodeUtil from "node:util";
 
 const REQUIRED_MOBILE_FFI_FILES = [
-  "include/t3_mobile_ffi.h",
-  "swift/T3MobileCore.swift",
-  "kotlin/T3MobileCore.kt",
-  "android/T3MobileBridge.kt",
+  "include/legion_mobile_ffi.h",
+  "swift/LegionMobileCore.swift",
+  "kotlin/LegionMobileCore.kt",
+  "android/LegionMobileBridge.kt",
   "apple/Package.swift",
 ];
 

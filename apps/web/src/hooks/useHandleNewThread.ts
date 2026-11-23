@@ -2,8 +2,12 @@ import {
   scopedProjectKey,
   scopeProjectRef,
   scopeThreadRef,
-} from "@t3tools/client-runtime/environment";
-import { DEFAULT_SERVER_SETTINGS, type ScopedProjectRef, type ThreadId } from "@t3tools/contracts";
+} from "@legioncode/client-runtime/environment";
+import {
+  DEFAULT_SERVER_SETTINGS,
+  type ScopedProjectRef,
+  type ThreadId,
+} from "@legioncode/contracts";
 import { type AnyRouter, useRouter } from "@tanstack/react-router";
 import {
   composerDraftHasUserContent,
@@ -19,8 +23,11 @@ import {
   deriveLogicalProjectKeyFromSettings,
   getProjectOrderKey,
   selectProjectGroupingSettings,
-} from "@t3tools/client-runtime/state/project-grouping";
-import { resolveNewThreadEnvMode, resolveProjectSettings } from "@t3tools/shared/projectSettings";
+} from "@legioncode/client-runtime/state/project-grouping";
+import {
+  resolveNewThreadEnvMode,
+  resolveProjectSettings,
+} from "@legioncode/shared/projectSettings";
 import {
   readProject,
   readProjects,
@@ -36,8 +43,8 @@ import {
   resolveNewThreadModelSelectionOverride,
   threadHasStarted,
 } from "../lib/chatThreadActions";
-import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";
-import { readT3ProjectFile } from "../lib/t3ProjectFileDefaults";
+import type { EnvironmentProject } from "@legioncode/client-runtime/state/shell";
+import { readLegionProjectFile } from "../lib/legionProjectFileDefaults";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { environmentSummaries } from "../state/presentation";
 import { environmentServerConfigsAtom } from "../state/server";
@@ -51,9 +58,9 @@ import { defaultProjectFallbackReadyAtom } from "../state/projects";
 import { useThreadRouteTarget } from "./useThreadRouteTarget";
 import { readUnloadedThreadCount } from "../state/olderSettledShelf";
 import { resolveProjectDefaultProviderModelSelection } from "../providerInstances";
-import { resolveNewThreadModelSelection } from "@t3tools/shared/usageLimits";
+import { resolveNewThreadModelSelection } from "@legioncode/shared/usageLimits";
 
-export const LAST_USED_PROJECT_STORAGE_KEY = "t3code:last-used-project:v1";
+export const LAST_USED_PROJECT_STORAGE_KEY = "legioncode:last-used-project:v1";
 export const lastUsedProjectKeySchema = Schema.NullOr(Schema.String);
 
 export function readLastUsedProjectKey(): string | null {
@@ -207,7 +214,7 @@ export function createNewThreadHandler(router: AnyRouter) {
           .get(environmentSummaries.connectedEnvironmentIdsAtom)
           .includes(project.environmentId);
       const projectFile = consultProjectFile
-        ? await readT3ProjectFile(project.environmentId, project.workspaceRoot)
+        ? await readLegionProjectFile(project.environmentId, project.workspaceRoot)
         : null;
       return resolveNewThreadEnvMode({
         projectSettings: resolveProjectSettings(

@@ -42,9 +42,9 @@ describe("check:changed", () => {
   it("runs the server tests for the one guide they read and leaves other docs inert", () => {
     const packages = readWorkspace();
     assert.isTrue(
-      decide(["docs/user/t3-connect-troubleshooting.md"], packages, false).outputs.test_server,
+      decide(["docs/user/legion-connect-troubleshooting.md"], packages, false).outputs.test_server,
     );
-    assert.deepStrictEqual(docReaderTests(["docs/user/t3-connect-troubleshooting.md"]), [
+    assert.deepStrictEqual(docReaderTests(["docs/user/legion-connect-troubleshooting.md"]), [
       "apps/server/src/cloud/ConnectReachability.test.ts",
     ]);
     assert.deepStrictEqual(decide(["docs/user/install.md"], packages, false).affected, []);
@@ -240,7 +240,7 @@ describe("check:changed", () => {
 // ~/.config/git/ignore can ignore or sign fixture files.
 // Git for Windows rejects the null device as a config path, so use an empty file.
 const emptyConfigDir = NodeFS.mkdtempSync(
-  NodePath.join(NodeOS.tmpdir(), "t3-check-changed-config-"),
+  NodePath.join(NodeOS.tmpdir(), "legioncode-check-changed-config-"),
 );
 const emptyConfig = NodePath.join(emptyConfigDir, "empty.gitconfig");
 NodeFS.writeFileSync(emptyConfig, "");
@@ -266,7 +266,7 @@ const env = {
 // History A -> B -> C, with HEAD at C. Each remote's main points at A or B.
 function fixture(remotes: Record<string, "A" | "B">) {
   const root = NodeFS.realpathSync(
-    NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3-check-changed-")),
+    NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "legioncode-check-changed-")),
   );
   const commits: Record<string, string> = {};
   try {
@@ -360,7 +360,7 @@ it("lists the ignored inputs that main's pathspecs list, without entering node_m
     "replaced/sub/a.d.ts",
     "skipped/a.d.ts",
     "rust/target/release/out.d.ts",
-    "rust/dist/wasm-web/t3_wasm_ffi.d.ts",
+    "rust/dist/wasm-web/legion_wasm_ffi.d.ts",
   ])
     write(file);
   const command =
@@ -372,13 +372,13 @@ it("lists the ignored inputs that main's pathspecs list, without entering node_m
   assert.includeMembers(old, ["old/dist/a.d.ts", "replaced/sub/a.d.ts", "skipped/a.d.ts"]);
   const result = await inFixture(ignoredCheckInputs(project.root));
   assert.notInclude(result, "rust/target/release/out.d.ts");
-  assert.notInclude(result, "rust/dist/wasm-web/t3_wasm_ffi.d.ts");
+  assert.notInclude(result, "rust/dist/wasm-web/legion_wasm_ffi.d.ts");
   assert.deepStrictEqual(result, old);
 });
 
 function launcherFixture() {
   const root = NodeFS.realpathSync(
-    NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "t3 checks & (fixture) ")),
+    NodeFS.mkdtempSync(NodePath.join(NodeOS.tmpdir(), "legioncode checks & (fixture) ")),
   );
   const write = (file: string, content: string) => {
     const path = NodePath.join(root, file);
@@ -431,7 +431,7 @@ function launcherFixture() {
       'vitePlusCommand(args, "win32")',
     ),
   );
-  for (const name of ["effect", "@effect/platform-node", "@t3tools/shared"]) {
+  for (const name of ["effect", "@effect/platform-node", "@legioncode/shared"]) {
     const dest = NodePath.join(root, "node_modules", name);
     NodeFS.mkdirSync(NodePath.dirname(dest), { recursive: true });
     NodeFS.symlinkSync(

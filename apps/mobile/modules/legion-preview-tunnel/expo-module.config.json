@@ -1,0 +1,5 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": { "modules": ["LegionPreviewTunnelModule"] },
+  "android": { "modules": ["dev.legioncode.previewtunnel.LegionPreviewTunnelModule"] }
+}

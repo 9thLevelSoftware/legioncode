@@ -1,6 +1,6 @@
 import { useAtomValue } from "@effect/atom-react";
-import { issueTrackerSummary } from "@t3tools/client-runtime/state/issue-trackers";
-import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
+import { issueTrackerSummary } from "@legioncode/client-runtime/state/issue-trackers";
+import { squashAtomCommandFailure } from "@legioncode/client-runtime/state/runtime";
 import { T, useGT, useMessages } from "gt-react";
 import { ChevronDownIcon, ExternalLinkIcon, XIcon } from "lucide-react";
 import { useState, type ElementType } from "react";
@@ -9,7 +9,7 @@ import type {
   IssueTrackerConnection,
   IssueTrackerConnectionList,
   ProjectId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 
 import { useEnvironmentQuery } from "../../state/query";
 import { issueTrackerEnvironment } from "../../state/issueTrackers";

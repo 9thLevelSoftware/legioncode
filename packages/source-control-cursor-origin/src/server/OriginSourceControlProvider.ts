@@ -2,16 +2,16 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
-import { SourceControlProviderError, SourceControlProviderKind } from "@t3tools/contracts";
+import { SourceControlProviderError, SourceControlProviderKind } from "@legioncode/contracts";
 import { CURSOR_ORIGIN_WEB_BASE_URL } from "../shared/definition.ts";
-import * as SourceControlProvider from "@t3tools/source-control-core/server/SourceControlProvider";
-import * as SourceControlHost from "@t3tools/source-control-core/server/SourceControlHost";
+import * as SourceControlProvider from "@legioncode/source-control-core/server/SourceControlProvider";
+import * as SourceControlHost from "@legioncode/source-control-core/server/SourceControlHost";
 import {
   probeSourceControlProvider,
   providerAuth,
   type SourceControlCliDiscoverySpec,
   type SourceControlManagedCliDiscoverySpec,
-} from "@t3tools/source-control-core/server/discovery";
+} from "@legioncode/source-control-core/server/discovery";
 
 import * as OriginCli from "./OriginCli.ts";
 import {
@@ -196,7 +196,7 @@ export const make = Effect.gen(function* () {
     createChangeRequest: Effect.fn("OriginSourceControlProvider.createChangeRequest")(
       function* (input) {
         const repository = input.target?.repository ?? (yield* cli.resolveRepository(input));
-        // Origin creates drafts unless told otherwise; T3 asks for draft explicitly elsewhere.
+        // Origin creates drafts unless told otherwise; LegionCode asks for draft explicitly elsewhere.
         yield* cli.api(
           {
             cwd: input.cwd,

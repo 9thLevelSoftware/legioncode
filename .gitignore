@@ -25,7 +25,7 @@ build/
 release/
 release-cli/
 release-mock/
-.t3
+.legioncode
 .idea/
 apps/web/.playwright
 apps/web/playwright-report

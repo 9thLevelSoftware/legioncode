@@ -14,7 +14,7 @@ import {
   type MainWorldElementInspectorResult,
 } from "./preview/PickPreload.ts";
 
-const INSPECT_ATTRIBUTE = "data-t3code-pick-inspect";
+const INSPECT_ATTRIBUTE = "data-legioncode-pick-inspect";
 
 registerMainWorldElementInspector(async (element) => {
   const token = globalThis.crypto.randomUUID();
@@ -30,7 +30,7 @@ registerMainWorldElementInspector(async (element) => {
 
 // Electron hands webPreferences.additionalArguments to sandboxed preloads in process.argv.
 if (process.argv.includes(PASSKEY_BRIDGE_ARGUMENT)) {
-  const bridgeKey = `__t3codePasskeyBridge_${globalThis.crypto.randomUUID().replaceAll("-", "")}`;
+  const bridgeKey = `__legioncodePasskeyBridge_${globalThis.crypto.randomUUID().replaceAll("-", "")}`;
   contextBridge.exposeInMainWorld(bridgeKey, {
     create: (publicKey: unknown) =>
       ipcRenderer.invoke(PASSKEY_CREATE_CHANNEL, toCloneable(publicKey)),

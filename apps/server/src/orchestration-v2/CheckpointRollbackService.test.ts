@@ -17,7 +17,7 @@ import {
   ProviderSessionId,
   ProviderThreadId,
   ThreadId,
-} from "@t3tools/contracts";
+} from "@legioncode/contracts";
 import * as Effect from "effect/Effect";
 import * as DateTime from "effect/DateTime";
 import * as SqlClient from "effect/sql/SqlClient";
@@ -39,15 +39,15 @@ import * as CheckpointService from "./CheckpointService.ts";
 import * as CheckpointRollbackService from "./CheckpointRollbackService.ts";
 import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
 import * as EventSink from "./EventSink.ts";
-import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
+import * as IdAllocator from "@legioncode/provider-core/server/IdAllocator";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import * as ProjectStore from "./ProjectStore.ts";
-import type * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import type * as ProviderAdapter from "@legioncode/provider-core/server/ProviderAdapter";
 import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import * as RuntimePolicy from "./RuntimePolicy.ts";
 
 const unrelatedProject = Option.some({
-  workspaceRoot: "/nonexistent/t3-rollback-project",
+  workspaceRoot: "/nonexistent/legion-rollback-project",
 } as never);
 const layerCheckpointRollbackService = CheckpointRollbackService.layer.pipe(
   Layer.provide(
@@ -196,7 +196,7 @@ it.effect.each([
     const fileSystem = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const workspaceRoot = yield* fileSystem.realPath(
-      yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-rollback-" }),
+      yield* fileSystem.makeTempDirectoryScoped({ prefix: "legion-rollback-" }),
     );
     const worktreesDir = path.join(workspaceRoot, "worktrees");
     const worktreePath = unmanaged
@@ -424,7 +424,7 @@ it.effect.each([{ restoreFiles: true }, { restoreFiles: false }])(
       const fileSystem = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const workspaceRoot = yield* fileSystem.realPath(
-        yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-rollback-reservation-" }),
+        yield* fileSystem.makeTempDirectoryScoped({ prefix: "legion-rollback-reservation-" }),
       );
       const worktreesDir = path.join(workspaceRoot, "worktrees");
       const worktreePath = path.join(worktreesDir, "repo", "feature");
@@ -750,7 +750,7 @@ const seedRollbackHistory = Effect.gen(function* () {
         parentCheckpointId: null,
         ordinalWithinScope: ordinal,
         appRunOrdinal: ordinal === 0 ? null : ordinal,
-        ref: CheckpointRef.make(`refs/t3/rollback-history/${ordinal}`),
+        ref: CheckpointRef.make(`refs/legioncode/rollback-history/${ordinal}`),
         status: ordinal === 7 ? "stale" : "ready",
         files: [],
         capturedAt: now,

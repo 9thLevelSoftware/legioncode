@@ -7,7 +7,7 @@ import * as NodeURL from "node:url";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
-import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as HostProcess from "@legioncode/shared/HostProcess";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
@@ -24,27 +24,27 @@ class FakeChildProcess extends NodeEvents.EventEmitter {
 }
 
 it.layer(NodeServices.layer)("rustCutover", (it) => {
-  it("parses T3CODE_LEGACY_NODE case-insensitively with whitespace trimming", () => {
+  it("parses LEGIONCODE_LEGACY_NODE case-insensitively with whitespace trimming", () => {
     assert.isFalse(isLegacyNodeForced({}));
-    assert.isFalse(isLegacyNodeForced({ T3CODE_LEGACY_NODE: "" }));
-    assert.isFalse(isLegacyNodeForced({ T3CODE_LEGACY_NODE: "0" }));
-    assert.isFalse(isLegacyNodeForced({ T3CODE_LEGACY_NODE: "false" }));
-    assert.isTrue(isLegacyNodeForced({ T3CODE_LEGACY_NODE: "1" }));
-    assert.isTrue(isLegacyNodeForced({ T3CODE_LEGACY_NODE: " 1 " }));
-    assert.isTrue(isLegacyNodeForced({ T3CODE_LEGACY_NODE: "true" }));
-    assert.isTrue(isLegacyNodeForced({ T3CODE_LEGACY_NODE: " True " }));
+    assert.isFalse(isLegacyNodeForced({ LEGIONCODE_LEGACY_NODE: "" }));
+    assert.isFalse(isLegacyNodeForced({ LEGIONCODE_LEGACY_NODE: "0" }));
+    assert.isFalse(isLegacyNodeForced({ LEGIONCODE_LEGACY_NODE: "false" }));
+    assert.isTrue(isLegacyNodeForced({ LEGIONCODE_LEGACY_NODE: "1" }));
+    assert.isTrue(isLegacyNodeForced({ LEGIONCODE_LEGACY_NODE: " 1 " }));
+    assert.isTrue(isLegacyNodeForced({ LEGIONCODE_LEGACY_NODE: "true" }));
+    assert.isTrue(isLegacyNodeForced({ LEGIONCODE_LEGACY_NODE: " True " }));
   });
 
-  it.effect("resolves T3CODE_RUST_BIN, dist/bin, and target/release in priority order", () =>
+  it.effect("resolves LEGIONCODE_RUST_BIN, dist/bin, and target/release in priority order", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-rust-cutover-" });
-      const customBin = path.join(root, "custom-t3");
-      const distBinWin = path.join(root, "rust", "dist", "bin", "t3.exe");
-      const releaseBinWin = path.join(root, "rust", "target", "release", "t3.exe");
-      const distBinPosix = path.join(root, "rust", "dist", "bin", "t3");
-      const releaseBinPosix = path.join(root, "rust", "target", "release", "t3");
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "legion-rust-cutover-" });
+      const customBin = path.join(root, "custom-legioncode");
+      const distBinWin = path.join(root, "rust", "dist", "bin", "legioncode.exe");
+      const releaseBinWin = path.join(root, "rust", "target", "release", "legioncode.exe");
+      const distBinPosix = path.join(root, "rust", "dist", "bin", "legioncode");
+      const releaseBinPosix = path.join(root, "rust", "target", "release", "legioncode");
 
       assert.isUndefined(resolveRustCliBinary({ repoRoot: root, platform: "win32", env: {} }));
 
@@ -82,16 +82,16 @@ it.layer(NodeServices.layer)("rustCutover", (it) => {
         resolveRustCliBinary({
           repoRoot: root,
           platform: "win32",
-          env: { T3CODE_RUST_BIN: customBin },
+          env: { LEGIONCODE_RUST_BIN: customBin },
         }),
         customBin,
       );
-      // Missing T3CODE_RUST_BIN falls through to the staged repository binary.
+      // Missing LEGIONCODE_RUST_BIN falls through to the staged repository binary.
       assert.strictEqual(
         resolveRustCliBinary({
           repoRoot: root,
           platform: "win32",
-          env: { T3CODE_RUST_BIN: path.join(root, "missing-bin") },
+          env: { LEGIONCODE_RUST_BIN: path.join(root, "missing-bin") },
         }),
         distBinWin,
       );
@@ -102,8 +102,8 @@ it.layer(NodeServices.layer)("rustCutover", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-rust-cutover-skip-" });
-      const distBin = path.join(root, "rust", "dist", "bin", "t3");
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "legion-rust-cutover-skip-" });
+      const distBin = path.join(root, "rust", "dist", "bin", "legioncode");
       yield* fs.makeDirectory(path.dirname(distBin), { recursive: true });
       yield* fs.writeFileString(distBin, "rust-binary");
 
@@ -129,7 +129,7 @@ it.layer(NodeServices.layer)("rustCutover", (it) => {
           tryRunRustCliCutover({
             repoRoot: root,
             platform: "linux",
-            env: { T3CODE_LEGACY_NODE: "1" },
+            env: { LEGIONCODE_LEGACY_NODE: "1" },
             isSea: () => false,
             spawn: spawnStub,
           }),
@@ -154,8 +154,8 @@ it.layer(NodeServices.layer)("rustCutover", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-rust-cutover-run-" });
-      const distBin = path.join(root, "rust", "dist", "bin", "t3");
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "legion-rust-cutover-run-" });
+      const distBin = path.join(root, "rust", "dist", "bin", "legioncode");
       yield* fs.makeDirectory(path.dirname(distBin), { recursive: true });
       yield* fs.writeFileString(distBin, "rust-binary");
 
@@ -187,7 +187,7 @@ it.layer(NodeServices.layer)("rustCutover", (it) => {
         tryRunRustCliCutover({
           repoRoot: root,
           platform: "linux",
-          env: { T3CODE_HOME: root },
+          env: { LEGIONCODE_HOME: root },
           argv: ["node", "bin.ts", "status", "--json"],
           isSea: () => false,
           spawn: spawnStub,

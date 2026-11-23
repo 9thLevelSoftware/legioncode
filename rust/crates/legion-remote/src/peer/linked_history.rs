@@ -35,7 +35,7 @@ pub struct LoadedLinkedHistory {
     pub restore_through: Option<HistoryAnchor>,
 }
 
-/// Snapshot summary fed into [`LinkedHistoryTracker::on_snapshot`].
+/// Snapshot summary fed into [`evaluate_linked_snapshot_retention`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkedSnapshotInput {
     /// Snapshot sequence number.
@@ -46,7 +46,7 @@ pub struct LinkedSnapshotInput {
     pub visible_items: Vec<HistoryAnchor>,
 }
 
-/// History page summary fed into [`LinkedHistoryTracker::on_history_page_success`].
+/// History page summary fed into [`evaluate_linked_history_page`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LinkedHistoryPageInput {
     /// Sequence number at which the peer generated this history page.
@@ -59,7 +59,7 @@ pub struct LinkedHistoryPageInput {
     pub combined_visible_items: Vec<HistoryAnchor>,
 }
 
-/// Action returned by [`LinkedHistoryTracker`] when snapshot or page events arrive.
+/// Action returned by [`evaluate_linked_snapshot_retention`] and [`evaluate_linked_history_page`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LinkedHistoryDecision {
     /// Reuse held older rows from the previous view immediately (snapshot kept window compatible).

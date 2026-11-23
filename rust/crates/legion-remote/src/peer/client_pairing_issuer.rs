@@ -11,7 +11,7 @@ pub const CLIENT_PAIRING_TTL_MS: u64 = 180_000;
 /// Maximum caller client-label characters retained on issued pairing labels (`PeerClientPairing.ts`).
 pub const ISSUER_CLIENT_LABEL_MAX_LENGTH: usize = 80;
 
-/// Machine-readable refusal reason returned by [`PeerClientPairingIssuerPolicy::validate`].
+/// Machine-readable refusal reason returned by [`evaluate_pairing_issue`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PeerClientPairingRefusalReason {

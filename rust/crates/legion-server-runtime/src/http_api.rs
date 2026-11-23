@@ -14,7 +14,8 @@ use crate::error::ServerRuntimeError;
 use crate::http_api_routes::build_runtime_api_router;
 use crate::http_auth::{AuthenticatedPrincipal, now_unix_ms};
 use crate::http_env::assets::{
-    SignedHttpUrl, build_signed_asset_url, build_signed_attachment_upload_url,
+    SignedHttpUrl, build_signed_asset_url, build_signed_asset_url_with_disposition,
+    build_signed_attachment_upload_url,
 };
 use crate::http_env::auth_support::{WsTicketStore, derive_scoped_session_cookie_name};
 use crate::http_env::connect::ConnectRuntimeState;
@@ -58,6 +59,12 @@ pub struct RuntimeHttpState {
     pub orchestrator: Option<Arc<Orchestrator>>,
     /// Optional live terminal runtime reference.
     pub terminal_runtime: Option<Arc<TerminalRuntime>>,
+    /// Live SEP-3415 milestone hub for MCP and workflow status streams.
+    pub milestone_hub: Arc<legion_protocol::milestones::MilestoneHub>,
+    /// Local-only agent feedback persistence store (`ADR-013`: `sent = 0`).
+    pub feedback_store: Option<Arc<legion_workflows::feedback::FeedbackStore>>,
+    /// Optional live workflow definitions and execution manager.
+    pub workflow_manager: Option<Arc<legion_workflows::definitions::WorkflowDefinitionsManager>>,
     /// Provider and speech endpoint health-probe service.
     pub probe_service: Arc<ProviderProbeService>,
     /// Headless browser CDP host runtime for `/api/preview/action`.
@@ -85,6 +92,9 @@ impl RuntimeHttpState {
         let logs = logs_dir.into();
         let secrets = logs.join("secrets");
         let attachments_dir = logs.parent().unwrap_or(logs.as_path()).join("attachments");
+        let feedback_store = legion_workflows::feedback::FeedbackStore::new(Arc::clone(&db))
+            .ok()
+            .map(Arc::new);
         Self {
             db,
             cookie_name: "legioncode_session".to_owned(),
@@ -99,6 +109,9 @@ impl RuntimeHttpState {
             linked_environments_enabled: true,
             orchestrator: None,
             terminal_runtime: None,
+            milestone_hub: Arc::new(legion_protocol::milestones::MilestoneHub::new()),
+            feedback_store,
+            workflow_manager: None,
             probe_service: Arc::new(ProviderProbeService::default()),
             preview_browser: Arc::new(PreviewBrowserRuntime::new()),
             mcp_sign_in: Arc::new(McpSignInRegistry::new()),
@@ -155,6 +168,31 @@ impl RuntimeHttpState {
     pub fn with_orchestrator(mut self, orchestrator: Arc<Orchestrator>) -> Self {
         self.orchestrator = Some(orchestrator);
         self
+    }
+
+    /// Attach a shared SEP-3415 [`legion_protocol::milestones::MilestoneHub`].
+    #[must_use]
+    pub fn with_milestone_hub(
+        mut self,
+        milestone_hub: Arc<legion_protocol::milestones::MilestoneHub>,
+    ) -> Self {
+        self.milestone_hub = milestone_hub;
+        self
+    }
+
+    /// Attach a [`legion_workflows::definitions::WorkflowDefinitionsManager`] handle.
+    #[must_use]
+    pub fn with_workflow_manager(
+        mut self,
+        workflow_manager: Arc<legion_workflows::definitions::WorkflowDefinitionsManager>,
+    ) -> Self {
+        self.workflow_manager = Some(workflow_manager);
+        self
+    }
+
+    /// Returns the currently loaded [`legion_workflows::WorkflowEngine`], if initialized.
+    pub fn workflow_engine(&self) -> Option<Arc<legion_workflows::WorkflowEngine>> {
+        self.workflow_manager.as_ref().map(|mgr| mgr.engine())
     }
 
     /// Attach a [`TerminalRuntime`] handle.
@@ -306,6 +344,23 @@ impl RuntimeHttpState {
         ttl_ms: Option<i64>,
     ) -> Result<SignedHttpUrl, ServerRuntimeError> {
         build_signed_asset_url(&self.signed_asset_secret, path, filename, ttl_ms)
+    }
+
+    /// Creates a short-lived HMAC-signed `/api/assets/...` URL with optional `attachment` download disposition (`#40631`).
+    pub fn create_signed_asset_url_with_disposition(
+        &self,
+        path: &Path,
+        filename: Option<&str>,
+        ttl_ms: Option<i64>,
+        as_attachment: bool,
+    ) -> Result<SignedHttpUrl, ServerRuntimeError> {
+        build_signed_asset_url_with_disposition(
+            &self.signed_asset_secret,
+            path,
+            filename,
+            ttl_ms,
+            as_attachment,
+        )
     }
 
     /// Creates a short-lived HMAC-signed `/api/attachments/upload/...` URL for `attachment_id`.

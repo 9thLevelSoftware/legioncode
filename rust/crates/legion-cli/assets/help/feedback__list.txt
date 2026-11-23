@@ -1,0 +1,9 @@
+DESCRIPTION
+  List recent feedback reports saved on this machine, newest first.
+
+USAGE
+  legioncode feedback list [flags]
+
+FLAGS
+  --base-dir string   Explicit LegionCode data directory.
+  --json              Emit machine-readable JSON output.

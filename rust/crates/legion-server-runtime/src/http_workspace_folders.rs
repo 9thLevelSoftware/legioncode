@@ -19,6 +19,9 @@ use legion_persistence::project_store::{
     ensure_project_store_schema, find_project_by_id_or_workspace,
 };
 use legion_scm::workspace_folders::{TaskFolderCoordinator, scan_workspace_folders};
+use legion_scm::workspace_folders_scanner::{
+    is_whole_project_ignored, load_ignored_repository_paths,
+};
 use serde::Deserialize;
 
 use crate::error::ServerRuntimeError;
@@ -58,6 +61,38 @@ fn classify_folder_state(raw_path: &str) -> WorkspaceFolderState {
     }
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IgnoredOnly {
+    #[serde(default)]
+    ignore_repositories: Vec<String>,
+}
+
+/// Checks `.legion.json`, `legioncode.json`, and `t3.json` for whole-project `ignoreRepositories` (`#40664`).
+#[must_use]
+pub fn project_ignores_whole_workspace(root: &Path) -> bool {
+    if is_whole_project_ignored(root, &load_ignored_repository_paths(root)) {
+        return true;
+    }
+    for name in [".legion.json", "t3.json"] {
+        let Ok(raw) = std::fs::read_to_string(root.join(name)) else {
+            continue;
+        };
+        let Ok(parsed) = serde_json::from_str::<IgnoredOnly>(&raw) else {
+            continue;
+        };
+        let resolved: Vec<PathBuf> = parsed
+            .ignore_repositories
+            .into_iter()
+            .map(|entry| root.join(entry))
+            .collect();
+        if is_whole_project_ignored(root, &resolved) {
+            return true;
+        }
+    }
+    false
+}
+
 /// Resolves merged workspace folders for a project ID (`workspace.listFolders`, `#35925`).
 pub fn list_workspace_folders_service(
     state: &RuntimeHttpState,
@@ -76,6 +111,13 @@ pub fn list_workspace_folders_service(
     };
     let saved_tracked: Vec<ProjectTrackedFolder> =
         read_saved_tracked_folders(state, input.project_id.as_str());
+    if saved_tracked.is_empty()
+        && project_ignores_whole_workspace(Path::new(&project.workspace_root))
+    {
+        return Ok(WorkspaceListFoldersResult {
+            folders: Vec::new(),
+        });
+    }
     let resolved = TaskFolderCoordinator::resolve_project_folders(
         Path::new(&project.workspace_root),
         &saved_tracked,
@@ -103,6 +145,15 @@ pub fn scan_workspace_folders_service(
         return Err(ServerRuntimeError::BadRequest(
             "workspaceRoot must not be empty".to_owned(),
         ));
+    }
+    let root = Path::new(input.workspace_root.trim());
+    if project_ignores_whole_workspace(root) {
+        return Ok(WorkspaceScanFoldersResult {
+            workspace_root: root.to_string_lossy().into_owned(),
+            is_git_repository: root.join(".git").exists(),
+            code_workspace_file: None,
+            folders: Vec::new(),
+        });
     }
     scan_workspace_folders(input, None).map_err(|err| ServerRuntimeError::BadRequest(err.detail))
 }

@@ -3,9 +3,9 @@
 
 use legion_speech::types::TranscriptionOptions;
 use legion_speech::voice_ws::{
-    AudioSampleEncoding, CloseFrame, DEFAULT_MAX_SESSION_DURATION_MS, VOICE_WS_PATH, VirtualClock,
-    VoiceClientFrame, VoiceErrorCode, VoiceOutboundFrame, VoiceServerEvent, VoiceWsConfig,
-    VoiceWsSession, VoiceWsState,
+    AudioSampleEncoding, CloseFrame, DEFAULT_IDLE_TIMEOUT_MS, DEFAULT_MAX_SESSION_DURATION_MS,
+    VOICE_WS_PATH, VirtualClock, VoiceClientFrame, VoiceErrorCode, VoiceOutboundFrame,
+    VoiceServerEvent, VoiceWsConfig, VoiceWsSession, VoiceWsState,
 };
 
 fn assert_error_before_close(
@@ -216,5 +216,36 @@ fn malformed_oversized_and_out_of_order_frames_emit_error_before_close() -> Resu
         f32::NAN.to_le_bytes().to_vec(),
     ));
     assert_error_before_close(&bad_f32, VoiceErrorCode::InvalidAudio, 1008)?;
+    Ok(())
+}
+
+#[test]
+fn dropped_silent_dictation_client_releases_session_after_idle_timeout() -> Result<(), String> {
+    assert_eq!(DEFAULT_IDLE_TIMEOUT_MS, 15_000);
+    let clock = VirtualClock::new(10_000);
+    let config = VoiceWsConfig::default().with_idle_timeout_ms(DEFAULT_IDLE_TIMEOUT_MS);
+    let mut ws = VoiceWsSession::new(config, clock.clone());
+
+    ws.handle_frame(VoiceClientFrame::Start {
+        options: TranscriptionOptions::default(),
+    });
+    assert_eq!(ws.last_activity_ms(), 10_000);
+
+    // Activity at +10s resets the 15s idle window.
+    clock.advance_ms(10_000);
+    assert_eq!(ws.tick(), [] as [VoiceOutboundFrame; 0]);
+    ws.handle_frame(VoiceClientFrame::AudioChunk(vec![0_u8; 64]));
+    assert_eq!(ws.last_activity_ms(), 20_000);
+
+    // 1 ms before 15s idle expires: still healthy.
+    clock.advance_ms(DEFAULT_IDLE_TIMEOUT_MS - 1);
+    assert_eq!(ws.tick(), [] as [VoiceOutboundFrame; 0]);
+
+    // At 15s of silence: idle timeout closes the session and frees buffered audio.
+    clock.advance_ms(1);
+    let idle_closed = ws.tick();
+    assert_error_before_close(&idle_closed, VoiceErrorCode::SessionTimeout, 1008)?;
+    assert_eq!(ws.state(), VoiceWsState::Closing);
+    assert_eq!(ws.buffered_audio(), [0_u8; 0]);
     Ok(())
 }

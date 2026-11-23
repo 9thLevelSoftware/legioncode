@@ -76,7 +76,7 @@ pub(crate) async fn dispatch(state: &Arc<AppState>, tag: &str, payload: Value) -
         },
         "peerLinks.list" => peers_secrets_share::peer_links_list(state),
         "peerLinks.link" => peers_secrets_share::peer_links_link(&payload),
-        "peerLinks.unlink" => peers_secrets_share::peer_links_unlink(state, payload),
+        "peerLinks.unlink" => peers_secrets_share::peer_links_unlink(state, payload).await,
         "secrets.answerRequest" => peers_secrets_share::answer_secret_request(state, payload),
         "guestShare.create" => peers_secrets_share::guest_share_create(state, payload),
         _ => rpc_fail(

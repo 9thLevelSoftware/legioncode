@@ -14,8 +14,10 @@ use super::ops::{finish_wait, print_json_value, read_message_text};
 use super::resolve_project_id;
 use crate::cli_global::fail_with_command_help;
 use crate::cmd_thread_args::{
-    ParsedThreadCli, ThreadAction, ThreadCommonOpts, bad_flag, take_common_opt, take_thr_opt,
+    ParsedThreadCli, ThreadAction, ThreadCommonOpts, bad_flag, take_common_opt, take_single_thread,
+    take_thr_opt,
 };
+use crate::cmd_trace::parse_duration_ms;
 use crate::fallback::write_stdout_line;
 
 /// Parsed CLI options for `legioncode thread start`.
@@ -242,4 +244,46 @@ pub(crate) async fn run_start(
         has_schema,
     )
     .await
+}
+
+pub(crate) fn parse_wait(tail: &[String]) -> Result<ParsedThreadCli, i32> {
+    let path = &["thread"];
+    let mut common = ThreadCommonOpts::default();
+    let mut run_id = None;
+    let mut timeout_ms = None;
+    let mut json = false;
+    let mut pos = Vec::new();
+    let mut idx = 0;
+
+    while idx < tail.len() {
+        let arg = &tail[idx];
+        if arg == "--json" {
+            json = true;
+        } else if take_common_opt(path, tail, &mut idx, &mut common)? {
+        } else if let Some(val) = take_thr_opt(path, tail, &mut idx, "run")? {
+            run_id = Some(val);
+        } else if let Some(val) = take_thr_opt(path, tail, &mut idx, "timeout")? {
+            let ms = parse_duration_ms(&val)
+                .filter(|d| *d > 0)
+                .ok_or_else(|| fail_with_command_help(path, "Invalid duration for --timeout."))?;
+            timeout_ms = u64::try_from(ms).ok();
+        } else if arg.starts_with('-') {
+            return Err(bad_flag(path, arg, "wait"));
+        } else {
+            pos.push(arg.clone());
+        }
+        idx += 1;
+    }
+
+    Ok(ParsedThreadCli {
+        remote_url: common.remote_url,
+        token: common.token,
+        action: ThreadAction::Wait {
+            base_dir: common.base_dir,
+            thread_id: take_single_thread(path, pos)?,
+            run_id,
+            timeout_ms,
+            json,
+        },
+    })
 }

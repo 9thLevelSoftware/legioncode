@@ -114,3 +114,40 @@ pub fn match_focused_browser_webview_shortcut(
         None
     }
 }
+
+/// Escapes single `&` characters as `&&` so native Windows/Linux menus display literal
+/// ampersands instead of parsing them as mnemonic accelerators (`#41097`).
+#[must_use]
+pub fn escape_native_menu_label(label: &str) -> String {
+    label.replace('&', "&&")
+}
+
+/// Logical native context menu item mirrored from `DesktopContextMenuItem` (`#41097`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeContextMenuItem {
+    pub id: String,
+    pub label: String,
+    #[serde(default)]
+    pub disabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checked: Option<bool>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<NativeContextMenuItem>,
+}
+
+/// Escapes ampersands across every label and nested submenu item before handing the menu template
+/// to the OS menu toolkit (`#41097`).
+#[must_use]
+pub fn build_native_context_menu(items: &[NativeContextMenuItem]) -> Vec<NativeContextMenuItem> {
+    items
+        .iter()
+        .map(|item| NativeContextMenuItem {
+            id: item.id.clone(),
+            label: escape_native_menu_label(&item.label),
+            disabled: item.disabled,
+            checked: item.checked,
+            children: build_native_context_menu(&item.children),
+        })
+        .collect()
+}

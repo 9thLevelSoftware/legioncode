@@ -320,7 +320,10 @@ async fn serve_exposes_environment_ws_rpc_frame_parts_mcp_and_owner_lock() -> Te
     let descriptor: ExecutionEnvironmentDescriptor = env_resp.json().await?;
     assert_eq!(&descriptor.environment_id, server.environment_id());
     assert_eq!(descriptor.orchestration_protocol_version, Some(2));
-    assert_eq!(descriptor.database_migration, Some(105));
+    assert_eq!(
+        descriptor.database_migration,
+        u32::try_from(legion_persistence::sqlite::BUILD_MIGRATION_HEAD).ok()
+    );
 
     let ws_no_proto = http.get(format!("{base_url}/ws")).send().await?;
     assert_eq!(ws_no_proto.status(), 426);

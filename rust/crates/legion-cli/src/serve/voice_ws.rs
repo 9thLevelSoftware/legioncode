@@ -8,9 +8,9 @@ use legion_speech::acoustic_model::AcousticAsrEngine;
 use legion_speech::asr::AsrTranscriberSession;
 use legion_speech::vad::VadConfig;
 use legion_speech::voice_ws::{
-    AudioSampleEncoding, DEFAULT_MAX_AUDIO_BUFFER_BYTES, DEFAULT_MAX_CHUNK_BYTES,
-    DEFAULT_MAX_CONTROL_FRAME_BYTES, DEFAULT_MAX_SESSION_DURATION_MS, SystemClock,
-    VoiceClientFrame, VoiceOutboundFrame, VoiceWsConfig, VoiceWsSession,
+    AudioSampleEncoding, DEFAULT_IDLE_TIMEOUT_MS, DEFAULT_MAX_AUDIO_BUFFER_BYTES,
+    DEFAULT_MAX_CHUNK_BYTES, DEFAULT_MAX_CONTROL_FRAME_BYTES, DEFAULT_MAX_SESSION_DURATION_MS,
+    SystemClock, VoiceClientFrame, VoiceOutboundFrame, VoiceWsConfig, VoiceWsSession,
 };
 
 use crate::cmd_speech_worker::build_acoustic_engine;
@@ -31,6 +31,11 @@ fn config_from_query(query: Option<&str>) -> VoiceWsConfig {
     if let Some(ms) = parse_query_u64(query, "maxSessionDurationMs") {
         cfg.max_session_duration_ms = ms.clamp(1, DEFAULT_MAX_SESSION_DURATION_MS);
     }
+    cfg.idle_timeout_ms = Some(
+        parse_query_u64(query, "idleTimeoutMs").map_or(DEFAULT_IDLE_TIMEOUT_MS, |ms| {
+            ms.clamp(1, DEFAULT_MAX_SESSION_DURATION_MS)
+        }),
+    );
     if let Some(bytes) = parse_query_usize(query, "maxAudioBufferBytes") {
         cfg.max_audio_buffer_bytes = bytes.clamp(1, DEFAULT_MAX_AUDIO_BUFFER_BYTES);
     }
@@ -70,8 +75,7 @@ fn parse_query_usize(query: Option<&str>, key: &str) -> Option<usize> {
 async fn run_voice_ws_session(mut socket: WebSocket, config: VoiceWsConfig) {
     let duration = tokio::time::Duration::from_millis(config.max_session_duration_ms);
     let mut session = VoiceWsSession::new(config.clone(), SystemClock);
-    let Ok(mut asr) = AsrTranscriberSession::new(build_acoustic_engine(), VadConfig::default())
-    else {
+    let Ok(asr) = AsrTranscriberSession::new(build_acoustic_engine(), VadConfig::default()) else {
         let _ = socket
             .send(Message::Text(
                 r#"{"type":"error","code":"internal_error","message":"Failed to initialize speech VAD."}"#
@@ -87,25 +91,51 @@ async fn run_voice_ws_session(mut socket: WebSocket, config: VoiceWsConfig) {
         return;
     };
 
+    let idle_ms = config.idle_timeout_ms.unwrap_or(DEFAULT_IDLE_TIMEOUT_MS);
+    let idle_duration = tokio::time::Duration::from_millis(idle_ms);
+    let mut asr = Some(asr);
+
     let deadline = tokio::time::Instant::now() + duration;
+    let idle_deadline = tokio::time::Instant::now() + idle_duration;
     tokio::pin!(deadline);
+    tokio::pin!(idle_deadline);
 
     loop {
         tokio::select! {
             () = tokio::time::sleep_until(*deadline) => {
+                drop(asr.take());
                 let frames = session.tick();
-                let _ = send_outbound(&mut socket, &mut session, frames).await;
+                let _ = tokio::time::timeout(
+                    tokio::time::Duration::from_secs(2),
+                    send_outbound(&mut socket, &mut session, frames),
+                ).await;
+                break;
+            }
+            () = tokio::time::sleep_until(*idle_deadline) => {
+                drop(asr.take());
+                let frames = session.expire_idle(idle_ms);
+                let _ = tokio::time::timeout(
+                    tokio::time::Duration::from_secs(2),
+                    send_outbound(&mut socket, &mut session, frames),
+                ).await;
                 break;
             }
             maybe_msg = socket.recv() => {
                 let Some(Ok(msg)) = maybe_msg else {
                     break;
                 };
-                if !handle_incoming_message(&mut socket, &mut session, &mut asr, &config, msg).await {
+                let Some(active_asr) = asr.as_mut() else {
+                    break;
+                };
+                if !handle_incoming_message(&mut socket, &mut session, active_asr, &config, msg).await {
                     break;
                 }
+                idle_deadline
+                    .as_mut()
+                    .set(tokio::time::Instant::now() + idle_duration);
                 let timed_out = session.tick();
                 if !timed_out.is_empty() {
+                    drop(asr.take());
                     let _ = send_outbound(&mut socket, &mut session, timed_out).await;
                     break;
                 }

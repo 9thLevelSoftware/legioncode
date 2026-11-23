@@ -5,6 +5,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use legion_scm::git_ref_cache::{
+    IdleLocalStatusTracker, read_ref_snapshot, read_ref_snapshot_with_worktrees,
+};
 use tokio::sync::{Mutex, Notify};
 use tokio::task::JoinHandle;
 
@@ -42,6 +45,21 @@ pub struct GitStatusFetchOptions {
     /// When `true` (used at startup), awaits the full in-flight fetch handle rather than
     /// falling back to cached refs after [`STATUS_FETCH_SOFT_WAIT`].
     pub await_status_fetch: bool,
+}
+
+/// Checks [`IdleLocalStatusTracker`] against [`read_ref_snapshot_with_worktrees`] so idle local
+/// `git status` polls skip work when neither refs nor worktree branches moved (`#40385`).
+pub fn should_refresh_local_git_status(
+    tracker: &mut IdleLocalStatusTracker,
+    cwd: &Path,
+    git_common_dir: &Path,
+    worktree_stamp: Option<&str>,
+) -> bool {
+    let snapshot = match worktree_stamp {
+        Some(stamp) => read_ref_snapshot_with_worktrees(git_common_dir, Some(stamp)),
+        None => read_ref_snapshot(git_common_dir),
+    };
+    tracker.should_refresh_local(&cwd.to_string_lossy(), snapshot.as_deref())
 }
 
 /// Shared coordinator tracking active slow background `git fetch` jobs keyed by `(common_dir, remote)`.

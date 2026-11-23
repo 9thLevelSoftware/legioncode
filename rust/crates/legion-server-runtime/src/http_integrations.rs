@@ -205,7 +205,7 @@ pub(crate) async fn handle_link_peer(
     Ok((StatusCode::CREATED, Json(json!({ "peer": linked }))).into_response())
 }
 
-/// `DELETE /api/peers/{id}` — unlink peer environment and scrub stored secret (`AccessWrite`).
+/// `DELETE /api/peers/{id}` — unlink peer environment, scrub secret, and revoke remote MCP token (`#41005`).
 pub(crate) async fn handle_unlink_peer(
     State(state): State<Arc<RuntimeHttpState>>,
     headers: HeaderMap,
@@ -213,21 +213,33 @@ pub(crate) async fn handle_unlink_peer(
 ) -> Result<Response, ServerRuntimeError> {
     let _principal = authorize_request(&state, &headers, &[EnvironmentScope::AccessWrite], true)?;
     let secrets = state.secrets_store()?;
-    let removed = {
+    let target = {
         let conn = state
             .db()
             .lock()
             .map_err(|_| ServerRuntimeError::Persistence("db mutex poisoned".to_owned()))?;
-        PeerLinksService::new(secrets).unlink(&conn, &id)?
+        PeerLinksService::new(secrets).unlink_with_revocation_target(&conn, &id)?
     };
-    if !removed {
+    let Some(target) = target else {
         return Err(ServerRuntimeError::NotFound(format!(
             "linked peer `{id}` not found"
         )));
-    }
+    };
+    let ended_there = if let Some(ref token) = target.token {
+        LivePeerClient::new()?
+            .revoke_peer_token(&target.environment_id, &target.urls, token)
+            .await
+    } else {
+        false
+    };
     Ok((
         StatusCode::OK,
-        Json(json!({ "unlinked": true, "environmentId": id })),
+        Json(json!({
+            "unlinked": true,
+            "removed": true,
+            "endedThere": ended_there,
+            "environmentId": id,
+        })),
     )
         .into_response())
 }

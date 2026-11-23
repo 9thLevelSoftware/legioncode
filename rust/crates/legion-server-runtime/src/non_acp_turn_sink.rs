@@ -4,6 +4,12 @@ use legion_contracts::ids::TurnItemId;
 use legion_contracts::orchestration::{
     DomainEvent, DomainEventPayload, TurnItemKind, TurnItemStatus,
 };
+use legion_providers::drivers::claude_lifecycle::{
+    ClaudeLostBackgroundWorkPlan, ClaudeModelSwitchRestartCheck, ClaudeThinkingTracker,
+    ClaudeTrackedBackgroundTask, resolve_claude_lost_background_work,
+    should_start_updated_claude_on_model_switch,
+};
+use legion_providers::drivers::codex_lifecycle::CodexAppServerRetirementState;
 use legion_providers::non_acp::NonAcpTurnUpdate;
 use serde_json::{Value, json};
 
@@ -13,6 +19,10 @@ use crate::turn_events_builders::TurnItemMeta;
 
 /// Accumulated turn state derived from a stream of [`NonAcpTurnUpdate`] items.
 #[derive(Debug, Default)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Tracks independent per-turn stream suppression and thinking block state flags."
+)]
 pub struct NonAcpStreamSummary {
     /// Native provider session identifier reported by `SessionStarted`, if any.
     pub native_session_id: Option<String>,
@@ -28,6 +38,61 @@ pub struct NonAcpStreamSummary {
     pub saw_stream_text_delta: bool,
     /// Tracks whether streamed `thinking_delta` chunks were emitted for the current Claude message block.
     pub saw_stream_thinking_delta: bool,
+    /// Tracks Claude `thinking` blocks per message for pre-tool update surfacing (`#41085`).
+    pub thinking_tracker: ClaudeThinkingTracker,
+    /// Buffered text of the currently open Claude thinking block.
+    pub current_thinking_text: String,
+    /// True while inside an active thinking content block.
+    pub thinking_block_open: bool,
+    /// Monotonic counter identifying completed thinking blocks within the turn.
+    pub thinking_seq: u64,
+    /// App-server retirement state preventing reuse after terminal failures or deadline errors (`#25123`).
+    pub codex_retirement: CodexAppServerRetirementState,
+}
+
+impl NonAcpStreamSummary {
+    /// Marks the start of a thinking block (including empty default-display anchor blocks).
+    pub fn begin_thinking_block(&mut self) {
+        self.thinking_block_open = true;
+        self.current_thinking_text.clear();
+    }
+
+    /// Finalizes the active thinking block into [`ClaudeThinkingTracker`] if open (`#41085`).
+    pub fn finish_thinking_block(&mut self, message_id: &str) {
+        if !self.thinking_block_open {
+            return;
+        }
+        self.thinking_block_open = false;
+        self.thinking_seq = self.thinking_seq.saturating_add(1);
+        let item_id = format!("{message_id}-think-{}", self.thinking_seq);
+        let completed = std::mem::take(&mut self.current_thinking_text);
+        self.thinking_tracker
+            .record_thinking(message_id, &item_id, &completed);
+    }
+
+    /// Parses Claude `stream_event` thinking block start/stop envelopes for `#41085`.
+    pub fn handle_claude_thinking_line(&mut self, line: &str, assistant_message_id: &str) {
+        if let Ok(val) = serde_json::from_str::<Value>(line)
+            && val.get("type").and_then(Value::as_str) == Some("stream_event")
+            && let Some(ev) = val.get("event")
+        {
+            match ev.get("type").and_then(Value::as_str) {
+                Some("content_block_start")
+                    if ev
+                        .get("content_block")
+                        .and_then(|b| b.get("type"))
+                        .and_then(Value::as_str)
+                        == Some("thinking") =>
+                {
+                    self.begin_thinking_block();
+                }
+                Some("content_block_stop") => {
+                    self.finish_thinking_block(assistant_message_id);
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 /// Apply one normalized [`NonAcpTurnUpdate`] to `ctx`, emitting orchestration domain events.
@@ -44,6 +109,9 @@ pub fn apply_non_acp_update(
             provider_session_id,
             model,
         } => {
+            summary.thinking_tracker.clear();
+            summary.current_thinking_text.clear();
+            summary.thinking_block_open = false;
             summary.native_session_id = Some(provider_session_id);
             let effective_model = model.as_deref().unwrap_or(model_name);
             let session =
@@ -57,12 +125,17 @@ pub fn apply_non_acp_update(
             )?);
         }
         NonAcpTurnUpdate::AssistantTextDelta { text } => {
+            summary.finish_thinking_block(ctx.assistant_message_id.as_str());
             if !text.is_empty() {
                 ctx.assistant_text.push_str(&text);
                 events.extend(ctx.build_assistant_message_events(true, now_iso)?);
             }
         }
         NonAcpTurnUpdate::ReasoningDelta { text } => {
+            if !summary.thinking_block_open {
+                summary.begin_thinking_block();
+            }
+            summary.current_thinking_text.push_str(&text);
             if !text.is_empty() {
                 ctx.reasoning_text.push_str(&text);
                 events.push(ctx.build_reasoning_event(true, now_iso)?);
@@ -72,7 +145,20 @@ pub fn apply_non_acp_update(
             call_id,
             name,
             input_json,
-        } => push_tool_started(ctx, &mut events, call_id, name, input_json, now_iso)?,
+        } => {
+            summary.finish_thinking_block(ctx.assistant_message_id.as_str());
+            if let Some(pre_tool) = summary
+                .thinking_tracker
+                .take_pre_tool_update(model_name, ctx.assistant_message_id.as_str())
+            {
+                if !ctx.assistant_text.is_empty() {
+                    ctx.assistant_text.push('\n');
+                }
+                ctx.assistant_text.push_str(pre_tool.trim());
+                events.extend(ctx.build_assistant_message_events(true, now_iso)?);
+            }
+            push_tool_started(ctx, &mut events, call_id, name, input_json, now_iso)?;
+        }
         NonAcpTurnUpdate::ToolCallCompleted {
             call_id,
             output_json,
@@ -100,9 +186,16 @@ pub fn apply_non_acp_update(
             events.push(ctx.wrap_event(now_iso, DomainEventPayload::ProviderTurnUpdated(turn))?);
         }
         NonAcpTurnUpdate::TurnCompleted { .. } => {
+            summary.finish_thinking_block(ctx.assistant_message_id.as_str());
+            summary.thinking_tracker.clear();
             summary.terminal_seen = true;
         }
         NonAcpTurnUpdate::TurnFailed { message } => {
+            summary.finish_thinking_block(ctx.assistant_message_id.as_str());
+            summary.thinking_tracker.clear();
+            if ctx.driver.as_str() == "codex" {
+                summary.codex_retirement.mark_terminated(&message);
+            }
             summary.terminal_seen = true;
             summary.failure_message = Some(message);
         }
@@ -257,4 +350,29 @@ pub(crate) fn commit_http_turn_finish(
         return Err(ServerRuntimeError::Upstream(err_msg.clone()));
     }
     Ok(())
+}
+
+/// Decides whether switching models should launch an updated Claude binary instead of reusing an
+/// in-flight query (`#41086`).
+#[must_use]
+pub fn check_claude_model_switch_restart(input: &ClaudeModelSwitchRestartCheck<'_>) -> bool {
+    should_start_updated_claude_on_model_switch(input)
+}
+
+/// Computes lost Claude background task reconciliation outcomes across process relaunch.
+#[must_use]
+pub fn plan_claude_lost_background_work<S: ::std::hash::BuildHasher>(
+    exited_unexpectedly: bool,
+    wake_requested: bool,
+    buffered_task_notification_ids: &std::collections::HashSet<String, S>,
+    awaited_roster_tasks: &[ClaudeTrackedBackgroundTask],
+    owed_wake_tasks: &[ClaudeTrackedBackgroundTask],
+) -> ClaudeLostBackgroundWorkPlan {
+    resolve_claude_lost_background_work(
+        exited_unexpectedly,
+        wake_requested,
+        buffered_task_notification_ids,
+        awaited_roster_tasks,
+        owed_wake_tasks,
+    )
 }

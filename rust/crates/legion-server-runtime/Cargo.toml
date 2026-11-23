@@ -29,6 +29,7 @@ legion-scm = { path = "../legion-scm" }
 legion-shared = { path = "../legion-shared" }
 legion-speech = { path = "../legion-speech" }
 legion-terminal-vt = { path = "../legion-terminal-vt" }
+legion-workflows = { path = "../legion-workflows" }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

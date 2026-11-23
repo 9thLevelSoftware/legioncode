@@ -31,6 +31,8 @@ $global:_legioncode_Completions[''] = @{
     @{ name = 'doctor'; description = 'Inspect this LegionCode data directory and repair it. Pauses and restarts the background service as needed.' }
     @{ name = 'policy'; description = 'Inspect the administrator''s managed policy.' }
     @{ name = 'triage'; description = 'Investigate a LegionCode problem on this machine with Claude Code, Codex, or Antigravity, and help file a good issue.' }
+    @{ name = 'workflow'; description = 'Start, inspect and steer durable workflow runs on the running server.' }
+    @{ name = 'feedback'; description = 'Record and inspect local agent feedback reports.' }
   )
   flags = @(
     @{ name = 'mode'; forms = @('--mode'); takesValue = $true; values = @('web', 'desktop'); pathType = $null; description = 'Runtime mode. `desktop` keeps loopback defaults unless overridden.' }
@@ -577,6 +579,37 @@ $global:_legioncode_Completions['triage'] = @{
     @{ name = 'base-dir'; forms = @('--base-dir'); takesValue = $true; values = @(); pathType = $null; description = 'Explicit LegionCode data directory; runtime state is stored under userdata (equivalent to LEGIONCODE_HOME).' }
     @{ name = 'agent'; forms = @('--agent'); takesValue = $true; values = @('claude', 'codex', 'antigravity'); pathType = $null; description = 'Agent CLI to use. Default: ask when multiple are installed.' }
     @{ name = 'model'; forms = @('--model'); takesValue = $true; values = @(); pathType = $null; description = 'Model passed through to the agent CLI. Default: the agent''s default.' }
+  )
+  arguments = @()
+}
+$global:_legioncode_Completions['workflow'] = @{
+  subcommands = @(
+    @{ name = 'start'; description = 'Start a workflow run and print it.' }
+    @{ name = 'list'; description = 'List workflow runs, newest first.' }
+    @{ name = 'show'; description = 'Show a run and its steps.' }
+    @{ name = 'resume'; description = 'Run a paused run''s failed step again.' }
+    @{ name = 'cancel'; description = 'Cancel a run.' }
+    @{ name = 'signal'; description = 'Wake a waiting run, or answer its question.' }
+    @{ name = 'questions'; description = 'List open human workflow questions.' }
+    @{ name = 'hooks'; description = 'List webhook paths.' }
+    @{ name = 'store'; description = 'See and change workflow store keys.' }
+  )
+  flags = @(
+    @{ name = 'base-dir'; forms = @('--base-dir'); takesValue = $true; values = @(); pathType = $null; description = 'Explicit LegionCode data directory.' }
+    @{ name = 'json'; forms = @('--json'); takesValue = $false; values = @(); pathType = $null; description = 'JSON output.' }
+  )
+  arguments = @()
+}
+$global:_legioncode_Completions['feedback'] = @{
+  subcommands = @(
+    @{ name = 'list'; description = 'List recent feedback reports saved on this machine.' }
+  )
+  flags = @(
+    @{ name = 'kind'; forms = @('--kind'); takesValue = $true; values = @('bug', 'confusing', 'missing_capability', 'wrong_docs', 'other'); pathType = $null; description = 'What went wrong.' }
+    @{ name = 'subject'; forms = @('--subject'); takesValue = $true; values = @(); pathType = $null; description = 'Tool, command, or general.' }
+    @{ name = 'expected'; forms = @('--expected'); takesValue = $true; values = @(); pathType = $null; description = 'Expected behavior.' }
+    @{ name = 'actual'; forms = @('--actual'); takesValue = $true; values = @(); pathType = $null; description = 'Actual behavior.' }
+    @{ name = 'workaround'; forms = @('--workaround'); takesValue = $true; values = @(); pathType = $null; description = 'Workaround used.' }
   )
   arguments = @()
 }

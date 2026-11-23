@@ -71,10 +71,28 @@ pub(super) async fn run_ws_connection(
 
     let mut assembler = FramePartAssembler::new();
     let next_token = AtomicU64::new(1);
+    let heartbeat_interval = std::time::Duration::from_secs(20);
+    let mut heartbeat = tokio::time::interval_at(
+        tokio::time::Instant::now() + heartbeat_interval,
+        heartbeat_interval,
+    );
+    heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 
-    while let Some(msg_res) = ws_rx.next().await {
-        let Ok(msg) = msg_res else {
-            break;
+    loop {
+        let msg = tokio::select! {
+            _ = heartbeat.tick() => {
+                // Keep idle Effect RPC connections alive below 60s reverse-proxy timeouts (#40932).
+                if writer_tx.send(OutboundItem::Frame(ServerRpcFrame::Pong)).is_err() {
+                    break;
+                }
+                continue;
+            }
+            maybe_msg = ws_rx.next() => {
+                let Some(Ok(msg)) = maybe_msg else {
+                    break;
+                };
+                msg
+            }
         };
         match msg {
             Message::Text(text) => {

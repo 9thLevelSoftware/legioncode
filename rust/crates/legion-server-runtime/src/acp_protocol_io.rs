@@ -13,6 +13,7 @@ use legion_providers::acp::codec::{AcpStdioCodec, JsonRpcEnvelope, JsonRpcId, Js
 use legion_providers::acp::permissions::{RequestPermissionRequest, select_permission_option};
 use legion_providers::acp::protocol::{METHOD_SESSION_REQUEST_PERMISSION, StopReason};
 use legion_providers::acp::updates::SessionUpdateNotification;
+use legion_providers::drivers::antigravity::is_antigravity_legion_mcp_request;
 use serde::Serialize;
 use serde_json::Value;
 use tokio::sync::mpsc;
@@ -215,12 +216,33 @@ pub fn handle_agent_request(
     runtime_mode: RuntimeMode,
     interaction_mode: ProviderInteractionMode,
 ) -> Result<(), ServerRuntimeError> {
+    handle_agent_request_for_driver(writer, req, runtime_mode, interaction_mode, None)
+}
+
+/// Handle one agent-initiated JSON-RPC request with optional driver context for Antigravity
+/// built-in MCP tool auto-approval.
+pub fn handle_agent_request_for_driver(
+    writer: &AcpWriter,
+    req: &JsonRpcRequest,
+    runtime_mode: RuntimeMode,
+    interaction_mode: ProviderInteractionMode,
+    driver_slug: Option<&str>,
+) -> Result<(), ServerRuntimeError> {
     if req.method == METHOD_SESSION_REQUEST_PERMISSION {
         let payload_val = req.params.clone().unwrap_or(Value::Null);
         let parsed: RequestPermissionRequest = serde_json::from_value(payload_val)
             .map_err(|e| ServerRuntimeError::Process(format!("invalid permission request: {e}")))?;
+        let effective_mode = if driver_slug == Some("antigravity")
+            && is_antigravity_legion_mcp_request(
+                parsed.tool_call.title.as_deref(),
+                parsed.tool_call.raw_input.as_ref(),
+            ) {
+            RuntimeMode::FullAccess
+        } else {
+            runtime_mode
+        };
         let resp =
-            select_permission_option(&parsed, None, Some(runtime_mode), Some(interaction_mode));
+            select_permission_option(&parsed, None, Some(effective_mode), Some(interaction_mode));
         writer.send_response_ok(req.id.clone(), serde_json::to_value(&resp)?)?;
         return Ok(());
     }

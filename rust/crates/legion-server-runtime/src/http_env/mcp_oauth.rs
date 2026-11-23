@@ -99,6 +99,7 @@ pub(crate) async fn handle_mcp_authorization_server(headers: HeaderMap) -> Respo
         "authorization_endpoint": format!("{origin}/oauth/mcp/authorize"),
         "token_endpoint": format!("{origin}/oauth/mcp/token"),
         "registration_endpoint": format!("{origin}/oauth/mcp/register"),
+        "revocation_endpoint": format!("{origin}/oauth/mcp/revoke"),
         "response_types_supported": ["code"],
         "grant_types_supported": ["authorization_code"],
         "code_challenge_methods_supported": ["S256"],

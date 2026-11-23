@@ -11,7 +11,9 @@ use super::{AppState, rpc_fail, rpc_fail_obj, utc_now_iso};
 
 pub(crate) async fn dispatch(state: &Arc<AppState>, tag: &str, _payload: Value) -> RpcExit {
     match tag {
-        "server.probe" => RpcExit::Success { value: json!({}) },
+        "server.probe" => RpcExit::Success {
+            value: json!({ "serverTime": utc_now_iso() }),
+        },
         "server.getConfig" => get_config(state).await,
         _ => rpc_fail(
             "UnsupportedRpcMethod",

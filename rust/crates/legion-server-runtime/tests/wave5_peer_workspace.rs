@@ -9,7 +9,7 @@ use legion_contracts::environment::{
 use legion_contracts::ids::{EnvironmentId, ThreadId, TurnItemId};
 use legion_contracts::orchestration::McpClientAccess;
 use legion_contracts::peer_links::PeerLinkThreadHistoryInput;
-use legion_persistence::pairing_tokens::{IssuePairingTokenInput, issue_pairing_token_with_conn};
+use legion_persistence::auth_mutations::{IssueSessionInput, issue_scoped_session};
 use legion_persistence::sqlite::SqliteStore;
 use legion_remote::peer::links::{InsertPeerLinkInput, PeerLinksService};
 use legion_server_runtime::{
@@ -37,9 +37,9 @@ async fn spawn_state_server(
 
 async fn setup_peer_box_b(
     logs_b: &TempDir,
-) -> Result<(String, tokio::task::JoinHandle<()>), Box<dyn std::error::Error>> {
+) -> Result<(String, String, tokio::task::JoinHandle<()>), Box<dyn std::error::Error>> {
     let store_b = SqliteStore::open_in_memory()?;
-    {
+    let peer_tok = {
         let conn = store_b.connection();
         conn.execute(
             "INSERT INTO projection_projects (project_id, title, workspace_root, scripts_json, created_at, updated_at)
@@ -56,23 +56,28 @@ async fn setup_peer_box_b(
              VALUES ('msg-1', 'thr-1', 'run-1', 'assistant', 0, '2026-11-20T00:01:00Z', '2026-11-20T00:01:00Z', '{\"text\":\"hello peer\"}')",
             [],
         )?;
-        let _ = issue_pairing_token_with_conn(
+        issue_scoped_session(
             conn,
-            &IssuePairingTokenInput {
-                scopes: vec!["*".to_owned()],
-                ttl_ms: 600_000,
-                label: Some("peer-link".to_owned()),
-            },
-            1_700_000_000_000,
-        )?;
-    }
+            IssueSessionInput::default()
+                .with_subject("peer-link:full-access")
+                .with_label("LegionCode · Phone")
+                .with_scopes([
+                    "orchestration:read",
+                    "orchestration:operate",
+                    "settings:write",
+                    "source-control:write",
+                ]),
+        )?
+        .token
+    };
     let db_b = Arc::new(Mutex::new(store_b.into_connection()));
     let state_b = Arc::new(
         RuntimeHttpState::new(Arc::clone(&db_b), logs_b.path())
             .with_require_auth(false)
             .with_linked_environments_enabled(true),
     );
-    spawn_state_server(state_b).await
+    let (url_b, handle) = spawn_state_server(state_b).await?;
+    Ok((url_b, peer_tok, handle))
 }
 
 async fn verify_peer_relay_client(url_b: &str, bearer_token: &str) -> TestResult {
@@ -137,7 +142,7 @@ async fn verify_peer_relay_client(url_b: &str, bearer_token: &str) -> TestResult
 #[tokio::test]
 async fn peer_threads_relay_and_transitive_pairing_roundtrip() -> TestResult {
     let logs_b = TempDir::new()?;
-    let (url_b, _hb) = setup_peer_box_b(&logs_b).await?;
+    let (url_b, peer_tok, _hb) = setup_peer_box_b(&logs_b).await?;
     let client = reqwest::Client::new();
 
     let origin_refused = client
@@ -163,8 +168,19 @@ async fn peer_threads_relay_and_transitive_pairing_roundtrip() -> TestResult {
         .await?;
     assert_eq!(missing_resp.status(), StatusCode::NOT_FOUND);
 
+    let unauth_pair = client
+        .post(format!("{url_b}/api/links/client-pairing"))
+        .json(&json!({
+            "scopes": ["orchestration:read", "access:write"],
+            "clientLabel": "Phone"
+        }))
+        .send()
+        .await?;
+    assert_eq!(unauth_pair.status(), StatusCode::UNAUTHORIZED);
+
     let pair_resp: Value = client
         .post(format!("{url_b}/api/links/client-pairing"))
+        .bearer_auth(&peer_tok)
         .json(&json!({
             "scopes": ["orchestration:read", "access:write"],
             "clientLabel": "Link · via Phone"

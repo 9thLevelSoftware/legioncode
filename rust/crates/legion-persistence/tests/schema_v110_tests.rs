@@ -324,8 +324,8 @@ fn migrations_108_109_110_create_feedback_accounts_and_workflow_tables_and_helpe
         [],
     )?;
     conn.execute(
-        "INSERT INTO workflow_engine_journal (run_id, step_name, action_key, outcome, payload_json, created_at, updated_at)
-         VALUES ('wfr-1', 'step-a', 'act-1', 'completed', '{\"ok\":true}', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+        "INSERT INTO workflow_engine_journal (run_id, seq, entry_key, kind, status, payload_json, wake_at, created_at, updated_at)
+         VALUES ('wfr-1', 1, 'step-a:act-1', 'activity', 'completed', '{\"ok\":true}', NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
         [],
     )?;
     Ok(())

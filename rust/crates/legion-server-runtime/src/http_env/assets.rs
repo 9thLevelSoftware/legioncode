@@ -8,7 +8,9 @@ use std::sync::Arc;
 use axum::Json;
 use axum::body::Bytes;
 use axum::extract::{Path as AxumPath, State};
-use axum::http::header::{ACCEPT_RANGES, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE, ETAG, RANGE};
+use axum::http::header::{
+    ACCEPT_RANGES, CONTENT_DISPOSITION, CONTENT_LENGTH, CONTENT_RANGE, CONTENT_TYPE, ETAG, RANGE,
+};
 use axum::http::{HeaderMap, HeaderValue, Method, StatusCode};
 use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
@@ -41,6 +43,8 @@ struct SignedAssetClaims {
     base_dir: String,
     rel_path: String,
     exp_ms: i64,
+    #[serde(default)]
+    disposition: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -57,6 +61,17 @@ pub(crate) fn build_signed_asset_url(
     filename: Option<&str>,
     ttl_ms: Option<i64>,
 ) -> Result<SignedHttpUrl, ServerRuntimeError> {
+    build_signed_asset_url_with_disposition(secret, path, filename, ttl_ms, false)
+}
+
+/// Builds a signed `/api/assets/<token>/<filename>` URL, optionally forcing `attachment` download (`#40631`).
+pub(crate) fn build_signed_asset_url_with_disposition(
+    secret: &[u8],
+    path: &Path,
+    filename: Option<&str>,
+    ttl_ms: Option<i64>,
+    as_attachment: bool,
+) -> Result<SignedHttpUrl, ServerRuntimeError> {
     let base = path
         .parent()
         .filter(|p| !p.as_os_str().is_empty())
@@ -70,6 +85,7 @@ pub(crate) fn build_signed_asset_url(
         base_dir: base.to_string_lossy().into_owned(),
         rel_path: file_part.to_owned(),
         exp_ms: expires_at,
+        disposition: as_attachment.then(|| "attachment".to_owned()),
     };
     let bytes = serde_json::to_vec(&claims).map_err(|e| {
         ServerRuntimeError::Persistence(format!("asset claim serialize error: {e}"))
@@ -241,6 +257,8 @@ pub(crate) async fn handle_signed_asset(
     let mime = guess_mime_from_path(&canon_target);
     let etag = format!("\"{}\"", hex::encode(&Sha256::digest(&bytes)[..12]));
     let is_head = method == Method::HEAD;
+    let attachment_header = (claims.disposition.as_deref() == Some("attachment"))
+        .then(|| format_content_disposition(&claims.rel_path));
 
     if let Some(range_hdr) = headers.get(RANGE).and_then(|v| v.to_str().ok()) {
         let Some((start, end)) = parse_byte_range(range_hdr, total_len) else {
@@ -260,6 +278,11 @@ pub(crate) async fn handle_signed_asset(
         let h = resp.headers_mut();
         h.insert(CONTENT_TYPE, HeaderValue::from_static(mime));
         h.insert(ACCEPT_RANGES, HeaderValue::from_static("bytes"));
+        if let Some(ref disp) = attachment_header
+            && let Ok(hv) = HeaderValue::from_str(disp)
+        {
+            h.insert(CONTENT_DISPOSITION, hv);
+        }
         if let Ok(hv) = HeaderValue::from_str(&format!("bytes {start}-{end}/{total_len}")) {
             h.insert(CONTENT_RANGE, hv);
         }
@@ -277,6 +300,11 @@ pub(crate) async fn handle_signed_asset(
     let h = resp.headers_mut();
     h.insert(CONTENT_TYPE, HeaderValue::from_static(mime));
     h.insert(ACCEPT_RANGES, HeaderValue::from_static("bytes"));
+    if let Some(ref disp) = attachment_header
+        && let Ok(hv) = HeaderValue::from_str(disp)
+    {
+        h.insert(CONTENT_DISPOSITION, hv);
+    }
     if let Ok(hv) = HeaderValue::from_str(&total_len.to_string()) {
         h.insert(CONTENT_LENGTH, hv);
     }
@@ -284,6 +312,29 @@ pub(crate) async fn handle_signed_asset(
         h.insert(ETAG, hv);
     }
     resp
+}
+
+fn format_content_disposition(rel_path: &str) -> String {
+    let raw_name = Path::new(rel_path)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("download");
+    let ascii: String = raw_name
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_graphic() && !matches!(ch, '"' | '\\' | '/' | ';') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let safe = if ascii.is_empty() {
+        "download".to_owned()
+    } else {
+        ascii
+    };
+    format!("attachment; filename=\"{safe}\"")
 }
 
 /// `POST /api/attachments/{*tail}` — verifies signed attachment upload token and stores file.
@@ -344,9 +395,4 @@ pub(crate) async fn handle_signed_attachment_upload(
         "relativeUrl": signed_read.map(|u| u.relative_url),
     }))
     .into_response()
-}
-
-/// JSON 404 fallback for unknown `/api/*` and `/oauth/*` paths so SPA `index.html` is never served.
-pub(crate) async fn handle_api_not_found() -> Response {
-    env_not_found("Not Found")
 }

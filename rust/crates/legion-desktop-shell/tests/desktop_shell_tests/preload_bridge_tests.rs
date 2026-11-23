@@ -111,7 +111,7 @@ const sandbox = {
   document: { documentElement: { style: { setProperty() {} } }, addEventListener() {} },
   atob: (s) => Buffer.from(s, "base64").toString("binary"),
   btoa: (s) => Buffer.from(s, "binary").toString("base64"),
-  console, Uint8Array, Map, Set, Array, Promise, Error, JSON, Buffer,
+  console, ArrayBuffer, Uint8Array, Map, Set, Array, Promise, Error, JSON, Buffer,
 };
 vm.runInNewContext(script, sandbox);
 const bridge = sandbox.window.desktopBridge;
@@ -140,6 +140,14 @@ for (const k of ["open", "close"]) {
 }
 for (const k of ["onInput", "startScreencast", "stopScreencast", "save"]) {
   if (typeof bridge.preview.recording[k] !== "function") throw new Error(`Missing recording.${k}`);
+}
+for (const k of ["available", "supportedLocales", "prepare", "transcribe"]) {
+  if (typeof bridge.appleSpeech[k] !== "function") throw new Error(`Missing appleSpeech.${k}`);
+}
+bridge.appleSpeech.transcribe({ locale: "en-US", pcm: new Uint8Array([1, 2, 3, 4]) });
+const txReq = posted.pop();
+if (!txReq || txReq.method !== "desktop.appleSpeech.transcribe" || !Array.isArray(txReq.params.pcm) || txReq.params.pcm.length !== 4) {
+  throw new Error("Bad appleSpeech.transcribe payload");
 }
 
 const brand = bridge.getAppBranding();

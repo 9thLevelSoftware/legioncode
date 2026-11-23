@@ -70,8 +70,20 @@ fn browse_filesystem(payload: Value) -> RpcExit {
         }
     };
     let mut entries: Vec<(String, String)> = Vec::new();
+    let mut symlink_stats = 0usize;
     for entry in rd.flatten() {
-        if !entry.file_type().is_ok_and(|t| t.is_dir()) {
+        let Ok(ft) = entry.file_type() else {
+            continue;
+        };
+        let is_dir = if ft.is_dir() {
+            true
+        } else if ft.is_symlink() && symlink_stats < 32 {
+            symlink_stats += 1;
+            fs::metadata(entry.path()).is_ok_and(|m| m.is_dir())
+        } else {
+            false
+        };
+        if !is_dir {
             continue;
         }
         let name = entry.file_name().to_string_lossy().into_owned();
@@ -138,19 +150,14 @@ fn get_metadata(state: &AppState, payload: Value) -> RpcExit {
 struct OpenInEditorPayload {
     cwd: String,
     editor: String,
+    #[serde(default)]
+    reveal: Option<bool>,
 }
 
 fn open_in_editor(payload: Value) -> RpcExit {
     let req: OpenInEditorPayload = match parse_payload(payload) {
         Ok(p) => p,
         Err(e) => return e,
-    };
-    let Some(cmd_name) = map_editor_command(&req.editor) else {
-        return rpc_fail_obj(json!({
-            "_tag": "ExternalLauncherUnknownEditorError",
-            "editor": req.editor,
-            "message": format!("Unknown editor: {}", req.editor),
-        }));
     };
     let target = req.cwd.trim();
     if target.is_empty()
@@ -165,14 +172,43 @@ fn open_in_editor(payload: Value) -> RpcExit {
             "message": "Target path is empty or contains invalid characters.",
         }));
     }
-    let mut cmd = std::process::Command::new(cmd_name);
-    if req.editor == "cursor" {
-        cmd.arg("--classic");
-    } else if req.editor == "kiro" {
-        cmd.arg("ide");
+    if req.reveal == Some(true) && !Path::new(target).exists() {
+        return rpc_fail_obj(json!({
+            "_tag": "ExternalLauncherRevealTargetMissingError",
+            "editor": req.editor,
+            "target": target,
+            "message": format!("No file or folder exists at {target}"),
+        }));
     }
-    cmd.arg(target)
-        .stdin(Stdio::null())
+    let Some(cmd_name) = map_editor_command(&req.editor) else {
+        return rpc_fail_obj(json!({
+            "_tag": "ExternalLauncherUnknownEditorError",
+            "editor": req.editor,
+            "message": format!("Unknown editor: {}", req.editor),
+        }));
+    };
+    let mut cmd = std::process::Command::new(cmd_name);
+    if req.editor == "file-manager" {
+        if cfg!(windows) && req.reveal == Some(true) {
+            cmd.arg(format!("/select,{target}"));
+        } else if cfg!(target_os = "macos") && req.reveal == Some(true) {
+            cmd.args(["-R", target]);
+        } else {
+            let dir_target = Path::new(target)
+                .parent()
+                .filter(|_| req.reveal == Some(true) && !Path::new(target).is_dir())
+                .unwrap_or_else(|| Path::new(target));
+            cmd.arg(dir_target);
+        }
+    } else {
+        if req.editor == "cursor" {
+            cmd.arg("--classic");
+        } else if req.editor == "kiro" {
+            cmd.arg("ide");
+        }
+        cmd.arg(target);
+    }
+    cmd.stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     match cmd.spawn() {
@@ -209,6 +245,9 @@ fn map_editor_command(editor: &str) -> Option<&'static str> {
         "goland" => Some("goland"),
         "pycharm" => Some("pycharm"),
         "rustrover" => Some("rustrover"),
+        "file-manager" if cfg!(windows) => Some("explorer.exe"),
+        "file-manager" if cfg!(target_os = "macos") => Some("open"),
+        "file-manager" => Some("xdg-open"),
         _ => None,
     }
 }

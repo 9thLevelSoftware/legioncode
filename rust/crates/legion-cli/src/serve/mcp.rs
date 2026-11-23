@@ -1,21 +1,22 @@
 //! Pre-auth `/mcp` HTTP boundary handler and authenticated MCP JSON-RPC tool dispatcher.
 
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::Json;
 use axum::body::to_bytes;
 use axum::extract::{Request, State};
-use axum::http::header::AUTHORIZATION;
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use legion_contracts::brand::ACTIVE_BRAND;
-use legion_persistence::pairing_tokens::verify_bearer_session_with_conn;
 use legion_protocol::mcp::{McpGateOutcome, McpHttpRequest, evaluate_mcp_http_request};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
 use super::AppState;
+use super::mcp_milestones::{
+    authorize_caller, handle_events_list, handle_events_poll, handle_events_stream,
+    handle_events_subscribe, handle_server_discover,
+};
 
 const MAX_MCP_BODY_BYTES: usize = 4 * 1024 * 1024;
 const MCP_SESSION_ID_HEADER: &str = "mcp-session-id";
@@ -60,13 +61,8 @@ pub(crate) async fn handle_mcp(State(state): State<Arc<AppState>>, req: Request)
 }
 
 async fn handle_mcp_post(state: &Arc<AppState>, req: Request) -> Response {
-    let auth_header = req
-        .headers()
-        .get(AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .map(str::to_owned);
-    let session_header = req
-        .headers()
+    let headers = req.headers().clone();
+    let session_header = headers
         .get(MCP_SESSION_ID_HEADER)
         .and_then(|v| v.to_str().ok())
         .map(str::to_owned);
@@ -81,6 +77,7 @@ async fn handle_mcp_post(state: &Arc<AppState>, req: Request) -> Response {
 
     let id = payload.get("id").cloned().unwrap_or(Value::Null);
     let method = payload.get("method").and_then(Value::as_str).unwrap_or("");
+    let params = payload.get("params").cloned().unwrap_or_else(|| json!({}));
 
     match method {
         "ping" => (
@@ -92,6 +89,7 @@ async fn handle_mcp_post(state: &Arc<AppState>, req: Request) -> Response {
             })),
         )
             .into_response(),
+        "server/discover" => handle_server_discover(&id),
         "initialize" => {
             let mut resp = (
                 StatusCode::OK,
@@ -100,7 +98,10 @@ async fn handle_mcp_post(state: &Arc<AppState>, req: Request) -> Response {
                     "id": id,
                     "result": {
                         "protocolVersion": "2025-06-18",
-                        "capabilities": { "tools": {} },
+                        "capabilities": {
+                            "tools": {},
+                            "extensions": { "io.modelcontextprotocol/events": {} },
+                        },
                         "serverInfo": {
                             "name": ACTIVE_BRAND.product_name,
                             "version": env!("CARGO_PKG_VERSION")
@@ -115,42 +116,26 @@ async fn handle_mcp_post(state: &Arc<AppState>, req: Request) -> Response {
             }
             resp
         }
-        "notifications/initialized" => StatusCode::ACCEPTED.into_response(),
-        "tools/list" | "tools/call" => {
-            if !is_authorized(state, auth_header.as_deref()) {
+        "notifications/initialized" | "notifications/roots/list_changed" => {
+            let Some(_caller) = authorize_caller(state, &headers) else {
                 return (
                     StatusCode::UNAUTHORIZED,
                     Json(json!({ "error": "unauthorized", "message": "Missing or invalid Bearer token." })),
                 )
                     .into_response();
-            }
-            if method == "tools/list" {
+            };
+            if payload.get("id").is_some() {
                 return (
-                    StatusCode::OK,
-                    Json(json!({
-                        "jsonrpc": "2.0",
-                        "id": id,
-                        "result": super::mcp_tools::list_tools_json(),
-                    })),
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": "invalid_request", "message": "Notification must not carry id." })),
                 )
                     .into_response();
             }
-            let params = payload.get("params").cloned().unwrap_or_else(|| json!({}));
-            let tool_name = params.get("name").and_then(Value::as_str).unwrap_or("");
-            let args = params
-                .get("arguments")
-                .cloned()
-                .unwrap_or_else(|| json!({}));
-            let result = super::mcp_tools::call_tool(state, tool_name, &args).await;
-            (
-                StatusCode::OK,
-                Json(json!({
-                    "jsonrpc": "2.0",
-                    "id": id,
-                    "result": result,
-                })),
-            )
-                .into_response()
+            StatusCode::ACCEPTED.into_response()
+        }
+        "tools/list" | "tools/call" | "events/list" | "events/poll" | "events/stream"
+        | "events/subscribe" => {
+            dispatch_authenticated_mcp(state, &headers, method, id, &params).await
         }
         _ => (
             StatusCode::OK,
@@ -164,36 +149,52 @@ async fn handle_mcp_post(state: &Arc<AppState>, req: Request) -> Response {
     }
 }
 
-fn is_authorized(state: &AppState, auth_header: Option<&str>) -> bool {
-    if !state.runtime_http.require_auth {
-        return true;
-    }
-    let Some(token) = auth_header.and_then(|raw| {
-        let mut parts = raw.splitn(2, char::is_whitespace);
-        let scheme = parts.next()?.trim();
-        let rest = parts.next()?.trim();
-        (scheme.eq_ignore_ascii_case("Bearer") && !rest.is_empty()).then_some(rest)
-    }) else {
-        return false;
+async fn dispatch_authenticated_mcp(
+    state: &Arc<AppState>,
+    headers: &axum::http::HeaderMap,
+    method: &str,
+    id: Value,
+    params: &Value,
+) -> Response {
+    let Some(caller) = authorize_caller(state, headers) else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "error": "unauthorized", "message": "Missing or invalid Bearer token." })),
+        )
+            .into_response();
     };
-    if let Some(ref dev_tok) = state.runtime_http.dev_auth_token
-        && dev_tok == token
-    {
-        return true;
+    match method {
+        "events/list" => handle_events_list(state, &caller, &id),
+        "events/poll" => handle_events_poll(state, &caller, headers, &id, params),
+        "events/stream" => handle_events_stream(Arc::clone(state), caller, headers, id, params),
+        "events/subscribe" => handle_events_subscribe(&id, params),
+        "tools/list" => (
+            StatusCode::OK,
+            Json(json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "result": super::mcp_tools::list_tools_json(state, &caller),
+            })),
+        )
+            .into_response(),
+        _ => {
+            let tool_name = params.get("name").and_then(Value::as_str).unwrap_or("");
+            let args = params
+                .get("arguments")
+                .cloned()
+                .unwrap_or_else(|| json!({}));
+            let result = super::mcp_tools::call_tool(state, &caller, tool_name, &args).await;
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "result": result,
+                })),
+            )
+                .into_response()
+        }
     }
-    let now_ms = i64::try_from(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_millis(),
-    )
-    .unwrap_or(i64::MAX);
-    state
-        .orchestrator
-        .sink()
-        .db()
-        .lock()
-        .is_ok_and(|conn| verify_bearer_session_with_conn(&conn, token, now_ms).is_ok())
 }
 
 fn jsonrpc_parse_error(message: &str) -> Response {

@@ -1,0 +1,22 @@
+DESCRIPTION
+  Start, inspect and steer durable workflow runs on the running server.
+
+USAGE
+  legioncode workflow <subcommand> [flags]
+
+SUBCOMMANDS
+  start       Start a workflow run and print it.
+  list        List workflow runs, newest first.
+  show        Show a run and its steps.
+  resume      Run a paused run's failed step again.
+  cancel      Cancel a run.
+  signal      Wake a waiting run, or answer its question.
+  questions   List the questions runs are waiting on a person to answer.
+  hooks       List the URL paths that start runs.
+  store       See and change what workflows keep between runs.
+
+FLAGS
+  --base-dir string     Explicit LegionCode data directory.
+  --remote-url string   Target remote server URL.
+  --token string        Bearer token for --remote-url.
+  --json                Emit machine-readable JSON output.

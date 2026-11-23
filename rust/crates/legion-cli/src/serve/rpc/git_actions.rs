@@ -1,10 +1,13 @@
 //! Git stacked action and PR-thread workflow RPC handlers (`git.*`).
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::Arc;
 
+use legion_persistence::project_store::list_projects;
 use legion_protocol::rpc_codec::RpcExit;
+use legion_scm::worktree_guards::{CheckoutThreadRef, assert_checkout_idle};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tokio::process::Command;
@@ -12,7 +15,7 @@ use uuid::Uuid;
 
 use super::projects_fs::base_dir_from_state;
 use super::vcs_git::{current_branch, git_err, run_git_cmd};
-use super::{AppState, parse_payload, rpc_fail};
+use super::{AppState, parse_payload, rpc_fail, with_db};
 
 pub(crate) async fn vcs_create_worktree(state: &AppState, payload: Value) -> RpcExit {
     let req: CreateWorktreePayload = match parse_payload(payload) {
@@ -279,4 +282,57 @@ async fn git_prepare_pr_thread(state: &AppState, payload: Value) -> RpcExit {
             "isOnPullRequestHead": false,
         }),
     }
+}
+
+pub(crate) fn check_checkout_idle(state: &AppState, raw_cwd: &str) -> Result<(), RpcExit> {
+    let canonical = std::fs::canonicalize(raw_cwd)
+        .unwrap_or_else(|_| PathBuf::from(raw_cwd))
+        .to_string_lossy()
+        .into_owned();
+    let res = with_db(state, |conn| {
+        let project_ids: HashSet<String> = list_projects(conn)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|p| {
+                p.deleted_at.is_none()
+                    && (p.workspace_root == raw_cwd
+                        || std::fs::canonicalize(&p.workspace_root)
+                            .is_ok_and(|c| c.to_string_lossy() == canonical))
+            })
+            .map(|p| p.id)
+            .collect();
+        let mut stmt = conn
+            .prepare(
+                "SELECT t.thread_id, t.title, COALESCE(t.project_id, ''),
+                        json_extract(t.payload_json, '$.worktreePath'),
+                        EXISTS (
+                            SELECT 1 FROM orchestration_v2_projection_runs r
+                            WHERE r.thread_id = t.thread_id
+                              AND r.completed_at IS NULL
+                              AND r.status IN ('running', 'starting', 'pending', 'cancelling', 'interrupting')
+                        )
+                 FROM orchestration_v2_projection_threads t
+                 WHERE t.deleted_at IS NULL",
+            )
+            .map_err(|e| git_err("vcs.switchRef", raw_cwd, &e.to_string()))?;
+        let threads: Vec<CheckoutThreadRef> = stmt
+            .query_map([], |row| {
+                Ok(CheckoutThreadRef {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    project_id: row.get(2)?,
+                    worktree_path: row.get(3)?,
+                    is_busy: row.get::<_, i64>(4)? != 0,
+                })
+            })
+            .map_err(|e| git_err("vcs.switchRef", raw_cwd, &e.to_string()))?
+            .filter_map(Result::ok)
+            .collect();
+        Ok(assert_checkout_idle(
+            &[raw_cwd, canonical.as_str()],
+            &project_ids,
+            &threads,
+        ))
+    })?;
+    res.map_err(|detail| git_err("vcs.switchRef", raw_cwd, &detail))
 }

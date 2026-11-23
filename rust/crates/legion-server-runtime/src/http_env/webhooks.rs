@@ -1,5 +1,6 @@
 //! Webhook ingestion (`/api/hooks/{hookId}/{token}`).
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use axum::Json;
@@ -7,6 +8,8 @@ use axum::body::Bytes;
 use axum::extract::{OriginalUri, Path, State};
 use axum::http::{HeaderMap, HeaderValue, Method, StatusCode};
 use axum::response::{IntoResponse, Response};
+use legion_workflows::triggers_hooks::{HOOK_PREFIX, HookDeliveryInput, WebhookRequest};
+use legion_workflows::types::WorkflowError;
 use rusqlite::{OptionalExtension, params};
 use serde_json::json;
 use uuid::Uuid;
@@ -17,7 +20,8 @@ use crate::outbox_state::utc_now_iso;
 
 const MAX_WEBHOOK_BODY_BYTES: usize = 1_048_576;
 
-/// `GET|POST|PUT|PATCH /api/hooks/{hookId}/{token}` — accepts webhook deliveries (`202 { deliveryId }`).
+/// `GET|POST|PUT|PATCH /api/hooks/{hookId}/{token}` (and `/webhooks/{hookId}/{token}`) —
+/// routes `wf-*` hooks to [`WorkflowEngine::deliver`] and scheduled-task hooks to SQLite (`#38882`).
 pub(crate) async fn handle_webhook_delivery(
     State(state): State<Arc<RuntimeHttpState>>,
     method: Method,
@@ -43,6 +47,11 @@ pub(crate) async fn handle_webhook_delivery(
                 "message": "Webhook payload exceeds 1 MiB limit",
             }),
         );
+    }
+
+    if hook_id.starts_with(HOOK_PREFIX) {
+        return dispatch_workflow_webhook(&state, &method, &uri, &hook_id, &token, &headers, &body)
+            .await;
     }
 
     let delivery_id = Uuid::new_v4().to_string();
@@ -98,4 +107,92 @@ pub(crate) async fn handle_webhook_delivery(
         HeaderValue::from_static("accepted"),
     );
     resp
+}
+
+fn hook_json_response(
+    status: StatusCode,
+    payload: serde_json::Value,
+    outcome: &'static str,
+) -> Response {
+    let mut resp = (status, Json(payload)).into_response();
+    resp.headers_mut().insert(
+        "x-legioncode-hook-outcome",
+        HeaderValue::from_static(outcome),
+    );
+    resp
+}
+
+async fn dispatch_workflow_webhook(
+    state: &RuntimeHttpState,
+    method: &Method,
+    uri: &axum::http::Uri,
+    hook_id: &str,
+    token: &str,
+    headers: &HeaderMap,
+    body: &Bytes,
+) -> Response {
+    let policy_denied = state
+        .managed_policy
+        .as_ref()
+        .and_then(|p| p.limits.as_ref())
+        .is_some_and(|l| l.webhook_tasks == Some(false));
+    if policy_denied {
+        return hook_json_response(
+            StatusCode::FORBIDDEN,
+            json!({ "error": "blocked_by_policy" }),
+            "blocked_by_policy",
+        );
+    }
+    let Some(engine) = state.workflow_engine() else {
+        return hook_json_response(
+            StatusCode::NOT_FOUND,
+            json!({ "error": "hook_not_found" }),
+            "not_found",
+        );
+    };
+    let mut header_map = BTreeMap::new();
+    for (k, v) in headers {
+        if let Ok(val) = v.to_str() {
+            header_map.insert(k.as_str().to_ascii_lowercase(), val.to_owned());
+        }
+    }
+    let relay_delivery_id = headers
+        .get("x-legioncode-relay-delivery-id")
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| format!("relay:{s}"));
+    let input = HookDeliveryInput {
+        hook_id: hook_id.to_owned(),
+        token: token.to_owned(),
+        request: WebhookRequest {
+            method: method.as_str().to_owned(),
+            headers: header_map,
+            query: uri.query().unwrap_or_default().to_owned(),
+            body: String::from_utf8_lossy(body).into_owned(),
+        },
+        delivery_id: relay_delivery_id,
+    };
+    match engine.deliver(input).await {
+        Ok(Some(run_id)) => hook_json_response(
+            StatusCode::ACCEPTED,
+            json!({ "runId": run_id, "deliveryId": run_id }),
+            "accepted",
+        ),
+        Ok(None) => hook_json_response(
+            StatusCode::NOT_FOUND,
+            json!({ "error": "hook_not_found" }),
+            "not_found",
+        ),
+        Err(WorkflowError::Input { problem }) => hook_json_response(
+            StatusCode::BAD_REQUEST,
+            json!({ "error": "invalid_request", "problem": problem }),
+            "invalid",
+        ),
+        Err(_) => hook_json_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({ "error": "internal_error" }),
+            "error",
+        ),
+    }
 }

@@ -248,7 +248,7 @@ pub(crate) fn percent_decode_form(raw: &str) -> Result<String, ServerRuntimeErro
         .map_err(|_| ServerRuntimeError::BadRequest("invalid UTF-8 in form value".to_owned()))
 }
 
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+pub(crate) fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
     }

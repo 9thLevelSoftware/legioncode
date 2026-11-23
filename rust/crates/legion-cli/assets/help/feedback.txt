@@ -1,0 +1,19 @@
+DESCRIPTION
+  Record local feedback about LegionCode on this machine (`sent = 0`, never uploaded). Needs Agent feedback set to Automatic in Settings > Labs; to approve a report first, ask your agent in a thread.
+
+USAGE
+  legioncode feedback --kind <kind> --subject <subject> --expected <expected> --actual <actual> [--workaround <text>] [flags]
+  legioncode feedback list [flags]
+
+SUBCOMMANDS
+  list    List recent feedback reports saved on this machine, newest first.
+
+FLAGS
+  --kind choice         What went wrong (bug, confusing, missing_capability, wrong_docs, other).
+  --subject string      Tool name, command such as `legioncode thread send`, or `general`.
+  --expected string     What you expected.
+  --actual string       What happened instead.
+  --workaround string   What you did instead.
+  --base-dir string     Explicit LegionCode data directory.
+  --remote-url string   Target remote server URL.
+  --token string        Bearer token for --remote-url.

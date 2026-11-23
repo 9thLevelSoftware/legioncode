@@ -108,13 +108,15 @@ CREATE TABLE IF NOT EXISTS workflow_run_references (
 
 CREATE TABLE IF NOT EXISTS workflow_engine_journal (
   run_id TEXT NOT NULL,
-  step_name TEXT NOT NULL,
-  action_key TEXT NOT NULL,
-  outcome TEXT NOT NULL,
-  payload_json TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  entry_key TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  status TEXT NOT NULL,
+  payload_json TEXT,
+  wake_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  PRIMARY KEY (run_id, step_name, action_key)
+  PRIMARY KEY (run_id, entry_key)
 );
 ";
 
@@ -126,7 +128,7 @@ CREATE INDEX IF NOT EXISTS workflow_runs_unpruned ON workflow_runs (ended_at)
   WHERE ended_at IS NOT NULL AND engine_pruned_at IS NULL;
 CREATE INDEX IF NOT EXISTS workflow_waits_key ON workflow_waits (workflow, key);
 CREATE INDEX IF NOT EXISTS workflow_mail_address ON workflow_mail (address);
-CREATE INDEX IF NOT EXISTS workflow_engine_journal_run_idx ON workflow_engine_journal (run_id);
+CREATE INDEX IF NOT EXISTS workflow_engine_journal_seq ON workflow_engine_journal (run_id, seq);
 ";
 
 pub(crate) fn create_workflow_tables(conn: &Connection) -> rusqlite::Result<()> {

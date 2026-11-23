@@ -7,8 +7,11 @@ use serde_json::{Value, json};
 
 #[path = "other_streams_helpers.rs"]
 mod helpers;
+#[path = "other_streams_peers_wf.rs"]
+mod peers_wf;
 
 use self::helpers::{load_scheduled_tasks_json, stream_git_stacked_action};
+use self::peers_wf::{stream_peer_thread, stream_workflows_counts, stream_workflows_snapshot};
 use super::stream_ctx::StreamContext;
 use super::telemetry_vcs::{stream_resource_telemetry, stream_vcs_branch, stream_vcs_status};
 use crate::serve::ws_mcp::rpc_fail;
@@ -21,6 +24,9 @@ pub(super) fn handles_tag(tag: &str) -> bool {
             | "subscribeVcsBranch"
             | "subscribeResourceTelemetry"
             | "scheduledTasks.subscribe"
+            | "workflows.subscribe"
+            | "workflows.counts"
+            | "peerLinks.subscribeThread"
             | "subscribeProjectClones"
             | "subscribeWorktreeSetup"
             | "subscribePreviewEvents"
@@ -52,6 +58,9 @@ pub(super) async fn dispatch_stream(ctx: &StreamContext, tag: &str, payload: Val
         "subscribeVcsBranch" => stream_vcs_branch(ctx, payload).await,
         "subscribeResourceTelemetry" => stream_resource_telemetry(ctx).await,
         "scheduledTasks.subscribe" => stream_scheduled_tasks(ctx).await,
+        "workflows.subscribe" => stream_workflows_snapshot(ctx).await,
+        "workflows.counts" => stream_workflows_counts(ctx).await,
+        "peerLinks.subscribeThread" => stream_peer_thread(ctx, payload).await,
         "subscribeProjectClones" => stay_open_with(ctx, json!([])).await,
         "subscribeWorktreeSetup" => stay_open_with(ctx, Value::Null).await,
         "subscribePreviewEvents" => stay_open_quiet().await,

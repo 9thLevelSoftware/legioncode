@@ -155,14 +155,28 @@ fn antigravity_managed_release_and_skills_discovery() {
         "profile custom"
     );
 
-    // 1c379b63ba + 26b48d2da8 + ece4964b8e + 367f9d3759
+    // 1c379b63ba + 26b48d2da8 + ece4964b8e + 367f9d3759 + #40488 literal matching
     let ws = dir.path().join("ws");
     std::fs::create_dir_all(ws.join(".agents")).expect("mkdir");
     std::fs::create_dir_all(ws.join("extra-skills").join("alpha")).expect("mkdir");
+    std::fs::create_dir_all(ws.join("extra-skills").join("experimental-draft")).expect("mkdir");
+    std::fs::create_dir_all(ws.join("extra-skills").join("lint-draft")).expect("mkdir");
     std::fs::create_dir_all(ws.join("direct-skill")).expect("mkdir");
     std::fs::write(
         ws.join("extra-skills").join("alpha").join("SKILL.md"),
         "---\nname: alpha-skill\ndescription: Alpha helper\n---\n",
+    )
+    .expect("write");
+    std::fs::write(
+        ws.join("extra-skills")
+            .join("experimental-draft")
+            .join("SKILL.md"),
+        "---\nname: experimental-draft\n---\n",
+    )
+    .expect("write");
+    std::fs::write(
+        ws.join("extra-skills").join("lint-draft").join("SKILL.md"),
+        "---\nname: lint-draft\n---\n",
     )
     .expect("write");
     std::fs::write(
@@ -175,7 +189,7 @@ fn antigravity_managed_release_and_skills_discovery() {
         json!({
             "inherits": null,
             "entries": [
-                { "path": "../extra-skills", "include_only": ["a.*"], "exclude": null },
+                { "path": "../extra-skills", "include_only": ["alpha", "experimental-draft", "lint-.*"], "exclude": ["experimental-.*"] },
                 { "path": "../direct-skill/SKILL.md" }
             ]
         })
@@ -188,5 +202,8 @@ fn antigravity_managed_release_and_skills_discovery() {
     );
     let skills = discover_antigravity_skills(&ws, dir.path());
     let names: Vec<&str> = skills.iter().map(|s| s.name.as_str()).collect();
-    assert_eq!(names, vec!["alpha-skill", "direct-skill"]);
+    assert_eq!(
+        names,
+        vec!["alpha-skill", "direct-skill", "experimental-draft"]
+    );
 }

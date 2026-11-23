@@ -5,6 +5,7 @@
 //! HTTP/SSE, and xAI `grok` HTTP/SSE into [`NonAcpTurnUpdate`].
 
 pub mod claude_stream_json;
+pub mod claude_stream_usage;
 pub mod codex_app_server;
 mod codex_parser;
 pub mod cursor_and_pi;
@@ -22,14 +23,17 @@ pub use claude_stream_json::{
     build_claude_permission_control_response, build_claude_user_prompt_envelope,
     encode_claude_user_prompt_line, parse_claude_stream_json_line,
 };
+pub use claude_stream_usage::{ClaudeStreamUsage, optional_claude_token};
 pub use codex_app_server::{
     CodexAppServerCodec, CodexApprovalDecision, CodexThreadStartParams, CodexTurnStartParams,
     codex_decision_from_approval, encode_apply_patch_approval_response,
     encode_exec_command_approval_response, parse_codex_app_server_line,
 };
+pub use codex_parser::{CodexFileUpdateChange, CodexPatchChangeKind, codex_multi_file_patch};
 pub use cursor_and_pi::{
-    build_cursor_cancel_request, build_cursor_send_request, build_pi_abort_command,
-    build_pi_prompt_command, parse_cursor_sidecar_line, parse_pi_json_line,
+    PiTurnTokenUsage, build_cursor_cancel_request, build_cursor_send_request,
+    build_pi_abort_command, build_pi_prompt_command, parse_cursor_sidecar_line, parse_pi_json_line,
+    parse_pi_turn_token_usage, pi_token_usage_from_session_stats,
 };
 pub use grok_http::{
     DEFAULT_XAI_API_BASE, GrokChatMessage, build_grok_chat_completions_request,

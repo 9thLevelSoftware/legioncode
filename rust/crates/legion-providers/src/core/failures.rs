@@ -246,6 +246,28 @@ fn classify_limit_or_transport(
     lower: &str,
     code_norm: Option<String>,
 ) -> Option<ClassifiedProviderFailure> {
+    if lower.contains("codexappserverunresponsiveerror")
+        || lower.contains("codexappserverretirederror")
+        || lower.contains("was retired and accepts no new work")
+        || lower.contains("did not answer")
+            && lower.contains("codex app-server")
+            && lower.contains("within 2 minutes")
+    {
+        return Some(ClassifiedProviderFailure {
+            class: ProviderFailureClass::ProviderError,
+            code: code_norm.or_else(|| {
+                if lower.contains("retired") {
+                    Some("codex_app_server_retired".to_owned())
+                } else {
+                    Some("codex_app_server_unresponsive".to_owned())
+                }
+            }),
+            message: redact_sensitive_text(base_raw),
+            retryable: false,
+            retry_budget_ms: None,
+        });
+    }
+
     if input.http_status == Some(429)
         || lower.contains("rate limit")
         || lower.contains("too many requests")

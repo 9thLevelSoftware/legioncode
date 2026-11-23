@@ -84,6 +84,9 @@ pub fn is_antigravity_background_wait_tool(tool_name: &str) -> bool {
         && ACTIVE_BRAND.canonical_mcp_tool_suffix(trimmed) == "background_wait"
 }
 
+/// Bounds how long a settled Antigravity turn can stay held by silent background commands (`30 minutes`, `#40858`).
+pub const ANTIGRAVITY_POST_SETTLE_COMMAND_HOLD_MILLIS: i64 = 30 * 60 * 1_000;
+
 /// Returns `true` when an Antigravity tool call continues running after its prompt returns
 /// (scheduled wakes or non-daemon shell commands) (`505f6d6cf4`, `6edb53026b`).
 #[must_use]
@@ -97,6 +100,24 @@ pub fn antigravity_tool_outlives_prompt(
     {
         return true;
     }
+    antigravity_command_outlives_prompt(kind, title, raw_input)
+}
+
+/// Returns `true` for non-daemon shell commands awaited across prompt settle (`#40858`).
+///
+/// Unlike scheduled wakes, commands report progress while running and are subject to the
+/// 30-minute silent post-settle hold expiry.
+#[must_use]
+pub fn antigravity_command_outlives_prompt(
+    kind: &ToolCallKind,
+    title: Option<&str>,
+    raw_input: Option<&Value>,
+) -> bool {
+    if let Some(t) = title
+        && SCHEDULE_TITLES.contains(&t)
+    {
+        return false;
+    }
     if *kind != ToolCallKind::Execute {
         return false;
     }
@@ -106,6 +127,74 @@ pub fn antigravity_tool_outlives_prompt(
         .and_then(Value::as_bool)
         == Some(true);
     !is_daemon
+}
+
+/// Prompt lifecycle phase evaluated when checking background command holds (`#40858`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AntigravityTurnPhase {
+    /// Model prompt has not settled yet.
+    ActivePrompt,
+    /// Prompt settled while non-daemon background commands remain alive.
+    SettledPrompt,
+    /// Turn has already finalized.
+    Finalized,
+}
+
+/// Inputs evaluated for the silent post-settle background command hold timer (`#40858`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PostSettleCommandHoldState {
+    /// Current lifecycle phase of the turn.
+    pub phase: AntigravityTurnPhase,
+    /// Start of the current quiet window (epoch ms).
+    pub quiet_since_ms: i64,
+    /// Timestamp of the last observed tool or model activity (epoch ms).
+    pub last_progress_at_ms: i64,
+    /// Current wall-clock timestamp (epoch ms).
+    pub now_ms: i64,
+    /// Maximum silent hold duration before finalizing (ms).
+    pub hold_timeout_ms: i64,
+    /// Whether any non-daemon background command is still holding the turn.
+    pub has_running_command: bool,
+    /// Whether non-command holds (questions, schedules, subagents) are active.
+    pub has_other_deferred_work: bool,
+}
+
+/// Decision for the silent post-settle background command hold timer (`#40858`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PostSettleCommandHoldAction {
+    /// Prompt is not settled or turn is already finalized; stop the expiry timer.
+    StopTimer,
+    /// Remaining milliseconds to sleep before re-checking silence.
+    SleepRemaining { remaining_ms: i64 },
+    /// Other background holds (questions, schedules, subagents) are active; reset `quiet_since_ms = now_ms`.
+    ResetSilence { new_quiet_since_ms: i64 },
+    /// Silence threshold exceeded with only running commands holding the turn; finalize now.
+    FinalizeTurn,
+}
+
+/// Evaluates whether a settled turn held only by background commands has gone silent past
+/// `hold_timeout_ms` (`#40858`).
+#[must_use]
+pub fn evaluate_post_settle_command_hold(
+    state: &PostSettleCommandHoldState,
+) -> PostSettleCommandHoldAction {
+    if state.phase != AntigravityTurnPhase::SettledPrompt {
+        return PostSettleCommandHoldAction::StopTimer;
+    }
+    let effective_quiet = state.quiet_since_ms.max(state.last_progress_at_ms);
+    let remaining_ms = effective_quiet
+        .saturating_add(state.hold_timeout_ms)
+        .saturating_sub(state.now_ms);
+    if remaining_ms > 0 {
+        return PostSettleCommandHoldAction::SleepRemaining { remaining_ms };
+    }
+    if state.has_running_command && !state.has_other_deferred_work {
+        PostSettleCommandHoldAction::FinalizeTurn
+    } else {
+        PostSettleCommandHoldAction::ResetSilence {
+            new_quiet_since_ms: state.now_ms,
+        }
+    }
 }
 
 /// Returns `true` when a worktree-handoff thread settling to idle must finalize its

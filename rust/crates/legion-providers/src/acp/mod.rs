@@ -39,8 +39,14 @@ pub use render::{
     extract_mcp_tool_call_identity, map_tool_call_presentation,
 };
 pub use session_sync::{
-    ACP_LOADED_COMMANDS_WAIT_MS, ACP_MCP_CALL_LAUNCHER_CMD, AcpCompactionGate,
-    AcpUsageUpdateEmission, acp_session_update_applies_live_background_mutations,
-    evaluate_acp_compaction_gate, format_acp_usage_update_emission, resolve_acp_mcp_call_arguments,
+    ACP_LOADED_COMMANDS_WAIT_MS, ACP_MCP_CALL_LAUNCHER_CMD, ACP_STARTUP_HANDSHAKE_TIMEOUT_MS,
+    AcpAgentModeChange, AcpCompactionGate, AcpUsageUpdateEmission,
+    acp_interrupt_cause_should_settle_turn, acp_late_session_update_thread_status,
+    acp_session_update_applies_live_background_mutations, acp_startup_timeout_error_detail,
+    detect_acp_agent_mode_changes, evaluate_acp_compaction_gate, format_acp_usage_update_emission,
+    resolve_acp_mcp_call_arguments,
 };
-pub use updates::{AvailableCommand, SessionUpdateKind, SessionUpdateNotification};
+pub use updates::{
+    AvailableCommand, SessionUpdateKind, SessionUpdateNotification, session_update_is_replay,
+    sync_mode_into_config_options,
+};

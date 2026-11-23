@@ -3,6 +3,7 @@
 use legion_contracts::pull_requests::{PullRequestChecksState, PullRequestMergeability};
 use serde_json::Value;
 
+pub use crate::forges::issue_links::parse_gitlab_mention_reference;
 use crate::forges::{
     CliCommandSpec, ForgeError, NormalizedPullRequest, json_str, json_u64, parse_standard_pr_state,
     validate_hostname,
@@ -223,4 +224,124 @@ pub fn normalize_gitlab_mr_json(json: &Value) -> Result<NormalizedPullRequest, F
         mergeability,
         checks_state,
     })
+}
+
+/// Normalized `GitLab` merge request preserving fork source repository metadata and any
+/// unresolved numeric `source_project_id` needing follow-up resolution (`#40894`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GitLabForkMergeRequest {
+    /// Core normalized PR/MR fields.
+    pub pull_request: NormalizedPullRequest,
+    /// Whether source and target projects differ (`source_project_id != target_project_id`).
+    pub is_cross_repository: Option<bool>,
+    /// Full `<namespace>/<repo>` of the fork source project when resolved.
+    pub head_repository_name_with_owner: Option<String>,
+    /// Root namespace owner login derived from source path.
+    pub head_repository_owner_login: Option<String>,
+    /// Numeric `source_project_id` retained when `is_cross_repository` is `true` without path.
+    pub unresolved_source_project_id: Option<u64>,
+}
+
+/// Parses a `GitLab` merge request payload including fork source project resolution state (`#40894`).
+///
+/// # Errors
+///
+/// Returns [`ForgeError::MalformedResponse`] if required MR fields are absent.
+pub fn parse_gitlab_mr_with_fork_source(
+    json: &Value,
+) -> Result<GitLabForkMergeRequest, ForgeError> {
+    let pull_request = normalize_gitlab_mr_json(json)?;
+    let source_id = json_u64(json, "source_project_id");
+    let target_id = json_u64(json, "target_project_id");
+    let source_path = json
+        .get("source")
+        .and_then(|s| json_str(s, "path_with_namespace").or_else(|| json_str(s, "path")))
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned);
+    let is_cross_repository = match (source_id, target_id) {
+        (Some(src), Some(tgt)) => Some(src != tgt),
+        _ => None,
+    };
+    let head_repository_owner_login = source_path
+        .as_deref()
+        .and_then(|p| p.split('/').next())
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned);
+    let unresolved_source_project_id = if is_cross_repository == Some(true) && source_path.is_none()
+    {
+        source_id
+    } else {
+        None
+    };
+
+    Ok(GitLabForkMergeRequest {
+        pull_request,
+        is_cross_repository,
+        head_repository_name_with_owner: source_path,
+        head_repository_owner_login,
+        unresolved_source_project_id,
+    })
+}
+
+/// Fills in a fork MR's `head_repository_*` fields from `GET /projects/:id` (`path_with_namespace`)
+/// and clears `unresolved_source_project_id` (`#40894`).
+#[must_use]
+pub fn with_source_project_path(
+    mut record: GitLabForkMergeRequest,
+    source_project_path: Option<&str>,
+) -> GitLabForkMergeRequest {
+    record.unresolved_source_project_id = None;
+    let clean = source_project_path
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned);
+    record.head_repository_owner_login = clean
+        .as_deref()
+        .and_then(|p| p.split('/').next())
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned);
+    record.head_repository_name_with_owner = clean;
+    record
+}
+
+/// Keeps the first head selector per branch so fork lookups (`owner:branch` ordered first)
+/// trigger fork source-project resolution on a single full-page probe (`#40894`).
+#[must_use]
+pub fn gitlab_head_branch_probe_selectors(head_selectors: &[&str]) -> Vec<String> {
+    let mut seen_branches = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for &selector in head_selectors {
+        let trimmed = selector.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let branch = trimmed
+            .split_once(':')
+            .map_or(trimmed, |(_, branch)| branch);
+        if seen_branches.insert(branch.to_owned()) {
+            out.push(trimmed.to_owned());
+        }
+    }
+    out
+}
+
+/// Detects `GitLab < 16.1` schema errors lacking `Note.awardEmoji` so issue details degrade
+/// gracefully without reaction badges (`#39621`).
+#[must_use]
+pub fn is_gitlab_missing_note_award_emoji_error(error_text: &str) -> bool {
+    let lower = error_text.to_ascii_lowercase();
+    lower.contains("awardemoji") && (lower.contains("doesn't exist") || lower.contains("field"))
+}
+
+/// Prefixes `Draft: ` on `GitLab` MR titles when not already marked `[draft]`, `(draft)`, or `draft:` (`#39817`).
+#[must_use]
+pub fn format_gitlab_draft_mr_title(title: &str) -> String {
+    let trimmed = title.trim_start();
+    let lower = trimmed.to_ascii_lowercase();
+    if lower.starts_with("[draft]") || lower.starts_with("(draft)") || lower.starts_with("draft:") {
+        title.to_owned()
+    } else {
+        format!("Draft: {title}")
+    }
 }

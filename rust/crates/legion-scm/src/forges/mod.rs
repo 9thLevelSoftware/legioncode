@@ -9,11 +9,15 @@ pub mod azure_devops_auth;
 pub mod bitbucket;
 pub mod cursor_origin;
 pub mod forgejo;
+pub mod forgejo_template;
 pub mod gitcafe;
 pub mod github;
+pub mod github_checks;
 pub mod github_graphql;
 pub mod gitlab;
+pub mod issue_links;
 pub mod linear;
+pub mod linear_accounts;
 
 use http::Method;
 use legion_contracts::pull_requests::{

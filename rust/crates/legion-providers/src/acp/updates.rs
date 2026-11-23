@@ -260,3 +260,39 @@ fn serialize_tagged_payload(tag: &str, payload: &ToolCallUpdatePayload) -> Value
     }
     val
 }
+
+/// Returns `true` when an ACP `session/update` envelope marks historical replay via
+/// `_meta.isReplay == true` (`#40328`).
+#[must_use]
+pub fn session_update_is_replay(raw_notification: &Value) -> bool {
+    raw_notification
+        .get("_meta")
+        .and_then(Value::as_object)
+        .and_then(|meta| meta.get("isReplay"))
+        .and_then(Value::as_bool)
+        == Some(true)
+}
+
+/// Synchronizes an ACP `current_mode_update` (`mode_id`) into any `select` config option
+/// with `category == "mode"` so subsequent mode pickers do not retain stale mode values (`#40818`).
+///
+/// Returns `true` if at least one mode config option was updated.
+pub fn sync_mode_into_config_options(config_options: &mut [Value], mode_id: &str) -> bool {
+    let mut changed = false;
+    for option in config_options {
+        let Some(obj) = option.as_object_mut() else {
+            continue;
+        };
+        let is_mode_select = obj.get("category").and_then(Value::as_str) == Some("mode")
+            && obj.get("type").and_then(Value::as_str) == Some("select");
+        if !is_mode_select {
+            continue;
+        }
+        let current = obj.get("currentValue").and_then(Value::as_str);
+        if current != Some(mode_id) {
+            obj.insert("currentValue".to_owned(), Value::String(mode_id.to_owned()));
+            changed = true;
+        }
+    }
+    changed
+}

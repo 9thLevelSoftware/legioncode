@@ -7,11 +7,21 @@ use regex::Regex;
 use serde_json::Value;
 
 use crate::core::discovery::parse_git_remote_url;
+pub use crate::forges::github_checks::{
+    CHECKS_ALREADY_PASSED_WATCH_NEXT, GitHubWorkflowRunRef, RawGitHubCheckContext,
+    already_ended_watch_next, normalize_github_check_contexts, resolve_watch_pull_request_next,
+};
 pub use crate::forges::github_graphql::{
     GITHUB_GRAPHQL_ALIAS_BATCH_SIZE, GitHubRateLimitSignal, PrLookupItem, ReviewCommentBatchTarget,
     build_aliased_pr_summary_batch, build_github_graphql_request,
     build_review_thread_comments_batch, build_review_threads_page_request, check_github_quota,
     classify_github_response, normalize_github_pr_json, parse_aliased_pr_summary_batch,
+};
+pub use crate::forges::issue_links::{
+    GITHUB_ISSUE_LINK_METADATA_QUERY, GitHubIssueLinkMetadata, IssueEventReference,
+    IssueReferenceKind, RepositoryIssueBinding, RepositoryIssueBindingCache,
+    build_github_issue_link_metadata_request, parse_github_cross_referenced_source,
+    parse_github_issue_link_metadata, resolve_git_host_issue_bindings,
 };
 use crate::forges::{CliCommandSpec, ForgeError, HttpRequestSpec, validate_hostname};
 

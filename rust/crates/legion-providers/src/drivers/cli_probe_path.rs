@@ -155,3 +155,152 @@ pub fn summarize_antigravity_probe(
         ),
     }
 }
+
+fn win_parent_dir(path_str: &str) -> Option<&str> {
+    let no_trailing = path_str.trim_end_matches(['\\', '/']);
+    let idx = no_trailing.rfind(['\\', '/'])?;
+    Some(&no_trailing[..idx])
+}
+
+/// Finds Git for Windows' `bash.exe` beside `git.exe` (never WSL's `System32\bash.exe`) (`#40418`).
+#[must_use]
+pub fn git_for_windows_bash(
+    git_executable: &str,
+    mut is_file: impl FnMut(&str) -> bool,
+) -> Option<String> {
+    let trimmed = git_executable.trim();
+    let basename = trimmed.rsplit(['\\', '/']).next()?;
+    if !basename.eq_ignore_ascii_case("git.exe") {
+        return None;
+    }
+    let sep = if trimmed.contains('\\') { '\\' } else { '/' };
+    let bin_or_cmd = win_parent_dir(trimmed)?;
+    let launcher_root = win_parent_dir(bin_or_cmd)?;
+    let grand_root = win_parent_dir(launcher_root);
+    let mut roots = vec![launcher_root];
+    if let Some(outer) = grand_root {
+        roots.push(outer);
+    }
+    for root in roots {
+        let candidate = format!("{root}{sep}bin{sep}bash.exe");
+        if is_file(&candidate) {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+/// Shell-aware invocation built for ACP `terminal/create` requests (`#40418`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AcpTerminalInvocation {
+    /// Executable program to spawn (Git Bash on Windows when `posix_shell` applies).
+    pub program: String,
+    /// Arguments passed directly without ambient shell wrapper when `use_default_shell` is `false`.
+    pub args: Vec<String>,
+    /// True when generic host shell wrapping should be enabled.
+    pub use_default_shell: bool,
+}
+
+/// Builds an ACP terminal spawn plan running shell-source commands under Git Bash on Windows (`#40418`).
+#[must_use]
+pub fn build_acp_terminal_invocation(
+    command: &str,
+    args: &[String],
+    shell_commands: bool,
+    posix_shell: Option<&str>,
+) -> AcpTerminalInvocation {
+    let is_shell_source = shell_commands && args.is_empty();
+    if is_shell_source && let Some(shell) = posix_shell {
+        return AcpTerminalInvocation {
+            program: shell.to_owned(),
+            args: vec![
+                "-c".to_owned(),
+                format!("chcp.com 65001 >/dev/null 2>&1\n{command}"),
+            ],
+            use_default_shell: false,
+        };
+    }
+    AcpTerminalInvocation {
+        program: command.to_owned(),
+        args: args.to_vec(),
+        use_default_shell: is_shell_source,
+    }
+}
+
+/// Merges `PATH` strings with deduplication while preserving order and platform separator (`#40693`).
+#[must_use]
+pub fn merge_path_entries(
+    primary: Option<&str>,
+    secondary: Option<&str>,
+    is_windows: bool,
+) -> String {
+    let sep = if is_windows { ';' } else { ':' };
+    let mut seen = std::collections::HashSet::new();
+    let mut ordered = Vec::new();
+    for raw in [primary, secondary].into_iter().flatten() {
+        for segment in raw.split(sep) {
+            let trimmed = segment.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let key = if is_windows {
+                trimmed.to_ascii_lowercase()
+            } else {
+                trimmed.to_owned()
+            };
+            if seen.insert(key) {
+                ordered.push(trimmed.to_owned());
+            }
+        }
+    }
+    ordered.join(&sep.to_string())
+}
+
+/// Reads case-variant `PATH`/`Path`/`path` from an explicit environment lookup (`#40693`).
+#[must_use]
+pub fn resolve_host_path_value(env: &[(String, String)]) -> Option<String> {
+    for target in ["PATH", "Path", "path"] {
+        if let Some((_, val)) = env.iter().find(|(k, _)| k == target) {
+            return Some(val.clone());
+        }
+    }
+    None
+}
+
+/// Compares previous and newly refreshed host `PATH` strings and returns whether instances
+/// missing their CLI should rebuild on the updated `PATH` (`#40693`).
+#[must_use]
+pub fn did_host_path_change(previous_path: Option<&str>, current_path: Option<&str>) -> bool {
+    previous_path != current_path
+}
+
+/// Returns candidate POSIX login shells to probe when refreshing `PATH` after launch (`#40693`).
+#[must_use]
+pub fn list_login_shell_candidates(configured_shell: Option<&str>) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    let defaults = ["/bin/zsh", "/bin/bash", "/bin/sh"];
+    for cand in configured_shell
+        .into_iter()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .chain(defaults)
+    {
+        if seen.insert(cand.to_owned()) {
+            out.push(cand.to_owned());
+        }
+    }
+    out
+}
+
+/// Selects only provider instance IDs that are currently missing their CLI executable so
+/// installed healthy instances preserve live sessions on `PATH` refresh (`#40693`).
+#[must_use]
+pub fn instances_needing_rebuild_after_path_change<'a>(
+    instances: &[(&'a str, bool)],
+) -> Vec<&'a str> {
+    instances
+        .iter()
+        .filter_map(|&(id, installed)| (!installed).then_some(id))
+        .collect()
+}

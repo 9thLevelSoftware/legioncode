@@ -118,3 +118,49 @@ pub(crate) fn capabilities_for_reasoning(supports_reasoning: bool) -> Option<Mod
         option_descriptors: Some(vec![reasoning_effort_descriptor()]),
     })
 }
+
+/// Candidate snapshot entry evaluated by [`select_text_generation_fallback`] (`#40699`).
+#[derive(Debug, Clone)]
+pub struct TextGenerationFallbackCandidate<'a> {
+    /// Target provider instance identifier.
+    pub instance_id: &'a str,
+    /// Underlying provider driver slug.
+    pub driver: &'a str,
+    /// Candidate model slug.
+    pub model_slug: &'a str,
+    /// Explicit per-model text generation capability flag (`Some(false)` excludes it).
+    pub supports_text_generation: Option<bool>,
+    /// Whether this instance+model is available, installed, healthy, and within quota.
+    pub usable: bool,
+}
+
+/// Selects a fallback `(instance_id, model_slug)` when the primary text-generation selection
+/// cannot run (`#40699`).
+///
+/// Mirrors upstream `TextGeneration.ts`: prefers qualified models on OTHER instances first,
+/// only falling back to other usable models on the rejected instance if none exists, and never
+/// picks any model whose `supports_text_generation == Some(false)`.
+#[must_use]
+pub fn select_text_generation_fallback<'a>(
+    candidates: &[TextGenerationFallbackCandidate<'a>],
+    rejected_instance_id: &str,
+    rejected_model_slug: &str,
+) -> Option<(&'a str, &'a str)> {
+    let other_instance = candidates.iter().find(|cand| {
+        cand.usable
+            && cand.supports_text_generation != Some(false)
+            && cand.instance_id != rejected_instance_id
+    });
+    if let Some(found) = other_instance {
+        return Some((found.instance_id, found.model_slug));
+    }
+    candidates
+        .iter()
+        .find(|cand| {
+            cand.usable
+                && cand.supports_text_generation != Some(false)
+                && cand.instance_id == rejected_instance_id
+                && cand.model_slug != rejected_model_slug
+        })
+        .map(|found| (found.instance_id, found.model_slug))
+}

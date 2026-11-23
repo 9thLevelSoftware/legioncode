@@ -245,3 +245,75 @@ pub const fn antigravity_permission_disposition(
         (_, other) => other,
     }
 }
+
+/// Applies Antigravity permission safety rules including built-in `LegionCode`/`T3` MCP tool
+/// pre-approval in `Auto` and `AutoAcceptEdits` (`#39822`).
+#[must_use]
+pub fn antigravity_permission_disposition_for_tool(
+    mode: RuntimeMode,
+    approval_policy: Option<&str>,
+    base: AntigravityPermissionDisposition,
+    title: Option<&str>,
+    raw_input: Option<&serde_json::Value>,
+) -> AntigravityPermissionDisposition {
+    if base == AntigravityPermissionDisposition::Deny {
+        return AntigravityPermissionDisposition::Deny;
+    }
+    if matches!(mode, RuntimeMode::Auto | RuntimeMode::AutoAcceptEdits)
+        && matches!(approval_policy, None | Some("never"))
+        && super::mcp_tools::is_antigravity_legion_mcp_request(title, raw_input)
+    {
+        return AntigravityPermissionDisposition::Approve;
+    }
+    antigravity_permission_disposition(mode, base)
+}
+
+/// Default Antigravity supported modes before any session advertises native `Auto` (`#40154`).
+pub const ANTIGRAVITY_DEFAULT_RUNTIME_MODES: &[RuntimeMode] = &[
+    RuntimeMode::ApprovalRequired,
+    RuntimeMode::AutoAcceptEdits,
+    RuntimeMode::FullAccess,
+];
+
+/// Saved runtime modes per `auth_method` so `Auto` stays in the picker after restart (`#40154`).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RememberedAntigravityRuntimeModes {
+    /// Auth method identifier that observed these modes (`"oauth-personal"`, etc.).
+    pub auth_method: String,
+    /// Ordered supported runtime modes advertised by the last live session.
+    pub modes: Vec<RuntimeMode>,
+}
+
+/// Resolves initial runtime modes for `auth_method`, restoring remembered modes only when
+/// `auth_method` matches (`#40154`).
+#[must_use]
+pub fn resolve_initial_antigravity_runtime_modes(
+    auth_method: &str,
+    remembered: Option<&RememberedAntigravityRuntimeModes>,
+) -> Vec<RuntimeMode> {
+    if let Some(saved) = remembered
+        && saved.auth_method == auth_method
+        && !saved.modes.is_empty()
+    {
+        return saved.modes.clone();
+    }
+    ANTIGRAVITY_DEFAULT_RUNTIME_MODES.to_vec()
+}
+
+/// Parses remembered runtime modes JSON (`#40154`).
+#[must_use]
+pub fn parse_remembered_antigravity_runtime_modes(
+    raw_json: &str,
+) -> Option<RememberedAntigravityRuntimeModes> {
+    serde_json::from_str(raw_json).ok()
+}
+
+/// Returns `true` when `next` modes differ from `previous` and should be persisted (`#40154`).
+#[must_use]
+pub fn should_persist_remembered_runtime_modes(
+    previous: Option<&[RuntimeMode]>,
+    next: &[RuntimeMode],
+) -> bool {
+    previous != Some(next)
+}

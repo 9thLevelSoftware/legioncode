@@ -10,7 +10,8 @@ use legion_protocol::provider_env::NdjsonLineCodec;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use super::{NonAcpParseError, NonAcpTurnUpdate, str_field, u64_field};
+use super::claude_stream_usage::ClaudeStreamUsage;
+use super::{NonAcpParseError, NonAcpTurnUpdate, str_field};
 
 /// Content block serialized inside Claude `stream-json` user or assistant messages.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -238,7 +239,9 @@ fn parse_claude_assistant(val: &Value) -> Vec<NonAcpTurnUpdate> {
             }
         }
     }
-    append_claude_usage(msg.and_then(|m| m.get("usage")), &mut out);
+    if str_field(msg, "model") != Some("<synthetic>") {
+        append_claude_usage(msg.and_then(|m| m.get("usage")), &mut out);
+    }
     out
 }
 
@@ -268,21 +271,37 @@ fn parse_claude_user(val: &Value) -> Vec<NonAcpTurnUpdate> {
 
 fn parse_claude_stream_event(val: &Value) -> Vec<NonAcpTurnUpdate> {
     let event = val.get("event");
-    if str_field(event, "type") != Some("content_block_delta") {
-        return Vec::new();
-    }
-    let delta = event.and_then(|e| e.get("delta"));
-    match str_field(delta, "type") {
-        Some("text_delta") => str_field(delta, "text")
-            .filter(|t| !t.is_empty())
-            .map(|t| NonAcpTurnUpdate::AssistantTextDelta { text: t.to_owned() })
-            .into_iter()
-            .collect(),
-        Some("thinking_delta") => str_field(delta, "thinking")
-            .filter(|t| !t.is_empty())
-            .map(|t| NonAcpTurnUpdate::ReasoningDelta { text: t.to_owned() })
-            .into_iter()
-            .collect(),
+    match str_field(event, "type") {
+        Some("content_block_delta") => {
+            let delta = event.and_then(|e| e.get("delta"));
+            match str_field(delta, "type") {
+                Some("text_delta") => str_field(delta, "text")
+                    .filter(|t| !t.is_empty())
+                    .map(|t| NonAcpTurnUpdate::AssistantTextDelta { text: t.to_owned() })
+                    .into_iter()
+                    .collect(),
+                Some("thinking_delta") => str_field(delta, "thinking")
+                    .filter(|t| !t.is_empty())
+                    .map(|t| NonAcpTurnUpdate::ReasoningDelta { text: t.to_owned() })
+                    .into_iter()
+                    .collect(),
+                _ => Vec::new(),
+            }
+        }
+        Some("message_start") => {
+            let msg = event.and_then(|e| e.get("message"));
+            if str_field(msg, "model") == Some("<synthetic>") {
+                return Vec::new();
+            }
+            let mut out = Vec::new();
+            append_claude_usage(msg.and_then(|m| m.get("usage")), &mut out);
+            out
+        }
+        Some("message_delta") => {
+            let mut out = Vec::new();
+            append_claude_usage(event.and_then(|e| e.get("usage")), &mut out);
+            out
+        }
         _ => Vec::new(),
     }
 }
@@ -333,10 +352,9 @@ fn parse_claude_result(val: &Value) -> Vec<NonAcpTurnUpdate> {
 }
 
 fn append_claude_usage(usage: Option<&Value>, out: &mut Vec<NonAcpTurnUpdate>) {
-    let input = u64_field(usage, "input_tokens").unwrap_or(0)
-        + u64_field(usage, "cache_read_input_tokens").unwrap_or(0)
-        + u64_field(usage, "cache_creation_input_tokens").unwrap_or(0);
-    let output = u64_field(usage, "output_tokens").unwrap_or(0);
+    let parsed = ClaudeStreamUsage::from_message_start(usage);
+    let input = parsed.total_input_tokens();
+    let output = parsed.output_tokens;
     if input > 0 || output > 0 {
         out.push(NonAcpTurnUpdate::UsageReported {
             input_tokens: input,

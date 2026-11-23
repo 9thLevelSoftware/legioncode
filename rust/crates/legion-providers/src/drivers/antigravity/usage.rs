@@ -1,8 +1,10 @@
 //! Antigravity ACP usage math, model-id/rate-model mapping, catalog labeling, and SQLite DB filtering.
 
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use regex::Regex;
+use sha2::{Digest, Sha256};
 
 use crate::core::ServerModelEntry;
 
@@ -151,4 +153,30 @@ where
     table_names
         .into_iter()
         .any(|name| name == "gen_metadata" || name == "steps")
+}
+
+/// Derives all `LegionCode`-managed Antigravity usage conversation directories across EVERY
+/// registered instance (`instance_id`), including default unconfigured instances (`#41155`).
+#[must_use]
+pub fn antigravity_usage_profile_dirs<'a, I>(state_dir: &Path, instance_ids: I) -> Vec<PathBuf>
+where
+    I: IntoIterator<Item = &'a str>,
+{
+    let mut dirs = Vec::new();
+    for instance_id in instance_ids {
+        let trimmed = instance_id.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let digest_hex = hex::encode(Sha256::digest(trimmed.as_bytes()));
+        dirs.push(
+            state_dir
+                .join("providers")
+                .join("antigravity")
+                .join(digest_hex)
+                .join("antigravity-acp")
+                .join("conversations"),
+        );
+    }
+    dirs
 }

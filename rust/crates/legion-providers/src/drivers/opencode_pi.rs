@@ -259,3 +259,46 @@ pub fn pi_async_run_should_settle(
     }
     true
 }
+
+/// Result after sending an `OpenCode` `session.command` when checking whether the command triggered
+/// an actual model execution or finished locally without prompting (`#27378`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpenCodeCommandCompletionStatus {
+    /// Leave execution open because session is busy or history shows a post-boundary message.
+    WaitForExecutionEvents,
+    /// Complete the turn immediately because no execution started.
+    CompleteImmediatelyCompleted,
+    /// Complete the turn as interrupted because caller interrupted before idle settle.
+    CompleteImmediatelyInterrupted,
+}
+
+/// Observed session execution activity right after `OpenCode` `session.command` returns (`#27378`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpenCodeSessionActivity {
+    /// Session is idle, absent from active turn tracking, and has no post-boundary activity messages.
+    IdleNoActivity,
+    /// Session status is still `busy` or `retry`.
+    Busy,
+    /// Session remains registered in active turn tracking.
+    TrackedInActiveMap,
+    /// Session message history contains messages created after the pre-command boundary.
+    PostBoundaryMessageObserved,
+}
+
+/// Evaluates whether an `OpenCode` slash command that never prompted the model should immediately
+/// finalize its turn (`#27378`).
+#[must_use]
+pub const fn opencode_should_complete_command_immediately(
+    is_still_active_turn: bool,
+    activity: OpenCodeSessionActivity,
+    turn_interrupted: bool,
+) -> OpenCodeCommandCompletionStatus {
+    if !is_still_active_turn || !matches!(activity, OpenCodeSessionActivity::IdleNoActivity) {
+        return OpenCodeCommandCompletionStatus::WaitForExecutionEvents;
+    }
+    if turn_interrupted {
+        OpenCodeCommandCompletionStatus::CompleteImmediatelyInterrupted
+    } else {
+        OpenCodeCommandCompletionStatus::CompleteImmediatelyCompleted
+    }
+}

@@ -4,7 +4,8 @@
 use std::collections::{BTreeMap, HashSet};
 
 use legion_contracts::brand::{ACTIVE_BRAND, BrandConfig};
-use legion_contracts::orchestration::ProviderFailureClass;
+use legion_contracts::orchestration::{ProviderApprovalDecision, ProviderFailureClass};
+use legion_contracts::policy::RuntimeMode;
 use legion_protocol::provider_env::SanitizedEnv;
 use serde_json::Value;
 
@@ -234,4 +235,41 @@ pub fn codex_should_recover_rejected_history(
     } else {
         CodexHistoryRecoveryDecision::RecoverInFreshSession
     }
+}
+
+/// Returns `true` when Codex in `FullAccess` mode (without explicit approval/sandbox overrides
+/// or managed-network approval asks) should accept command execution automatically (`#40773`).
+#[must_use]
+pub fn codex_should_auto_accept_command_approval(
+    runtime_mode: RuntimeMode,
+    has_approval_policy_override: bool,
+    has_sandbox_policy_override: bool,
+    has_network_approval_context: bool,
+    proposed_network_policy_amendments: usize,
+) -> bool {
+    runtime_mode == RuntimeMode::FullAccess
+        && !has_approval_policy_override
+        && !has_sandbox_policy_override
+        && !has_network_approval_context
+        && proposed_network_policy_amendments == 0
+}
+
+/// Resolves an automatic `Accept` decision for full-access dangerous command prompts
+/// while leaving managed-network allowlist prompts interactive (`#40773`).
+#[must_use]
+pub fn codex_auto_command_approval_decision(
+    runtime_mode: RuntimeMode,
+    has_approval_policy_override: bool,
+    has_sandbox_policy_override: bool,
+    has_network_approval_context: bool,
+    proposed_network_policy_amendments: usize,
+) -> Option<ProviderApprovalDecision> {
+    codex_should_auto_accept_command_approval(
+        runtime_mode,
+        has_approval_policy_override,
+        has_sandbox_policy_override,
+        has_network_approval_context,
+        proposed_network_policy_amendments,
+    )
+    .then_some(ProviderApprovalDecision::Accept)
 }

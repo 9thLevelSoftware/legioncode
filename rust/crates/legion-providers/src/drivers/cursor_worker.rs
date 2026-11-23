@@ -359,3 +359,23 @@ impl CursorRuntimeInstructionTracker {
         self.delivered_by_agent.remove(agent_id);
     }
 }
+
+/// Returns `true` when a Cursor turn failed or was cancelled before saving any checkpoint
+/// (meaning Cursor dropped the prompt from native conversation history and inline handoff should
+/// preserve it as undelivered) (`#40670`).
+#[must_use]
+pub fn cursor_turn_prompt_dropped(
+    status: &str,
+    compacted: bool,
+    has_prompt: bool,
+    run_checkpointed: bool,
+) -> bool {
+    (status == "failed" || status == "cancelled") && !compacted && has_prompt && !run_checkpointed
+}
+
+/// Returns `true` when a recorded provider turn actually delivered its prompt to native history
+/// (`#40670`).
+#[must_use]
+pub const fn is_delivered_provider_turn(prompt_dropped: bool) -> bool {
+    !prompt_dropped
+}

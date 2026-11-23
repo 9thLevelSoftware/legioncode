@@ -8,6 +8,12 @@ use regex::Regex;
 use serde_json::Value;
 
 use crate::core::pr_helpers::{CheckEntry, rollup_check_statuses};
+pub use crate::forges::forgejo_template::{
+    FORGEJO_TEMPLATE_MAX_BYTES, FORGEJO_TEMPLATE_TRUNCATION_MARKER, FORGEJO_TREE_LIST_MAX_BYTES,
+    bound_forgejo_pr_template, detect_forgejo_pr_template, forgejo_template_paths,
+    parse_forgejo_ls_tree_templates,
+};
+pub use crate::forges::issue_links::{ForgejoIssueLink, is_forgejo_host, parse_forgejo_issue_url};
 use crate::forges::{
     CliCommandSpec, ForgeError, HttpRequestSpec, NormalizedPullRequest, json_str, json_u64,
     parse_standard_pr_state, validate_hostname,

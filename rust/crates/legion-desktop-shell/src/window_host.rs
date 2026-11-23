@@ -196,6 +196,8 @@ fn create_desktop_window(
 ) -> Result<Window, DesktopHostError> {
     WindowBuilder::new()
         .with_title(&config.title)
+        .with_theme(Some(tao::window::Theme::Dark))
+        .with_window_icon(build_brand_window_icon())
         .with_inner_size(LogicalSize::new(
             f64::from(clamped_bounds.width),
             f64::from(clamped_bounds.height),
@@ -211,6 +213,33 @@ fn create_desktop_window(
         .with_visible(!config.headless_smoke)
         .build(event_loop)
         .map_err(|err| DesktopHostError::WindowCreate(err.to_string()))
+}
+
+fn build_brand_window_icon() -> Option<tao::window::Icon> {
+    let size = 32_u32;
+    let mut rgba = vec![0_u8; (size * size * 4) as usize];
+    for y in 0..size {
+        for x in 0..size {
+            let idx = ((y * size + x) * 4) as usize;
+            let border = x < 2 || x >= size - 2 || y < 2 || y >= size - 2;
+            let is_l = (6..=9).contains(&x) && (7..=24).contains(&y)
+                || (6..=14).contains(&x) && (21..=24).contains(&y);
+            let is_c = (17..=25).contains(&x) && ((7..=10).contains(&y) || (21..=24).contains(&y))
+                || (17..=20).contains(&x) && (7..=24).contains(&y);
+            let (r, g, b) = if is_l || is_c {
+                (248, 250, 252)
+            } else if border {
+                (59, 130, 246)
+            } else {
+                (13, 15, 22)
+            };
+            rgba[idx] = r;
+            rgba[idx + 1] = g;
+            rgba[idx + 2] = b;
+            rgba[idx + 3] = 255;
+        }
+    }
+    tao::window::Icon::from_rgba(rgba, size, size).ok()
 }
 
 fn build_desktop_webview(

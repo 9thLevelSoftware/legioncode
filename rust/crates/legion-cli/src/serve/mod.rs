@@ -178,29 +178,9 @@ pub async fn spawn_server(config: ServeConfig) -> Result<RunningServer, ServeErr
     spawn_server_with_dev_url(config, None).await
 }
 
-/// Starts the Safe Rust HTTP/WebSocket/MCP server with an explicit Vite `--dev-url` override.
-pub async fn spawn_server_with_dev_url(
-    config: ServeConfig,
-    dev_url: Option<String>,
-) -> Result<RunningServer, ServeError> {
-    let paths = ServerDerivedPaths::derive(&config.base_dir, false, config.base_dir_is_explicit);
-    ensure_server_directories(&paths)?;
-    let env_id_raw = ensure_environment_id(&paths.environment_id_path)?;
-    let environment_id = EnvironmentId::new(env_id_raw)?;
-
-    let owner_lock = ServerOwnerLock::acquire(&paths.server_runtime_state_path)?;
-    let fence = owner_lock.fence_token();
-
-    let store = SqliteStore::open(&paths.db_path)?;
-    let migration_head = read_migration_head(&paths.db_path)
-        .unwrap_or(BUILD_MIGRATION_HEAD)
-        .max(BUILD_MIGRATION_HEAD);
-    let database_migration = u32::try_from(migration_head).ok();
-
-    let orchestrator = Arc::new(Orchestrator::from_sqlite_store(store));
-    startup_repair::repair_startup_state(&orchestrator);
-    let descriptor = build_descriptor(environment_id.clone(), &config.cwd, database_migration);
-
+async fn bind_server_listener(
+    config: &ServeConfig,
+) -> Result<(&str, TcpListener, SocketAddr), ServeError> {
     let bind_host = config
         .host
         .as_deref()
@@ -218,6 +198,37 @@ pub async fn spawn_server_with_dev_url(
         addr: bind_addr,
         source,
     })?;
+    Ok((bind_host, listener, local_addr))
+}
+
+/// Starts the Safe Rust HTTP/WebSocket/MCP server with an explicit Vite `--dev-url` override.
+pub async fn spawn_server_with_dev_url(
+    config: ServeConfig,
+    dev_url: Option<String>,
+) -> Result<RunningServer, ServeError> {
+    let paths = ServerDerivedPaths::derive(
+        &config.base_dir,
+        dev_url.is_some(),
+        config.base_dir_is_explicit,
+    );
+    ensure_server_directories(&paths)?;
+    let env_id_raw = ensure_environment_id(&paths.environment_id_path)?;
+    let environment_id = EnvironmentId::new(env_id_raw)?;
+
+    let owner_lock = ServerOwnerLock::acquire(&paths.server_runtime_state_path)?;
+    let fence = owner_lock.fence_token();
+
+    let store = SqliteStore::open(&paths.db_path)?;
+    let migration_head = read_migration_head(&paths.db_path)
+        .unwrap_or(BUILD_MIGRATION_HEAD)
+        .max(BUILD_MIGRATION_HEAD);
+    let database_migration = u32::try_from(migration_head).ok();
+
+    let orchestrator = Arc::new(Orchestrator::from_sqlite_store(store));
+    startup_repair::repair_startup_state(&orchestrator);
+    let descriptor = build_descriptor(environment_id.clone(), &config.cwd, database_migration);
+
+    let (bind_host, listener, local_addr) = bind_server_listener(&config).await?;
 
     let mut runtime_state =
         PersistedServerRuntimeState::for_current_process(local_addr.port(), config.host.as_deref());

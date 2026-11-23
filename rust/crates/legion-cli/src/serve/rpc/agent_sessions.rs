@@ -20,6 +20,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
+use super::orchestration_commands::publish_project_shell_event;
 use super::{
     AppState, parse_optional_payload, parse_payload, rpc_fail_obj, utc_now_iso, with_db_mut,
 };
@@ -177,13 +178,30 @@ async fn import_project_sessions(
                 if let Some(ref t) = proj.title {
                     input = input.with_title(t);
                 }
-                create_project(&*conn, &input).map_err(|e| {
+                let created = create_project(&*conn, &input).map_err(|e| {
                     rpc_fail_obj(json!({
                         "_tag": "AgentSessionScanError",
                         "operation": "read-projects",
                         "cause": e.to_string(),
                     }))
-                })?
+                })?;
+                let now_iso = utc_now_iso();
+                publish_project_shell_event(
+                    state,
+                    conn,
+                    &created.id,
+                    false,
+                    "cmd-agent-session-import",
+                    &now_iso,
+                )
+                .map_err(|e| {
+                    rpc_fail_obj(json!({
+                        "_tag": "AgentSessionScanError",
+                        "operation": "read-projects",
+                        "cause": e.to_string(),
+                    }))
+                })?;
+                created
             };
         Ok(rec.id)
     })?;

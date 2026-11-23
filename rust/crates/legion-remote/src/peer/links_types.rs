@@ -138,6 +138,39 @@ pub struct StoredPeerCredentials {
     pub token: String,
 }
 
+/// Result of unlinking a peer locally and requesting remote session revocation (`#41005`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PeerUnlinkOutcome {
+    /// Whether a matching stored link was deleted locally.
+    pub removed: bool,
+    /// Whether the remote peer verified identity and accepted `/oauth/mcp/revoke`.
+    pub ended_there: bool,
+}
+
+/// Wire RPC/MCP response payload returned for `peerLinks.unlink` / `environment_unlink` (`#41005`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PeerUnlinkRpcResult {
+    /// Target environment identifier.
+    pub environment_id: EnvironmentId,
+    /// Whether the local link entry existed and was deleted.
+    pub removed: bool,
+    /// Whether the peer ended its linked session remotely.
+    pub ended_there: bool,
+}
+
+/// Credentials and URLs captured right before deleting a peer link for remote revocation (`#41005`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnlinkedPeerRevocationTarget {
+    /// Linked environment identifier.
+    pub environment_id: EnvironmentId,
+    /// Normalized peer origin URLs stored on the link.
+    pub urls: Vec<String>,
+    /// Stored bearer access token when readable from secret storage.
+    pub token: Option<String>,
+}
+
 pub(super) fn record_to_link(row: PeerLinkRecord) -> Result<PeerLink, PeerLinkError> {
     let environment_id = EnvironmentId::new(row.environment_id).map_err(|err| {
         PeerLinkError::new(

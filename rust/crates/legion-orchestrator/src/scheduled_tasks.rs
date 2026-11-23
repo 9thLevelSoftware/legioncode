@@ -1,6 +1,54 @@
 //! Scheduled task thread-binding and explicit unbind helpers (`898c22f990` / #39639).
 
-use legion_contracts::ids::{ProjectId, ThreadId};
+use legion_contracts::ids::{ProjectId, ScheduledTaskId, ThreadId};
+use thiserror::Error;
+
+/// Maximum UTF-16 code units / byte ceiling kept in `scheduled_task_webhook_deliveries.rendered_prompt` (`#40726`).
+pub const WEBHOOK_DELIVERY_LOG_PROMPT_LIMIT: usize = 64 * 1024;
+
+/// Error returned when saving/editing a scheduled task that was already deleted (`#41084`).
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum ScheduledTaskEditError {
+    /// Edit requested `require_existing: true`, but the schedule no longer exists.
+    #[error("Scheduled task `{0}` was deleted and cannot be recreated by an edit.")]
+    DeletedOrMissing(ScheduledTaskId),
+}
+
+/// Ensures `require_existing` edits fail cleanly instead of resurrecting deleted schedules (`#41084`).
+pub fn ensure_scheduled_task_exists_for_edit(
+    task_id: &ScheduledTaskId,
+    exists: bool,
+    require_existing: bool,
+) -> Result<(), ScheduledTaskEditError> {
+    if require_existing && !exists {
+        return Err(ScheduledTaskEditError::DeletedOrMissing(task_id.clone()));
+    }
+    Ok(())
+}
+
+/// Truncates `prompt` to at most [`WEBHOOK_DELIVERY_LOG_PROMPT_LIMIT`] without ever splitting a
+/// multi-byte UTF-8 scalar boundary or leaving a broken trailing surrogate pair (`#40726`).
+#[must_use]
+pub fn truncate_webhook_delivery_prompt(prompt: &str) -> &str {
+    truncate_prompt_to_limit(prompt, WEBHOOK_DELIVERY_LOG_PROMPT_LIMIT)
+}
+
+/// Bounded UTF-8 & UTF-16 safe prefix truncation (`#40726`).
+#[must_use]
+pub fn truncate_prompt_to_limit(prompt: &str, max_utf16_or_bytes: usize) -> &str {
+    let mut byte_end = 0;
+    let mut utf16_used = 0;
+    for (idx, ch) in prompt.char_indices() {
+        let ch_bytes = ch.len_utf8();
+        let ch_utf16 = ch.len_utf16();
+        if idx + ch_bytes > max_utf16_or_bytes || utf16_used + ch_utf16 > max_utf16_or_bytes {
+            break;
+        }
+        byte_end = idx + ch_bytes;
+        utf16_used += ch_utf16;
+    }
+    &prompt[..byte_end]
+}
 
 /// Input describing an upsert mutation on a scheduled task's bound `thread_id`.
 #[derive(Debug, Clone, PartialEq, Eq)]

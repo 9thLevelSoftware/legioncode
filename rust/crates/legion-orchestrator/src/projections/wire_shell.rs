@@ -197,6 +197,8 @@ pub fn list_wire_older_settled_threads(
            AND t.archived_at IS NULL
            AND json_extract(t.payload_json, '$.lineage.relationshipToParent') IS NOT 'subagent'
            AND json_extract(t.payload_json, '$.lineage.sideChat') IS NOT 1
+           AND json_extract(t.payload_json, '$.lineage.workflowStep') IS NOT 1
+           AND json_extract(t.payload_json, '$.workflowRun') IS NULL
            AND json_extract(t.payload_json, '$.settledOverride') = 'settled'
            AND json_extract(t.payload_json, '$.settledAt') IS NOT NULL",
     );

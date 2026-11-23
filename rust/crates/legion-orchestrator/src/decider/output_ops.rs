@@ -3,7 +3,7 @@
 
 use legion_contracts::orchestration::{
     DomainEvent, DomainEventPayload, Run, RunOutputPayload, RunOutputSchema, RunOutputSubmitted,
-    RunStatus, SubmitRunOutputCommand, validate_run_output_schema_size,
+    RunStatus, SubmitRunOutputCommand, TurnItem, TurnItemKind, validate_run_output_schema_size,
 };
 use serde_json::Value;
 
@@ -115,8 +115,93 @@ pub fn decide_submit_run_output(
     })
 }
 
-/// Resolves which run on a thread owes output during a live turn (`#38874`).
+/// Returns `true` when `run` was cancelled before ever starting execution (`#38882`).
+#[must_use]
+pub fn cancelled_before_start(run: &Run) -> bool {
+    run.status == RunStatus::Cancelled && run.started_at.is_none()
+}
+
+/// Returns `true` when `run` is a scheduled task run started with `fresh_context: Some(true)` (`#38882`).
+///
+/// Such runs form a side schedule conversation rather than resetting the parent thread's conversation boundary.
+#[must_use]
+pub fn is_scheduled_fresh_run(run: &Run, turn_items: &[TurnItem]) -> bool {
+    run.fresh_context == Some(true)
+        && turn_items.iter().any(|item| {
+            matches!(
+                &item.kind,
+                TurnItemKind::UserMessage {
+                    message_id,
+                    scheduled_task_id: Some(_),
+                    ..
+                } if message_id == &run.user_message_id
+            )
+        })
+}
+
+/// Returns the ordinal of the newest started non-scheduled `fresh_context` run (`#38882`, `contextBoundary.ts`).
+#[must_use]
+pub fn context_boundary_ordinal(runs: &[Run], turn_items: &[TurnItem]) -> u64 {
+    runs.iter()
+        .filter(|run| {
+            run.fresh_context == Some(true)
+                && run.status != RunStatus::Queued
+                && !cancelled_before_start(run)
+                && !is_scheduled_fresh_run(run, turn_items)
+        })
+        .map(|run| run.ordinal)
+        .max()
+        .unwrap_or(0)
+}
+
+/// Formats an output schema rejection error capped at `2000` cause characters (`#38882`).
+#[must_use]
+pub fn output_rejection_text(problem: &str, cause: Option<&str>) -> String {
+    match cause {
+        Some(detail) if !detail.is_empty() => {
+            let truncated: String = detail.chars().take(2_000).collect();
+            format!("{problem}\n{truncated}")
+        }
+        _ => problem.to_owned(),
+    }
+}
+
+/// Picks the newest started unanswered `outputSchema` run eligible for late submission (`#38882`).
+#[must_use]
+pub fn pick_owed_output_run<'a>(runs: &'a [Run], turn_items: &[TurnItem]) -> Option<&'a Run> {
+    let asked = runs
+        .iter()
+        .filter(|candidate| {
+            candidate.output_schema.is_some()
+                && candidate.status != RunStatus::Queued
+                && !cancelled_before_start(candidate)
+        })
+        .max_by_key(|candidate| candidate.ordinal)?;
+    if asked.status != RunStatus::Completed || asked.output.is_some() {
+        return None;
+    }
+    let has_later_fresh = runs
+        .iter()
+        .any(|later| later.fresh_context == Some(true) && later.ordinal > asked.ordinal);
+    if has_later_fresh && context_boundary_ordinal(runs, turn_items) > asked.ordinal {
+        return None;
+    }
+    Some(asked)
+}
+
+/// Resolves which run on a thread owes output during a live turn (`#38874`, `#38882`).
+///
+/// Considers only the active run (when it declares `outputSchema`) or the newest started
+/// `outputSchema` run on the thread, refusing stale runs behind a newer `outputSchema` run.
 pub fn pick_run_for_output_submission(runs: &[Run]) -> Result<&Run, DeciderError> {
+    pick_run_for_output_submission_with_context(runs, &[])
+}
+
+/// Context-aware variant of [`pick_run_for_output_submission`] honoring `context_boundary_ordinal` (`#38882`).
+pub fn pick_run_for_output_submission_with_context<'a>(
+    runs: &'a [Run],
+    turn_items: &[TurnItem],
+) -> Result<&'a Run, DeciderError> {
     let active = runs.iter().rev().find(|r| is_run_active(r));
     let Some(active_run) = active else {
         return Err(DeciderError::RunOutputRejected(
@@ -126,17 +211,20 @@ pub fn pick_run_for_output_submission(runs: &[Run]) -> Result<&Run, DeciderError
     if active_run.output_schema.is_some() {
         return Ok(active_run);
     }
-    let owed = runs
-        .iter()
-        .filter(|r| {
-            r.output_schema.is_some() && r.output.is_none() && r.status == RunStatus::Completed
-        })
-        .max_by_key(|r| r.ordinal);
-    owed.ok_or_else(|| {
+    pick_owed_output_run(runs, turn_items).ok_or_else(|| {
         DeciderError::RunOutputRejected(
             "This turn was not asked for a result. Reply in your message instead.".to_owned(),
         )
     })
+}
+
+/// Preserves structured output submitted by a woken continuation turn when waiting across turns (`#40360`).
+#[must_use]
+pub fn resolve_until_output_across_turns(
+    waited_output: Option<Value>,
+    prior_output: Option<Value>,
+) -> Option<Value> {
+    waited_output.or(prior_output)
 }
 
 /// Resolution status for `waitForThread(..., untilOutput: true)` (`#40137`).

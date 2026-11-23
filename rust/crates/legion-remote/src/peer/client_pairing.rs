@@ -18,6 +18,11 @@ pub use crate::peer::batch_linking::{
     BatchLinkOutcome, BatchLinkSummary, BatchLinkTarget, classify_batch_failure,
     link_unless_linked_local, run_batch_linking, summarize_batch_outcomes,
 };
+pub use crate::peer::client_pairing_issuer::{
+    ApprovedPairingIssue, CLIENT_PAIRING_TTL_MS, ISSUER_CLIENT_LABEL_MAX_LENGTH,
+    PairingIssuerCaller, PeerClientPairingRefusalReason, PeerClientPairingRefused,
+    evaluate_pairing_issue, evaluate_pairing_issue_for_brand,
+};
 use crate::peer::links::{PeerLink, PeerLinkError, PeerLinkErrorReason, validate_peer_origin};
 
 /// Default peer client pairing HTTP endpoint relative path.

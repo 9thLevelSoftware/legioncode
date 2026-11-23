@@ -92,6 +92,13 @@ struct ShellRunContext<'a> {
     tags: Option<Vec<String>>,
 }
 
+fn latest_run_with_status<'a>(runs: &[&'a Value], statuses: &[&str]) -> Option<&'a Value> {
+    runs.iter()
+        .copied()
+        .filter(|r| str_at(r, "status").is_some_and(|s| statuses.contains(&s)))
+        .max_by_key(|r| u64_at(r, "ordinal"))
+}
+
 fn derive_shell_run_context<'a>(t: &Value, ctx: &'a ThreadShellContext) -> ShellRunContext<'a> {
     let provider_instance_id = str_at(t, "providerInstanceId")
         .unwrap_or("codex")
@@ -112,26 +119,11 @@ fn derive_shell_run_context<'a>(t: &Value, ctx: &'a ThreadShellContext) -> Shell
         .rev()
         .find(|r| str_at(r, "status") != Some("queued") || bool_at(r, "queueHeld") != Some(true))
         .or_else(|| visible_runs.last().copied());
-    let active_run = visible_runs
-        .iter()
-        .copied()
-        .filter(|r| {
-            matches!(
-                str_at(r, "status"),
-                Some("preparing" | "starting" | "running")
-            )
-        })
-        .max_by_key(|r| u64_at(r, "ordinal"));
-    let activity_run = visible_runs
-        .iter()
-        .copied()
-        .filter(|r| {
-            matches!(
-                str_at(r, "status"),
-                Some("preparing" | "starting" | "running" | "waiting")
-            )
-        })
-        .max_by_key(|r| u64_at(r, "ordinal"));
+    let active_run = latest_run_with_status(&visible_runs, &["preparing", "starting", "running"]);
+    let activity_run = latest_run_with_status(
+        &visible_runs,
+        &["preparing", "starting", "running", "waiting"],
+    );
     let pending_runtime_request = pick_pending_request(ctx, activity_run.is_some());
     let mut user_msgs: Vec<&Value> = ctx
         .messages
@@ -184,6 +176,15 @@ fn derive_shell_run_context<'a>(t: &Value, ctx: &'a ThreadShellContext) -> Shell
     }
 }
 
+fn has_interrupt_request(latest_run: Option<&Value>, turn_items: &[Value]) -> bool {
+    latest_run.is_some_and(|r| {
+        let rid = str_at(r, "id");
+        turn_items.iter().any(|item| {
+            str_at(item, "runId") == rid && str_at(item, "type") == Some("run_interrupt_request")
+        })
+    })
+}
+
 fn build_wire_thread_shell(
     t: &Value,
     ctx: &ThreadShellContext,
@@ -222,17 +223,12 @@ fn build_wire_thread_shell(
         history_origin: opt_str_at(t, "historyOrigin"),
         link_origin: t.get("linkOrigin").cloned().filter(|v| !v.is_null()),
         delegated_from: t.get("delegatedFrom").cloned().filter(|v| !v.is_null()),
+        workflow_run: t.get("workflowRun").cloned().filter(|v| !v.is_null()),
         latest_run_id: rc.latest_run.and_then(|r| opt_str_at(r, "id")),
         latest_run_requested_at: rc.latest_run.and_then(|r| opt_str_at(r, "requestedAt")),
         latest_run_started_at: rc.latest_run.and_then(|r| opt_str_at(r, "startedAt")),
         latest_run_completed_at: rc.latest_run.and_then(|r| opt_str_at(r, "completedAt")),
-        latest_run_stop_requested: rc.latest_run.is_some_and(|r| {
-            let rid = str_at(r, "id");
-            ctx.turn_items.iter().any(|item| {
-                str_at(item, "runId") == rid
-                    && str_at(item, "type") == Some("run_interrupt_request")
-            })
-        }),
+        latest_run_stop_requested: has_interrupt_request(rc.latest_run, &ctx.turn_items),
         latest_run_background_wake: rc
             .latest_run
             .is_some_and(|r| is_background_wake_run(r, ctx)),
@@ -314,10 +310,11 @@ fn is_background_wake_run(run: &Value, ctx: &ThreadShellContext) -> bool {
     let Some(msg) = ctx.messages.iter().find(|m| str_at(m, "id") == msg_id) else {
         return false;
     };
+    let notif = msg.get("notification");
     let is_wake = msg.get("delegatedCompletion").is_none_or(Value::is_null)
-        && msg.get("notification").and_then(|n| str_at(n, "outcome")) == Some("updated")
+        && notif.and_then(|n| str_at(n, "outcome")) == Some("updated")
         && matches!(
-            msg.get("notification")
+            notif
                 .and_then(|n| n.get("source"))
                 .and_then(|s| str_at(s, "kind")),
             Some("background_task" | "command" | "monitor")
@@ -359,10 +356,9 @@ fn pick_pending_request(
             blocking: Some(str_at(item, "type") == Some("secret_request")),
             user_only: Some(true),
         };
-        if best.is_none()
-            || best
-                .as_ref()
-                .is_some_and(|b| card.created_at >= b.created_at)
+        if best
+            .as_ref()
+            .is_none_or(|b| card.created_at >= b.created_at)
         {
             best = Some(card);
         }

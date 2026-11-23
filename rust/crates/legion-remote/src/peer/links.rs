@@ -21,10 +21,11 @@ use crate::secrets::FileSecretStore;
 
 pub use format::{
     PeerLinkStatus, PeerLinkSummary, format_peer_links, format_peer_links_json,
-    format_peer_unlink_result,
+    format_peer_unlink_outcome, format_peer_unlink_result,
 };
 pub use types::{
-    InsertPeerLinkInput, PeerLink, PeerLinkError, PeerLinkErrorReason, StoredPeerCredentials,
+    InsertPeerLinkInput, PeerLink, PeerLinkError, PeerLinkErrorReason, PeerUnlinkOutcome,
+    PeerUnlinkRpcResult, StoredPeerCredentials, UnlinkedPeerRevocationTarget,
 };
 use types::{record_to_link, serialize_access, storage_err};
 pub use url_guard::validate_peer_origin;
@@ -309,5 +310,27 @@ impl PeerLinksService {
         };
         let _ = self.secrets.remove(&secret_name).map_err(storage_err)?;
         Ok(true)
+    }
+
+    /// Removes `environment_id` and its local `.bin` token while returning the pre-unlink target
+    /// URLs and bearer token (if readable) so callers can attempt remote revocation (`#41005`).
+    pub fn unlink_with_revocation_target(
+        &self,
+        conn: &Connection,
+        environment_id: &str,
+    ) -> Result<Option<UnlinkedPeerRevocationTarget>, PeerLinkError> {
+        let existing = self.get(conn, environment_id)?;
+        let Some(secret_name) = unlink_peer_link(conn, environment_id).map_err(storage_err)? else {
+            return Ok(None);
+        };
+        // Unreadable secret only skips remote revocation; local secret removal still proceeds.
+        let token = self.secrets.get_utf8(&secret_name).ok().flatten();
+        let _ = self.secrets.remove(&secret_name).map_err(storage_err)?;
+        let target = existing.map(|link| UnlinkedPeerRevocationTarget {
+            environment_id: link.environment_id,
+            urls: link.urls,
+            token,
+        });
+        Ok(target)
     }
 }

@@ -54,9 +54,11 @@ mod output_schema;
 pub mod pr_ops;
 mod queue_edit_ops;
 pub mod queue_ops;
+mod queue_steer_ops;
 pub mod run_ops;
 pub mod state_ops;
 pub mod thread_ops;
+pub mod title_ops;
 pub mod types;
 
 use legion_contracts::orchestration::OrchestrationCommand;

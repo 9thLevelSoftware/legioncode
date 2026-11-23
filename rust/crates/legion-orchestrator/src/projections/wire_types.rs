@@ -167,6 +167,9 @@ pub struct WireThreadShell {
     /// Remote parent provenance when present.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub delegated_from: Option<Value>,
+    /// Workflow coordinator step origin when present (`#38882`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow_run: Option<Value>,
     /// Latest presented run ID or `null`.
     pub latest_run_id: Option<String>,
     /// Latest run requested timestamp or `null`.

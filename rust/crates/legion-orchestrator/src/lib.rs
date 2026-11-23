@@ -9,6 +9,7 @@
 //! - [`projections`]: [`ShellSnapshot`] (`shellThreadFamilies` + `shellOlderSettled` 25-thread cut) and 24h [`prune_event_store`].
 //! - [`orchestrator`]: High-level [`Orchestrator`] tying lock hierarchy, decider, sink, and outbox together.
 
+pub mod checkpoint_policy;
 pub mod decider;
 pub mod locks;
 pub mod orchestrator;
@@ -17,9 +18,12 @@ pub mod outbox;
 pub mod projections;
 pub mod scheduled_tasks;
 pub mod session_recovery;
+pub mod settlement_policy;
 pub mod sink;
+pub mod subagent_delegation;
 pub mod subagent_lifecycle;
 pub mod time;
+pub mod workflow_lineage;
 
 pub use decider::{CommandDecision, DeciderError, RollbackIntent, decide_command};
 pub use locks::{

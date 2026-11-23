@@ -29,7 +29,7 @@ use crate::peer::links::{
     PeerLinkError, PeerLinkErrorReason, PeerLinksService, validate_peer_origin,
 };
 use crate::secrets::FileSecretStore;
-pub use client::LivePeerClient;
+pub use client::{LivePeerClient, OAUTH_MCP_REVOKE_ROUTE};
 pub use legion_protocol::mcp::parse_sse_json_rpc_response;
 use rpc::{
     build_mcp_request_headers, decode_json_or_sse_response, extract_tool_call_result,

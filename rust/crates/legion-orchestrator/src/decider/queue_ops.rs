@@ -48,6 +48,12 @@ fn is_slash_cmd_char(ch: char) -> bool {
     ch.is_alphanumeric() || ch == '_' || ch == ':' || ch == '-'
 }
 
+pub use super::queue_steer_ops::{
+    MissedSteerPlacement, ensure_steer_allows_command, format_provider_turn_prompt,
+    is_slash_command_message, plan_missed_steer_requeue, resolve_steer_fallback_model_selection,
+    should_defer_context_for_turn,
+};
+
 /// Returns `true` when the message is a `/compact` slash command (`#39417`, `#39455`).
 #[must_use]
 pub fn is_compact_command(text: &str, attachments: &[Value]) -> bool {
@@ -117,7 +123,11 @@ pub fn compute_follows_thread_selection(
 ) -> Option<bool> {
     let eligible = cmd.model_selection.is_none()
         && (cmd.scheduled_task_id.is_some()
-            || (will_queue && cmd.linked_sender.is_none() && cmd.notification.is_none()));
+            || (will_queue
+                && cmd.linked_sender.is_none()
+                && cmd.notification.is_none()
+                && cmd.delegated_completion.is_none()
+                && cmd.idle_compaction.is_none()));
     eligible.then_some(true)
 }
 

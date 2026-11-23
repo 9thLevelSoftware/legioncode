@@ -96,16 +96,20 @@ impl PeerThreadRelayClient {
         capabilities: &EnvironmentCapabilities,
         input: &PeerLinkThreadItemInput,
     ) -> Result<RelayedThreadPayload<Value>, PeerLinkThreadReadError> {
+        let mut params = vec![
+            ("thread", input.thread_id.as_str()),
+            ("item", input.item_id.as_str()),
+        ];
+        if let Some(revision) = input.revision.as_deref() {
+            params.push(("revision", revision));
+        }
         self.get_json(
             origin,
             label,
             bearer_token,
             capabilities,
             PEER_LINK_THREAD_ITEM_ROUTE,
-            &[
-                ("thread", input.thread_id.as_str()),
-                ("item", input.item_id.as_str()),
-            ],
+            &params,
         )
         .await
     }

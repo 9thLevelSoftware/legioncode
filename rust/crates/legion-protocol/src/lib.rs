@@ -21,6 +21,7 @@
 
 pub mod auth;
 pub mod mcp;
+pub mod milestones;
 pub mod provider_env;
 pub mod rpc_codec;
 pub mod tunnel;

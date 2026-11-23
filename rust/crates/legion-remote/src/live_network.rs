@@ -22,8 +22,8 @@ pub use live_cloud_relay::{
     RelayUnlinkOutcome, RelayWsOutgoingFrame,
 };
 pub use live_peer_mcp::{
-    LivePeerClient, LivePeerLinkInput, LivePeerMcpOptions, LivePeerMcpSession, PeerMcpError,
-    parse_sse_json_rpc_response,
+    LivePeerClient, LivePeerLinkInput, LivePeerMcpOptions, LivePeerMcpSession,
+    OAUTH_MCP_REVOKE_ROUTE, PeerMcpError, parse_sse_json_rpc_response,
 };
 pub use live_ssh_tailscale::{
     LiveSshError, LiveSshForwardHandle, LiveSshTunnelManager, LiveTailscaleController,

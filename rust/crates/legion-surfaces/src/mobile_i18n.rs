@@ -27,6 +27,8 @@ pub enum NavigationTabKind {
     PullRequests,
     /// Issues tab (`"issues"`).
     Issues,
+    /// Workflows tab (`"workflows"`).
+    Workflows,
     /// Usage limits tab (`"usage"`).
     Usage,
     /// Settings tab (`"settings"`).
@@ -34,12 +36,13 @@ pub enum NavigationTabKind {
 }
 
 impl NavigationTabKind {
-    /// Parses a tab key (`"threads"`, `"pullRequests"`, `"issues"`, `"usage"`, `"settings"`).
+    /// Parses a tab key (`"threads"`, `"pullRequests"`, `"issues"`, `"workflows"`, `"usage"`, `"settings"`).
     pub fn parse(raw: &str) -> Option<Self> {
         match raw {
             "threads" => Some(Self::Threads),
             "pullRequests" => Some(Self::PullRequests),
             "issues" => Some(Self::Issues),
+            "workflows" => Some(Self::Workflows),
             "usage" => Some(Self::Usage),
             "settings" => Some(Self::Settings),
             _ => None,
@@ -59,12 +62,14 @@ pub struct MobileNavigationStrings {
     pub threads: String,
     /// Compact label for `"pullRequests"` (`"Pulls"`).
     pub pulls: String,
-    /// Expanded rail label for `"pullRequests"` (`"Pull Requests"`).
+    /// Expanded rail label for `"pullRequests"` (`"Pull requests"`).
     pub pull_requests: String,
     /// Short badge/iOS label for `"pullRequests"` (`"PRs"`).
     pub prs_short: String,
     /// Label for `"issues"` (`"Issues"`).
     pub issues: String,
+    /// Label for `"workflows"` (`"Workflows"`).
+    pub workflows: String,
     /// Label for `"usage"` (`"Usage"`).
     pub usage: String,
     /// Label for `"settings"` (`"Settings"`).
@@ -124,6 +129,7 @@ impl MobileNavigationPresenter {
             NavigationTabKind::Threads => self.strings.chats,
             NavigationTabKind::PullRequests => self.strings.pulls,
             NavigationTabKind::Issues => self.strings.issues,
+            NavigationTabKind::Workflows => self.strings.workflows,
             NavigationTabKind::Usage => self.strings.usage,
             NavigationTabKind::Settings => self.strings.settings,
         }
@@ -179,6 +185,7 @@ impl MobileNavigationPresenter {
             pull_requests: self.strings.pull_requests.to_owned(),
             prs_short: self.strings.prs_short.to_owned(),
             issues: self.strings.issues.to_owned(),
+            workflows: self.strings.workflows.to_owned(),
             usage: self.strings.usage.to_owned(),
             settings: self.strings.settings.to_owned(),
             new_thread: self.strings.new_thread.to_owned(),

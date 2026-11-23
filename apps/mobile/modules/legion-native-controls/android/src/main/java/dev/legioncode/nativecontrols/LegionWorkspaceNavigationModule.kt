@@ -416,12 +416,13 @@ class LegionWorkspaceNavigationView(
     "threads" -> "Chats"
     "pullRequests" -> "Pulls"
     "issues" -> "Issues"
+    "workflows" -> "Workflows"
     "usage" -> "Usage"
     else -> "Settings"
   }
 
   private fun expandedTabTitle(tab: String) =
-    if (tab == "pullRequests") "Pull Requests" else tabTitle(tab)
+    if (tab == "pullRequests") "Pull requests" else tabTitle(tab)
 
   @Composable
   private fun tabIconPainter(tab: String) = painterResource(
@@ -429,6 +430,7 @@ class LegionWorkspaceNavigationView(
       "threads" -> R.drawable.legion_chats
       "pullRequests" -> R.drawable.legion_pull_requests
       "issues" -> R.drawable.legion_issues
+      "workflows" -> R.drawable.legion_workflows
       "usage" -> R.drawable.legion_usage
       else -> R.drawable.legion_settings
     }

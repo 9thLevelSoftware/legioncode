@@ -11,10 +11,11 @@ use legion_persistence::ownership::{
 use legion_persistence::paths::ServerDerivedPaths;
 use legion_persistence::service_launcher::{
     DESKTOP_UPDATE_IN_PROGRESS_TTL_MS, LauncherChildRole, LauncherOptions, LauncherStartupDecision,
-    ServiceLockGuard, ServiceState, ServiceUpdateRecord, compare_exact_service_versions,
-    decode_service_launcher_context, is_exact_service_version, parse_legacy_service_state,
-    parse_service_launcher_args, parse_service_state, plan_launcher_startup, publish_update_marker,
-    read_service_state, remaining_update_wait_ms, runtime_entry_paths, service_launcher_is_running,
+    PINNED_RUNTIME_PRUNE_GRACE_MS, ServiceLockGuard, ServiceState, ServiceUpdateRecord,
+    compare_exact_service_versions, decode_service_launcher_context, is_exact_service_version,
+    parse_legacy_service_state, parse_service_launcher_args, parse_service_state,
+    plan_launcher_startup, prune_pinned_runtimes_at, publish_update_marker, read_service_state,
+    remaining_update_wait_ms, runtime_entry_paths, service_launcher_is_running,
     service_launcher_is_serving, service_launcher_lock_path, service_serving_lock_path,
     service_state_path, state_dir_owned, write_service_state,
 };
@@ -236,11 +237,11 @@ fn launcher_startup_plan_covers_active_trial_rollback_and_preflight_block()
     assert_eq!(trial_plan.version, "1.1.0");
     assert!(decode_service_launcher_context(&trial_plan.context_json).is_some());
 
-    // Simulate future migration (> 105) blocking launch via service_preflight.
+    // Simulate future migration (> BUILD_MIGRATION_HEAD) blocking launch via service_preflight.
     let store = SqliteStore::open(&trial_db)?;
     store.connection().execute(
-        "INSERT INTO effect_sql_migrations (migration_id, name) VALUES (106, 'Future')",
-        [],
+        "INSERT INTO effect_sql_migrations (migration_id, name) VALUES (?1, 'Future')",
+        [legion_persistence::sqlite::BUILD_MIGRATION_HEAD + 1],
     )?;
     store.close()?;
     assert!(matches!(
@@ -265,5 +266,82 @@ fn launcher_startup_plan_covers_active_trial_rollback_and_preflight_block()
             ..
         }
     ));
+    Ok(())
+}
+
+#[test]
+fn prune_pinned_runtimes_removes_committed_from_version_and_abandoned_staging()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let base_dir = dir.path();
+    let versions_dir = base_dir.join("runtime").join("versions");
+
+    for version in ["1.0.0", "1.1.0", "1.2.0"] {
+        let (entry, sentinel) = runtime_entry_paths(base_dir, version);
+        if let Some(parent) = entry.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&entry, b"bin")?;
+        fs::write(&sentinel, version)?;
+    }
+
+    let staging_dir = versions_dir.join(".staging-abandoned");
+    fs::create_dir_all(&staging_dir)?;
+
+    let committed = ServiceState {
+        protocol: 4,
+        active_version: "1.2.0".to_owned(),
+        update: Some(ServiceUpdateRecord::Committed {
+            id: "upd-1".to_owned(),
+            from_version: "1.1.0".to_owned(),
+            target_version: "1.2.0".to_owned(),
+            reason: None,
+        }),
+    };
+    write_service_state(&service_state_path(base_dir), &committed)?;
+
+    let now_ms = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)?
+        .as_millis();
+
+    // Within the 1-hour grace window, nothing completed or staged is pruned.
+    let early = prune_pinned_runtimes_at(base_dir, &["1.0.0"], &[], now_ms, Some(""));
+    assert_eq!(early, Vec::<String>::new());
+    assert!(staging_dir.exists());
+    assert!(versions_dir.join("1.1.0").exists());
+
+    // Past the 1-hour grace window, committed `from_version` (1.1.0) and abandoned staging are removed.
+    let past_grace_ms = now_ms + PINNED_RUNTIME_PRUNE_GRACE_MS + 60_000;
+    let removed = prune_pinned_runtimes_at(base_dir, &["1.0.0"], &[], past_grace_ms, Some(""));
+    assert_eq!(removed, vec!["1.1.0".to_owned()]);
+    assert!(!versions_dir.join("1.1.0").exists());
+    assert!(!staging_dir.exists());
+    assert!(versions_dir.join("1.0.0").exists());
+    assert!(versions_dir.join("1.2.0").exists());
+
+    // A rolled-back update retains `from_version` so rollback fallback stays runnable.
+    let rollback_staging = versions_dir.join(".staging-keep");
+    fs::create_dir_all(&rollback_staging)?;
+    let (v110_entry, v110_sentinel) = runtime_entry_paths(base_dir, "1.1.0");
+    if let Some(parent) = v110_entry.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&v110_entry, b"bin")?;
+    fs::write(&v110_sentinel, "1.1.0")?;
+    let rolled_back = ServiceState {
+        protocol: 4,
+        active_version: "1.2.0".to_owned(),
+        update: Some(ServiceUpdateRecord::RolledBack {
+            id: "upd-2".to_owned(),
+            from_version: "1.1.0".to_owned(),
+            target_version: "1.3.0".to_owned(),
+            reason: None,
+        }),
+    };
+    write_service_state(&service_state_path(base_dir), &rolled_back)?;
+    let kept =
+        prune_pinned_runtimes_at(base_dir, &["1.0.0"], &[], past_grace_ms + 60_000, Some(""));
+    assert_eq!(kept, Vec::<String>::new());
+    assert!(versions_dir.join("1.1.0").exists());
     Ok(())
 }

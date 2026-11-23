@@ -12,11 +12,12 @@ use zip::result::ZipError;
 use crate::doc_extractor::{DOC_MAX_EXPANDED_BYTES, DocInternalErr};
 use crate::doc_extractor_entities::{
     decode_markup_bytes, percent_decode_href, posix_basename, posix_dirname, posix_join,
+    posix_normalize,
 };
-use crate::doc_extractor_layout::{emit_paragraphs, emit_table};
+use crate::doc_extractor_layout::{emit_paragraphs, emit_table, has_cell_text};
 use crate::doc_extractor_odf_ws::{all_matching, first_matching};
 use crate::doc_extractor_xlsx::extract_xlsx;
-use crate::doc_extractor_xml::{MarkupMode, TextPart, XmlNode, parse_xml};
+use crate::doc_extractor_xml::{MarkupMode, TextPart, XmlChild, XmlNode, parse_xml};
 
 const MAX_ARCHIVE_ENTRIES: usize = 2048;
 
@@ -86,14 +87,16 @@ pub(crate) fn extract_office_or_epub(
 ) -> Result<(), DocInternalErr> {
     let mode = match ext {
         "docx" => MarkupMode::Docx,
-        "odt" | "ods" | "odp" => MarkupMode::Odf,
+        "odt" | "ods" => MarkupMode::Odf,
+        "odp" => MarkupMode::Odp,
         _ => MarkupMode::Xml,
     };
     let mut notes: Vec<String> = Vec::new();
 
     match ext {
         "docx" => {
-            let doc = read_part(files, "word/document.xml", mode, &mut notes)?;
+            let main_part = resolve_docx_main_part(files, &mut notes)?;
+            let doc = read_part(files, &main_part, mode, &mut notes)?;
             emit_paragraphs(&doc, parts)?;
         }
         "odt" => {
@@ -110,9 +113,31 @@ pub(crate) fn extract_office_or_epub(
                     let sheet = item.attrs.get("name").map_or("Untitled", String::as_str);
                     parts.push(TextPart::Text(format!("\n\n## Sheet: {sheet}\n")));
                     emit_table(item, parts)?;
-                } else {
-                    parts.push(TextPart::Text(format!("\n\n## Slide {}\n", idx + 1)));
-                    emit_paragraphs(item, parts)?;
+                    continue;
+                }
+                parts.push(TextPart::Text(format!("\n\n## Slide {}\n", idx + 1)));
+                let notes_idx = item
+                    .children
+                    .iter()
+                    .position(|c| matches!(c, XmlChild::Element(n) if n.name == "notes"));
+                let (slide_body, slide_notes) = match notes_idx {
+                    Some(pos) => {
+                        let notes_node = match &item.children[pos] {
+                            XmlChild::Element(n) => Some(n),
+                            XmlChild::Text(_) => None,
+                        };
+                        let mut stripped = item.clone();
+                        stripped.children.remove(pos);
+                        (Some(stripped), notes_node)
+                    }
+                    None => (None, None),
+                };
+                emit_paragraphs(slide_body.as_ref().unwrap_or(item), parts)?;
+                if let Some(notes_node) = slide_notes
+                    && has_cell_text(notes_node)
+                {
+                    parts.push(TextPart::Text("\nNotes:\n".to_owned()));
+                    emit_paragraphs(notes_node, parts)?;
                 }
             }
         }
@@ -229,13 +254,81 @@ fn extract_pptx(
             if !is_notes || is_ext || note_target.is_empty() {
                 continue;
             }
-            parts.push(TextPart::Text("Notes:\n".to_owned()));
             let note_path = posix_join(dir, note_target);
             let note_doc = read_part(files, &note_path, MarkupMode::Xml, notes)?;
-            emit_paragraphs(&note_doc, parts)?;
+            let notes_page = without_notes_page_placeholders(&note_doc);
+            if !has_cell_text(&notes_page) {
+                continue;
+            }
+            parts.push(TextPart::Text("Notes:\n".to_owned()));
+            emit_paragraphs(&notes_page, parts)?;
         }
     }
     Ok(())
+}
+
+// Package relationship names the Word main part; Word for the web saves word/document2.xml (#40777).
+fn resolve_docx_main_part(
+    files: &BTreeMap<String, String>,
+    notes: &mut Vec<String>,
+) -> Result<String, DocInternalErr> {
+    if files.contains_key("_rels/.rels") {
+        let rel_tree = read_part(files, "_rels/.rels", MarkupMode::Xml, notes)?;
+        let mut rel_nodes = Vec::new();
+        all_matching(&rel_tree, &["Relationship"], &mut rel_nodes);
+        if let Some(target) = rel_nodes.into_iter().find_map(|rel| {
+            let is_office_doc = rel
+                .attrs
+                .get("Type")
+                .is_some_and(|t| t.ends_with("/officeDocument"));
+            let is_ext = rel.attrs.get("TargetMode").map(String::as_str) == Some("External");
+            if is_office_doc && !is_ext {
+                rel.attrs.get("Target").cloned()
+            } else {
+                None
+            }
+        }) {
+            let normalized = posix_normalize(&target);
+            let main_part = normalized.trim_start_matches('/');
+            if !main_part.is_empty() && files.contains_key(main_part) {
+                return Ok(main_part.to_owned());
+            }
+        }
+    }
+    Ok("word/document.xml".to_owned())
+}
+
+// A PPTX notes page also holds slide image, slide number, date, header, and footer placeholders (#40568).
+fn is_notes_page_placeholder(node: &XmlNode) -> bool {
+    if node.name != "sp" {
+        return false;
+    }
+    let Some(ph) = first_matching(node, "ph") else {
+        return false;
+    };
+    matches!(
+        ph.attrs.get("type").map(String::as_str),
+        Some("sldImg" | "sldNum" | "dt" | "hdr" | "ftr")
+    )
+}
+
+fn without_notes_page_placeholders(node: &XmlNode) -> XmlNode {
+    XmlNode {
+        name: node.name.clone(),
+        attrs: node.attrs.clone(),
+        children: node
+            .children
+            .iter()
+            .filter_map(|child| match child {
+                XmlChild::Text(text) => Some(XmlChild::Text(text.clone())),
+                XmlChild::Element(elem) => (!is_notes_page_placeholder(elem))
+                    .then(|| XmlChild::Element(without_notes_page_placeholders(elem))),
+            })
+            .collect(),
+        space_count: node.space_count,
+        has_text: node.has_text,
+        has_text_choice: node.has_text_choice,
+    }
 }
 
 fn extract_epub(

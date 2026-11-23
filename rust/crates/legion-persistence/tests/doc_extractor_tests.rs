@@ -308,3 +308,82 @@ fn extracts_odf_and_utf16_epub_and_enforces_limits_and_exit_codes() {
     let mac_out = extract_document_text(&mac_rtf_path, ".rtf").expect("mac rtf");
     assert_eq!(mac_out, "Cafeé — “Apple” \u{F8FF} kept clean");
 }
+
+#[test]
+fn extracts_rtf_fcharset_docx_sdt_rels_textbox_odt_odp_and_pptx_notes_fixes() {
+    let dir = tempfile::tempdir().expect("tempdir");
+
+    // #40476: per-font \fcharset + \deff + \plain reset across Windows codepages.
+    let rtf_path = dir.path().join("multifont.rtf");
+    let rtf_bytes = br"{\rtf1\ansi\ansicpg1252\deff0{\fonttbl{\f0\fcharset178 Arabic;}{\f1\fcharset161 Greek;}}\f0 \'d3\'e1\'c7\'e3 {\f1 \'c1\'e2}\plain \'cf}";
+    fs::write(&rtf_path, rtf_bytes).expect("write multifont rtf");
+    assert_eq!(
+        extract_document_text(&rtf_path, ".rtf").expect("multifont rtf"),
+        "سلام Αβ\u{062F}"
+    );
+
+    // #40496, #40777, #40782: DOCX non-default main part via _rels/.rels, <w:sdt> cell, <w:txbxContent>.
+    let docx = dir.path().join("modern.docx");
+    write_zip(
+        &docx,
+        &[
+            (
+                "_rels/.rels",
+                br#"<Relationships><Relationship Id="r1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="/word/document2.xml"/></Relationships>"#,
+            ),
+            (
+                "word/document2.xml",
+                br"<w:document><w:body><w:tbl><w:tr><w:sdt><w:sdtContent><w:tc><w:p><w:r><w:t>Locked</w:t></w:r></w:p></w:tc></w:sdtContent></w:sdt><w:tc><w:p><w:r><w:t>Right</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:t>Anchor </w:t></w:r><w:r><w:txbxContent><w:p><w:r><w:t>Box 1</w:t></w:r></w:p><w:p><w:r><w:t>Box 2</w:t></w:r></w:p></w:txbxContent></w:r></w:p></w:body></w:document>",
+            ),
+        ],
+    );
+    let docx_out = extract_document_text(&docx, ".docx").expect("docx");
+    assert_eq!(docx_out, "Locked\tRight\nAnchor Box 1\nBox 2");
+
+    // #40523 & #38542: ODT index-source suppression & ODP labeled notes without thumbnail clutter.
+    let odt = dir.path().join("toc.odt");
+    write_zip(
+        &odt,
+        &[(
+            "content.xml",
+            br"<office:document><text:table-of-content><text:table-of-content-source><text:index-title-template>Contents</text:index-title-template><text:table-of-content-entry-template><text:index-entry-span> . </text:index-entry-span></text:table-of-content-entry-template></text:table-of-content-source><text:index-body><text:index-title><text:p>Contents</text:p></text:index-title><text:p>Section 1</text:p></text:index-body></text:table-of-content></office:document>",
+        )],
+    );
+    assert_eq!(
+        extract_document_text(&odt, ".odt").expect("odt toc"),
+        "Contents\nSection 1"
+    );
+
+    let odp = dir.path().join("deck.odp");
+    write_zip(
+        &odp,
+        &[(
+            "content.xml",
+            br"<office:document><draw:page><draw:frame><draw:text-box><text:p>Agenda</text:p></draw:text-box></draw:frame><presentation:notes><draw:page-thumbnail><text:p>Thumb</text:p></draw:page-thumbnail><draw:frame><draw:text-box><text:p>Speak slow</text:p></draw:text-box></draw:frame></presentation:notes></draw:page></office:document>",
+        )],
+    );
+    assert_eq!(
+        extract_document_text(&odp, ".odp").expect("odp notes"),
+        "## Slide 1\nAgenda\n\nNotes:\nSpeak slow"
+    );
+
+    // #40568: PPTX notes strip sldImg/sldNum/dt/hdr/ftr and drop empty "Notes:" headers.
+    let pptx = dir.path().join("notes.pptx");
+    write_zip(
+        &pptx,
+        &[
+            ("ppt/presentation.xml", br#"<p:presentation><p:sldIdLst><p:sldId r:id="r1"/><p:sldId r:id="r2"/></p:sldIdLst></p:presentation>"#),
+            ("ppt/_rels/presentation.xml.rels", br#"<Relationships><Relationship Id="r1" Target="slides/s1.xml"/><Relationship Id="r2" Target="slides/s2.xml"/></Relationships>"#),
+            ("ppt/slides/s1.xml", br"<p:sld><a:p><a:t>One</a:t></a:p></p:sld>"),
+            ("ppt/slides/s2.xml", br"<p:sld><a:p><a:t>Two</a:t></a:p></p:sld>"),
+            ("ppt/slides/_rels/s1.xml.rels", br#"<Relationships><Relationship Type="http://schemas/notesSlide" Target="../notesSlides/n1.xml"/></Relationships>"#),
+            ("ppt/slides/_rels/s2.xml.rels", br#"<Relationships><Relationship Type="http://schemas/notesSlide" Target="../notesSlides/n2.xml"/></Relationships>"#),
+            ("ppt/notesSlides/n1.xml", br#"<p:notes><p:sp><p:nvSpPr><p:nvPr><p:ph type="sldNum"/></p:nvPr></p:nvSpPr><p:txBody><a:p><a:t>1</a:t></a:p></p:txBody></p:sp><p:sp><p:nvSpPr><p:nvPr><p:ph type="ftr"/></p:nvPr></p:nvSpPr><p:txBody><a:p><a:t>Conf</a:t></a:p></p:txBody></p:sp><p:sp><p:nvSpPr><p:nvPr><p:ph type="body"/></p:nvPr></p:nvSpPr><p:txBody><a:p><a:t>Keep me</a:t></a:p></p:txBody></p:sp></p:notes>"#),
+            ("ppt/notesSlides/n2.xml", br#"<p:notes><p:sp><p:nvSpPr><p:nvPr><p:ph type="dt"/></p:nvPr></p:nvSpPr><p:txBody><a:p><a:t>2026-01-01</a:t></a:p></p:txBody></p:sp></p:notes>"#),
+        ],
+    );
+    assert_eq!(
+        extract_document_text(&pptx, ".pptx").expect("pptx notes"),
+        "## Slide 1\nOne\nNotes:\nKeep me\n\n## Slide 2\nTwo"
+    );
+}

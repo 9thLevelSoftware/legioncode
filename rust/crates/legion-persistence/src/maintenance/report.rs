@@ -9,8 +9,6 @@ use super::DatabaseInspection;
 pub const DATABASE_COMPACTION_RECOMMENDED_BYTES: u64 = 1024 * 1024 * 1024;
 
 const KIB: u64 = 1024;
-const MIB: u64 = 1024 * 1024;
-const GIB: u64 = 1024 * 1024 * 1024;
 
 /// Identifier for a candidate doctor repair action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,13 +58,17 @@ pub struct DoctorOptions {
 /// assert_eq!(format_bytes(1024 * 1024), "1.0 MiB");
 /// assert_eq!(format_bytes(1024 * 1024 * 1024), "1.00 GiB");
 /// ```
+/// Formats byte counts identically to upstream `doctor.ts` (`#40952`):
+/// picks the unit after rounding so a size just under `1 GiB` reads `"1.00 GiB"`, not `"1024.0 MiB"`.
 pub fn format_bytes(bytes: u64) -> String {
-    if bytes >= GIB {
+    let mebibytes = format!("{:.1}", u64_to_f64(bytes) / 1_048_576.0);
+    let kibibytes = bytes.div_ceil(KIB);
+    if mebibytes.parse::<f64>().is_ok_and(|value| value >= 1024.0) {
         format!("{:.2} GiB", u64_to_f64(bytes) / 1_073_741_824.0)
-    } else if bytes >= MIB {
-        format!("{:.1} MiB", u64_to_f64(bytes) / 1_048_576.0)
+    } else if kibibytes >= 1024 {
+        format!("{mebibytes} MiB")
     } else {
-        format!("{} KiB", bytes.div_ceil(KIB))
+        format!("{kibibytes} KiB")
     }
 }
 

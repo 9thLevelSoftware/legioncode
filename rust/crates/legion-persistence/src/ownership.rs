@@ -21,7 +21,7 @@ pub use liveness::{
     format_epoch_millis_utc, format_iso8601_utc, is_process_alive, legacy_owner_is_live,
     parse_iso8601_utc_millis,
 };
-pub use lock_monitor::CancellationToken;
+pub use lock_monitor::{CancellationToken, is_server_ownership_held};
 use lock_monitor::{
     FileIdentity, MonitorHandle, check_lock_lost, open_ownership_lock, resolve_paths,
     spawn_lock_monitor, state_dir_owned_error,
@@ -29,7 +29,8 @@ use lock_monitor::{
 pub use runtime_state::{
     ManagedPolicyRecord, ManagedPolicyState, PersistedServerRuntimeState,
     clear_persisted_server_runtime_state, persist_server_runtime_state,
-    read_live_server_runtime_state, read_persisted_server_runtime_state, runtime_origin_for_host,
+    read_contending_server_runtime_state, read_live_server_runtime_state,
+    read_persisted_server_runtime_state, runtime_origin_for_host,
 };
 
 /// Process exit code signaling that another server or legacy service owns the state directory.

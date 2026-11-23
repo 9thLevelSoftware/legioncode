@@ -78,6 +78,11 @@ pub const V2_MIGRATION_MANIFEST: &[(i64, &str)] = &[
     (103, "IssueTrackerAdditionalScopes"),
     (104, "ProjectionProjectsTrackedFolders"),
     (105, "TaskFolders"),
+    (106, "WorktreePathKeyIndex"),
+    (107, "DeferredSlashCommandIndex"),
+    (108, "AgentFeedback"),
+    (109, "IssueTrackerAccounts"),
+    (110, "Workflows"),
 ];
 
 /// Result emitted by [`run_service_preflight`], serializing to exact wire JSON with `"status"` first.

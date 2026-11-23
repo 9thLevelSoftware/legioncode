@@ -1,6 +1,9 @@
 //! Rich Text Format (`.rtf`) bounded parser matching `documentTextWorker.ts:419-532`.
 
+use std::collections::HashMap;
+
 use crate::doc_extractor::DocInternalErr;
+use crate::doc_extractor_rtf_cp::{decode_codepage_byte, font_charset_codepage};
 use crate::doc_extractor_xml::TextPart;
 
 #[derive(Clone, Copy)]
@@ -8,6 +11,8 @@ struct RtfState {
     skip: bool,
     deleted: bool,
     uc: usize,
+    font: i64,
+    font_table: bool,
     codepage: u16,
 }
 
@@ -17,6 +22,8 @@ impl Default for RtfState {
             skip: false,
             deleted: false,
             uc: 1,
+            font: 0,
+            font_table: false,
             codepage: 1252,
         }
     }
@@ -33,6 +40,9 @@ pub(crate) fn extract_rtf_parts(
     }
     let mut state = RtfState::default();
     let mut stack: Vec<RtfState> = Vec::new();
+    // A font's \fcharset, not the document code page, encodes the bytes written in that font.
+    let mut fonts: HashMap<i64, u16> = HashMap::new();
+    let mut default_font = 0i64;
     let mut fallback = 0usize;
     let mut idx = 0usize;
 
@@ -57,7 +67,15 @@ pub(crate) fn extract_rtf_parts(
                 idx += 1;
             }
             b'\\' => {
-                handle_rtf_backslash(bytes, &mut idx, &mut state, &mut fallback, parts)?;
+                handle_rtf_backslash(
+                    bytes,
+                    &mut idx,
+                    &mut state,
+                    &mut fonts,
+                    &mut default_font,
+                    &mut fallback,
+                    parts,
+                )?;
             }
             b'\n' | b'\r' => idx += 1,
             raw_b => {
@@ -65,7 +83,7 @@ pub(crate) fn extract_rtf_parts(
                 if fallback > 0 {
                     fallback -= 1;
                 } else if !hidden {
-                    push_char(decode_rtf_byte(state.codepage, raw_b)?, parts);
+                    push_char(decode_active_byte(&state, &fonts, raw_b), parts);
                 }
             }
         }
@@ -77,6 +95,8 @@ fn handle_rtf_backslash(
     bytes: &[u8],
     idx: &mut usize,
     state: &mut RtfState,
+    fonts: &mut HashMap<i64, u16>,
+    default_font: &mut i64,
     fallback: &mut usize,
     parts: &mut Vec<TextPart>,
 ) -> Result<(), DocInternalErr> {
@@ -93,7 +113,7 @@ fn handle_rtf_backslash(
         if *fallback > 0 {
             *fallback -= 1;
         } else if !hidden {
-            push_char(decode_rtf_byte(state.codepage, val)?, parts);
+            push_char(decode_active_byte(state, fonts, val), parts);
         }
         *idx += 3;
         return Ok(());
@@ -121,7 +141,7 @@ fn handle_rtf_backslash(
         if is_rtf_skip_destination(control) {
             state.skip = true;
         }
-        return apply_rtf_control(control, param, state, fallback, parts);
+        return apply_rtf_control(control, param, state, fonts, default_font, fallback, parts);
     }
 
     let sym = bytes[*idx];
@@ -146,13 +166,37 @@ fn apply_rtf_control(
     control: &str,
     param: Option<i64>,
     state: &mut RtfState,
+    fonts: &mut HashMap<i64, u16>,
+    default_font: &mut i64,
     fallback: &mut usize,
     parts: &mut Vec<TextPart>,
 ) -> Result<(), DocInternalErr> {
     let hidden = state.skip || state.deleted;
+    let value = param.unwrap_or(0);
     match control {
+        "fonttbl" => state.font_table = true,
+        "deff" => {
+            *default_font = value;
+            state.font = value;
+        }
+        "f" => {
+            state.font = value;
+            if state.font_table {
+                fonts.remove(&value);
+            }
+        }
+        "fcharset" => {
+            if state.font_table
+                && let Some(cp) = font_charset_codepage(value)
+            {
+                fonts.insert(state.font, cp);
+            }
+        }
         "deleted" => state.deleted = param != Some(0),
-        "plain" => state.deleted = false,
+        "plain" => {
+            state.deleted = false;
+            state.font = *default_font;
+        }
         "mac" => state.codepage = 10000,
         "ansicpg" => {
             let cp = u16::try_from(param.unwrap_or(0)).unwrap_or(0);
@@ -259,74 +303,9 @@ fn rtf_symbol(control: &str) -> Option<&'static str> {
     Some(s)
 }
 
-fn decode_rtf_byte(codepage: u16, byte: u8) -> Result<char, DocInternalErr> {
-    if byte < 0x80 {
-        return Ok(char::from(byte));
-    }
-    if codepage == 1252 {
-        const CP1252_80_9F: [char; 32] = [
-            '\u{20AC}', '\u{FFFD}', '\u{201A}', '\u{0192}', '\u{201E}', '\u{2026}', '\u{2020}',
-            '\u{2021}', '\u{02C6}', '\u{2030}', '\u{0160}', '\u{2039}', '\u{0152}', '\u{FFFD}',
-            '\u{017D}', '\u{FFFD}', '\u{FFFD}', '\u{2018}', '\u{2019}', '\u{201C}', '\u{201D}',
-            '\u{2022}', '\u{2013}', '\u{2014}', '\u{02DC}', '\u{2122}', '\u{0161}', '\u{203A}',
-            '\u{0153}', '\u{FFFD}', '\u{017E}', '\u{0178}',
-        ];
-        return Ok(if byte < 0xA0 {
-            CP1252_80_9F[usize::from(byte - 0x80)]
-        } else {
-            char::from(byte)
-        });
-    }
-    if codepage == 1251 {
-        const CP1251_80_BF: [char; 64] = [
-            '\u{0402}', '\u{0403}', '\u{201A}', '\u{0453}', '\u{201E}', '\u{2026}', '\u{2020}',
-            '\u{2021}', '\u{20AC}', '\u{2030}', '\u{0409}', '\u{2039}', '\u{040A}', '\u{040C}',
-            '\u{040B}', '\u{040F}', '\u{0452}', '\u{2018}', '\u{2019}', '\u{201C}', '\u{201D}',
-            '\u{2022}', '\u{2013}', '\u{2014}', '\u{FFFD}', '\u{2122}', '\u{0459}', '\u{203A}',
-            '\u{045A}', '\u{045C}', '\u{045B}', '\u{045F}', '\u{00A0}', '\u{040E}', '\u{045E}',
-            '\u{0408}', '\u{00A4}', '\u{0490}', '\u{00A6}', '\u{00A7}', '\u{0401}', '\u{00A9}',
-            '\u{0404}', '\u{00AB}', '\u{00AC}', '\u{00AD}', '\u{00AE}', '\u{0407}', '\u{00B0}',
-            '\u{00B1}', '\u{0406}', '\u{0456}', '\u{0491}', '\u{00B5}', '\u{00B6}', '\u{00B7}',
-            '\u{0451}', '\u{2116}', '\u{0454}', '\u{00BB}', '\u{0458}', '\u{0405}', '\u{0455}',
-            '\u{0457}',
-        ];
-        return if byte < 0xC0 {
-            let mapped = CP1251_80_BF[usize::from(byte - 0x80)];
-            if mapped == '\u{FFFD}' {
-                Err(DocInternalErr::InvalidFormat(
-                    "Invalid byte for cp1251".to_owned(),
-                ))
-            } else {
-                Ok(mapped)
-            }
-        } else {
-            Ok(char::from_u32(0x0410 + u32::from(byte - 0xC0))
-                .unwrap_or(char::REPLACEMENT_CHARACTER))
-        };
-    }
-    if codepage == 10000 {
-        #[rustfmt::skip]
-        const MAC_ROMAN_80_FF: [char; 128] = [
-            '\u{00C4}', '\u{00C5}', '\u{00C7}', '\u{00C9}', '\u{00D1}', '\u{00D6}', '\u{00DC}', '\u{00E1}',
-            '\u{00E0}', '\u{00E2}', '\u{00E4}', '\u{00E3}', '\u{00E5}', '\u{00E7}', '\u{00E9}', '\u{00E8}',
-            '\u{00EA}', '\u{00EB}', '\u{00ED}', '\u{00EC}', '\u{00EE}', '\u{00EF}', '\u{00F1}', '\u{00F3}',
-            '\u{00F2}', '\u{00F4}', '\u{00F6}', '\u{00F5}', '\u{00FA}', '\u{00F9}', '\u{00FB}', '\u{00FC}',
-            '\u{2020}', '\u{00B0}', '\u{00A2}', '\u{00A3}', '\u{00A7}', '\u{2022}', '\u{00B6}', '\u{00DF}',
-            '\u{00AE}', '\u{00A9}', '\u{2122}', '\u{00B4}', '\u{00A8}', '\u{2260}', '\u{00C6}', '\u{00D8}',
-            '\u{221E}', '\u{00B1}', '\u{2264}', '\u{2265}', '\u{00A5}', '\u{00B5}', '\u{2202}', '\u{2211}',
-            '\u{220F}', '\u{03C0}', '\u{222B}', '\u{00AA}', '\u{00BA}', '\u{03A9}', '\u{00E6}', '\u{00F8}',
-            '\u{00BF}', '\u{00A1}', '\u{00AC}', '\u{221A}', '\u{0192}', '\u{2248}', '\u{2206}', '\u{00AB}',
-            '\u{00BB}', '\u{2026}', '\u{00A0}', '\u{00C0}', '\u{00C3}', '\u{00D5}', '\u{0152}', '\u{0153}',
-            '\u{2013}', '\u{2014}', '\u{201C}', '\u{201D}', '\u{2018}', '\u{2019}', '\u{00F7}', '\u{25CA}',
-            '\u{00FF}', '\u{0178}', '\u{2044}', '\u{20AC}', '\u{2039}', '\u{203A}', '\u{FB01}', '\u{FB02}',
-            '\u{2021}', '\u{00B7}', '\u{201A}', '\u{201E}', '\u{2030}', '\u{00C2}', '\u{00CA}', '\u{00C1}',
-            '\u{00CB}', '\u{00C8}', '\u{00CD}', '\u{00CE}', '\u{00CF}', '\u{00CC}', '\u{00D3}', '\u{00D4}',
-            '\u{F8FF}', '\u{00D2}', '\u{00DA}', '\u{00DB}', '\u{00D9}', '\u{0131}', '\u{02C6}', '\u{02DC}',
-            '\u{00AF}', '\u{02D8}', '\u{02D9}', '\u{02DA}', '\u{00B8}', '\u{02DD}', '\u{02DB}', '\u{02C7}',
-        ];
-        return Ok(MAC_ROMAN_80_FF[usize::from(byte - 0x80)]);
-    }
-    Ok(char::from(byte))
+fn decode_active_byte(state: &RtfState, fonts: &HashMap<i64, u16>, byte: u8) -> char {
+    let codepage = fonts.get(&state.font).copied().unwrap_or(state.codepage);
+    decode_codepage_byte(codepage, byte)
 }
 
 fn hex_val(b: u8) -> Option<u8> {

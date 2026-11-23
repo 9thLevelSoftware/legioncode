@@ -16,8 +16,15 @@ pub(crate) enum MarkupMode {
     Xml,
     Docx,
     Odf,
+    Odp,
     Xhtml,
     Html,
+}
+
+impl MarkupMode {
+    pub(crate) const fn is_odf(self) -> bool {
+        matches!(self, Self::Odf | Self::Odp)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -93,6 +100,14 @@ pub(crate) fn is_hidden_tag(name: &str) -> bool {
             | "sizeRelH"
             | "sizeRelV"
             | "fldData"
+            // OpenDocument indexes keep templates beside generated content (#40523).
+            | "table-of-content-source"
+            | "illustration-index-source"
+            | "table-index-source"
+            | "object-index-source"
+            | "user-index-source"
+            | "alphabetical-index-source"
+            | "bibliography-source"
     )
 }
 
@@ -242,7 +257,7 @@ fn build_node(
         attrs.insert(local_key, val);
     }
 
-    let space_count = if mode == MarkupMode::Odf && name == "s" {
+    let space_count = if mode.is_odf() && name == "s" {
         Some(repeat_count(attrs.get("c").map(String::as_str))?)
     } else {
         None
@@ -284,14 +299,18 @@ fn close_top(stack: &mut Vec<XmlNode>, mode: MarkupMode) {
     let Some(mut node) = stack.pop() else {
         return;
     };
+    let inside_notes = mode == MarkupMode::Odp
+        && node.name == "page-thumbnail"
+        && stack.iter().any(|ancestor| ancestor.name == "notes");
     let Some(parent) = stack.last_mut() else {
         return;
     };
-    if mode == MarkupMode::Odf && matches!(node.name.as_str(), "p" | "h") {
+    if mode.is_odf() && matches!(node.name.as_str(), "p" | "h") {
         collapse_odf_whitespace(&mut node);
     }
     if (mode == MarkupMode::Docx && node.name == "del")
-        || (mode == MarkupMode::Odf && node.name == "annotation" && parent.name != "semantics")
+        || (mode.is_odf() && node.name == "annotation" && parent.name != "semantics")
+        || inside_notes
     {
         return;
     }

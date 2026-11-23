@@ -7,6 +7,7 @@ mod legacy;
 mod prune;
 mod prune_search;
 pub mod report;
+pub mod storage_files;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -19,6 +20,9 @@ pub use prune_search::cleanup_imported_transcript;
 pub use report::{
     DATABASE_COMPACTION_RECOMMENDED_BYTES, DoctorOptions, DoctorRepair, DoctorRepairId,
     format_bytes, plan_doctor_repairs, render_doctor_report,
+};
+pub use storage_files::{
+    StorageFileCleanupResult, clean_expired_storage_files, clean_expired_storage_files_with_hook,
 };
 
 /// Counts of active records still present in `state.sqlite` that are absent from `statev2.sqlite`.
@@ -137,6 +141,14 @@ pub enum MaintenanceError {
         path: PathBuf,
         /// Specific FS or SQLite failure reason.
         reason: String,
+    },
+    /// Storage file cleanup failure (symlinks skipped safely, `#40528`).
+    #[error("Storage file cleanup failed at '{}': {message}", path.display())]
+    StorageCleanup {
+        /// Target directory path.
+        path: PathBuf,
+        /// Underlying failure message.
+        message: String,
     },
 }
 

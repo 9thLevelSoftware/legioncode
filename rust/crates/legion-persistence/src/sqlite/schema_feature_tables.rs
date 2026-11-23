@@ -1,4 +1,4 @@
-//! Feature tables: scheduled tasks, webhooks, issue tracker bindings, and task folders.
+//! Feature tables: scheduled tasks, webhooks, issue tracker bindings/accounts, feedback, task folders, and workflows.
 
 use rusqlite::Connection;
 
@@ -77,8 +77,32 @@ CREATE TABLE IF NOT EXISTS issue_tracker_bindings (
   tracker TEXT NOT NULL,
   scope TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  additional_scopes TEXT NOT NULL DEFAULT '[]'
+  additional_scopes TEXT NOT NULL DEFAULT '[]',
+  account_id TEXT
 ) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS issue_tracker_accounts (
+  tracker TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (tracker, account_id)
+) WITHOUT ROWID;
+
+CREATE TABLE IF NOT EXISTS agent_feedback (
+  id TEXT PRIMARY KEY,
+  thread_id TEXT,
+  run_id TEXT,
+  created_at TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  expected TEXT NOT NULL,
+  actual TEXT NOT NULL,
+  workaround TEXT NOT NULL,
+  user_requested INTEGER NOT NULL DEFAULT 0,
+  trace TEXT,
+  source TEXT NOT NULL,
+  sent INTEGER NOT NULL DEFAULT 0
+);
 
 CREATE TABLE IF NOT EXISTS task_folders (
   root TEXT PRIMARY KEY,
@@ -94,5 +118,6 @@ CREATE TABLE IF NOT EXISTS task_folders (
 ";
 
 pub(crate) fn create_feature_tables(conn: &Connection) -> rusqlite::Result<()> {
-    conn.execute_batch(FEATURE_TABLES_SQL)
+    conn.execute_batch(FEATURE_TABLES_SQL)?;
+    super::schema_workflow_tables::create_workflow_tables(conn)
 }

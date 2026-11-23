@@ -1,11 +1,15 @@
 //! Doctor report formatting, legacy inspection, and offline database compaction tests.
 
+use std::fs;
 use std::path::Path;
+use std::time::{Duration, SystemTime};
 
+use legion_persistence::maintenance::storage_files::clean_expired_storage_files_with_hook;
 use legion_persistence::maintenance::{
     DATABASE_COMPACTION_RECOMMENDED_BYTES, DatabaseCompactStep, DatabaseInspection, DoctorOptions,
-    LegacyOnlyRecords, MaintenanceError, compact_database_with_steps, format_bytes,
-    inspect_database, remove_legacy_database, render_doctor_report,
+    LegacyOnlyRecords, MaintenanceError, StorageFileCleanupResult, clean_expired_storage_files,
+    compact_database_with_steps, format_bytes, inspect_database, remove_legacy_database,
+    render_doctor_report,
 };
 use legion_persistence::sqlite::SqliteStore;
 use rusqlite::Connection;
@@ -21,6 +25,22 @@ fn doctor_report_matches_cli_byte_for_byte() {
     assert_eq!(format_bytes(1024 * 1024), "1.0 MiB");
     assert_eq!(format_bytes(12 * 1024 * 1024 / 10), "1.2 MiB");
     assert_eq!(format_bytes(1024 * 1024 * 1024), "1.00 GiB");
+    // #40952: values rounding up to 1024.0 MiB promote to GiB (never "1024.0 MiB").
+    assert_eq!(format_bytes(1024 * 1024 * 1024 - 4096), "1.00 GiB");
+    assert_eq!(format_bytes(1024 * 1024 - 512), "1.0 MiB");
+    let near_gib = DatabaseInspection {
+        database_bytes: 1024 * 1024 * 1024 - 4096,
+        reclaimable_bytes: 1024 * 1024 - 512,
+        incremental_vacuum_enabled: true,
+        legacy_database_bytes: None,
+        legacy_only_records: None,
+    };
+    let near_gib_report = render_doctor_report(&near_gib, DoctorOptions::default());
+    assert_eq!(
+        near_gib_report.lines().next(),
+        Some("Database: 1.00 GiB, 1.0 MiB reclaimable.")
+    );
+    assert!(near_gib_report.contains("Rewrites the whole 1.00 GiB database"));
 
     let clean = DatabaseInspection {
         database_bytes: 16 * 1024,
@@ -293,5 +313,86 @@ fn remove_legacy_database_checks_unmigrated_records_and_lock_contention() -> Tes
     assert!(!temp.path().join("state.sqlite-wal").exists());
     assert!(!temp.path().join("state.sqlite-shm").exists());
     assert!(db_path.exists());
+    Ok(())
+}
+
+#[test]
+fn storage_cleanup_removes_expired_files_and_skips_symlinks_and_toctou_swaps() -> TestResult {
+    let temp = tempfile::tempdir()?;
+    let logs_dir = temp.path().join("logs");
+    let nested = logs_dir.join("nested");
+    let outside = temp.path().join("outside");
+    fs::create_dir_all(&nested)?;
+    fs::create_dir_all(&outside)?;
+
+    let expired_log = nested.join("server.log.1");
+    let fresh_log = nested.join("server.log.2");
+    let ignored_file = nested.join("notes.txt");
+    let external_log = outside.join("external.log.1");
+    fs::write(&expired_log, b"expired")?;
+    fs::write(&fresh_log, b"fresh")?;
+    fs::write(&ignored_file, b"keep")?;
+    fs::write(&external_log, b"external")?;
+
+    let now = SystemTime::now();
+    let old_mtime = now - Duration::from_hours(240);
+    fs::File::options()
+        .write(true)
+        .open(&expired_log)?
+        .set_modified(old_mtime)?;
+    fs::File::options()
+        .write(true)
+        .open(&external_log)?
+        .set_modified(old_mtime)?;
+
+    #[cfg(unix)]
+    let symlinks_supported = {
+        std::os::unix::fs::symlink("missing", nested.join("00-dangling.log.1"))?;
+        std::os::unix::fs::symlink(&outside, nested.join("01-linked"))?;
+        true
+    };
+    #[cfg(windows)]
+    let symlinks_supported =
+        match std::os::windows::fs::symlink_file("missing", nested.join("00-dangling.log.1")) {
+            Ok(()) => {
+                let _ = std::os::windows::fs::symlink_dir(&outside, nested.join("01-linked"));
+                true
+            }
+            Err(err) if err.raw_os_error() == Some(1314) => false,
+            Err(err) => return Err(err.into()),
+        };
+
+    let result = clean_expired_storage_files(&logs_dir, Duration::from_hours(168), true, now)?;
+    assert_eq!(result, StorageFileCleanupResult { files: 1, bytes: 7 });
+    assert!(!expired_log.exists());
+    assert!(fresh_log.exists());
+    assert!(ignored_file.exists());
+    assert!(external_log.exists());
+
+    if symlinks_supported {
+        // Simulate a TOCTOU swap replacing `nested` with a symlink into `outside` before traversal.
+        let mut swapped = false;
+        let canonical_nested = fs::canonicalize(&nested)?;
+        let toctou = clean_expired_storage_files_with_hook(
+            &logs_dir,
+            Duration::from_hours(168),
+            true,
+            now,
+            &mut |dir| {
+                if !swapped && dir == canonical_nested {
+                    swapped = true;
+                    let backup = temp.path().join("nested-original");
+                    if fs::rename(dir, &backup).is_ok() {
+                        #[cfg(unix)]
+                        let _ = std::os::unix::fs::symlink(&outside, dir);
+                        #[cfg(windows)]
+                        let _ = std::os::windows::fs::symlink_dir(&outside, dir);
+                    }
+                }
+            },
+        )?;
+        assert_eq!(toctou, StorageFileCleanupResult::default());
+        assert!(external_log.exists());
+    }
     Ok(())
 }

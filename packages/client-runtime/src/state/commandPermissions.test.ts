@@ -163,11 +163,45 @@ describe("command permissions", () => {
     { method: WS_METHODS.workspaceAddTaskFolderRepository, scope: AuthSourceControlWriteScope },
     { method: WS_METHODS.providerMcpSignInStart, scope: AuthProvidersManageScope },
     { method: WS_METHODS.providerMcpSignInComplete, scope: AuthProvidersManageScope },
+    { method: WS_METHODS.workflowBoardSubscribe, scope: AuthOrchestrationReadScope },
+    { method: WS_METHODS.workflowBoardGetCard, scope: AuthOrchestrationReadScope },
+    { method: WS_METHODS.workflowBoardGetArtifact, scope: AuthOrchestrationReadScope },
+    { method: WS_METHODS.workflowBoardCreateCard, scope: AuthOrchestrationOperateScope },
+    { method: WS_METHODS.workflowBoardUpdateSpec, scope: AuthOrchestrationOperateScope },
+    { method: WS_METHODS.workflowBoardApproveSpec, scope: AuthOrchestrationOperateScope },
+    { method: WS_METHODS.workflowBoardStartStage, scope: AuthOrchestrationOperateScope },
+    { method: WS_METHODS.workflowBoardExploreStep, scope: AuthOrchestrationOperateScope },
+    { method: WS_METHODS.workflowBoardChallengeStep, scope: AuthOrchestrationOperateScope },
+    { method: WS_METHODS.workflowBoardUpdatePlan, scope: AuthOrchestrationOperateScope },
+    { method: WS_METHODS.workflowBoardApprovePlan, scope: AuthOrchestrationOperateScope },
+    { method: WS_METHODS.workflowBoardReturnForRevision, scope: AuthOrchestrationOperateScope },
+    { method: WS_METHODS.workflowBoardGetCardDiff, scope: AuthOrchestrationReadScope },
+    { method: WS_METHODS.workflowBoardPauseCard, scope: AuthOrchestrationOperateScope },
+    { method: WS_METHODS.workflowBoardResumeCard, scope: AuthOrchestrationOperateScope },
+    { method: WS_METHODS.workflowBoardRetryStep, scope: AuthOrchestrationOperateScope },
+    { method: WS_METHODS.workflowBoardProposeAmendment, scope: AuthOrchestrationOperateScope },
+    { method: WS_METHODS.workflowBoardResolveFinding, scope: AuthOrchestrationOperateScope },
+    {
+      method: WS_METHODS.workflowBoardRecordManualAcceptance,
+      scope: AuthOrchestrationOperateScope,
+    },
+    { method: WS_METHODS.workflowBoardApproveDelivery, scope: AuthOrchestrationOperateScope },
   ])("requires the destination $scope grant for $method", ({ method, scope }) =>
     Effect.gen(function* () {
       const registry = yield* setup;
       const command = createCommandPermissions(runtime, method);
-      registry.set(sessions(env), AsyncResult.success(grant(true)));
+      registry.set(
+        sessions(env),
+        AsyncResult.success(
+          scope === AuthOrchestrationOperateScope
+            ? {
+                ...grant(false),
+                scopes: [AuthOrchestrationReadScope],
+                permissions: [AuthOrchestrationReadScope],
+              }
+            : grant(true),
+        ),
+      );
       expect(registry.get(command.permissionAtom(env))).toBe(false);
       expect((yield* command.authorize(registry, env).pipe(Effect.flip))._tag).toBe(
         "EnvironmentAuthorizationError",

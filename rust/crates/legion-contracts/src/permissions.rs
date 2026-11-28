@@ -46,6 +46,7 @@
 mod git_rules;
 mod methods;
 mod rules;
+mod server_rules;
 
 use std::fmt;
 use std::str::FromStr;
@@ -58,6 +59,10 @@ pub use methods::{EmptyWsMethodError, WsMethod};
 pub use rules::{
     contains_secret_reference, required_scopes_for_server_settings_patch,
     server_required_scope_for_ws_method,
+};
+pub use server_rules::{
+    RpcCallerKind, auth_scope_required_response, caller_kind_from_subject,
+    client_only_required_response, requires_human_client_caller, server_required_scopes_for_rpc,
 };
 
 impl FromStr for WsMethod {

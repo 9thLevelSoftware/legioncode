@@ -1,7 +1,11 @@
 import { LegendList, type LegendListRef } from "@legendapp/list/react-native";
 import { useAtomValue } from "@effect/atom-react";
 import { uuidv4 } from "../../lib/uuid";
-import { useNavigation } from "@react-navigation/native";
+import { StackActions, useNavigation } from "@react-navigation/native";
+import {
+  isProjectWorkflowBoardEnabled,
+  isProjectWorkflowBoardSupported,
+} from "@legioncode/client-runtime/workflow-board";
 import {
   claimThreadOpen,
   nextShownOrder,
@@ -103,6 +107,7 @@ const ACTION_ICONS: Record<string, AppSymbolName> = {
   terminal: "terminal",
   review: PullRequestGlyph.pullRequest,
   copyThreadReference: "link",
+  workflowBoard: "flowchart",
 };
 
 function itemIcon(item: CommandPaletteItem): AppSymbolName {
@@ -380,6 +385,47 @@ export function CommandPalette(props: {
     const activeProject = activeThread
       ? projectByKey.get(scopedProjectKey(activeThread.environmentId, activeThread.projectId))
       : null;
+    const activeProjectConfig = activeProject
+      ? serverConfigs.get(activeProject.environmentId)
+      : undefined;
+    const activeProjectSupportsBoard =
+      activeProject != null &&
+      activeProjectConfig !== undefined &&
+      isProjectWorkflowBoardSupported(activeProjectConfig.environment.capabilities);
+    const anyBoardEnvironmentEnabled = searchEnvironmentIds.some((envId) => {
+      const config = serverConfigs.get(envId);
+      return (
+        config !== undefined &&
+        isProjectWorkflowBoardEnabled({
+          settings: config.settings,
+          capabilities: config.environment.capabilities,
+        })
+      );
+    });
+    if (activeProjectSupportsBoard && activeProject) {
+      actions.push({
+        key: "workflowBoard",
+        kind: "action",
+        title: gt("Open workflow board"),
+        detail: activeProject.title,
+        searchTerms: ["workflow", "board", "kanban", "spec", "plan", "execute", "ship"],
+        run: () =>
+          navigation.dispatch(
+            StackActions.push("WorkflowBoard", {
+              environmentId: String(activeProject.environmentId),
+              projectId: String(activeProject.id),
+            }),
+          ),
+      });
+    } else if (anyBoardEnvironmentEnabled) {
+      actions.push({
+        key: "workflowBoard",
+        kind: "action",
+        title: gt("Open workflow board"),
+        searchTerms: ["workflow", "board", "kanban", "spec", "plan", "execute", "ship"],
+        run: () => navigation.dispatch(StackActions.push("WorkflowBoard")),
+      });
+    }
     if (activeProject) {
       actions.unshift({
         key: "newThread",
@@ -507,7 +553,9 @@ export function CommandPalette(props: {
     projects,
     runCommand,
     savedConnectionsById,
+    searchEnvironmentIds,
     selectDetail,
+    serverConfigs,
     startTriage,
     threads,
     delegatedUnderParent,

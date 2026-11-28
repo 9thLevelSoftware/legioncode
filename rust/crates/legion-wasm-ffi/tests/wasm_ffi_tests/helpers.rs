@@ -183,5 +183,65 @@ fn evaluate_rpc_scopes_enforces_all_required_scopes() -> Result<(), String> {
         }"##,
     )?)?;
     assert_eq!(allowed["allowed"], true);
+
+    for method in [
+        "workflowBoard.exploreStep",
+        "workflowBoard.challengeStep",
+        "workflowBoard.updatePlan",
+        "workflowBoard.approvePlan",
+        "workflowBoard.returnForRevision",
+    ] {
+        let denied_board = parse_json(&evaluate_rpc_scopes_json(&format!(
+            r#"{{"method":"{method}","payload":{{}},"session":{{"authenticated":true,"permissions":["orchestration:read"]}}}}"#
+        ))?)?;
+        assert_eq!(denied_board["allowed"], false);
+        assert_eq!(
+            denied_board["requiredScopes"],
+            serde_json::json!(["orchestration:operate"])
+        );
+
+        let allowed_board = parse_json(&evaluate_rpc_scopes_json(&format!(
+            r#"{{"method":"{method}","payload":{{}},"session":{{"authenticated":true,"permissions":["orchestration:operate"]}}}}"#
+        ))?)?;
+        assert_eq!(allowed_board["allowed"], true);
+    }
+
+    let diff_res = parse_json(&evaluate_rpc_scopes_json(
+        r#"{"method":"workflowBoard.getCardDiff","payload":{},"session":{"authenticated":true,"permissions":["orchestration:read"]}}"#,
+    )?)?;
+    assert_eq!(diff_res["allowed"], true);
+    assert_eq!(diff_res["requiresHumanClientCaller"], false);
+    assert_eq!(
+        diff_res["requiredScopes"],
+        serde_json::json!(["orchestration:read"])
+    );
+
+    for (method, human_only) in [
+        ("workflowBoard.startStage", false),
+        ("workflowBoard.pauseCard", false),
+        ("workflowBoard.resumeCard", false),
+        ("workflowBoard.retryStep", false),
+        ("workflowBoard.proposeAmendment", false),
+        ("workflowBoard.resolveFinding", true),
+        ("workflowBoard.recordManualAcceptance", true),
+        ("workflowBoard.approveDelivery", true),
+        ("workflowBoard.previewCliImport", false),
+        ("workflowBoard.applyCliImport", true),
+    ] {
+        let agent_eval = parse_json(&evaluate_rpc_scopes_json(&format!(
+            r#"{{"method":"{method}","payload":{{}},"subject":"agent:sub-1","session":{{"authenticated":true,"permissions":["orchestration:operate"]}}}}"#
+        ))?)?;
+        assert_eq!(agent_eval["requiresHumanClientCaller"], human_only);
+        assert_eq!(agent_eval["allowed"], !human_only);
+        assert_eq!(
+            agent_eval["requiredScopes"],
+            serde_json::json!(["orchestration:operate"])
+        );
+
+        let client_eval = parse_json(&evaluate_rpc_scopes_json(&format!(
+            r#"{{"method":"{method}","payload":{{}},"subject":"one-time-token","session":{{"authenticated":true,"permissions":["orchestration:operate"]}}}}"#
+        ))?)?;
+        assert_eq!(client_eval["allowed"], true);
+    }
     Ok(())
 }

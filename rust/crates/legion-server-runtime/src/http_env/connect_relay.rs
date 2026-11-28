@@ -14,6 +14,7 @@ use legion_contracts::ids::EnvironmentId;
 use legion_contracts::permissions::EnvironmentScope;
 use legion_persistence::pairing_tokens::{IssuePairingTokenInput, issue_pairing_token_with_conn};
 use legion_persistence::paths::ensure_environment_id;
+use legion_persistence::sqlite::BUILD_MIGRATION_HEAD;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -52,7 +53,7 @@ pub(crate) fn build_connect_descriptor(env_id: EnvironmentId) -> ExecutionEnviro
         PlatformInfo::new(os, arch),
         crate::SERVER_RUNTIME_VERSION,
     )
-    .database_migration(105)
+    .database_migration(u32::try_from(BUILD_MIGRATION_HEAD).unwrap_or(114))
     .build()
 }
 

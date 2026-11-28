@@ -32,6 +32,7 @@ import {
   PeerLinkThreadReadError,
   ProviderMcpSignInError,
   TaskFolderError,
+  WorkflowBoardRequestError,
   WorkflowRequestError,
   authScopeResponse,
   AuthAccessStreamError,
@@ -3641,6 +3642,154 @@ export const layerWsRpc = (
           Effect.succeed({ changed: false, problems: [] }),
         [WS_METHODS.agentFeedbackAnswerRequest]: () =>
           Effect.fail(new AgentFeedbackRequestError({ reason: "feedback_off" })),
+        [WS_METHODS.workflowBoardSubscribe]: () => Stream.empty,
+        [WS_METHODS.workflowBoardGetCard]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardGetArtifact]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardCreateCard]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardUpdateSpec]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardApproveSpec]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardStartStage]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardExploreStep]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardChallengeStep]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardUpdatePlan]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardApprovePlan]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardReturnForRevision]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardPauseCard]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardResumeCard]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardRetryStep]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardProposeAmendment]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardResolveFinding]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardRecordManualAcceptance]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardApproveDelivery]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardGetCardDiff]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardPreviewCliImport]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
+        [WS_METHODS.workflowBoardApplyCliImport]: () =>
+          Effect.fail(
+            new WorkflowBoardRequestError({
+              code: "internal_error",
+              message: "Workflow board is handled by the Rust server.",
+            }),
+          ),
       });
       const splitHandlers: Pick<typeof handlers, SplitWsRpc["_tag"]> = handlers;
       const otherHandlers: Pick<typeof handlers, Exclude<ServerWsRpc, SplitWsRpc>["_tag"]> =

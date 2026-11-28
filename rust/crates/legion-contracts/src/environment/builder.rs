@@ -227,5 +227,6 @@ fn base_server_capabilities() -> EnvironmentCapabilities {
         transitive_peer_linking: Some(true),
         agent_feedback: Some(true),
         issue_tracker_accounts: Some(true),
+        project_workflow_board: Some(true),
     }
 }

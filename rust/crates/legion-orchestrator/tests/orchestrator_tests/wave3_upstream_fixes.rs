@@ -120,6 +120,8 @@ async fn idle_compaction_excluded_from_user_attribution_and_custom_title_kept() 
         delegated_from: None,
         imported_native_thread: None,
         initial_message: None,
+        title_renamed: None,
+        workflow_run: None,
     };
     let decision = decide_thread_create_with_title_renamed(&state, &create_cmd, true, t0)?;
     let thread = decision.resulting_thread.ok_or("missing created thread")?;

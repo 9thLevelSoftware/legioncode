@@ -65,6 +65,15 @@ export function SettingsLabsRouteScreen() {
             "On a Mac, clone new worktrees from a checkout cached in the LegionCode home folder instead of writing every file. Uses Git’s normal checkout when it can’t. Turning it off deletes the cache.",
           )}
         />
+        <MachineBetaSection
+          title={gt("Workflows")}
+          icon="flowchart"
+          capability="projectWorkflowBoard"
+          setting="workflowsEnabled"
+          description={gt(
+            "Enable the project workflow board and server workflows for each machine. While off, workflow board actions and server workflow runs stay paused.",
+          )}
+        />
         <AgentFeedbackSection />
       </ScrollView>
     </SettingsScreen>
@@ -264,7 +273,7 @@ export function NewThreadSettingsSection() {
   );
 }
 
-type MachineBetaSetting = "linkedEnvironmentsEnabled" | "fastWorktreeCheckout";
+type MachineBetaSetting = "linkedEnvironmentsEnabled" | "fastWorktreeCheckout" | "workflowsEnabled";
 
 const AGENT_FEEDBACK_CHOICES: ReadonlyArray<{
   readonly mode: AgentFeedbackMode;
@@ -358,7 +367,7 @@ function MachineBetaSection({
 }: {
   readonly title: string;
   readonly icon: ComponentProps<typeof SettingsSwitchRow>["icon"];
-  readonly capability: "peerLinks" | "fastWorktreeCheckout";
+  readonly capability: "peerLinks" | "fastWorktreeCheckout" | "projectWorkflowBoard";
   readonly setting: MachineBetaSetting;
   readonly description: string;
 }) {
@@ -402,7 +411,9 @@ function MachineBetaSection({
                     patch:
                       setting === "linkedEnvironmentsEnabled"
                         ? { linkedEnvironmentsEnabled: value }
-                        : { fastWorktreeCheckout: value },
+                        : setting === "fastWorktreeCheckout"
+                          ? { fastWorktreeCheckout: value }
+                          : { workflowsEnabled: value },
                   },
                 })
               }

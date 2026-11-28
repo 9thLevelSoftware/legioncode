@@ -396,6 +396,115 @@
   "4c55ce3dea11be53": "Länka den här miljön till Legion Connect för en publik URL.",
   "b0f7054082ac0af6": "Bara den här datorn kan anropa den här adressen. Länka Legion Connect för en publik URL.",
   "9bf61e6a1df6575e": "Fungerar där den här miljöns adress kan nås, till exempel via Tailscale eller din egen proxy. Länka Legion Connect för en publik URL.",
+  "8459c68d2060c35a": "Läser in arbetsflödestavla…",
+  "90f601a1a0d6f678": "Kontrollerar serverns stöd för arbetsflödestavla.",
+  "9fecf458b89a5449": "Miljön är inte ansluten",
+  "2f45c5a2f81ba606": "Anslut den här miljön för att öppna projektets arbetsflödestavla.",
+  "4403db20f00cc614": "Arbetsflödestavla stöds inte",
+  "f5abac40497b2046": "Den här servern annonserar ännu inte stöd för projektets arbetsflödestavla.",
+  "34ad53646f06ed80": "Arbetsflöden är avstängda",
+  "c6b50b7b14713939": "Aktivera Workflows under Inställningar → Labs för att använda projektets arbetsflödestavla.",
+  "1d35b292a6c7687d": "Läsbehörighet krävs",
+  "fa33841ab2928908": "Den här sessionen saknar läsbehörighet för orkestrering.",
+  "22028ce255e0ea52": "Projektet hittades inte",
+  "fe8b2f748a612525": "Välj ett anslutet projekt för att öppna dess arbetsflödestavla.",
+  "4745f5f657095541": "Specifikation",
+  "086cf7b4ca56543b": "Plan",
+  "a065de4ac95ed77f": "Utför",
+  "d4d0ad32bbf2492d": "Leverera",
+  "94bbaba26abf2d27": "Aktiv",
+  "1fb31498e9479945": "Blockerad",
+  "8ef7caaaed0e9a2f": "Pausad",
+  "691967567dac5630": "Slutförd",
+  "bea12807777a509e": "Specifikation godkänd",
+  "c6bc84b3cad27e0b": "Godkännande inaktuellt",
+  "9f44b2ae72a195e0": "Ersatt",
+  "3732e4686ecc2236": "Historisk",
+  "360ececbe1c5f453": "Utkast till specifikation",
+  "6f076ca649948075": "Plan godkänd",
+  "45407210a349b739": "Plangodkännande inaktuellt",
+  "7d4a7b98dc3f2a76": "Ersatt",
+  "5dfd2410affa78d1": "Historisk",
+  "71d442ae8ff8734d": "Planutkast",
+  "88bed77cea96973c": "Blockerad",
+  "fba2fd42c6ca6dbc": "Lös blockering",
+  "334f4e403f01659c": "Återuppta kort",
+  "6322554bddfe0eeb": "Visa slutfört kort",
+  "7c9ffc61b956d1bf": "Utforma och godkänn specifikation",
+  "a15fd2fccdf91aa6": "Godkänn specifikation",
+  "969da8329b257a62": "Fortsätt guidad utforskning",
+  "73699aca96bd6637": "Återuppta utforskning",
+  "4f6eac1da6c1edcf": "Öppna specifikationstråd",
+  "9d880e1f3c5dcaf3": "Starta plan",
+  "841158a8adfcd661": "Öppna plantråd",
+  "364feaa97d59af62": "Revidera specifikation",
+  "a519e85f438e3a98": "Revidera plan",
+  "009dcc38518b970c": "Revidera utförande",
+  "c882aa0b9204e579": "Redo för utförande",
+  "652b3111f7ffe081": "Slutför aktiv uppgift",
+  "5799efec8b8b94b7": "Kör planerade kontroller eller nästa uppgift",
+  "301ca5ac1d045e63": "Fortsätt utförandet",
+  "f823c2ed9f4a66a4": "Starta oberoende granskning",
+  "4d1020a08eb4b908": "Öppna granskningstråd",
+  "2509cade788dbbdf": "Granska inför leverans",
+  "f5c238210f2f18fe": "Lös filkontraktsöverträdelse",
+  "1483de3d575160ef": "Stäm av externa ändringar",
+  "b7e1b00a345e6ee3": "Kör om misslyckad kontroll",
+  "f568e6d9e1b9e61b": "Kör om oberoende granskning",
+  "9cbca87b0c55b7fb": "Försök misslyckad uppgift igen",
+  "23054cd61a1dae40": "Försök misslyckat steg igen",
+  "0d135da201ad2bad": "Hantera granskningsfynd",
+  "cdc91d38b6f98f71": "Åtgärda granskningsfynd",
+  "d27c5efd33206ae2": "Välj Git-leveransåtgärder",
+  "3be969173fbfa5a7": "Bekräfta importerade policyer",
+  "8dd799e5a890f2c9": "Åtgärda blockerad uppgift",
+  "c6a0b71976577bb6": "Godkänn specifikation igen",
+  "8739c3a43e539635": "Följ utförande",
+  "e2be9e0de6d4308c": "Levererad",
+  "a999df9a9077e11c": "Redo för leverans",
+  "0eadfd4a217b5520": "Leverans blockerad",
+  "3f68515fe02ebf5a": "Leverans väntar",
+  "d0269942595ffbcf": "Väntande",
+  "022a26912f57ae82": "Körs",
+  "f0059cf63e90467c": "Godkänd",
+  "3de3e4c5c604f62b": "Misslyckades",
+  "d03b783c26744f27": "Inaktuell",
+  "d00d8815730cd607": "Historisk",
+  "6603378371972f1b": "Godkänd",
+  "23157564c7b0c5c7": "Fynd",
+  "f4791321ea4bfd33": "Misslyckades",
+  "22cebdfc8330ee8b": "Inaktuell",
+  "3b44208e87c94661": "Väntande",
+  "75d35698f0f23090": "Väntande",
+  "ddf48130ba9524e0": "Godkänd",
+  "854af4695d5e7b98": "Underkänd",
+  "dfb8cedfa8477f86": "Ej tillämplig",
+  "7a8ff7588b3f6777": "Inaktuell",
+  "4a1e74e28a70a390": "Historisk",
+  "1a149b00bbfd6621": "Kräver bekräftelse",
+  "685d43222e85476a": "Bekräftad",
+  "797d04eb1c35efd7": "Specifikationsgodkännande",
+  "16fb60ceb54e33e8": "Plangodkännande",
+  "131a81d7730fa04a": "Utförande",
+  "432c14edbadd23fc": "Granskning",
+  "2e8a21a099e6cc72": "Kontroll",
+  "627beac6eb84f7c8": "Det här kortet ändrades på servern. Uppdatera och försök igen.",
+  "7dc8ee61b60fee26": "Det här kortet ändrades på servern (revision {revision}). Uppdatera och försök igen.",
+  "f572fe5898fba987": "Godkänn specifikationen innan du startar Plan.",
+  "4fc6d4a3de86ff63": "Slutför och godkänn planen innan du fortsätter.",
+  "32940a3be17d6e3e": "Lös alla utforskningsbeslut innan du godkänner specifikationen.",
+  "af45a3063dba3cb1": "Slutför eller lös utmaningens invändningar innan du godkänner specifikationen.",
+  "453593f5279af5ee": "Externa filändringar upptäcktes. Granska och uppdatera innan du fortsätter.",
+  "468d8875a1531d21": "Uppgiftens filkontrakt eller beroenden har en konflikt.",
+  "148b20a8a49bf5c9": "Artefakter på disk matchar inte det förväntade revisionssammandraget.",
+  "f21458e08e3a9d89": "Det gick inte att hitta det här arbetsflödeskortet.",
+  "c329dfd8aa6f885d": "Projektet hittades inte på den här servern.",
+  "b08bdc990f859d2f": "Den begärda artefakten hittades inte.",
+  "233efd452c5adf65": "Artefaktnyckeln är ogiltig.",
+  "b30f11c7f5b30ac4": "Den här fasövergången är inte tillåten just nu.",
+  "d02bd5dcde1faaf5": "Det gick inte att starta fastråden.",
+  "79b1ca0f8ecdf356": "Begäran till arbetsflödestavlan misslyckades.",
+  "a48ccae4d10fb37a": "Den här servern stöder inte den här åtgärden på arbetsflödestavlan.",
   "3669395daf36fd33": "Inte längre registrerat på den här servern",
   "fe513cf316e796e3": "Körs som en del av andra arbetsflöden",
   "ccf00b97925efab3": "Startas manuellt",
@@ -1864,6 +1973,7 @@
   "90896a7348c4e7ce": "Öppna inställningar",
   "1d17dc60c59e0524": "Lossa projekt",
   "5cfaaa20c460c328": "Fäst projekt",
+  "6be625c09e2198d7": "Öppna arbetsflödestavla",
   "24adf508b4c5d6b5": "Projektinställningar",
   "60e47b3da5901619": "Inställningar · {section}",
   "0c659f9a193255dd": "Det gick inte att lägga till projektet",
@@ -2258,6 +2368,7 @@
   "72c74536ea4cbbb4": "Klar",
   "b0d6a54da63aa886": "Redigera",
   "f780864e3218484a": "inga",
+  "00cec8f8a60014d5": "Inga av de valda filerna har ocommittade ändringar. Välj filer nedan att ta med i denna commit.",
   "df6dad594cd78417": "Exkluderade",
   "983426d3b3735ae3": "Commit-meddelande (valfritt)",
   "bc8c52fd255ea8d0": "Committa på ny gren",
@@ -2611,6 +2722,7 @@
   "e54720cac68f2adb": "Alla projekt",
   "ac47f86df1c31a4a": "Det gick inte att kopiera grenen",
   "4e6305459e784fea": "Det gick inte att kopiera tråd-ID",
+  "15fc18a031baacaa": "Arbetsflödestavla",
   "5a79b7c910831c76": "Trådens titel får inte vara tom",
   "5c14b37b13312503": "Det gick inte att byta namn på tråden",
   "fc97f746bdabe59f": "Det gick inte att markera tråden som klar",
@@ -2646,6 +2758,7 @@
   "1c8fc3c4a42949ab": "Projekt: {projects}",
   "165511761be2855c": "Sök projekt",
   "a46a6467883575a4": "Sök projekt...",
+  "c1e0964ec047106e": "Arbetsflödestavla för {project}",
   "fdc0e086438a3045": "Projektinställningar för {project}",
   "4c1197b422538300": "Sökresultat för trådar",
   "792fd010fcd31023": "Kunde inte söka i trådmeddelanden",
@@ -12051,6 +12164,14 @@
   "18fc8976ddb6783d": ", misslyckades",
   "10ae251c9435642b": ", klar",
   "ef436cc0f1cee213": ", arbetar",
+  "3502e3eeeab4e868": [
+    "Arbetsflödestavla för ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
   "2c3bb8ccf6c38078": "Stäng meddelandet om leverantörsuppdatering",
   "3cef7762c22f5fb1": "Stäng tills leverantörsstatusen ändras",
   "0f90824868d6c3af": "Ny tråd ({shortcut})",
@@ -12412,6 +12533,1077 @@
   "2cddd6095abc734a": "7 dagar",
   "53493056306708cf": "30 dagar",
   "c719359d18d37ad3": "90 dagar",
+  "77eed5dc15386226": "Behörighet att styra orkestrering krävs.",
+  "709266ea8f8f9fbe": "Arbetsflöden är inaktiverade i Inställningar -> Labs.",
+  "4a0f0b51d0b09e3f": "Välj en giltig leverantör, modell och arbetsytestrategi.",
+  "c51bd65d9933c53a": "Kortet måste vara i Utför för att starta uppgifter.",
+  "947590fcd1d48c0c": "Återuppta det pausade kortet innan du startar uppgifter.",
+  "c452f673680552a0": "Slutförda kort kan inte starta nya uppgifter.",
+  "49ac2f29e61bf2bb": "Plangodkännande krävs eller är inaktuellt. Godkänn planen igen först.",
+  "3e5f240f07aad2af": "Bekräfta CLI-policyer som inte stöds innan du startar utförandet.",
+  "c6ed067f6c1935b5": "Stäm av väntande journalposter eller externa ändringar först.",
+  "cdc0dc3b70d02fdd": "Lös väntande filkontraktsöverträdelser innan du startar en annan uppgift.",
+  "b727f7dcedbb99e0": "Endast en ändrande uppgift kan köras åt gången ({taskId} är aktiv).",
+  "c3db6bc3e0594804": "Uppgiften är redan slutförd.",
+  "bfd986ed3038a46f": "Försök igen med den blockerade uppgiften innan du startar utförandet.",
+  "c992d0264ee206ad": "Väntar på ofullständiga förhandskravsuppgifter.",
+  "041babd36d9c000b": "Oberoende granskning körs i Utför eller Leverera.",
+  "46dcca82ee3f9a6e": "Återuppta det pausade kortet innan du startar granskningen.",
+  "ecfdd9c5a2eb05a7": "Slutförda kort kan inte starta en ny granskning.",
+  "090cbc7e1d69ad89": "Plangodkännande krävs eller är inaktuellt före oberoende granskning.",
+  "36aa53d49af8f40a": "Lös väntande filkontraktsöverträdelser före granskning.",
+  "a2a52ce20b456ecc": "Slutför den aktiva uppgiften {taskId} innan du startar oberoende granskning.",
+  "3ddb95355dcebee2": "Tillåten",
+  "e40e0d50641ef262": "Oväntad",
+  "6d227e931d448c01": "Förbjuden",
+  "1a22550031b8805a": "Ej tilldelad",
+  "9e893e0b7189cade": "Arbetsträd-diff",
+  "d3fa5df47d263836": [
+    "bas ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "75e394a90d4e3c8a": [
+    "ögonblicksbild ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "17f622999756f4a3": [
+    "diff ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "97107cad02a2eaeb": "Uppdatera diff",
+  "1e914c155089b234": "Diff-utdata trunkerades eftersom fler än 250 filer ändrades.",
+  "d3b616e4946e8eaa": "Läser in kort-diff…",
+  "561ab4c144816ffe": "Inga ändrade produktfiler hittades i detta arbetsträd.",
+  "34371b40df46ce20": "Det gick inte att godkänna specifikationen.",
+  "0264e7c2814c6b1b": "Specifikation godkänd vid revision {revision}.",
+  "8c986e50755d3c22": "Kortarbetsyta",
+  "cf2c1fa24c9e6b72": "Kortets fasflikar",
+  "60955638c07d65cb": "Ansluten fastråd",
+  "f9f71384a58888c5": [
+    "Importerad från ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "f465ce3e3e456642": "Hanteras av LegionCode",
+  "e05e66d858edc983": [
+    "Kort ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " · rev ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "f44fd36664981ac6": "Skicka tillbaka för revidering",
+  "667e8e1240b3cb64": "Specifikation",
+  "0faf657712a9d10a": "Plan",
+  "d56d671e2becfb4a": "Utför",
+  "c2191f40bcabaa52": "Leverera",
+  "8ecdf11e3f5ce172": [
+    "Historik (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "28a213b593db1c78": "Åtgärden misslyckades",
+  "bf0a2a2980d65f46": "Specifikationsgodkännandet är inaktuellt",
+  "17795c4de5653257": "Specifikationen ändrades efter godkännandet. Granska den uppdaterade sammanfattningen och godkänn igen innan du startar Plan.",
+  "e2221be531b13c55": "Plangodkännandet är inaktuellt",
+  "79fc8ea510a6058d": "Plangodkännandet ogiltigförklarades av en specifikations- eller revisionsändring. Granska och godkänn planen igen före utförande.",
+  "fee3be43c6726418": "Externa ändringar upptäckta",
+  "733e099627d16adc": [
+    "CLI-importhärkomst (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "471a7919a72dd9fe": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " beslut · ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    " antaganden · ",
+    {
+      "i": 3,
+      "k": "_gt_value_3",
+      "v": "v"
+    },
+    " AC · ",
+    {
+      "i": 4,
+      "k": "_gt_value_4",
+      "v": "v"
+    },
+    " historiska kvitton"
+  ],
+  "4b7e6829f42ffe2e": "Källkatalog",
+  "80dcee6cc023050f": "Källspecifikations-ID",
+  "2cbee85b787ff893": "Ägarskap",
+  "17af677e66b5ffc2": "Historiska CLI-kvitton (inbyggd omvalidering krävs)",
+  "f913056e7e8d2dc1": "Historisk",
+  "c4ba40406c77fc87": "Införda CLI-policyer",
+  "cf3f1c93e24e92de": "Saknade CLI-kontrolloggar",
+  "e482c557b2a52289": "Specifikationen är godkänd. Du kan gå vidare till planfasen.",
+  "8a33e7183cd44d1a": "Lös utforskningsbeslut och slutför avgränsad utmaning för att godkänna specifikationen.",
+  "30ff41e82482fa32": "Godkänner…",
+  "b5cd560567347feb": "Specifikation godkänd",
+  "4f19d3b3fb35d010": "Godkänn specifikation",
+  "9b939cda922855a0": "Revisionshistorik",
+  "95fdd684b1e8a1c5": "Inga revisioner registrerade ännu.",
+  "18125122c20c5a92": [
+    "rev ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "66043444263910c2": "Ansluten specifikationstråd",
+  "1b6cc343adf389f5": "Ansluten utförandetråd",
+  "c21dc703736e0106": "Ansluten granskningstråd",
+  "3e524f39fabce11e": "Ansluten plantråd",
+  "02cad9b729613548": "Olöst",
+  "fdbe65b636bb30ff": "Svara",
+  "230512cebc263fe8": "Avfärda",
+  "51abc5d935121cb3": "Acceptera",
+  "c05a58687f5a28dc": "Acceptera risk",
+  "30a5e7226b9dbba7": "Skjut upp",
+  "a12f23b46f37685b": "Ange ett svar för invändning {concernId}.",
+  "cf92e5f933b0b963": "Ange ett skäl för avfärdande av {concernId}.",
+  "c5976e49894827b0": "Kunde inte spara utmaningssvaren.",
+  "ae41cd4c80118f6d": "Utmaningens åtgärder sparade.",
+  "1756e4a67ba773e9": "Manuell reservlösning kräver att aktiva invändningar lösts, 3 ifyllda svar och exakt bekräftelse.",
+  "c03d9bff982ec8be": "Kunde inte registrera manuell utmaningsreserv.",
+  "3f46e012244d813e": "Manuell 3-frågors utmaningsreserv registrerad.",
+  "8a7a228fa65d9528": "Utmaningssteget misslyckades.",
+  "dc031ac1ab3f29c9": "Utmaningssyntes klar med ordagrant bevarade mänskliga svar.",
+  "7420b076b48c4bef": "Utmaning markerad som slutförd.",
+  "415dc07bc215e5db": "Utmaningsomgång startad.",
+  "388d79c7d8f529a5": "Åtgärd för {concernId}",
+  "2b6423bcbd69286a": "Svar för {concernId}",
+  "b4c613b8f63820a5": "Ange ett svar (bevaras ordagrant vid syntes)...",
+  "9ec5b98f08eb6e6d": "Skäl för avfärdande av {concernId}",
+  "f2c84f662714d51d": "Varför avfärdas denna invändning?",
+  "dcd764755f0348c4": "Avgränsad utmaning",
+  "92bb6f58e9ec02a0": [
+    "Invändningar ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "/3"
+  ],
+  "24ff2758dcd27f9d": "Starta utmaning",
+  "2e48b2b105060b2f": [
+    "Syntetisera (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "/1)"
+  ],
+  "fed04a3437b36b29": "Slutför utmaning",
+  "0705296529b25c30": "Manuell reserv",
+  "5050fd724173d6b2": "Utmaningen är inaktuell eftersom specifikationen eller utforskningssvaren ändrats. Kör om eller slutför innan specifikationen godkänns.",
+  "81375a9f97997bfd": [
+    "Varför det spelar roll: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "f583d7f3c6c2ebfc": [
+    "Belägg: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "06c2a55b23b225e6": "Spara utmaningssvar",
+  "b2b45902059502cc": "Manuell reserv registrerad",
+  "bb7fa951b9594321": "Manuell 3-frågors utmaningsreserv",
+  "203ee5b864f72a42": "Lös eller hantera alla aktiva invändningar innan manuell reserv används.",
+  "9ab699c2fcfba074": "1. Vilket felläge eller återställningsgräns kan ogiltigförklara denna specifikation?",
+  "aa0d42f62ed4956a": "2. Vilka acceptanskriterier eller filkontrakt är mest utsatta?",
+  "f43aee7ab46c279c": "3. Hur ska planens verifiering bekräfta dessa antaganden?",
+  "fda3e7a0d01bd1a1": [
+    "Skriv ",
+    {
+      "t": "code",
+      "i": 1,
+      "c": "I acknowledge"
+    },
+    " för att bekräfta manuell utmaning"
+  ],
+  "aaffe004de86479c": "Skicka manuell reserv",
+  "c259295d3f067e59": "Automatiserad",
+  "69b26fe68936a290": "Manuell",
+  "5914a15ca04303be": "Extern",
+  "4639a9fb2678a86c": "Kontroll {number} ID",
+  "9dab7ff6c0dd4671": "Kontroll {number} argv-kommando",
+  "3a22c96ebda92c57": "vp test run src/feature.test.ts",
+  "e266bf5d9c7db8c1": "Ta bort kontroll {checkId}",
+  "52c5b976dcea8c95": "Kontroll {number} beskrivning",
+  "e21609c215334f11": "Vad denna kontroll verifierar",
+  "d15557b39bcb0885": "Beläggsmetod för {criterionId}",
+  "c678f4fe74ab1b29": "Kontroll-ID:n för {criterionId}",
+  "03542b84f024ecb0": "CHK-01",
+  "d2be106fc1b6e781": "Manuell verifieringsprocedur för {criterionId}",
+  "32ddc4fda2b8fe1a": "Beskriv de manuella verifieringsstegen...",
+  "2f343e083f199969": "Extern referens för {criterionId}",
+  "6a4422ba1b43d561": "Extern beläggsreferens eller ärende",
+  "d8cc6ea29cbae9f8": "Extern källa för {criterionId}",
+  "edd8438375734cbd": "Externt system eller CI-källa",
+  "6439d7b5393a32ca": "Planerade argv-kontroller",
+  "151172a2a766c4b7": "Lägg till kontroll",
+  "f69e49d00cdd3034": "Kontroll-ID får inte vara tomt.",
+  "2c4e6cabe4615e81": "Kontrollkommandot måste vara ett rent argv-anrop (inga skalomslag eller operatorer som sh -c, cmd /c, &&, | eller $()).",
+  "e569f781d744df7c": "Bevismappning för acceptanskriterier",
+  "ed59bc527c71f2ca": [
+    "Mappade ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "/",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "6a62fc7f8a1da16b": "Inga acceptanskriterier definierade i specifikationen ännu.",
+  "ea0bc42e6af70bad": "Omappad",
+  "0f236fec0492046c": "Kunde inte förhandsgranska CLI-projektet.",
+  "f339ee381b0a98f2": "Kunde inte importera CLI-projektet.",
+  "b27820fa4b8a1cd3": ".legion-cli",
+  "91b8a1beff4a7dbe": "Stoppa den aktiva CLI-körningen innan du importerar till LegionCode.",
+  "8e459a49cca877f9": "Importera CLI-projekt",
+  "7843ed30a2a297dd": "Förhandsgranska en befintlig .legion-cli-katalog, granska historiska kvitton och införda policyer och importera uttryckligen till projektets arbetsflödestavla.",
+  "687773e1e528b185": "CLI-katalog (relativ till arbetsytan)",
+  "e67f02a4a2cee1a3": "Förhandsgranskar…",
+  "74d30d60822d04a6": "Förhandsgranska import",
+  "93757c47ab8e6715": "Ange en säker relativ sökväg (ingen traversering, .git eller autentiseringsfiler).",
+  "5957c075ecbc3906": "Förhandsgranskningen misslyckades",
+  "4f9d4c6c773a866e": "Importen misslyckades",
+  "be8595e2c762ebb9": "Aktiv CLI-körning upptäckt: övertagande nekades",
+  "7524f9f016331f97": [
+    " ",
+    "(pid ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "b9a81413dbff86a4": [
+    " ",
+    "· körning ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "7cd38cdbbe9c9db7": "Inaktuella CLI-lås ignorerades",
+  "e5674185bfd401f5": [
+    " ",
+    "(inaktiv pid ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "55c299251817faf2": "Importanteckningar",
+  "bd3696cd846d198e": [
+    "Införda CLI-policyer som inte stöds (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "3508d167aa20eb25": "Blockerar utförande",
+  "d86ee2dd51487951": [
+    "Konfigurerat: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "79e39a82ba67cc62": "Bekräfta blockerande policyer som inte stöds under importen så att utförandet kan köras i LegionCode",
+  "94d5303faa191007": "Redan importerad (synkroniseras om idempotent)",
+  "a3799f9730d6a44e": "Beslut",
+  "e38d50e7f83b3f05": "Antaganden",
+  "907b69c8a7f51573": "Acceptanskriterier",
+  "157610c46916b2d8": [
+    "Bevarade uppgifter (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "f086bac12c9ea015": "Inga CLI-uppgifter hittades.",
+  "56fa7120bacb4121": [
+    "Historiska kvitton (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "55bf41657b2b79b7": "Inbyggd omvalidering krävs",
+  "29fcc734bf45f2b5": "Saknade kontrolloggar noterade",
+  "8024d6d8c02f619c": "Tillämpa import",
+  "5b1991cdca348ed3": "Det gick inte att skapa arbetsflödeskortet.",
+  "31006457b62318ae": "Guidad",
+  "47a22f11b45bef8e": "Balanserad",
+  "718f44ac6a9a9bfc": "Direkt",
+  "3ba8363bb9358dc5": "Börja från en idé",
+  "3adab074474e0d6a": "Importera brieffil",
+  "4d6e5de6af987bee": "Undersök kodbas",
+  "9acb512a6c262b10": "Nyutveckling",
+  "49be8bcac849dde2": "Ändring",
+  "0470c4f0c4432670": "Granskning",
+  "1e280f49cdbeb315": "Titel på funktion eller specifikation",
+  "27dcae60ba950bd2": "Källa",
+  "4b80e195c0d37342": "Intagsmål",
+  "d12beb9566021328": "Hjälpläge",
+  "a2890130274e0ad8": "docs/brief.md",
+  "841124116b0a3155": "Beskriv problemet, målen och begränsningarna...",
+  "f7ce9b670326e767": "README.md",
+  "cc1a91676109e080": "Nytt arbetsflödeskort",
+  "a76ea0f487efbe4c": "Skapa ett funktionskort i Specifikation från en idé, lokal brief eller kodbasundersökning.",
+  "3ac8ed47fe50bd34": "Titel",
+  "c317fa79a76d4963": "Källa",
+  "09c47b8c1d4e0ea6": "Intagsmål",
+  "45e2290d1d82bd92": "Hjälpläge",
+  "094a5f0aa8f9ae58": "Sökväg till brieffil (relativ till arbetsytan)",
+  "c19ee24d057b8c56": "Initial specifikation eller idé",
+  "d1e3ddc28b5bb424": "Referensfiler (valfritt, en per rad)",
+  "01975aaa5753c397": [
+    "Ogiltig relativ sökväg: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "b6aff8cc85743aaf": "Aktivera valfria HTML-trådramsmodeller (lämna avmarkerat för funktioner utan UI)",
+  "a9259586993dea80": "Skapar…",
+  "060e03a7ac9e0698": "Skapa kort",
+  "07861447f44abd0f": "Det gick inte att pausa kortet.",
+  "58313e63507cfa66": "Kort pausat.",
+  "9ae598c5e91f3fe5": "Det gick inte att återuppta kortet.",
+  "ea79ce7d32956b1e": "Stämde av {count} väntande objekt och återupptog kortet.",
+  "61792a9d9d80e033": "Kort återupptaget.",
+  "1348db88d6cbd3fa": "Det gick inte att återställa utförandesteget.",
+  "869d6fd6f8676b91": "Utförandesteget återställt för nytt försök.",
+  "13ff0947a4bdda9e": "Det gick inte att starta uppgiften {taskId}.",
+  "13264e9a1636c412": "Återansluten till tråden för uppgift {taskId}.",
+  "06077698ed64f5df": "Uppgift {taskId} startad.",
+  "749a34d6eccce113": "Det gick inte att försöka uppgiften {taskId} igen.",
+  "fb53fe1960c6bd41": "Uppgift {taskId} återställd till att göra.",
+  "920120b4731064c6": "Det gick inte att köra kontrollen {checkId}.",
+  "db2870000950de30": "Planerad kontroll {checkId} körd.",
+  "d173b568df7dd8b9": "Ändra filkontrakt efter oväntade ändringar i {taskId}",
+  "8d4db3550971e9c1": "Ange en orsak till planändringen.",
+  "b985a9c2b3b71177": "Git-metadatasökvägar (.git) kan inte läggas till i en uppgifts tillåtna filer. Avmarkera att inkludera oväntade filer eller justera uppgiften i Plan.",
+  "b65e2f166a8f0553": "Att inkludera dessa filer skulle strida mot en annan uppgifts filkontrakt. Justera filerna i Plan efter att ändringen föreslagits.",
+  "e95116de8fb40fb4": "Det gick inte att föreslå planändring.",
+  "1da450985f58f1bf": "Ändring föreslagen. Granska och godkänn planen igen innan utförandet återupptas.",
+  "1223c4825d141927": "Orsak till paus",
+  "23fc1b473975bcc3": "Valfri orsak till paus...",
+  "33d40b2afd967984": "Målsteg för ändring",
+  "bdc0df4d6fe087a2": "Specifikation",
+  "67733c48eaaec73a": "Plan",
+  "690c93d1ebf80240": "Beskriv varför planen eller filkontraktet måste ändras...",
+  "13ac16afd362776e": "Valfri sammanfattning av omfattningsändringar...",
+  "dc1b13160ae2208e": "Uppgiftens ändringar bröt mot det godkända filkontraktet.",
+  "ad85508807c7b5e2": "Ögonblicksbilden ändrades efter denna kontroll. Kör om kontrollen för att uppdatera kvittot.",
+  "987d148ab4ff206e": "Utförandelivscykel",
+  "600a7b99d303fc1f": [
+    "arbetsträd ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "b80ed2c94c54c53d": "Stämmer av…",
+  "44bed7a91f40c330": "Stäm av och återuppta",
+  "86b687d25db33421": "Återupptar…",
+  "0ade85ea90ad751c": "Återuppta kort",
+  "4566cc4be5b16e09": "Pausar…",
+  "90e5dbaabadf76dd": "Pausa kort",
+  "9eebc8bf0dea4f01": "Försök steg igen",
+  "da007503403e1774": "Föreslå planändring",
+  "b8ee31bb4f485919": "Orsak",
+  "78ff862361e52146": "Sammanfattning (valfritt)",
+  "520906041aced5d1": [
+    "Inkludera oväntade fil(er) (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ") i tillåtna filer för ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "ca18927b3e95d65c": "Skickar…",
+  "723e31b88a93b031": "Skicka ändring",
+  "f9c790c16ceb3934": "Ändringshistorik",
+  "1cf7f80d693e29ed": "Avstämning krävs",
+  "6450d05feb45a50c": "Uppdatera status",
+  "a212d6bc6deb0f06": "Pausa för avstämning",
+  "95141f907848b644": [
+    "Externa filändringar under .legion/workflows/",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "/ eller avbrutna skrivjournalåtgärder måste stämmas av innan nya uppgifter, kontroller, granskningar eller leveranser startas."
+  ],
+  "b0f10332f52e4ca1": [
+    ".legion-cli-policyer som inte stöds (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "5a58fbb6b2c3d62c": "Jag bekräftar dessa .legion-cli-policyer som inte stöds och vill köra utförandet i LegionCode",
+  "002cd140e0d8b402": [
+    "Oväntade ändringar sparade för granskning (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "da51822777231f07": "Filer utanför uppgiftens godkända kontrakt behölls orörda i arbetsträdet för granskning. Föreslå en planändring eller återgå till Plan för att uppdatera filägarskapet.",
+  "5acca5c601e49e30": "Återgå till Plan",
+  "5b860292a027036f": "Tillåtna",
+  "3596739c417e1455": "Oväntade",
+  "1949b04b9bcdea2e": "Förbjudna",
+  "81905eb0d318a479": "Uppgiftskö och DAG",
+  "635958befc2b1a25": [
+    "Aktiv ändrande uppgift: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "842af46d2568c0de": "Inga uppgifter definierade i den godkända planen.",
+  "ea3ed00c48073b79": "DAG redo",
+  "9ca58cd4346b9930": "Blockerad av beroenden",
+  "95be962a05d287ee": "Försök uppgift igen",
+  "bba1e3a22505b87f": "Startar…",
+  "e40c1fcfde101795": "Återuppta uppgift",
+  "6fed84a5e21aed17": "Starta uppgift",
+  "92b2f5e332fe2b9c": [
+    "Beror på: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "435b7da3a16c01e3": [
+    "Tillåtna filer: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "ec02505643032f35": [
+    "Förbjudna filer: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "d146df4a0786105b": "Planerade kontroller och kvitton",
+  "bafcfc98a9119de4": "Inga planerade argv-kontroller konfigurerade.",
+  "35f16b5452140293": "Inaktuell",
+  "24d40be77424ca6c": "Kör…",
+  "92d0d9c65378a8b1": "Kör kontroll igen",
+  "a006200f48808ab3": "Kör kontroll",
+  "71bdec4ce6ad0173": "Kontrollutdata",
+  "7f9f32d42c987a25": "Kunde inte uppdatera utforskningen.",
+  "00f86bb6249229e7": "Utforskningen pausad. Sparade svar behålls utan att specifikationen godkänns.",
+  "7b80734327349844": "Omgång klar. Fortsätt till nästa utforskningsomgång när du är redo.",
+  "c8036790a5b0d94b": "Utforskning uppdaterad (omgång {round}).",
+  "68f2d54da425ec8e": "Ange ett svar för beslut {decisionId} innan du skickar.",
+  "275aa6855df79650": "Förklara",
+  "e371d17b57b20cba": "Rekommendera",
+  "f2d7fbd78dde29d1": "Redigera",
+  "654173a5a79cfedc": "Osäker",
+  "35f919517eae1fcd": "Svar för {decisionId}",
+  "78b8798cd4f7886c": "Ange ditt svar för beslutet...",
+  "3d424196d9d438a4": "Guidad utforskning",
+  "83570a9ff6d6afa8": [
+    "Omgång ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "6e1cf7870eb5af9c": "Pausad",
+  "830d2c65517ac82d": "Alla beslut lösta",
+  "0ccc58f516ea5cfc": "Starta utforskning",
+  "5fdfa2857eb659b8": "Återuppta utforskning",
+  "6848686ec40ee487": "Pausa",
+  "66d122746ccfe403": [
+    "Rekommendation: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "b958a317a69fb7bd": "Fortsätt till nästa omgång",
+  "ff245f173776d5a4": "Skicka omgångens svar",
+  "6f92c000fd81e12a": "Denna utforskningsomgång är redo att gå vidare.",
+  "8f1b3bd23e86e44f": [
+    "Lösta beslut (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "0deabb397a585f0c": "Projektrot",
+  "75f2761d1fbb7698": "Befintligt worktree",
+  "cd1ecf414350321f": "Välj modell",
+  "ffb03f7e9c3d11ad": "Interaktionsläge",
+  "e6add5f3d5feffa8": "Basreferens",
+  "f1b79ec7eaf325fc": "HEAD",
+  "ac96ec22fe9485b9": "Worktree-sökväg",
+  "adc7abf973ff3eea": "/sökväg/till/worktree",
+  "aa4732594c744f1b": "Känt worktree",
+  "24fda42455f727f7": "Välj känt worktree",
+  "40be2953e6845f72": "Valfritt grennamn",
+  "07fe00eba221d93c": "Interaktionsläge",
+  "a6cd4c24e054da4a": "Basreferens",
+  "43f12a1dab02ea9a": "Ange en basreferens för att fortsätta.",
+  "5d7ffda1509234b9": "Worktree-sökväg",
+  "b16cffb0be79b32c": "Ange sökvägen till ett befintligt worktree för att fortsätta.",
+  "5cab12a31fc5ea09": "Gren (valfri)",
+  "3f71f14fc9efbea7": "Dra {title} till en annan fas",
+  "5e214c4145c1a7fb": "Skicka tillbaka {title} för revidering",
+  "f3ad2605c5fbb17c": "Flytta {title} till Plan",
+  "fefa29920c99b5b3": "Flytta {title} till Utför",
+  "a844dc25fe05956e": "Flytta {title} till Leverera",
+  "a622fcbcace25c1e": "Öppna stadiet {stage} ({count} kort)",
+  "31bb3fc4acca6bef": "Tryck på Mellanslag eller Retur för att lyfta ett arbetsflödeskort. Använd piltangenterna för att flytta till en målkolumn och tryck på Mellanslag eller Retur igen för att släppa, eller Escape för att avbryta.",
+  "62c549af8abc8217": "Lyfte kortet {title}.",
+  "975ade0e42f308ca": "Kortet {title} är över kolumnen {stage}.",
+  "0a4d1d9909596d8c": "Kortet {title} är inte över en tillgänglig övergångskolumn.",
+  "2f7cabada4de5771": "Släppte kortet {title} i kolumnen {stage}.",
+  "de799e3079ac2ab4": "Släppte kortet {title} utan att byta stadium.",
+  "152698a38a96030e": "Avbröt flytt av kortet {title}.",
+  "8cdddfab7537363d": "Slutförda kort",
+  "837ecc7ee4863ede": "Skicka tillbaka",
+  "999e98070ce01f91": "Godkänn plan",
+  "884b5e93ebd74849": "Godkänn leverans",
+  "80eb24f25c80b962": "Inga kort i den här fasen.",
+  "0aacb150f99bdd98": [
+    "Slutförda (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "1cf039ea5f16b992": "Endast levererade",
+  "0033dc6784409837": "Brödsmulor för arbetsflödestavla",
+  "b84165d70370ef55": "Utcheckning",
+  "0ce15a50dda3f30e": "Faser på arbetsflödestavlan",
+  "320d3be11655af87": "Det gick inte att läsa in arbetsflödestavlan",
+  "8be06ace3b979b6e": "Filtrera leveranskort",
+  "8f73065209a0c3c2": "Välj ett kort",
+  "9b2bfdb020f32d1a": "Välj ett kort från den här fasen eller skapa ett nytt kort.",
+  "84bb528e852d215b": "Det gick inte att läsa in kortet",
+  "eafda1b10a73aaf2": "Arbetsflödestavla",
+  "0cc4d69ef1012185": "Öppna arbetsflöden",
+  "e6e7ef8b10498bf2": "Nytt kort",
+  "fc91e652b8eca74e": "Läser in arbetsflödestavlan…",
+  "3481f6afc0db3da7": [
+    "Aktivera arbetsflöden i",
+    " ",
+    {
+      "t": "Link",
+      "i": 1,
+      "c": "Inställningar → Labs"
+    },
+    " ",
+    "för att använda projektets arbetsflödestavla."
+  ],
+  "29f0824614831f53": "Översikt",
+  "a65ad03dda72be9a": "Alla",
+  "2906d3cddb027693": "Under leverans",
+  "2fcaba58023037ad": "Levererade",
+  "5fe4b237d99c3980": "Läser in kort…",
+  "4c985dd51328cc28": "Alternativ {number} ID",
+  "3ad237e8eee6a767": "alt-1",
+  "3b0c03f22209abc7": "Alternativ {number} titel",
+  "b3eddade61de0eb8": "Alternativets titel",
+  "ac43df4572671d7b": "Alternativ {number} sammanfattning",
+  "3a50c07157ec7481": "Sammanfattning av designansats",
+  "502d0151e0b3298c": "Alternativ {number} avvägningar",
+  "28dfed1758e1d87a": "Viktiga avvägningar och risker",
+  "303c05f8d0f85244": "Förklara varför det valda alternativet bäst uppfyller specifikationen...",
+  "360370ae3f37e072": "Gräns för alternativrevidering nådd (1/1)",
+  "e1bb9ae67debecf5": "Begär en revidering av de två alternativen...",
+  "2a6ec46fb5693f3a": "Jämförelse av två alternativ",
+  "6546a55c7516736a": [
+    "Revideringar ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "/1"
+  ],
+  "f0950cde2bce0e79": [
+    "Alternativ ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "0183f2ebd19ad745": "Välj alternativ",
+  "ff30149132c3cdd5": "Motivering för val",
+  "f3f554fe1de7210c": "Motivering krävs när ett alternativ väljs.",
+  "5a329035ed2c1229": "Återkoppling för alternativrevidering (valfritt, max 1 gång)",
+  "4420ade4b732370d": "Resultatfokuserad",
+  "d1a44ca878205ac2": "Risk först",
+  "b4e7b125cebc5402": "Expandera-kontrahera",
+  "e958bbbd02e0a523": "Anpassad",
+  "394c44d5b657f7d3": "Grov",
+  "c90447bea1f77e6e": "Balanserad",
+  "79ab9784f8dbd47c": "Fin",
+  "1994e0d0d9b4707a": "Godkänn specifikationen först.",
+  "90aa1c178d307821": "Spara planen för att beräkna sammandrag för plan.md och design.md.",
+  "681e570a55f090e3": "Besluta om alla 6 designlinser med sammanfattningar eller skäl.",
+  "b7a83d1acef2a4c9": "Ange 2 tydligt skilda alternativ, välj ett och ange motivering.",
+  "268b7dbd70faa3a4": "Fyll i obligatoriska fält för planeringsstrategi.",
+  "071e5bb32eaee5c9": "Välj uppgiftsgranularitet.",
+  "286d919a69a33080": "Lägg till minst en giltig uppgift med exklusivt filägarskap.",
+  "ff287e49025dd885": "Korrigera ogiltiga argv-kontrollkommandon.",
+  "7a1e2eb19b79fce7": "Mappa 100 % av acceptanskriterierna till automatiserade, manuella eller externa belägg.",
+  "95877a9ae8a92a69": "Fyll i sammanfattning eller skäl för varje beslutad designlins.",
+  "9e67e67969f84006": "Ange två väsentligt olika alternativ med ifyllda fält.",
+  "27f2d4e7ef4edeb9": "Det valda alternativet måste matcha ett av de två jämförda alternativen.",
+  "9ce07c9ef0745466": "Motivering krävs vid val av alternativ.",
+  "454b38d9b7b1dbfd": "Fyll i obligatoriska fält för strategimotivering eller metadata.",
+  "53270673d7251418": "Åtgärda cykler i uppgifts-DAG eller överlappande tillåtna filer innan du sparar.",
+  "bdf031ac199ab7d3": "Varje planerad kontroll kräver ett icke-tomt ID.",
+  "196f2e9a4c49729a": "Planerade kontroller måste vara rena argv-kommandon utan skaloperatorer.",
+  "c5e156e178db8c07": "Slutför all bevismappning för acceptanskriterier innan du sparar.",
+  "2c701beeecf457f7": "Kunde inte spara planen.",
+  "11929851c7dad519": "Plan sparad vid revision {revision}. Specifikationsgodkännandet bevarades.",
+  "f8e4796a7a2f6c74": "Plan sparad vid revision {revision}.",
+  "b6377299e8ed9cb5": "Kunde inte godkänna planen.",
+  "048ebd85d354227a": "Plan godkänd vid revision {revision}.",
+  "27e7aaa4097655ea": "Det gick inte att starta fasen Plan.",
+  "f10a23aaeedfe556": "Återupptog befintlig plantråd.",
+  "3330a786ec6f948a": "Planfas startad och planunderlag förberett.",
+  "7411066c7f4681b2": "Planeringsstrategi",
+  "a0b16553f7ef5d46": "Uppgiftsgranularitet",
+  "fa94a22606d86531": "Redigering av enbart plan bevarar specifikationsgodkännande",
+  "3651e4f2e62c480e": "Redigering av planfält uppdaterar planrevisionen medan den godkända specifikationen förblir intakt.",
+  "a78d05c9aed2f8f3": "Nyare serverrevision tillgänglig",
+  "8aaa50b04ce13299": [
+    "Ditt lokala planutkast började vid revision ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ", medan servern är på revision ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    "."
+  ],
+  "cadae74f904ad839": "Återställ till server",
+  "3c08c0bc5a2d5619": "Överlämning till Planfas",
+  "a35b98e6396d1979": "Starta Plan för att förbereda underlaget och ansluta en worktree-medveten agenttråd.",
+  "af624a327de300be": "Godkänn specifikationen innan du startar Plan.",
+  "f49881dfdd5d8109": "Startar Plan…",
+  "07679c36085e1b62": "Återuppta Plan",
+  "3625baa4d231de05": "Starta Plan",
+  "8cdf99a52d31d9b7": "Förberett planunderlag",
+  "2e9c8c8f7cec674d": "Läser in planunderlag…",
+  "8f2e3a30fec7f842": "Planförfattande",
+  "15c4550102b918e6": "Sparar plan…",
+  "01b1a962ec786b25": "Spara plan",
+  "21e54b8c2e27d7d2": "Plan godkänd",
+  "c793507c9e809c4d": "Planeringsstrategi",
+  "b6e61688c1c89a68": "Uppgiftsgranularitet",
+  "3dcbce2a019e9132": "Motivering för anpassad strategi",
+  "f91d9907f3725e32": "Huvud osäkerhet",
+  "202599da425f022c": "ID för sondtask",
+  "4fe51f30c883d67c": "Kompatibilitetsfönster",
+  "eac06ef27b5a97e3": "Övergångssteg",
+  "fd29f70fd57dfbbc": "Krav för avveckling",
+  "9b9b0713266f65c5": "Återstående krav för plangodkännande",
+  "e5342a1c2be483f4": "UX",
+  "8aeb986bf3816208": "Funktionell",
+  "67a0dc21f65919e4": "Arkitektur",
+  "42adc347a410b574": "Kvalitet",
+  "e821ed62f520237d": "Infrastruktur",
+  "7e5497bff6cb4705": "Leverans",
+  "f79d292d68a2fcab": "{lens} tillämplig",
+  "c4de5cbc6c527c3f": "{lens} ej tillämplig",
+  "56623f7d0aa162d1": "Sammanfattning av {lens}",
+  "785bc2a9c5087f14": "Beskriv designbesluten för denna lins...",
+  "a27944bfcb5dac7c": "Skäl till att {lens} inte är tillämplig",
+  "518d0f700cf424c5": "Varför är denna lins inte tillämplig?",
+  "9daa342dcbf58ecc": "Sex designlinser",
+  "e1073d7d9788e2a3": "Tillämplig",
+  "43af18c4a9e11a01": "Ej tillämplig",
+  "ceea5a3fde0ef45a": "Obestämd",
+  "ddc0a1346184eb6c": "Sammanfattning krävs när den är tillämplig.",
+  "aaffe5b9dd08c7a0": "Skäl krävs när den inte är tillämplig.",
+  "2d5299203ad2b9d1": "Det gick inte att starta oberoende granskning.",
+  "d04cdfbe115fe3ed": "Oberoende granskning startad i en ny tråd.",
+  "7a9204e01ec5b09c": "Det gick inte att försöka oberoende granskning igen.",
+  "7a858adee736181e": "Granskningen återställd för nytt försök.",
+  "1e3a170313b8f0b1": "En motivering krävs när ett fynd avfärdas eller risk accepteras.",
+  "f346c569dd5c7d14": "Det gick inte att hantera granskningsfyndet.",
+  "74fe7638cce975dc": "Fynd {id} uppdaterat.",
+  "bd676de1d33c7648": "Produktens ögonblicksbild eller plan ändrades efter denna granskning. Starta en ny oberoende granskning.",
+  "d10d13fd5c0999fc": "Hantering för {id}",
+  "febc6acf6595b684": "Åtgärda i kod",
+  "8e54c259329177fa": "Acceptera risk",
+  "d8a40cb375b734b6": "Avfärda",
+  "e54cac810f096235": "Skjut upp",
+  "dbb2b52bb21fe676": "Motivering för {id}",
+  "9596889f52f27eb7": "Förklara hanteringen (krävs för Avfärda eller Acceptera risk)...",
+  "a7dbdfe65901e1f2": "Oberoende granskning",
+  "1a7decbe6a776ba1": "Öppna granskningstråd",
+  "7902ad7555ce5844": "Försök granskning igen",
+  "bcc6c921e479350c": "Startar granskning…",
+  "b952879faff74b1e": "Starta oberoende granskning",
+  "a72124afacbee042": "Startar i en ny tråd utan påverkan från tidigare körningar mot aktuell produktögonblicksbild.",
+  "1a4a33d9d32f4515": "Oberoende granskning är inaktuell",
+  "ab0593f3e2c12bfd": "Ingen oberoende granskning registrerad ännu.",
+  "db917e4765113671": [
+    "status ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "79bc5940505f197f": "Inga fynd rapporterade.",
+  "2c91b05fbe4e375e": [
+    "Åtgärdsanteckning: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "dbf0db05e401bedf": "Lös fynd",
+  "e8f7db9a9b875e7a": "En anteckning krävs när Underkänd eller Ej tillämplig registreras.",
+  "668a1d19df1d2992": "Det gick inte att registrera acceptansobservation.",
+  "75861b0570fdfdef": "Observation registrerad för {criterionId}.",
+  "7439a4d97d5b4810": "Det gick inte att godkänna leveransen.",
+  "523f68888952b288": "Leverans godkänd. Kortet markerat som levererat utan automatisk commit.",
+  "838c42e7fb3cfe9d": "Produktens ögonblicksbild ändrades efter denna observation. Registrera uppdaterad verifiering.",
+  "0d58fe0d4d8c044d": "Utlåtande för {id}",
+  "d3d91531eca989c7": "Godkänd",
+  "dd3f1177a88f7bfe": "Underkänd",
+  "f387afbb3bef16d5": "Ej tillämplig",
+  "e970b8095d1a4afb": "Bevisreferens för {id}",
+  "8bcc0e7dc1704d0d": "Valfri bevisreferens / URL...",
+  "85d30b60a03c9b67": "Observationsanteckning för {id}",
+  "2e41026c25a28476": "Observationsanteckning (krävs för Underkänd eller Ej tillämplig)...",
+  "e8f8fb7c3fa4fcde": "Anteckning för leveransgodkännande",
+  "36976091a81dc80e": "Valfri leveransanteckning...",
+  "783fbed077962c92": "Leveranskvitto",
+  "bf95ee4192c60321": "Kvitto-ID",
+  "aee1a43ee4f6531c": "Produktögonblicksbild",
+  "b9956c674527acb4": "Godkänd av",
+  "425d2f705ea86abb": "AC-sammanfattning",
+  "b4366339c2dc8826": [
+    "commit ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "1e24aad893b73bf9": "Leveransberedskap och blockerare",
+  "98ea45c14a5b1342": "Detta kort har godkänts för leverans.",
+  "4266a022c32366ba": "Alla kontroller, fynd från oberoende granskning och acceptanskriterier är aktuella.",
+  "598a7929e2626a66": "Gå till åtgärd",
+  "6aeaa5f636b823f7": "Verifiering av acceptanskriterier",
+  "f4f7ebda4c45b54e": "Inga acceptanskriterier definierade i specifikationen.",
+  "519bf3d628960948": [
+    "Procedur: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "1528799365f156ad": "Registrera observation",
+  "75c599bf02cb8af8": "Registrerar ett autentiserat mänskligt leveranskvitto mot den testade ögonblicksbilden utan automatisk commit.",
+  "8b9aa8c059409266": "Godkänner leverans…",
+  "69e06d7b4db7b86b": "Källkodshanteringsåtgärder för leverans",
+  "5e876a6a95cf413a": "Commit, Push och Skapa PR är individuellt valda åtgärder. Inget committas automatiskt.",
+  "a9c81a5e7a3d8387": "Idé",
+  "f2d7e21a61c598d7": "Brieffil",
+  "fe04f4e2de8e7d3a": "Kodbas",
+  "6ace4758d8573110": "Det gick inte att spara specifikationen.",
+  "d4d19566d7a5d535": "Specifikation sparad vid revision {revision}.",
+  "305658f3670692c3": "Kunde inte starta specifikationstråden.",
+  "ccffe43447dab032": "Specifikationstråd återupptagen.",
+  "74d3c964de109bc4": "Specifikationstråd startad.",
+  "1d0859c2c3667f90": "AC-1: Tavlan visar fyra faskolumner",
+  "3ece920a978e52b3": "Specifikationsförfattande",
+  "9b619bc6acf8022c": "Startar specifikation…",
+  "84ee5b4ace27c08d": "Återuppta specifikationstråd",
+  "c8a3ce1e5a20ceb8": "Starta specifikationstråd",
+  "afd0e18962c972db": "Spara specifikation",
+  "cfde6f4f6892793b": [
+    "Ditt lokala utkast började vid revision ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ", medan servern är på revision ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    "."
+  ],
+  "cce76af6ec9caa4c": "Brownfield-intagsskanning",
+  "38cc0f50ebcebd0a": [
+    "Lämnade beslut (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "b9de0d1b51a9e47d": [
+    "Härledda kodbas-signaler (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "e3bebfb66ba17a8d": [
+    "Saknade beslut (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "0374dd07e98404e6": "Specifikationstitel",
+  "068726cb0ed7b768": "Specifikationsunderlag (Markdown)",
+  "8f3bff8396d01f33": "Acceptanskriterier (ett per rad)",
+  "34857dfae51273ef": "Begränsningar (en per rad)",
+  "7ebc6f90a1ee031f": "Källreferenser (en per rad)",
+  "b02f18034c0ab02f": "Sökvägar för indatafiler (en per rad)",
+  "2d93ca0dceb9a756": [
+    "Visa senaste specifikationsdiff (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "8645a8649565ce49": "Test först",
+  "8185cfe6491c638a": "Regression först",
+  "dfe3befe52404637": "Befintliga kontroller",
+  "1ccf0f59ebea3e3c": "Ta bort uppgift {taskId}",
+  "f3bee1a5674c7333": "Uppgift {number} ID",
+  "281b1de316c875e5": "TSK-01",
+  "e1ef9fc009c6487b": "Uppgift {number} titel",
+  "41b435c414e51be5": "Uppgiftssammanfattning",
+  "ecc58440ece4e979": "Uppgift {number} blockerad av",
+  "4d9f67b471f989ec": "Blockerad av (kommaavgränsade ID:n)",
+  "7374483495979bc9": "Uppgift {number} blockerar",
+  "f13e1d116b717c62": "Blockerar (kommaavgränsade ID:n)",
+  "0b5544bbdb87109a": "Uppgift {number} testmetod",
+  "265f12c7e41fbe76": "Uppgift {number} tillåtna filer",
+  "45e9533d9e50ee84": "Uppgift {number} förbjudna filer",
+  "6c12d5f4c19d83cb": "Uppgift {number} verifieringskommandon",
+  "fc8c0958da6750e6": "vp test run src/feature.test.ts",
+  "d5aa3dcaec18c5dd": "Uppgifts-DAG och exklusivt filägarskap",
+  "9f5028cc4b8fa000": "Lägg till uppgift",
+  "b31a7b0e50f5d267": "Uppgiftskontrakt måste bilda en acyklisk DAG med unika ID:n, giltiga beroenden och icke-överlappande tillåtna filer.",
+  "ca20955f2b7409ce": "Lägg till minst en uppgift med exklusivt filägarskap innan planen godkänns.",
+  "a7c0a351a2570841": [
+    "Uppgift ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "4007da85b7252df3": "Tillåtna filer (en per rad)",
+  "a2258e07549c6aa6": "Förbjudna filer (en per rad)",
+  "64498de77cb87a19": "Uppgiftens verifieringskommandon (argv-token, ett kommando per rad)",
+  "c9195b0b17d7e7ab": [
+    "Ogiltig tillåten filsökväg: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "195300b7a99af317": "Verifieringskommandon måste vara rena argv-kommandon utan skaloperatorer.",
+  "8f2d5c4509a34845": "Kunde inte skicka tillbaka kortet för revidering.",
+  "62b2af69bf139c45": "Leveransen är för närvarande blockerad av utestående kontroller, fynd eller acceptanskriterier.",
+  "aebba4867b334cd9": "Målfas",
+  "e978ea34dab15de7": "Beskriv vad som behöver revideras...",
+  "7691f04fc06b6446": "Godkänn specifikation och flytta till Plan",
+  "3d64909ee5f06013": "Godkänn plan och flytta till Utför",
+  "86cc67c78d3ccdab": "Godkänn leverans och markera som levererad",
+  "0e149e97c8f45467": "Skicka tillbaka kort för revidering",
+  "83fa16d97aa3a569": [
+    "Godkänn den aktuella specifikationsrevisionen för ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " och flytta kortet till Plan."
+  ],
+  "dace8cf88d67afe6": [
+    "Godkänn den aktuella planrevisionen för ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " och flytta kortet till Utför."
+  ],
+  "db7b4ee467985cd6": [
+    "Godkänn leverans för ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " och skapa ett beständigt leveranskvitto utan automatisk commit."
+  ],
+  "edd1feb2ca2147a8": [
+    "Att skicka tillbaka ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " till ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    " bevarar revisionshistoriken och markerar berörda efterföljande godkännanden och belägg som inaktuella."
+  ],
+  "93828efdde7a0adc": "Granska leveransblockerare",
+  "a5d24f45656197eb": "Du har inte orkestreringsbehörighet för att utföra denna övergång.",
+  "ecc3252761a80898": "Leveransanteckning (valfritt)",
+  "4b967a3b6c78877e": "Målfas",
+  "230ae8d36a0628f9": "Skäl för revidering",
+  "fcf160e604bb89db": "Bekräfta specifikationsgodkännande",
+  "72781fdc5bdb6b1c": "Bekräfta plangodkännande",
+  "874ccd0a4122a71d": "Bekräfta leveransgodkännande",
+  "c04554fba9bd4f5d": "Bekräfta retur för revidering",
+  "be6b1845eaf15794": "Kunde inte uppdatera trådramsinställningarna.",
+  "57a64bdcb31b781b": "Valfria HTML-trådramsmodeller aktiverade.",
+  "5f0fb48ef2b94565": "Trådramsmodeller rensade för funktion utan UI.",
+  "a1f3e5adbdb2810d": "Trådramsförhandsvisning för {title}",
+  "4e3c08a995d8be2b": "HTML-trådramsmodeller",
+  "734b88e1cdd8566c": "Hoppades över (inget UI)",
+  "421a3139f99272a8": "Aktivera trådramsmodeller",
+  "420aec2a3febae7a": "Dölj HTML-källa",
+  "29ed923f964e3363": "Visa HTML-källa",
+  "0e419b23921f5338": "Helskärmsförhandsvisning",
+  "c17fbc5b22082cb6": "Hoppa över trådramsmodeller (inget UI)",
+  "48dbbe6886d1a037": "Trådramsmodeller är valfria och hoppas över för funktioner utan UI. Aktivera dem om funktionen introducerar interaktiva UI-layouter.",
+  "c42dc43a82f73e59": "Laddar trådramsförhandsvisning…",
   "0bd950151ddc6407": "Lämna utan att spara? Dina ändringar i filen går förlorade.",
   "c0ba3f6756b09f30": "Osparade ändringar",
   "6914e22d357f0ad6": "Sparad och körs",
@@ -12647,7 +13839,6 @@
   "5d8d278ff828102d": "Alla arbetsflöden",
   "290e0ab40b87dc17": "Brödsmulor för arbetsflöden",
   "f3fad236d4b955f1": "Miljö",
-  "34ad53646f06ed80": "Arbetsflöden är avstängda",
   "8f6589c9e0ac5d4e": "Ingen miljö ansluten",
   "744127f8dfad7d22": "Anslut en miljö för att se dess arbetsflödeskörningar.",
   "036182ec7e2ee4d4": "Bredvid körningen",

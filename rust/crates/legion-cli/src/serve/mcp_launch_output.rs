@@ -3,47 +3,28 @@
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use legion_contracts::ids::{CommandId, MessageId, ProjectId, ProviderInstanceId, RunId, ThreadId};
+use legion_contracts::ids::{CommandId, MessageId, RunId, ThreadId};
 use legion_contracts::orchestration::{
-    CreationSource, InitialThreadMessage, ModelSelection, OrchestrationActor, OrchestrationCommand,
-    ProviderInteractionMode, RunOutputSchema, SubmitRunOutputCommand, ThreadCreateCommand,
+    CreationSource, InitialThreadMessage, OrchestrationActor, SubmitRunOutputCommand,
 };
-use legion_contracts::policy::RuntimeMode;
 use legion_orchestrator::decider::output_ops::validate_output_request_for_message;
+use legion_server_runtime::{LaunchThreadRequest, ThreadLauncher};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
 use super::super::AppState;
+#[path = "mcp_launch_args.rs"]
+mod args;
+pub(super) use args::parse_output_schema_arg;
+use args::{
+    parse_interaction_mode, parse_or_resolve_model_selection, parse_or_resolve_runtime_mode,
+    parse_workflow_run, parse_workspace_strategy,
+};
 
-/// Parses an optional `outputSchema` JSON object from `/mcp` tool arguments.
-pub(super) fn parse_output_schema_arg(args: &Value) -> Result<Option<RunOutputSchema>, String> {
-    let Some(raw) = args.get("outputSchema") else {
-        return Ok(None);
-    };
-    if raw.is_null() {
-        return Ok(None);
-    }
-    let Some(map) = raw.as_object() else {
-        return Err("outputSchema must be a JSON Schema object.".to_owned());
-    };
-    Ok(Some(map.clone()))
-}
-
-/// Validates and handles `legion_thread_launch` / `legion_thread_launch`.
+/// Validates and handles `legion_thread_launch` / `t3_thread_launch`.
 pub(super) async fn thread_launch(state: &Arc<AppState>, args: &Value) -> Result<Value, String> {
-    let project_id_raw = args
-        .get("projectId")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| "Missing required `projectId` parameter.".to_owned())?;
-    let title = args
-        .get("title")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| "Missing required `title` parameter.".to_owned())?
-        .to_owned();
+    let project_hint = required_non_empty(args, "projectId")?;
+    let title = required_non_empty(args, "title")?.to_owned();
     let generate_title = args.get("generateTitle").and_then(Value::as_bool);
     let message = args
         .get("message")
@@ -75,74 +56,99 @@ pub(super) async fn thread_launch(state: &Arc<AppState>, args: &Value) -> Result
     )
     .map_err(|e| e.to_string())?;
 
+    let launcher = ThreadLauncher::new(
+        Arc::clone(&state.orchestrator),
+        state.paths.worktrees_dir.clone(),
+    )
+    .with_settings_path(Some(state.paths.settings_path.clone()));
+    let project = launcher
+        .resolve_project(project_hint)
+        .map_err(|e| e.to_string())?;
+
+    let model_selection =
+        parse_or_resolve_model_selection(args.get("modelSelection"), &project, state)?;
+    let runtime_mode = parse_or_resolve_runtime_mode(args.get("runtimeMode"), state)?;
+    let interaction_mode = parse_interaction_mode(args.get("interactionMode"))?;
+    let workspace_strategy = parse_workspace_strategy(args.get("workspaceStrategy"))?;
+    let workflow_run =
+        parse_workflow_run(args.get("workflowRun"), &state.descriptor.environment_id)?;
+
+    let stable_launch_key = args
+        .get("stableLaunchKey")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned);
+    let reuse_existing_thread = args
+        .get("reuseExistingThread")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+
     let command_id =
         CommandId::new(format!("mcp-launch-{}", Uuid::new_v4())).map_err(|e| e.to_string())?;
-    let thread_id =
-        ThreadId::new(format!("mcp-thread-{}", Uuid::new_v4())).map_err(|e| e.to_string())?;
-    let project_id = ProjectId::new(project_id_raw).map_err(|e| e.to_string())?;
-    let model_selection = parse_model_selection(args.get("modelSelection"))?;
+    let initial_message =
+        build_initial_message(message, attachments, generate_title, &title, output_schema)?;
 
-    let initial_message = if message.is_some() || !attachments.is_empty() {
-        Some(InitialThreadMessage {
-            message_id: MessageId::new(format!("mcp-msg-{}", Uuid::new_v4()))
-                .map_err(|e| e.to_string())?,
-            text: message.unwrap_or_default(),
-            attachments,
-            context: None,
-            title_seed: generate_title.and_then(|g| g.then(|| title.clone())),
-            scheduled_task_id: None,
-            sender_thread_id: None,
-            output_schema,
-            workspace_strategy: None,
+    let result = launcher
+        .launch_thread(LaunchThreadRequest {
+            command_id,
+            created_by: OrchestrationActor::Agent,
+            creation_source: CreationSource::Mcp,
+            thread_id: None,
+            stable_launch_key,
+            reuse_existing_thread,
+            project_id: project.id,
+            title,
+            title_renamed: None,
+            generate_title,
+            model_selection,
+            runtime_mode,
+            interaction_mode,
+            workspace_strategy,
+            workflow_run,
+            link_origin: None,
+            delegated_from: None,
+            initial_message,
         })
-    } else {
-        None
-    };
-
-    let cmd = OrchestrationCommand::ThreadCreate(ThreadCreateCommand {
-        created_by: OrchestrationActor::Agent,
-        creation_source: CreationSource::Mcp,
-        command_id,
-        thread_id: thread_id.clone(),
-        project_id,
-        title,
-        generate_title,
-        model_selection,
-        runtime_mode: RuntimeMode::ApprovalRequired,
-        interaction_mode: ProviderInteractionMode::Default,
-        branch: None,
-        worktree_path: None,
-        link_origin: None,
-        delegated_from: None,
-        imported_native_thread: None,
-        initial_message,
-    });
-    state
-        .orchestrator
-        .dispatch_now(&cmd)
         .await
         .map_err(|e| e.to_string())?;
 
-    attach_workflow_run(state, thread_id.as_str(), args.get("workflowRun"));
-
     Ok(json!({
-        "threadId": thread_id.as_str(),
-        "runId": Value::Null,
+        "threadId": result.thread_id.as_str(),
+        "runId": result.run_id,
     }))
 }
 
-fn attach_workflow_run(state: &Arc<AppState>, thread_id: &str, wf_run: Option<&Value>) {
-    if let Some(wf_run) = wf_run.filter(|v| v.is_object())
-        && let Ok(conn) = state.orchestrator.sink().db().lock()
-        && let Ok(raw) = serde_json::to_string(wf_run)
-    {
-        let _ = conn.execute(
-            "UPDATE orchestration_v2_projection_threads
-             SET payload_json = json_set(payload_json, '$.workflowRun', json(?1))
-             WHERE thread_id = ?2",
-            rusqlite::params![raw, thread_id],
-        );
+fn required_non_empty<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
+    args.get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| format!("Missing required `{key}` parameter."))
+}
+
+fn build_initial_message(
+    message: Option<String>,
+    attachments: Vec<Value>,
+    generate_title: Option<bool>,
+    title: &str,
+    output_schema: Option<legion_contracts::orchestration::RunOutputSchema>,
+) -> Result<Option<InitialThreadMessage>, String> {
+    if message.is_none() && attachments.is_empty() {
+        return Ok(None);
     }
+    Ok(Some(InitialThreadMessage {
+        message_id: MessageId::new(format!("mcp-msg-{}", Uuid::new_v4()))
+            .map_err(|e| e.to_string())?,
+        text: message.unwrap_or_default(),
+        attachments,
+        context: None,
+        title_seed: generate_title.and_then(|g| g.then(|| title.to_owned())),
+        scheduled_task_id: None,
+        sender_thread_id: None,
+        output_schema,
+        workspace_strategy: None,
+    }))
 }
 
 /// Validates and commits `legion_submit_output` (`SubmitRunOutputCommand`).
@@ -233,18 +239,4 @@ fn resolve_output_target(state: &Arc<AppState>, args: &Value) -> Result<(String,
         |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)),
     )
     .map_err(|_| "This turn was not asked for a result. Reply in your message instead.".to_owned())
-}
-
-fn parse_model_selection(raw: Option<&Value>) -> Result<ModelSelection, String> {
-    if let Some(val) = raw
-        && !val.is_null()
-    {
-        return serde_json::from_value(val.clone())
-            .map_err(|e| format!("Invalid modelSelection: {e}"));
-    }
-    Ok(ModelSelection {
-        instance_id: ProviderInstanceId::new("codex").map_err(|e| e.to_string())?,
-        model: "gpt-5-codex".to_owned(),
-        options: None,
-    })
 }

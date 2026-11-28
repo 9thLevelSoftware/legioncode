@@ -60,6 +60,10 @@ const reactTests = [
   "src/features/connection/LinkedEnvironmentsSection.test.tsx",
   "src/features/devices/device-stream.browser.test.ts",
   "src/features/keyboard/keyboardControllerState.test.tsx",
+  "src/features/workflow-board/WorkflowBoardMobile.test.tsx",
+  "src/features/workflows/workflowBoardE2eHarness.test.tsx",
+  "src/features/workflows/workflowBoardE2eMobile.test.tsx",
+  "src/features/workflows/workflowBoardE2eMobileScenarios.test.tsx",
 ];
 
 const sourceRoot = `${normalizePath(NodeURL.fileURLToPath(new URL("./src", import.meta.url)))}/`;

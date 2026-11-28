@@ -212,7 +212,7 @@ fn load_thread_for_milestone(
     };
     let row: Option<String> = conn
         .query_row(
-            "SELECT payload_json FROM projection_threads WHERE thread_id = ?1 LIMIT 1",
+            "SELECT payload_json FROM orchestration_v2_projection_threads WHERE thread_id = ?1 LIMIT 1",
             [thread_id],
             |r| r.get(0),
         )

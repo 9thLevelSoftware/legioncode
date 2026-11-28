@@ -139,6 +139,8 @@ import { SettingsProjectGroupingRouteScreen } from "./features/settings/Settings
 import { SettingsProjectOverviewRouteScreen } from "./features/settings/SettingsProjectOverviewRouteScreen";
 import { UsageLimitAccountScreen } from "./features/usage/UsageLimitsPooled";
 import { UsageRouteScreen } from "./features/usage/UsageRouteScreen";
+import { WorkflowBoardRouteScreen } from "./features/workflow-board/WorkflowBoardRouteScreen";
+import { WorkflowCardRouteScreen } from "./features/workflow-board/WorkflowCardRouteScreen";
 import { WorkflowRunRouteScreen } from "./features/workflows/WorkflowRunRouteScreen";
 import { WorkflowStepSheet } from "./features/workflows/WorkflowStepSheet";
 import { SettingsAboutRouteScreen } from "./features/settings/SettingsAboutRouteScreen";
@@ -212,6 +214,8 @@ const ROUTE_TITLES: Readonly<Record<string, string>> = {
   NewTaskRepositories: msg("Repositories"),
   AddProject: msg("Add project"),
   ThreadFiles: msg("Files"),
+  WorkflowBoard: msg("Workflow board"),
+  WorkflowCard: msg("Workflow card"),
   WorkflowRun: msg("Run", { $context: "noun, page title for one workflow run" }),
   SettingsLegal: msg("Legal"),
   ConnectOnboarding: msg("Set up {product}", { product: "Legion Connect" }),
@@ -786,6 +790,16 @@ const RootStackConfig = createWorkspaceStackNavigator({
     ThreadQueue: createNativeStackScreen({
       screen: ThreadQueueSheet,
       options: sheetRoute({ detent: 0.65, androidMaxDetent: 0.95 }),
+    }),
+    WorkflowBoard: createNativeStackScreen({
+      screen: WorkflowBoardRouteScreen,
+      linking: "projects/:environmentId?/:projectId?/board",
+      options: pageRoute(),
+    }),
+    WorkflowCard: createNativeStackScreen({
+      screen: WorkflowCardRouteScreen,
+      linking: "projects/:environmentId/:projectId/board/:cardId",
+      options: pageRoute(),
     }),
     WorkflowRun: createNativeStackScreen({
       screen: WorkflowRunRouteScreen,

@@ -16,7 +16,11 @@ import {
   type ProjectGroup,
 } from "@legioncode/client-runtime/state/project-grouping";
 import type { EnvironmentProject } from "@legioncode/client-runtime/state/shell";
-import { useNavigation } from "@react-navigation/native";
+import {
+  isProjectWorkflowBoardEnabled,
+  isProjectWorkflowBoardSupported,
+} from "@legioncode/client-runtime/workflow-board";
+import { StackActions, useNavigation } from "@react-navigation/native";
 import { useRef, useState } from "react";
 import { Platform, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -144,6 +148,7 @@ function ProjectOverviewContent(props: {
   readonly onProjectRemoved: (projectKey: string | null) => void;
 }) {
   const gt = useGT();
+  const navigation = useNavigation();
   const { isRemoving, setIsRemoving, startRemoval, finishRemoval } = props;
   const representative = props.members[0]!;
   const displayName = deriveProjectGroupLabel({
@@ -217,6 +222,39 @@ function ProjectOverviewContent(props: {
   };
   const nextName = (draftName ?? displayName).trim();
   const canSave = !isSaving && nextName.length > 0 && nextName !== displayName;
+
+  const boardMember =
+    props.members.find((member) => {
+      const target = props.connectedTargets.find(
+        (entry) => entry.environmentId === member.environmentId,
+      );
+      return (
+        target !== undefined &&
+        isProjectWorkflowBoardEnabled({
+          settings: target.serverConfig.settings,
+          capabilities: target.serverConfig.environment.capabilities,
+        })
+      );
+    }) ??
+    props.members.find((member) => {
+      const target = props.connectedTargets.find(
+        (entry) => entry.environmentId === member.environmentId,
+      );
+      return (
+        target !== undefined &&
+        isProjectWorkflowBoardSupported(target.serverConfig.environment.capabilities)
+      );
+    }) ??
+    null;
+  const boardMemberTarget = boardMember
+    ? props.connectedTargets.find((entry) => entry.environmentId === boardMember.environmentId)
+    : undefined;
+  const boardMemberEnabled =
+    boardMemberTarget !== undefined &&
+    isProjectWorkflowBoardEnabled({
+      settings: boardMemberTarget.serverConfig.settings,
+      capabilities: boardMemberTarget.serverConfig.environment.capabilities,
+    });
 
   const checkRemovalAccess = (members: readonly EnvironmentProject[]) => {
     const denied = members.find(
@@ -373,6 +411,28 @@ function ProjectOverviewContent(props: {
           </View>
         </View>
       </SettingsSection>
+
+      {boardMember !== null ? (
+        <SettingsSection title={gt("Workflows")}>
+          <SettingsActionRow
+            icon="flowchart"
+            label={gt("Workflow board")}
+            description={
+              boardMemberEnabled
+                ? gt("Inspect cards, approvals, and execution progress.")
+                : gt("Workflows are off in Settings → Labs.")
+            }
+            onPress={() =>
+              navigation.dispatch(
+                StackActions.push("WorkflowBoard", {
+                  environmentId: String(boardMember.environmentId),
+                  projectId: String(boardMember.id),
+                }),
+              )
+            }
+          />
+        </SettingsSection>
+      ) : null}
 
       {canOrganize ? (
         <SettingsSection title={gt("Organize")}>

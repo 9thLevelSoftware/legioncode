@@ -1,17 +1,25 @@
 //! Upgrade protocol validation, credential verification, and loopback/origin guards for `/ws`.
 
+#[path = "auth_helpers.rs"]
+mod helpers;
+
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use axum::http::header::{AUTHORIZATION, COOKIE, HOST, ORIGIN};
+use axum::http::header::{AUTHORIZATION, COOKIE, ORIGIN};
 use axum::http::{HeaderMap, StatusCode, Uri};
 use axum::response::{IntoResponse, Response};
+use legion_contracts::permissions::{RpcCallerKind, caller_kind_from_subject};
 use legion_persistence::pairing_tokens::verify_bearer_session_with_conn;
 use legion_protocol::auth::extract_cookie_value;
 use legion_protocol::rpc_codec::validate_orchestration_protocol;
-use legion_server_runtime::authenticate_headers;
+use legion_server_runtime::{AuthenticatedPrincipal, authenticate_headers};
 use serde_json::json;
 
+use self::helpers::{
+    constant_time_eq, find_prefixed_cookie, has_query_flag, is_allowed_loopback_origin,
+    is_direct_loopback_request, percent_decode, query_param,
+};
 use crate::serve::AppState;
 
 const DEV_AUTH_COOKIE_NAME: &str = "legioncode_dev_auth";
@@ -21,19 +29,59 @@ const SESSION_COOKIE_PREFIX: &str = "legioncode_session_";
 #[derive(Debug, Clone)]
 pub(super) struct WsPrincipal {
     pub session_id: String,
+    #[expect(dead_code, reason = "retained on WsPrincipal for session diagnostics")]
+    pub role: String,
+    #[expect(dead_code, reason = "retained on WsPrincipal for session diagnostics")]
+    pub subject: String,
+    pub scopes: Vec<String>,
+    #[expect(dead_code, reason = "retained on WsPrincipal for session diagnostics")]
+    pub method: String,
+    pub caller_kind: RpcCallerKind,
+}
+
+fn is_mcp_client_subject(subject: &str) -> bool {
+    let lower = subject.trim().to_ascii_lowercase();
+    lower == "mcp-client" || lower.starts_with("mcp-client:")
 }
 
 impl WsPrincipal {
     fn local() -> Self {
         Self {
             session_id: "local".to_owned(),
+            role: "admin".to_owned(),
+            subject: "local".to_owned(),
+            scopes: vec!["*".to_owned()],
+            method: "local".to_owned(),
+            caller_kind: RpcCallerKind::Client,
         }
     }
 
     fn dev_token() -> Self {
         Self {
             session_id: "dev".to_owned(),
+            role: "admin".to_owned(),
+            subject: "owner".to_owned(),
+            scopes: vec!["*".to_owned()],
+            method: "dev_token".to_owned(),
+            caller_kind: RpcCallerKind::Client,
         }
+    }
+
+    fn from_authenticated(p: AuthenticatedPrincipal) -> Result<Self, WsUpgradeRejection> {
+        if is_mcp_client_subject(&p.subject) {
+            return Err(unauthorized(
+                "MCP client sessions are only accepted by the MCP endpoint.",
+            ));
+        }
+        let caller_kind = caller_kind_from_subject(&p.subject);
+        Ok(Self {
+            session_id: p.session_id,
+            role: p.role,
+            subject: p.subject,
+            scopes: p.scopes,
+            method: p.method,
+            caller_kind,
+        })
     }
 }
 
@@ -96,12 +144,9 @@ pub(super) fn authenticate_ws_upgrade(
             .consume_ws_ticket(trimmed, Some("rpc"))
             .or_else(|| state.runtime_http.consume_ws_ticket(trimmed, None))
         {
-            return Ok(WsPrincipal {
-                session_id: principal.session_id,
-            });
+            return WsPrincipal::from_authenticated(principal);
         }
-        return verify_token_credential(state, trimmed)
-            .ok_or_else(|| unauthorized("invalid or expired WebSocket ticket"));
+        return verify_token_credential(state, trimmed);
     }
 
     let cookie_raw = headers
@@ -116,16 +161,13 @@ pub(super) fn authenticate_ws_upgrade(
         || find_prefixed_cookie(cookie_raw, "legioncode_dev_session_").is_some();
 
     if has_auth_hdr || has_named_cookie {
-        return authenticate_headers(&state.runtime_http, headers)
-            .map(|p| WsPrincipal {
-                session_id: p.session_id,
-            })
-            .map_err(|_| unauthorized("invalid WebSocket credentials"));
+        let principal = authenticate_headers(&state.runtime_http, headers)
+            .map_err(|_| unauthorized("invalid WebSocket credentials"))?;
+        return WsPrincipal::from_authenticated(principal);
     }
 
     if let Some(prefixed_token) = find_prefixed_cookie(cookie_raw, SESSION_COOKIE_PREFIX) {
-        return verify_token_credential(state, &prefixed_token)
-            .ok_or_else(|| unauthorized("invalid session cookie"));
+        return verify_token_credential(state, &prefixed_token);
     }
 
     if !state.runtime_http.require_auth {
@@ -150,23 +192,39 @@ pub(super) fn authenticate_ws_upgrade(
     Ok(WsPrincipal::local())
 }
 
-fn verify_token_credential(state: &AppState, raw: &str) -> Option<WsPrincipal> {
+fn verify_token_credential(state: &AppState, raw: &str) -> Result<WsPrincipal, WsUpgradeRejection> {
     let token = raw.trim();
     if token.is_empty() {
-        return None;
+        return Err(unauthorized("invalid or expired WebSocket credentials"));
     }
 
     if let Some(ref dev_tok) = state.runtime_http.dev_auth_token
         && constant_time_eq(token.as_bytes(), dev_tok.as_bytes())
     {
-        return Some(WsPrincipal::dev_token());
+        return Ok(WsPrincipal::dev_token());
     }
 
     let now_ms = now_unix_ms();
-    let conn = state.runtime_http.db().lock().ok()?;
-    let verified = verify_bearer_session_with_conn(&conn, token, now_ms).ok()?;
-    Some(WsPrincipal {
+    let conn = state
+        .runtime_http
+        .db()
+        .lock()
+        .map_err(|_| unauthorized("session lookup unavailable"))?;
+    let verified = verify_bearer_session_with_conn(&conn, token, now_ms)
+        .map_err(|_| unauthorized("invalid or expired WebSocket credentials"))?;
+    if is_mcp_client_subject(&verified.subject) {
+        return Err(unauthorized(
+            "MCP client sessions are only accepted by the MCP endpoint.",
+        ));
+    }
+    let caller_kind = caller_kind_from_subject(&verified.subject);
+    Ok(WsPrincipal {
         session_id: verified.session_id,
+        role: verified.role,
+        subject: verified.subject,
+        scopes: verified.scopes,
+        method: verified.method,
+        caller_kind,
     })
 }
 
@@ -177,141 +235,9 @@ fn unauthorized(msg: &str) -> WsUpgradeRejection {
     }
 }
 
-fn find_prefixed_cookie(cookie_header: &str, prefix: &str) -> Option<String> {
-    for segment in cookie_header.split(';') {
-        let trimmed = segment.trim();
-        let Some((name, val)) = trimmed.split_once('=') else {
-            continue;
-        };
-        if name.trim().starts_with(prefix) {
-            let value = val.trim();
-            if !value.is_empty() {
-                return Some(value.to_owned());
-            }
-        }
-    }
-    None
-}
-
-fn is_direct_loopback_request(headers: &HeaderMap) -> bool {
-    const PROXY_HEADERS: [&str; 5] = [
-        "x-forwarded-for",
-        "x-forwarded-host",
-        "forwarded",
-        "cf-connecting-ip",
-        "true-client-ip",
-    ];
-    if PROXY_HEADERS.iter().any(|name| headers.contains_key(*name)) {
-        return false;
-    }
-
-    let Some(host_val) = headers.get(HOST).and_then(|v| v.to_str().ok()) else {
-        return true;
-    };
-    is_loopback_authority(host_val.trim())
-}
-
-fn is_allowed_loopback_origin(origin: &str) -> bool {
-    let trimmed = origin.trim();
-    let lower = trimmed.to_ascii_lowercase();
-    if [
-        "app://",
-        "legioncode://",
-        "capacitor://",
-        "ionic://",
-        "file://",
-        "tauri://",
-    ]
-    .iter()
-    .any(|scheme| lower.starts_with(scheme))
-    {
-        return true;
-    }
-    let rest = lower
-        .strip_prefix("http://")
-        .or_else(|| lower.strip_prefix("https://"));
-    let Some(authority) = rest else {
-        return false;
-    };
-    let host_part = authority.split('/').next().unwrap_or("");
-    is_loopback_authority(host_part)
-}
-
-fn is_loopback_authority(authority: &str) -> bool {
-    let host = if let Some(after_bracket) = authority.strip_prefix('[') {
-        after_bracket.split(']').next().unwrap_or("")
-    } else {
-        authority.split(':').next().unwrap_or("")
-    };
-    matches!(host, "localhost" | "127.0.0.1" | "::1")
-}
-
-fn constant_time_eq(lhs: &[u8], rhs: &[u8]) -> bool {
-    if lhs.len() != rhs.len() {
-        return false;
-    }
-    let mut diff = 0_u8;
-    for (a, b) in lhs.iter().zip(rhs.iter()) {
-        diff |= a ^ b;
-    }
-    diff == 0
-}
-
 pub(super) fn now_unix_ms() -> i64 {
     let ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_millis());
     i64::try_from(ms).unwrap_or(i64::MAX)
-}
-
-fn query_param(query: Option<&str>, key: &str) -> Option<String> {
-    let q = query?;
-    for pair in q.split('&') {
-        let (k, v) = pair.split_once('=').unwrap_or((pair, ""));
-        if k == key {
-            return Some(v.to_owned());
-        }
-    }
-    None
-}
-
-fn has_query_flag(query: Option<&str>, key: &str) -> bool {
-    let Some(q) = query else {
-        return false;
-    };
-    for pair in q.split('&') {
-        let (k, v) = pair.split_once('=').unwrap_or((pair, ""));
-        if k == key {
-            return !v.eq_ignore_ascii_case("0") && !v.eq_ignore_ascii_case("false");
-        }
-    }
-    false
-}
-
-fn percent_decode(raw: &str) -> String {
-    let bytes = raw.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len());
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%'
-            && i + 2 < bytes.len()
-            && let (Some(hi), Some(lo)) = (hex_nibble(bytes[i + 1]), hex_nibble(bytes[i + 2]))
-        {
-            out.push((hi << 4) | lo);
-            i += 3;
-            continue;
-        }
-        out.push(if bytes[i] == b'+' { b' ' } else { bytes[i] });
-        i += 1;
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
-const fn hex_nibble(b: u8) -> Option<u8> {
-    match b {
-        b'0'..=b'9' => Some(b - b'0'),
-        b'a'..=b'f' => Some(b - b'a' + 10),
-        b'A'..=b'F' => Some(b - b'A' + 10),
-        _ => None,
-    }
 }

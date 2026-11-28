@@ -35,6 +35,7 @@ pub(crate) struct ManagerInner {
     pub revision: u64,
     pub dir_problem: Option<String>,
     pub dir_next_retry: Option<Instant>,
+    pub builtins: Vec<WorkflowDefinition>,
     pub disk_sources: BTreeMap<String, String>,
     pub loaded: BTreeMap<String, LoadedRecord>,
     pub failed: BTreeMap<String, FailedRecord>,
@@ -112,7 +113,9 @@ pub(crate) fn perform_reload(
         );
     }
     for (name, src, ev) in evaluated_ok {
-        if let Some(prob) = find_conflict_against_loaded(&g.loaded, &name, &ev.definitions) {
+        if let Some(prob) =
+            find_conflict_against_loaded(&g.loaded, &g.builtins, &name, &ev.definitions)
+        {
             g.failed.insert(
                 name,
                 FailedRecord {
@@ -173,9 +176,25 @@ fn collect_pending_changes(
 
 pub(crate) fn find_conflict_against_loaded(
     loaded: &BTreeMap<String, LoadedRecord>,
+    builtins: &[WorkflowDefinition],
     file_name: &str,
     defs: &[WorkflowDefinition],
 ) -> Option<WorkflowDefinitionProblem> {
+    for builtin in builtins {
+        if defs
+            .iter()
+            .any(|d| d.name == builtin.name && d.version == builtin.version)
+        {
+            return Some(WorkflowDefinitionProblem {
+                message: format!(
+                    "Workflow '{}@{}' is reserved by a built-in stage job.",
+                    builtin.name, builtin.version
+                ),
+                file: Some(file_name.to_owned()),
+                line: None,
+            });
+        }
+    }
     for (other_file, rec) in loaded {
         if other_file == file_name {
             continue;
@@ -229,11 +248,8 @@ pub(crate) fn rebuild_engine(
 ) {
     let unfinished: HashSet<(String, i64)> =
         store.unfinished().unwrap_or_default().into_iter().collect();
-    let mut defs: Vec<WorkflowDefinition> = g
-        .loaded
-        .values()
-        .flat_map(|r| r.defs.iter().cloned())
-        .collect();
+    let mut defs: Vec<WorkflowDefinition> = g.builtins.clone();
+    defs.extend(g.loaded.values().flat_map(|r| r.defs.iter().cloned()));
     let present: HashSet<(String, i64)> =
         defs.iter().map(|d| (d.name.clone(), d.version)).collect();
     g.retired

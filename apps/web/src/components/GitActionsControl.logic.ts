@@ -301,6 +301,7 @@ export function resolveQuickAction(
   isDefaultRef = false,
   hasPrimaryRemote = true,
   resolve: MessageResolver = m,
+  allowStackedQuickAction = true,
 ): GitQuickAction {
   if (isBusy) {
     return {
@@ -344,7 +345,7 @@ export function resolveQuickAction(
   }
 
   if (hasChanges) {
-    if (isBehind || (!gitStatus.hasUpstream && !hasPrimaryRemote)) {
+    if (!allowStackedQuickAction || isBehind || (!gitStatus.hasUpstream && !hasPrimaryRemote)) {
       return {
         label: resolve(msg("Commit", { $context: "verb, git action" })),
         disabled: false,
@@ -396,6 +397,14 @@ export function resolveQuickAction(
         hint: resolve(msg("No local commits to push.")),
       };
     }
+    if (!allowStackedQuickAction) {
+      return {
+        label: resolve(msg("Push", { $context: "verb, git action" })),
+        disabled: false,
+        kind: "run_action",
+        action: "push",
+      };
+    }
     if (hasOpenPr || isDefaultRef) {
       return {
         label: resolve(msg("Push", { $context: "verb, git action" })),
@@ -434,6 +443,14 @@ export function resolveQuickAction(
   }
 
   if (isAhead) {
+    if (!allowStackedQuickAction) {
+      return {
+        label: resolve(msg("Push", { $context: "verb, git action" })),
+        disabled: false,
+        kind: "run_action",
+        action: "push",
+      };
+    }
     if (hasOpenPr || isDefaultRef) {
       return {
         label: resolve(msg("Push", { $context: "verb, git action" })),
@@ -696,4 +713,91 @@ export function resolveChangesTotals(
           )
         : null,
   };
+}
+
+export type PreferredCommitSelection =
+  | { readonly kind: "all" }
+  | {
+      readonly kind: "subset";
+      readonly filePaths: string[];
+      readonly excludedFilePaths: ReadonlyArray<string>;
+    }
+  | {
+      readonly kind: "empty_match";
+      readonly excludedFilePaths: ReadonlyArray<string>;
+    };
+
+function normalizeRepoRelativePath(filePath: string): string {
+  return filePath.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+export function resolvePreferredCommitSelection(
+  allFiles: ReadonlyArray<{ readonly path: string }>,
+  preferredFilePaths?: ReadonlyArray<string>,
+): PreferredCommitSelection {
+  if (preferredFilePaths === undefined || preferredFilePaths.length === 0) {
+    return { kind: "all" };
+  }
+  const normalizedPreferred = new Set(preferredFilePaths.map(normalizeRepoRelativePath));
+  const matchingPaths: string[] = [];
+  const excludedFilePaths: string[] = [];
+  for (const file of allFiles) {
+    if (normalizedPreferred.has(normalizeRepoRelativePath(file.path))) {
+      matchingPaths.push(file.path);
+    } else {
+      excludedFilePaths.push(file.path);
+    }
+  }
+  if (matchingPaths.length === 0) {
+    return allFiles.length === 0 ? { kind: "all" } : { kind: "empty_match", excludedFilePaths };
+  }
+  if (excludedFilePaths.length === 0) {
+    return { kind: "all" };
+  }
+  return {
+    kind: "subset",
+    filePaths: matchingPaths,
+    excludedFilePaths,
+  };
+}
+
+export type CommitCapableStackedAction = "commit" | "commit_push" | "commit_push_pr";
+
+function isCommitCapableStackedAction(
+  action: GitStackedAction,
+): action is CommitCapableStackedAction {
+  return action === "commit" || action === "commit_push" || action === "commit_push_pr";
+}
+
+export type QuickActionPreferredFilesResolution =
+  | { readonly kind: "run"; readonly action: GitStackedAction; readonly filePaths?: string[] }
+  | {
+      readonly kind: "open_dialog_empty_match";
+      readonly action: CommitCapableStackedAction;
+      readonly excludedFilePaths: ReadonlyArray<string>;
+    };
+
+export function resolveQuickActionWithPreferredFiles(
+  action: GitStackedAction,
+  allFiles: ReadonlyArray<{ readonly path: string }>,
+  preferredFilePaths?: ReadonlyArray<string>,
+): QuickActionPreferredFilesResolution {
+  if (
+    !isCommitCapableStackedAction(action) ||
+    preferredFilePaths === undefined ||
+    preferredFilePaths.length === 0
+  ) {
+    return { kind: "run", action };
+  }
+  const selection = resolvePreferredCommitSelection(allFiles, preferredFilePaths);
+  if (selection.kind === "empty_match") {
+    return {
+      kind: "open_dialog_empty_match",
+      action,
+      excludedFilePaths: selection.excludedFilePaths,
+    };
+  }
+  return selection.kind === "subset"
+    ? { kind: "run", action, filePaths: selection.filePaths }
+    : { kind: "run", action };
 }

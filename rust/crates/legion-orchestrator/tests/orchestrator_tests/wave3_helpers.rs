@@ -45,6 +45,7 @@ pub(super) fn make_thread(thread_id: &str, project_id: &str) -> Result<AppThread
             relationship_to_parent: None,
             root_thread_id: tid,
             side_chat: None,
+            workflow_step: None,
         },
         forked_from: None,
         created_at: "2026-11-22T00:00:00.000Z".to_owned(),
@@ -71,6 +72,7 @@ pub(super) fn make_thread(thread_id: &str, project_id: &str) -> Result<AppThread
         rollback_request_id: None,
         rollback_failure: None,
         rollback_unrestored: None,
+        workflow_run: None,
         deleted_at: None,
     })
 }

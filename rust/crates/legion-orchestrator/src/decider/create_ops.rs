@@ -102,6 +102,7 @@ fn build_new_thread(cmd: &ThreadCreateCommand, now_iso: &str) -> AppThread {
             relationship_to_parent: None,
             root_thread_id: cmd.thread_id.clone(),
             side_chat: None,
+            workflow_step: cmd.workflow_run.as_ref().map(|_| true),
         },
         forked_from: None,
         created_at: now_iso.to_owned(),
@@ -131,10 +132,11 @@ fn build_new_thread(cmd: &ThreadCreateCommand, now_iso: &str) -> AppThread {
             None
         },
         last_title_regeneration: None,
-        title_renamed: None,
+        title_renamed: cmd.title_renamed,
         rollback_request_id: None,
         rollback_failure: None,
         rollback_unrestored: None,
+        workflow_run: cmd.workflow_run.clone(),
         deleted_at: None,
     }
 }

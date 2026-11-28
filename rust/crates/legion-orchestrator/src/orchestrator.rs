@@ -37,6 +37,8 @@
 //!     delegated_from: None,
 //!     imported_native_thread: None,
 //!     initial_message: None,
+//!     title_renamed: None,
+//!     workflow_run: None,
 //! });
 //! let res = orch.dispatch_command(&cmd, "2026-11-20T00:00:00.000Z").await?;
 //! assert!(!res.outcome.replayed);

@@ -266,6 +266,20 @@ fn spawn_request(
     discard: bool,
 ) {
     super::open_request_window(&state, client_id, &id, &tag);
+    if let Err(error) = super::auth_guard::authorize_ws_request(&principal, &tag, &payload) {
+        if let Ok(mut windows) = state.output_windows.lock() {
+            let _ = windows.on_send_exit(client_id, &id);
+        }
+        if !is_notification && !discard {
+            let _ = writer_tx.send(OutboundItem::Frame(ServerRpcFrame::Exit {
+                request_id: id,
+                exit: RpcExit::Failure {
+                    cause: vec![RpcCauseReason::Fail { error }],
+                },
+            }));
+        }
+        return;
+    }
     if discard && !is_notification {
         let _ = writer_tx.send(OutboundItem::Frame(ServerRpcFrame::Exit {
             request_id: id.clone(),

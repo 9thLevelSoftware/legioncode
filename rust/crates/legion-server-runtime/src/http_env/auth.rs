@@ -68,6 +68,7 @@ pub(crate) async fn handle_get_session(
     let principal = if !state.require_auth && !has_explicit_cred {
         Ok(AuthenticatedPrincipal {
             session_id: "local".to_owned(),
+            subject: "local".to_owned(),
             role: "owner".to_owned(),
             scopes: ADMINISTRATIVE_CLIENT_SCOPES
                 .iter()

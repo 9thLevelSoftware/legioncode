@@ -70,6 +70,7 @@ import {
   FolderGit2Icon,
   FolderIcon,
   FolderPlusIcon,
+  KanbanIcon,
   MessageSquareDashedIcon,
   LinkIcon,
   MessageSquareIcon,
@@ -132,12 +133,14 @@ import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { useAtomQueryRunner } from "../state/use-atom-query-runner";
 import { useScratchProject } from "../hooks/useScratchProject";
 import { useWorkflowEnvironmentIds } from "./workflows/useWorkflowEnvironmentIds";
+import { isProjectGroupWorkflowBoardEnabled } from "./workflow-board/workflowBoard.logic";
 import { useStartTriage } from "../hooks/useStartTriage";
 import { pickTriageEnvironment } from "../lib/triageTarget";
 import { useNewProject } from "../hooks/useNewProject";
 import { useOrderWhileOpen } from "../hooks/useOrderWhileOpen";
 import { reportProjectFailure, useProjectPin } from "../hooks/useProjectGroupUpdate";
 import {
+  useConnectedEnvironmentIds,
   useEnvironmentProviders,
   useEnvironments,
   usePrimaryEnvironmentId,
@@ -519,7 +522,9 @@ function OpenCommandPaletteDialog(props: {
         : null;
   const openPanelPullRequestUrl = useOpenPanelPullRequestUrl(referenceThreadRef);
   const workflowsReachable = useWorkflowEnvironmentIds().length > 0;
-  const activeThreadServerConfig = useServerConfigs().get(
+  const serverConfigs = useServerConfigs();
+  const connectedEnvironmentIds = useConnectedEnvironmentIds();
+  const activeThreadServerConfig = serverConfigs.get(
     activeThread?.environmentId ?? ("" as EnvironmentId),
   );
   const canOperateActiveThread = useEnvironmentScope(
@@ -1843,6 +1848,38 @@ function OpenCommandPaletteDialog(props: {
   }
   const contextualProjectGroup = currentProjectGroup ?? projectGroups[0] ?? null;
   if (contextualProjectGroup) {
+    if (
+      isProjectGroupWorkflowBoardEnabled(
+        contextualProjectGroup,
+        serverConfigs,
+        connectedEnvironmentIds,
+      )
+    ) {
+      actionItems.push({
+        kind: "action",
+        value: "action:project-workflow-board",
+        searchTerms: [
+          "workflow",
+          "board",
+          "kanban",
+          "spec",
+          "plan",
+          "execute",
+          "ship",
+          contextualProjectGroup.displayName,
+        ],
+        title: gt("Open workflow board"),
+        description: contextualProjectGroup.displayName,
+        icon: <KanbanIcon className={ITEM_ICON_CLASS} />,
+        run: async () => {
+          await navigate({
+            to: "/projects/$projectKey/board",
+            params: { projectKey: contextualProjectGroup.projectKey },
+            search: {},
+          });
+        },
+      });
+    }
     actionItems.push({
       kind: "action",
       value: "action:project-settings",

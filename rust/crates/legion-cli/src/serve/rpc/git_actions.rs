@@ -14,7 +14,7 @@ use tokio::process::Command;
 use uuid::Uuid;
 
 use super::projects_fs::base_dir_from_state;
-use super::vcs_git::{current_branch, git_err, run_git_cmd};
+use super::vcs_git::{git_err, run_git_cmd};
 use super::{AppState, parse_payload, rpc_fail, with_db};
 
 pub(crate) async fn vcs_create_worktree(state: &AppState, payload: Value) -> RpcExit {
@@ -127,60 +127,8 @@ pub(crate) async fn dispatch(state: &Arc<AppState>, tag: &str, payload: Value) -
     }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct StackedActionPayload {
-    cwd: String,
-    action: String,
-    commit_message: Option<String>,
-}
-
 pub(crate) async fn git_run_stacked_action(payload: Value) -> RpcExit {
-    let req: StackedActionPayload = match parse_payload(payload) {
-        Ok(p) => p,
-        Err(e) => return e,
-    };
-    let cwd = Path::new(&req.cwd);
-    let branch = current_branch(cwd)
-        .await
-        .unwrap_or_else(|| "HEAD".to_owned());
-    let mut commit_sha = None;
-    if matches!(
-        req.action.as_str(),
-        "commit" | "commit_push" | "commit_push_pr"
-    ) {
-        if let Err((op, detail)) = run_git_cmd(cwd, &["add", "-A"]).await {
-            return git_err(&op, &req.cwd, &detail);
-        }
-        let msg = req
-            .commit_message
-            .as_deref()
-            .filter(|s| !s.trim().is_empty())
-            .unwrap_or("chore: save workspace changes");
-        if let Err((op, detail)) = run_git_cmd(cwd, &["commit", "-m", msg]).await {
-            return git_err(&op, &req.cwd, &detail);
-        }
-        commit_sha = run_git_cmd(cwd, &["rev-parse", "HEAD"])
-            .await
-            .ok()
-            .map(|s| s.trim().to_owned());
-    }
-    RpcExit::Success {
-        value: json!({
-            "action": req.action,
-            "branch": { "status": "skipped_not_requested", "name": branch },
-            "commit": commit_sha.map_or_else(
-                || json!({ "status": "skipped_not_requested" }),
-                |sha| json!({ "status": "created", "commitSha": sha, "subject": "commit" }),
-            ),
-            "push": { "status": "skipped_not_requested" },
-            "pr": { "status": "skipped_not_requested" },
-            "toast": {
-                "title": "Git action complete",
-                "cta": { "kind": "none" },
-            },
-        }),
-    }
+    super::git_stacked_action::git_run_stacked_action(payload).await
 }
 
 #[derive(Debug, Deserialize)]

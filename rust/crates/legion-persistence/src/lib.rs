@@ -43,7 +43,9 @@ pub mod service_launcher;
 pub mod service_preflight;
 pub mod sqlite;
 pub mod task_folder_store;
+pub mod thread_launch_store;
 pub mod triage_session;
+pub mod workflow_board_repo;
 pub mod worktree_lookup;
 
 pub use auth_connect_devices::{
@@ -139,6 +141,11 @@ pub use sqlite::{
     BUILD_MIGRATION_HEAD, RecordedMigration, SqliteOpenOptions, SqliteStore, SqliteStoreError,
     WAL_SIZE_LIMIT_BYTES, is_damaged_sqlite_code, is_damaged_sqlite_error, read_migration_head,
     read_recorded_migrations,
+};
+pub use thread_launch_store::{
+    ClaimThreadLaunchInput, ClaimThreadLaunchOutcome, ThreadLaunchRecord, ThreadLaunchStoreError,
+    claim_thread_launch, get_thread_launch, mark_thread_launch_committed,
+    mark_thread_launch_failed, mark_thread_launch_setup_committed,
 };
 pub use triage_session::{
     BOOT_SERVICE_LOG_FILE, RELAY_CLIENT_LOG_FILE, TRIAGE_PLAYBOOK, TRIAGE_PROMPT_FILE_NAME,

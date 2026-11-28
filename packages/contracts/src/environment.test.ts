@@ -52,4 +52,20 @@ describe("ExecutionEnvironmentDescriptor", () => {
       ).toBeUndefined();
     }
   });
+
+  it("decodes projectWorkflowBoard capability as omitted, false, or true", () => {
+    expect(decodeDescriptor(descriptor).capabilities.projectWorkflowBoard).toBeUndefined();
+    expect(
+      decodeDescriptor({
+        ...descriptor,
+        capabilities: { ...descriptor.capabilities, projectWorkflowBoard: false },
+      }).capabilities.projectWorkflowBoard,
+    ).toBe(false);
+    expect(
+      decodeDescriptor({
+        ...descriptor,
+        capabilities: { ...descriptor.capabilities, projectWorkflowBoard: true },
+      }).capabilities.projectWorkflowBoard,
+    ).toBe(true);
+  });
 });

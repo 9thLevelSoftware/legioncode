@@ -299,6 +299,8 @@ async fn mcp_thread_launch_workflow_run_and_list_parity() -> TestResult {
                 "arguments": {
                     "projectId": "proj-mcp",
                     "title": "WF Step",
+                    "modelSelection": { "instanceId": "devReplay", "model": "dev-replay" },
+                    "runtimeMode": "approval-required",
                     "workflowRun": { "runId": "wf-1", "workflow": "mcp_wf" }
                 }
             }
@@ -334,6 +336,57 @@ async fn mcp_thread_launch_workflow_run_and_list_parity() -> TestResult {
             .any(|t| t["threadId"] == tid && t["workflowRun"]["runId"] == "wf-1")
     );
 
+    // Omitting modelSelection / runtimeMode or passing unknown project fails explicitly (no silent defaults).
+    for (req_id, args) in [
+        (
+            15,
+            json!({
+                "projectId": "proj-missing",
+                "title": "Bad Proj",
+                "modelSelection": { "instanceId": "devReplay", "model": "dev-replay" },
+                "runtimeMode": "approval-required"
+            }),
+        ),
+        (
+            16,
+            json!({
+                "projectId": "proj-mcp",
+                "title": "Missing Model",
+                "runtimeMode": "approval-required"
+            }),
+        ),
+        (
+            17,
+            json!({
+                "projectId": "proj-mcp",
+                "title": "Missing Mode",
+                "modelSelection": { "instanceId": "devReplay", "model": "dev-replay" }
+            }),
+        ),
+    ] {
+        let err_resp = post_mcp_json(
+            &client,
+            server.origin(),
+            Some(&token),
+            &[],
+            json!({
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "method": "tools/call",
+                "params": { "name": "legion_thread_launch", "arguments": args }
+            }),
+        )
+        .await?;
+        assert_eq!(err_resp["result"]["isError"], true);
+    }
+
     server.shutdown().await?;
     Ok(())
 }
+
+#[path = "wave6_mcp_m2_cases.rs"]
+mod m2_cases;
+#[path = "wave6_mcp/m3_cases.rs"]
+mod m3_cases;
+#[path = "support/mcp_m3_seed.rs"]
+mod mcp_m3_seed;

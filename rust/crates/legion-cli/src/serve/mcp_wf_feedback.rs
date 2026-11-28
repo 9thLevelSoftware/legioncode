@@ -168,6 +168,8 @@ const REGISTERED_FEEDBACK_TOOLS: &[&str] = &[
     "thread_wait",
     "workflow",
     "feedback",
+    "workflow_board_read_brief",
+    "workflow_board_propose",
 ];
 
 const REGISTERED_FEEDBACK_CLI_COMMANDS: &[&str] = &[

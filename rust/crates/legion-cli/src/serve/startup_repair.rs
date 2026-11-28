@@ -26,6 +26,9 @@ pub(crate) fn repair_startup_state(orchestrator: &Orchestrator) {
         let _ = conn.execute_batch("ROLLBACK;");
         eprintln!("[startup-repair] warning: startup repair failed: {err}");
     }
+    if let Err(err) = legion_server_runtime::reconcile_incomplete_write_journal(&conn, &now_iso) {
+        eprintln!("[startup-repair] warning: workflow board write-journal recovery failed: {err}");
+    }
 }
 
 fn repair_in_tx(conn: &Connection, now_iso: &str) -> Result<(), rusqlite::Error> {

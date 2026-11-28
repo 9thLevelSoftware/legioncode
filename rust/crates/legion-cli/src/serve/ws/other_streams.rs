@@ -5,11 +5,14 @@ use legion_protocol::rpc_codec::RpcExit;
 use serde::Deserialize;
 use serde_json::{Value, json};
 
+#[path = "other_streams_board.rs"]
+mod board;
 #[path = "other_streams_helpers.rs"]
 mod helpers;
 #[path = "other_streams_peers_wf.rs"]
 mod peers_wf;
 
+use self::board::stream_workflow_board;
 use self::helpers::{load_scheduled_tasks_json, stream_git_stacked_action};
 use self::peers_wf::{stream_peer_thread, stream_workflows_counts, stream_workflows_snapshot};
 use super::stream_ctx::StreamContext;
@@ -26,6 +29,7 @@ pub(super) fn handles_tag(tag: &str) -> bool {
             | "scheduledTasks.subscribe"
             | "workflows.subscribe"
             | "workflows.counts"
+            | "workflowBoard.subscribe"
             | "peerLinks.subscribeThread"
             | "subscribeProjectClones"
             | "subscribeWorktreeSetup"
@@ -60,6 +64,7 @@ pub(super) async fn dispatch_stream(ctx: &StreamContext, tag: &str, payload: Val
         "scheduledTasks.subscribe" => stream_scheduled_tasks(ctx).await,
         "workflows.subscribe" => stream_workflows_snapshot(ctx).await,
         "workflows.counts" => stream_workflows_counts(ctx).await,
+        "workflowBoard.subscribe" => stream_workflow_board(ctx, payload).await,
         "peerLinks.subscribeThread" => stream_peer_thread(ctx, payload).await,
         "subscribeProjectClones" => stay_open_with(ctx, json!([])).await,
         "subscribeWorktreeSetup" => stay_open_with(ctx, Value::Null).await,

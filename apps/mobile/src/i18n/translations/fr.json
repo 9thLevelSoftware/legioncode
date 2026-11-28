@@ -396,6 +396,115 @@
   "4c55ce3dea11be53": "Associez cet environnement à Legion Connect pour obtenir une URL publique.",
   "b0f7054082ac0af6": "Seul cet ordinateur peut appeler cette adresse. Associez Legion Connect pour obtenir une URL publique.",
   "9bf61e6a1df6575e": "Fonctionne partout où l’adresse de cet environnement est joignable, par exemple via Tailscale ou votre propre proxy. Associez Legion Connect pour obtenir une URL publique.",
+  "8459c68d2060c35a": "Chargement du tableau de workflow…",
+  "90f601a1a0d6f678": "Vérification des capacités du serveur pour le tableau de workflow.",
+  "9fecf458b89a5449": "L'environnement n'est pas connecté",
+  "2f45c5a2f81ba606": "Connectez cet environnement pour ouvrir le tableau de workflow du projet.",
+  "4403db20f00cc614": "Le tableau de workflow n'est pas pris en charge",
+  "f5abac40497b2046": "Ce serveur ne prend pas encore en charge le tableau de workflow du projet.",
+  "34ad53646f06ed80": "Les workflows sont désactivés",
+  "c6b50b7b14713939": "Activez Workflows dans Paramètres → Labs pour utiliser le tableau de workflow du projet.",
+  "1d35b292a6c7687d": "Autorisation de lecture requise",
+  "fa33841ab2928908": "Cette session n'a pas l'accès en lecture à l'orchestration.",
+  "22028ce255e0ea52": "Projet introuvable",
+  "fe8b2f748a612525": "Choisissez un projet connecté pour ouvrir son tableau de workflow.",
+  "4745f5f657095541": "Spécification",
+  "086cf7b4ca56543b": "Plan",
+  "a065de4ac95ed77f": "Exécuter",
+  "d4d0ad32bbf2492d": "Livrer",
+  "94bbaba26abf2d27": "Actif",
+  "1fb31498e9479945": "Bloqué",
+  "8ef7caaaed0e9a2f": "En pause",
+  "691967567dac5630": "Terminé",
+  "bea12807777a509e": "Spécification approuvée",
+  "c6bc84b3cad27e0b": "Approbation obsolète",
+  "9f44b2ae72a195e0": "Remplacé",
+  "3732e4686ecc2236": "Historique",
+  "360ececbe1c5f453": "Brouillon de spécification",
+  "6f076ca649948075": "Plan approuvé",
+  "45407210a349b739": "Approbation du plan obsolète",
+  "7d4a7b98dc3f2a76": "Remplacé",
+  "5dfd2410affa78d1": "Historique",
+  "71d442ae8ff8734d": "Brouillon du plan",
+  "88bed77cea96973c": "Bloqué",
+  "fba2fd42c6ca6dbc": "Résoudre le blocage",
+  "334f4e403f01659c": "Reprendre la carte",
+  "6322554bddfe0eeb": "Voir la carte terminée",
+  "7c9ffc61b956d1bf": "Rédiger et approuver la spécification",
+  "a15fd2fccdf91aa6": "Approuver la spécification",
+  "969da8329b257a62": "Poursuivre l'exploration guidée",
+  "73699aca96bd6637": "Reprendre l'exploration",
+  "4f6eac1da6c1edcf": "Ouvrir le fil de spécification",
+  "9d880e1f3c5dcaf3": "Démarrer le plan",
+  "841158a8adfcd661": "Ouvrir le fil du plan",
+  "364feaa97d59af62": "Réviser la spécification",
+  "a519e85f438e3a98": "Réviser le plan",
+  "009dcc38518b970c": "Réviser l'exécution",
+  "c882aa0b9204e579": "Prêt pour l'exécution",
+  "652b3111f7ffe081": "Terminer la tâche active",
+  "5799efec8b8b94b7": "Exécuter les vérifications planifiées ou la tâche suivante",
+  "301ca5ac1d045e63": "Poursuivre l'exécution",
+  "f823c2ed9f4a66a4": "Démarrer une revue indépendante",
+  "4d1020a08eb4b908": "Ouvrir le fil de revue",
+  "2509cade788dbbdf": "Examiner pour livraison",
+  "f5c238210f2f18fe": "Résoudre la violation du contrat de fichiers",
+  "1483de3d575160ef": "Réconcilier les modifications externes",
+  "b7e1b00a345e6ee3": "Relancer la vérification échouée",
+  "f568e6d9e1b9e61b": "Relancer la revue indépendante",
+  "9cbca87b0c55b7fb": "Relancer la tâche échouée",
+  "23054cd61a1dae40": "Relancer l'étape échouée",
+  "0d135da201ad2bad": "Résoudre les constats de revue",
+  "cdc91d38b6f98f71": "Corriger le constat de revue",
+  "d27c5efd33206ae2": "Sélectionner les actions Git de livraison",
+  "3be969173fbfa5a7": "Confirmer les politiques importées",
+  "8dd799e5a890f2c9": "Résoudre la tâche bloquée",
+  "c6a0b71976577bb6": "Réapprouver la spécification",
+  "8739c3a43e539635": "Suivre l'exécution",
+  "e2be9e0de6d4308c": "Livrée",
+  "a999df9a9077e11c": "Prête à livrer",
+  "0eadfd4a217b5520": "Livraison bloquée",
+  "3f68515fe02ebf5a": "Livraison en attente",
+  "d0269942595ffbcf": "En attente",
+  "022a26912f57ae82": "En cours",
+  "f0059cf63e90467c": "Réussie",
+  "3de3e4c5c604f62b": "Échouée",
+  "d03b783c26744f27": "Obsolète",
+  "d00d8815730cd607": "Historique",
+  "6603378371972f1b": "Validé",
+  "23157564c7b0c5c7": "Constats",
+  "f4791321ea4bfd33": "Échoué",
+  "22cebdfc8330ee8b": "Obsolète",
+  "3b44208e87c94661": "En attente",
+  "75d35698f0f23090": "En attente",
+  "ddf48130ba9524e0": "Réussi",
+  "854af4695d5e7b98": "Échoué",
+  "dfb8cedfa8477f86": "Non applicable",
+  "7a8ff7588b3f6777": "Obsolète",
+  "4a1e74e28a70a390": "Historique",
+  "1a149b00bbfd6621": "Confirmation requise",
+  "685d43222e85476a": "Confirmée",
+  "797d04eb1c35efd7": "Approbation de spécification",
+  "16fb60ceb54e33e8": "Approbation du plan",
+  "131a81d7730fa04a": "Exécution",
+  "432c14edbadd23fc": "Revue",
+  "2e8a21a099e6cc72": "Vérification",
+  "a48ccae4d10fb37a": "Ce serveur ne prend pas en charge cette action du tableau de workflow.",
+  "627beac6eb84f7c8": "Cette carte a été modifiée sur le serveur. Actualisez et réessayez.",
+  "7dc8ee61b60fee26": "Cette carte a été modifiée sur le serveur (révision {revision}). Actualisez et réessayez.",
+  "f572fe5898fba987": "Approuvez la spécification avant de démarrer le plan.",
+  "4fc6d4a3de86ff63": "Complétez et approuvez le plan avant de continuer.",
+  "32940a3be17d6e3e": "Résolvez toutes les décisions d'exploration avant d'approuver la spécification.",
+  "af45a3063dba3cb1": "Complétez ou résolvez les points de contestation avant d'approuver la spécification.",
+  "453593f5279af5ee": "Des modifications externes de fichiers ont été détectées. Vérifiez et actualisez avant de continuer.",
+  "468d8875a1531d21": "Les contrats de fichiers ou les dépendances des tâches présentent un conflit.",
+  "148b20a8a49bf5c9": "Les artefacts sur disque ne correspondent pas au condensé de révision attendu.",
+  "f21458e08e3a9d89": "Impossible de trouver cette carte de workflow.",
+  "c329dfd8aa6f885d": "Le projet est introuvable sur ce serveur.",
+  "b08bdc990f859d2f": "L'artefact demandé est introuvable.",
+  "233efd452c5adf65": "La clé de l'artefact n'est pas valide.",
+  "b30f11c7f5b30ac4": "Cette transition d'étape n'est pas autorisée actuellement.",
+  "d02bd5dcde1faaf5": "Impossible de démarrer le fil de l'étape.",
+  "79b1ca0f8ecdf356": "La requête du tableau de workflow a échoué.",
   "3669395daf36fd33": "N’est plus enregistré sur ce serveur",
   "fe513cf316e796e3": "S’exécute dans le cadre d’autres workflows",
   "ccf00b97925efab3": "Démarré à la main",
@@ -1360,6 +1469,8 @@
   "d226ec7eb6c63131": "Choisir un projet",
   "d2ccdb8cd3297212": "Ajouter un projet",
   "cba3e832ece50257": "Fichiers",
+  "15fc18a031baacaa": "Tableau de workflow",
+  "b34c46e07b690a63": "Carte de workflow",
   "2e684630750efb96": "Exécution",
   "6a48fd0a37e725a1": "Mentions légales",
   "60894ad472e4cdee": "Configurer {product}",
@@ -2254,7 +2365,7 @@
   "6de674abaec6e767": "Préparation de l’aperçu...",
   "560c67308393e0d9": "Retour au document",
   "91eae98ce68f11a6": "Le fichier n’a pas pu être affiché.",
-  "5957c075ecbc3906": "Échec de l’aperçu",
+  "5957c075ecbc3906": "Échec de la prévisualisation",
   "b89be031608768f7": "Trop volumineux pour être parcouru ici",
   "60966cd36b4bf51c": "Le parcours fonctionne jusqu’à {size}. Enregistrez le ZIP pour l’ouvrir dans une autre app.",
   "14fdaffe7ede45b8": "Téléchargement annulé",
@@ -2343,6 +2454,7 @@
   "5dcdca7407caa33b": "Supprimer",
   "f6dd36e7cc2f9725": "Filtrer les fils par environnement",
   "1ef65b647231ff0b": "Filtrer les fils par projet",
+  "6be625c09e2198d7": "Ouvrir le tableau de workflow",
   "32a8bfef83ff2d97": "Réinitialiser les filtres de fils",
   "c395d6d5b8e3b1c3": "Fil clos",
   "364216d868acbcb8": "Fil reporté",
@@ -3132,7 +3244,7 @@
       "c": " a lancé une discussion"
     }
   ],
-  "29f0824614831f53": "Vue d’ensemble",
+  "29f0824614831f53": "Vue d'ensemble",
   "62c3b9089374dccf": "D’autres activités sont disponibles chez le fournisseur.",
   "9dd78a7f8c484706": [
     {
@@ -3493,6 +3605,8 @@
   "a153544a5fadb6cb": "checkout rapide des worktrees",
   "1c17afcab29fcfea": "cache de clonage",
   "6fdf9ac26f1b65b3": "retours des agents",
+  "7c2ffd79e887ac81": "workflows",
+  "3b88c616eb3eeaf3": "tableau de workflow",
   "9a7d63c1ed8ea2c2": "mises à jour",
   "6cbbbfe7191d82d1": "mises à jour des fournisseurs",
   "1f1b06dd5896df8a": "redémarrer",
@@ -3667,6 +3781,9 @@
   "aead92b761823bb0": "Échec de la suppression de « {project} »",
   "d94a4382aaf01787": "{count, plural, one {{count} checkout} other {{count} checkouts}}",
   "097a50ffe86aecc6": "Enregistrer le nom du projet",
+  "2dadb2359422121c": "Workflows",
+  "dd28d95cc040f0af": "Inspecter les cartes, approbations et la progression d'exécution.",
+  "a4143cb5f4c82040": "Les workflows sont désactivés dans Paramètres → Labs.",
   "7679d49fbd511b31": "Organiser",
   "da558d4aa2205fb0": "Épingler",
   "fc5c319684c43a4b": "Connectez chaque machine qui a ce projet pour modifier ce paramètre.",
@@ -3997,6 +4114,7 @@
   "0b83813eb16a9bc0": "Permet aux agents d’une machine de travailler sur vos autres machines, et aux leurs de travailler sur celle-ci. Activez l’option sur chaque machine. Tant qu’elle est désactivée, rien de nouveau ne démarre via une association ; les tâches en cours se terminent.",
   "f9904f78d3003f58": "Checkout rapide des worktrees",
   "1970de6e703abf2b": "Sur Mac, clone les nouveaux worktrees depuis une copie en cache dans le dossier LegionCode home au lieu d’écrire chaque fichier. Utilise le checkout Git normal quand ce n’est pas possible. La désactivation supprime le cache.",
+  "609169699172585d": "Activer le tableau de workflow du projet et les workflows serveur pour chaque machine. Lorsqu'ils sont désactivés, les actions du tableau et les exécutions serveur restent en pause.",
   "d6ada5ec242e37ff": "Limites d’utilisation",
   "62127e7b5c0f57a3": "Reprendre après les limites d’utilisation",
   "4df30d44eb0b0728": "Reprend automatiquement les fils quand leurs limites d’utilisation sont réinitialisées. Vous pouvez annuler la reprise automatique dans chaque fil.",
@@ -5246,6 +5364,380 @@
   "84f8481f49bd28ec": "Préparation",
   "cd5d90cbbfae32f6": "Enregistrement {time}",
   "6236e2f587bc4eb4": "Transcription",
+  "098db8d734e08970": "Terminé",
+  "cad08cd03258bbb3": "Historique",
+  "87faa6d9d43cce40": "Ouvrir le fil actif",
+  "50a06ecc2e427b78": "Ouvrir le fil de Spécification",
+  "945345be844e40dd": "Ouvrir le fil de Plan",
+  "96b21664eb6e9a03": "Ouvrir le fil d'Exécution ({taskId})",
+  "95369f5f7389eadc": "Ouvrir le fil d'Exécution",
+  "0d358a35d85e0c93": "Ouvrir le fil de Revue",
+  "7e80b6eed63c0977": "Ouvrir le fil de Livraison",
+  "b0a39c96d400e6d6": "Ouvrir le fil de la tâche {taskId}",
+  "c1891f6ef5224542": "Approuvez la spécification avant d'approuver le plan.",
+  "077f79bf1d6e6b5b": "Enregistrez le plan avant d'approuver.",
+  "5a98442bfc40605a": "Complétez les six décisions d'applicabilité des axes de conception.",
+  "b7a83d1acef2a4c9": "Fournissez 2 alternatives distinctes, choisissez-en une et justifiez votre choix.",
+  "268b7dbd70faa3a4": "Complétez les champs requis de la stratégie de planification.",
+  "071e5bb32eaee5c9": "Choisissez une granularité de tâches.",
+  "286d919a69a33080": "Ajoutez au moins une tâche valide avec propriété exclusive des fichiers.",
+  "ff287e49025dd885": "Corrigez les commandes argv de vérification invalides.",
+  "7a1e2eb19b79fce7": "Associez 100 % des critères d'acceptation à des preuves automatisées, manuelles ou externes.",
+  "febc6acf6595b684": "Corriger dans le code",
+  "8e54c259329177fa": "Accepter le risque",
+  "d8a40cb375b734b6": "Écarter",
+  "e54cac810f096235": "Différer",
+  "d3d91531eca989c7": "Réussi",
+  "dd3f1177a88f7bfe": "Échoué",
+  "f387afbb3bef16d5": "Non applicable",
+  "a9606ca2a62ea22d": "Rapprochement requis",
+  "bf079cb769b17285": "Import CLI",
+  "f3577f9f079e8469": "Impossible de charger le tableau de workflow.",
+  "559de9f1e4ff203d": "Actualiser le tableau de workflow",
+  "6ebe340e1d3eb0b2": "Ouvrir les paramètres Labs",
+  "dd1d0e9c049d3464": "Récupération des cartes de workflow pour ce projet.",
+  "00ebef252df7fc3f": "Aucune carte dans {stage}",
+  "7de8bf09ab6a46fe": "Les cartes livrées apparaissent ici une fois la livraison approuvée.",
+  "3de54a165a0b01c6": "Les cartes de cette étape apparaîtront ici au fil de l'avancement.",
+  "70569c77e320ba01": "{stage} ({count})",
+  "18125122c20c5a92": [
+    "rév. ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "f73ebbb67abc9f7b": [
+    "Suivante : ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "69e3c06e8954a323": "Copie locale du projet",
+  "bcdd78c0c6c71291": "Aucun résumé de spécification rédigé pour l'instant.",
+  "d8749fb92ea75365": "Approbation…",
+  "3085dc62be5a85b0": "Spécification approuvée",
+  "ed53eb126dd2250c": "Approuver la spécification",
+  "8692f5742dc69b70": "Critères d'acceptation ({count})",
+  "0a1ab3194d17d5de": "En pause",
+  "49efaf6aaf47df4f": "Non défini",
+  "01de85d802b70955": "Plan approuvé",
+  "84fb3c0d1ad08e3c": "Approuver le plan",
+  "7e21e36644951a9f": "Applicable",
+  "413896e45e448c0d": "Non applicable",
+  "038556e21aa8b1cb": "Indécis",
+  "eba00638c6719508": "Sélectionnée",
+  "f93a8504cc10863c": "Contrats de tâche ({count})",
+  "27dd32364c1cf77c": "Correspondances critère-preuve ({count})",
+  "faa2ce347b9e9897": "Actualiser le diff",
+  "8085fffe17afaae0": "Masquer le patch",
+  "f8e64898ae428b5d": "Afficher le patch",
+  "3040a5198cd8d1a6": "Exécutions de tâche ({count})",
+  "16fe2d775e47e6da": "Réessayer l'étape",
+  "2ce56d921f5dea81": "Réessayer la tâche",
+  "6fdc1d07a63a6815": "Vérifications planifiées ({count})",
+  "06d9f2f933698edc": "Obsolète",
+  "7c3cca288a82c82d": "Lancer la vérification",
+  "69c2428c2aceeba4": "Réessayer la vérification",
+  "50b7d647406c87c6": "Réessayer la revue",
+  "3ce8e6f10011f8dc": "Observations ({open} non résolues / {total} au total)",
+  "e298bc8d1b938713": "Motif de résolution de l'observation",
+  "57f55f775ce74a02": "Motif requis pour Écarter ou Accepter le risque",
+  "9c574963b6757a3f": "Note facultative",
+  "aab5753ee527c07b": "Résoudre l'observation",
+  "c04fb00d5d30ca4d": "Toutes les vérifications de livraison et critères d'acceptation sont satisfaits.",
+  "5a8a204cf1c23e3d": "Aucun bloqueur de livraison restant.",
+  "02f0a91950e67331": "Aller corriger",
+  "e8f8fb7c3fa4fcde": "Note d'approbation de livraison",
+  "0f00b0c4923433dd": "Note de livraison facultative",
+  "fd8669b0c8d1178f": "Approbation de la livraison…",
+  "77e1c2ac18925862": "Approuver la livraison",
+  "d72ee98dc98469af": "Observations de critère ({count})",
+  "353b08f4363dbb2c": "En attente",
+  "521d868ca190160d": "Note d'observation pour {criterionId}",
+  "3d0bd0881832c8b0": "Note requise pour Échoué ou Non applicable",
+  "da94bd0ba233f802": "Note d'observation facultative",
+  "77642405d4e62dd1": "Référence de preuve pour {criterionId}",
+  "e9510e05b8524c62": "Référence de preuve facultative",
+  "bbd5902292cfc436": "Enregistrer l'observation",
+  "1afac34a1340e7f2": "Historique",
+  "098d877681a45afa": "Historique des révisions ({count})",
+  "d8665cba9cdeb8e5": "Résumé de la spécification",
+  "e47303d3b6a4247d": [
+    "Source : ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " · Assistance : ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "c451e35f23a539b3": [
+    "Rév. approuvée ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " par ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    " à ",
+    {
+      "i": 3,
+      "k": "_gt_value_3",
+      "v": "v"
+    }
+  ],
+  "e5cbdb3b6ae31f54": "Aucun critère d'acceptation enregistré.",
+  "8c8c67e37c05ff55": "Contraintes",
+  "e7f695abc4859976": "Références source",
+  "3d424196d9d438a4": "Exploration guidée",
+  "52c20b7c330b89e8": [
+    "Tour ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " · Non résolues : ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "37cc0279e102bad1": [
+    "Réponse : ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "dcd764755f0348c4": "Contestation bornée",
+  "efb9d95e18162d77": [
+    "Statut : ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " · Préoccupations : ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "f20afd81cc808247": [
+    "Motif : ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "34747f291bdc0d6f": "Artefacts",
+  "145bd57a426b85db": "Chargement de l'artefact…",
+  "bef90ba46df75152": "Résumé du plan",
+  "5a1e983a6e5f6dd1": [
+    "Stratégie : ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " · Granularité : ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "4eac2452d3187f6c": [
+    "Alternative sélectionnée : ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "13dbf87965e365dd": [
+    "Rév. approuvée ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " par ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "9b9b0713266f65c5": "Conditions restantes d'approbation du plan",
+  "4daa1e874fb20704": "Axes de conception",
+  "e0905ece83e3f89c": "Alternatives comparées",
+  "9650a2fa8bfcfef3": [
+    "Compromis : ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "307a85db3ca7defb": "Aucune tâche définie pour l'instant.",
+  "f47a068d710dc054": [
+    "Autorisé : ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "92b2f5e332fe2b9c": [
+    "Dépend de : ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "a2d814adb5c8f9d4": "Aucune correspondance critère-preuve pour l'instant.",
+  "64beef950bed8a96": [
+    "Vérifications : ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "9e893e0b7189cade": "Diff du worktree",
+  "b95f021d9ee3ac33": "Chargement du diff…",
+  "037e05c7b0989c0d": "Aucun diff enregistré pour l'instant.",
+  "f7c87eb4b56b8187": "L'arbre de travail est propre.",
+  "1fce359ee59c9489": "Récupération et rapprochement des modifications externes",
+  "c3e31477f59a482e": [
+    "Entrées de journal en attente : ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " · Modifications externes détectées : ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "52125c033f742f93": "Aucune exécution de tâche démarrée pour l'instant.",
+  "6a217935a928c209": [
+    "Tentative ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "eb6e1f355386eb92": "Validation du contrat de fichiers",
+  "41737f26fdaaed3c": [
+    "Inattendus : ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "17e63b35a2e9187f": [
+    "Interdits : ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "4ad9c7055a911a44": "Aucune vérification planifiée enregistrée pour l'instant.",
+  "a7dbdfe65901e1f2": "Revue indépendante",
+  "ab0593f3e2c12bfd": "Aucune revue indépendante enregistrée pour l'instant.",
+  "ef356613bf0be2b4": "Préparation à la livraison",
+  "783fbed077962c92": "Reçu de livraison",
+  "8be2358f9fba4ecf": "Provenance d'import CLI",
+  "290c28664d34a724": [
+    "Spécification source : ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " · Propriétaire : ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "4c3e88e9606570c8": "Reçus CLI historiques",
+  "c4ba40406c77fc87": "Politiques CLI adoptées",
+  "cf3f1c93e24e92de": "Journaux de vérification CLI manquants",
+  "95fdd684b1e8a1c5": "Aucune révision enregistrée pour l'instant.",
+  "361a3c72ee94a9bd": "Approuver la spécification ?",
+  "5e6dc19336079d2f": "Approuve la révision {revision} afin que le Plan puisse démarrer.",
+  "34371b40df46ce20": "Impossible d'approuver la spécification.",
+  "1d23e86d3a7b0090": "Spécification approuvée.",
+  "c9f037b98204d5df": "Approuver le plan ?",
+  "5cb55fbcc3830f17": "Approuve le plan, les tâches et les vérifications pour l'exécution.",
+  "b6377299e8ed9cb5": "Impossible d'approuver le plan.",
+  "ee135cf04d9eb1e4": "Plan approuvé.",
+  "ad093aa56fd5503d": "Approuver la livraison ?",
+  "a5b465d91d622cd1": "Marque la carte comme livrée sans valider automatiquement les modifications.",
+  "7439a4d97d5b4810": "Impossible d'approuver la livraison.",
+  "df6825579a98f4e5": "Livraison approuvée. Carte marquée comme livrée.",
+  "07861447f44abd0f": "Impossible de mettre la carte en pause.",
+  "58313e63507cfa66": "Carte mise en pause.",
+  "9ae598c5e91f3fe5": "Impossible de reprendre la carte.",
+  "01698ddaa7ea1c38": "{count} élément(s) rapproché(s) et carte reprise.",
+  "61792a9d9d80e033": "Carte reprise.",
+  "75c6d24ba27a86e3": "Impossible de réessayer l'étape.",
+  "1e6711399439007d": "Nouvelle tentative d'étape envoyée.",
+  "a50779e7c3c7c609": "Un motif est requis lors de l'écart ou de l'acceptation du risque.",
+  "d556f620556c5317": "Impossible de résoudre l'observation.",
+  "7eeb458bb9c21ff0": "Observation mise à jour.",
+  "e8f7db9a9b875e7a": "Une note est requise lors de l'enregistrement d'Échoué ou Non applicable.",
+  "668a1d19df1d2992": "Impossible d'enregistrer l'observation d'acceptation.",
+  "75861b0570fdfdef": "Observation enregistrée pour {criterionId}.",
+  "d3519fa962dcaaee": "Saisissez un motif avant de renvoyer une carte en révision.",
+  "0b67d770f8700dad": "Renvoyer vers {stage} ?",
+  "e7a03998318f9e24": "Les approbations et preuves en aval peuvent devenir obsolètes.",
+  "c488329a00dd4939": "Renvoyer en révision",
+  "8f2d5c4509a34845": "Impossible de renvoyer la carte pour révision.",
+  "5d3c6398279513e4": "Carte renvoyée vers {stage}.",
+  "79eb91a2933f099b": "Impossible de charger l'artefact.",
+  "6f9e74f02f7ded1b": "Impossible de charger le diff.",
+  "c111deddfa2a68db": "Rapprocher et reprendre",
+  "6fae9d1c85fe5149": "Les entrées de journal en attente ou modifications externes de fichiers doivent être rapprochées avant de continuer.",
+  "8ced2d36350ce3a5": "Certaines approbations ou preuves sont obsolètes et doivent être revalidées.",
+  "17c9b6af54a6bc09": "{count} élément(s) de politique CLI importé(s) nécessitent une confirmation sur ordinateur/web.",
+  "c71f9a3dfa938a85": "Motif de renvoi de la carte",
+  "0d32141ebfb34987": "Motif de révision (requis)",
+  "e218b61bc38500bb": "Impossible de charger la carte de workflow.",
+  "6963356aabf8830a": "Actualiser la carte de workflow",
+  "e8b4b5d016ff6823": "Chargement de la carte de workflow…",
+  "af763961c375436a": "Récupération des artefacts, tâches, vérifications et preuves de la carte.",
+  "f44fd36664981ac6": "Renvoyer pour révision",
   "4e430d5ea01c249b": "Impossible d’envoyer la réponse",
   "e721a8b98f44d5f7": "Demander d’abord à l’agent",
   "e39f89c909df4db0": "Impossible de reprendre l’exécution",

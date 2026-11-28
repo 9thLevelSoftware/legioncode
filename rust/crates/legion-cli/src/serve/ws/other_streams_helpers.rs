@@ -2,8 +2,12 @@
 
 use legion_protocol::rpc_codec::{RpcCauseReason, RpcExit};
 use serde_json::{Value, json};
+use tokio::sync::mpsc;
 
 use super::StreamContext;
+use crate::serve::rpc::git_stacked_action::{
+    run_stacked_action_with_progress, stacked_action_phases,
+};
 
 pub(super) async fn stream_git_stacked_action(ctx: &StreamContext, payload: Value) -> RpcExit {
     let action_id = payload
@@ -21,16 +25,54 @@ pub(super) async fn stream_git_stacked_action(ctx: &StreamContext, payload: Valu
         .and_then(Value::as_str)
         .unwrap_or("commit")
         .to_owned();
+    let phases = stacked_action_phases(&payload);
     let _ = ctx
         .send_chunk(json!({
             "actionId": action_id,
             "cwd": cwd,
             "action": action,
             "kind": "action_started",
-            "phases": [],
+            "phases": phases,
         }))
         .await;
-    let res = crate::serve::rpc::git_actions::git_run_stacked_action(payload).await;
+
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let runner = run_stacked_action_with_progress(payload, Some(tx));
+    tokio::pin!(runner);
+    let (res, failed_phase) = loop {
+        tokio::select! {
+            chunk = rx.recv(), if !rx.is_closed() => {
+                if let Some(c) = chunk {
+                    let _ = ctx
+                        .send_chunk(json!({
+                            "actionId": action_id,
+                            "cwd": cwd,
+                            "action": action,
+                            "kind": "phase_started",
+                            "phase": c.phase,
+                            "label": c.label,
+                        }))
+                        .await;
+                }
+            }
+            done = &mut runner => {
+                while let Ok(c) = rx.try_recv() {
+                    let _ = ctx
+                        .send_chunk(json!({
+                            "actionId": action_id,
+                            "cwd": cwd,
+                            "action": action,
+                            "kind": "phase_started",
+                            "phase": c.phase,
+                            "label": c.label,
+                        }))
+                        .await;
+                }
+                break done;
+            }
+        }
+    };
+
     match res {
         RpcExit::Success { value } => {
             let _ = ctx
@@ -61,7 +103,7 @@ pub(super) async fn stream_git_stacked_action(ctx: &StreamContext, payload: Valu
                     "cwd": cwd,
                     "action": action,
                     "kind": "action_failed",
-                    "phase": Value::Null,
+                    "phase": failed_phase,
                     "message": msg,
                 }))
                 .await;

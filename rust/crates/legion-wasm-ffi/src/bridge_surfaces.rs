@@ -5,7 +5,8 @@ use std::collections::BTreeMap;
 
 use legion_client_core::diff_markdown::Utf16Span;
 use legion_contracts::permissions::{
-    EnvironmentScope, SessionGrantInput, WsMethod, grants_all_scopes, required_scopes_for_rpc,
+    EnvironmentScope, RpcCallerKind, SessionGrantInput, WsMethod, caller_kind_from_subject,
+    grants_all_scopes, required_scopes_for_rpc, requires_human_client_caller,
 };
 use legion_edge::i18n::{
     DEFAULT_LOCALE, SUPPORTED_LOCALE_CODES, SYSTEM_LANGUAGE, localized_href, lookup_locale,
@@ -191,6 +192,8 @@ struct EvaluateRpcScopesRequest {
     payload: Option<serde_json::Value>,
     #[serde(default)]
     session: Option<SessionGrantDto>,
+    #[serde(default)]
+    subject: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -198,6 +201,7 @@ struct EvaluateRpcScopesRequest {
 struct EvaluateRpcScopesResponse<'a> {
     method: &'a str,
     required_scopes: Vec<EnvironmentScope>,
+    requires_human_client_caller: bool,
     allowed: Option<bool>,
 }
 
@@ -208,6 +212,12 @@ pub fn evaluate_rpc_scopes_json(input_json: &str) -> Result<String, String> {
     let method = WsMethod::parse(&req.method).map_err(|err| err.to_string())?;
     let required_scopes =
         required_scopes_for_rpc(&method, req.payload.as_ref()).map_err(|err| err.to_string())?;
+    let requires_human_client = requires_human_client_caller(&method);
+    let caller_allowed = !requires_human_client
+        || req
+            .subject
+            .as_deref()
+            .is_none_or(|subj| caller_kind_from_subject(subj) == RpcCallerKind::Client);
     let allowed = req.session.map(|dto| {
         let session = SessionGrantInput {
             authenticated: dto.authenticated,
@@ -215,12 +225,13 @@ pub fn evaluate_rpc_scopes_json(input_json: &str) -> Result<String, String> {
             permissions: dto.permissions,
             server_update_scope: dto.server_update_scope,
         };
-        grants_all_scopes(&session, &required_scopes)
+        caller_allowed && grants_all_scopes(&session, &required_scopes)
     });
 
     let response = EvaluateRpcScopesResponse {
         method: method.as_str(),
         required_scopes,
+        requires_human_client_caller: requires_human_client,
         allowed,
     };
     serde_json::to_string(&response)

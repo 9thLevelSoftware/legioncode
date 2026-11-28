@@ -51,6 +51,7 @@ fn sample_thread(id: &str, is_subagent: bool) -> Result<AppThread, Box<dyn Error
             relationship_to_parent: is_subagent.then(|| "subagent".to_owned()),
             root_thread_id: ThreadId::new("parent-1")?,
             side_chat: None,
+            workflow_step: None,
         },
         forked_from: None,
         created_at: "2026-11-22T00:00:00.000Z".to_owned(),
@@ -77,6 +78,7 @@ fn sample_thread(id: &str, is_subagent: bool) -> Result<AppThread, Box<dyn Error
         rollback_request_id: None,
         rollback_failure: None,
         rollback_unrestored: None,
+        workflow_run: None,
         deleted_at: None,
     })
 }

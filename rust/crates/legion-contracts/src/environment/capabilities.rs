@@ -56,7 +56,7 @@ pub struct FileAttachmentsCapability {
     pub max_upload_bytes: NonZeroU64,
 }
 
-/// Capability flags advertised by an execution environment (87 fields on wire).
+/// Capability flags advertised by an execution environment (88 fields on wire).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvironmentCapabilities {
@@ -337,4 +337,7 @@ pub struct EnvironmentCapabilities {
     /// Supports multiple saved accounts per standalone issue tracker.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub issue_tracker_accounts: Option<bool>,
+    /// Serves `workflowBoard.*` Project Workflow Board RPCs and subscriptions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_workflow_board: Option<bool>,
 }

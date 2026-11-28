@@ -69,6 +69,10 @@ pub(crate) async fn journaled_start(
         } else {
             None
         },
+        stable_launch_key: opts
+            .launch
+            .as_ref()
+            .and_then(|l| l.stable_launch_key.clone()),
     };
     if let Some(ref issue_addr) = opts.issue
         && let Ok(detail) = deps.forge.issues_read(issue_addr.clone()).await

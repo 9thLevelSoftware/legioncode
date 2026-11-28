@@ -54,6 +54,8 @@ fn make_thread_create(
         delegated_from: None,
         imported_native_thread: None,
         initial_message: None,
+        title_renamed: None,
+        workflow_run: None,
     }))
 }
 

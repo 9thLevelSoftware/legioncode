@@ -11,7 +11,9 @@ import {
   resolveDefaultBranchActionDialogCopy,
   resolveFeatureBranchUnavailableReason,
   resolveLiveThreadBranchUpdate,
+  resolvePreferredCommitSelection,
   resolveQuickAction,
+  resolveQuickActionWithPreferredFiles,
   getMenuActionDisabledReason,
 } from "./GitActionsControl.logic";
 
@@ -58,6 +60,45 @@ describe("when: ref is clean, ahead, and has an open PR", () => {
       false,
     );
     assert.deepInclude(quick, { kind: "run_action", action: "push", label: "Push" });
+  });
+
+  it("keeps commit, push, and create PR discrete when allowStackedQuickAction is false", () => {
+    const dirtyFeature = status({ hasWorkingTreeChanges: true });
+    assert.deepEqual(resolveQuickAction(dirtyFeature, false, false, true, undefined, false), {
+      label: "Commit",
+      disabled: false,
+      kind: "run_action",
+      action: "commit",
+    });
+
+    const aheadFeature = status({ aheadCount: 2, hasUpstream: true, pr: null });
+    assert.deepEqual(resolveQuickAction(aheadFeature, false, false, true, undefined, false), {
+      label: "Push",
+      disabled: false,
+      kind: "run_action",
+      action: "push",
+    });
+
+    const aheadNoUpstream = status({ aheadCount: 2, hasUpstream: false, pr: null });
+    assert.deepEqual(resolveQuickAction(aheadNoUpstream, false, false, true, undefined, false), {
+      label: "Push",
+      disabled: false,
+      kind: "run_action",
+      action: "push",
+    });
+
+    const readyForPr = status({
+      aheadCount: 0,
+      aheadOfDefaultCount: 2,
+      hasUpstream: true,
+      pr: null,
+    });
+    assert.deepEqual(resolveQuickAction(readyForPr, false, false, true, undefined, false), {
+      label: "Create PR",
+      disabled: false,
+      kind: "run_action",
+      action: "create_pr",
+    });
   });
 });
 
@@ -400,5 +441,58 @@ describe("resolveChangesTotals", () => {
       ),
       { insertions: 2, deletions: 0 },
     );
+  });
+});
+
+describe("resolvePreferredCommitSelection", () => {
+  it("selects all when preferredFilePaths is omitted or empty or matches all dirty files", () => {
+    const files = [{ path: "src/a.ts" }, { path: "src/b.ts" }];
+    assert.deepEqual(resolvePreferredCommitSelection(files, undefined), { kind: "all" });
+    assert.deepEqual(resolvePreferredCommitSelection(files, []), { kind: "all" });
+    assert.deepEqual(resolvePreferredCommitSelection(files, ["./src/a.ts", "src\\b.ts"]), {
+      kind: "all",
+    });
+    assert.deepEqual(resolvePreferredCommitSelection([], ["src/a.ts"]), { kind: "all" });
+  });
+
+  it("scopes to matching subset with path normalization", () => {
+    const files = [{ path: "src/a.ts" }, { path: "src/b.ts" }, { path: "README.md" }];
+    assert.deepEqual(resolvePreferredCommitSelection(files, ["./src/a.ts", "src\\b.ts"]), {
+      kind: "subset",
+      filePaths: ["src/a.ts", "src/b.ts"],
+      excludedFilePaths: ["README.md"],
+    });
+  });
+
+  it("returns empty_match with all dirty files excluded when preferredFilePaths matches nothing", () => {
+    const files = [{ path: "src/unrelated-1.ts" }, { path: "src/unrelated-2.ts" }];
+    assert.deepEqual(resolvePreferredCommitSelection(files, ["src/card-file.ts"]), {
+      kind: "empty_match",
+      excludedFilePaths: ["src/unrelated-1.ts", "src/unrelated-2.ts"],
+    });
+  });
+
+  it("applies preferredFilePaths guard to commit, commit_push, and commit_push_pr quick actions while preserving action", () => {
+    const files = [{ path: "src/card-file.ts" }, { path: "src/unrelated.ts" }];
+    for (const action of ["commit", "commit_push", "commit_push_pr"] as const) {
+      assert.deepEqual(resolveQuickActionWithPreferredFiles(action, files, ["src/card-file.ts"]), {
+        kind: "run",
+        action,
+        filePaths: ["src/card-file.ts"],
+      });
+      assert.deepEqual(resolveQuickActionWithPreferredFiles(action, files, ["src/missing.ts"]), {
+        kind: "open_dialog_empty_match",
+        action,
+        excludedFilePaths: ["src/card-file.ts", "src/unrelated.ts"],
+      });
+      assert.deepEqual(resolveQuickActionWithPreferredFiles(action, files, []), {
+        kind: "run",
+        action,
+      });
+    }
+    assert.deepEqual(resolveQuickActionWithPreferredFiles("push", files, ["src/missing.ts"]), {
+      kind: "run",
+      action: "push",
+    });
   });
 });

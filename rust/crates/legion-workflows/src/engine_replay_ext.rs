@@ -9,13 +9,14 @@ use crate::engine_agent::{
     AgentStepAttempt, AgentStepDeps, AgentStepOptions, AgentStepOutcome, AgentThreadRef,
     execute_agent_step,
 };
+use crate::engine_agent_turns::journaled_start;
 use crate::engine_replay::ReplayContext;
 use crate::engine_step::{ChildOutcome, PassControl, StepRetry};
 use crate::engine_wait::{
     WaitOptions, WaitReplayOutcome, ask_schema_and_request, execute_wait_replay, pr_watch_schema,
 };
-use crate::traits::{PullRequestAddress, PullRequestStanding, PullRequestUntil};
-use crate::types::{RunParent, WorkflowStepKind};
+use crate::traits::{AgentTurn, PullRequestAddress, PullRequestStanding, PullRequestUntil};
+use crate::types::{RunParent, WorkflowError, WorkflowStepKind};
 
 impl ReplayContext {
     /// Invokes a child workflow run and waits for its terminal outcome.
@@ -86,6 +87,44 @@ impl ReplayContext {
             )),
             WaitReplayOutcome::Waiting => Err(PassControl::Suspend),
         }
+    }
+
+    /// Starts an agent turn non-blockingly (journaled start only) without awaiting turn settlement.
+    pub async fn start_agent_turn(
+        &mut self,
+        name: &str,
+        opts: &AgentStepOptions,
+    ) -> Result<AgentTurn, PassControl> {
+        self.claim(name, false)?;
+        if opts.thread.is_some()
+            && (opts.project.is_some()
+                || opts.environment.is_some()
+                || opts.model.is_some()
+                || opts.title.is_some()
+                || opts.launch.is_some())
+        {
+            return Err(PassControl::Fault(format!(
+                "agent({name:?}) continues `thread`, which keeps how it started. Drop `project`/`environment`/`model`/`title`/`launch`."
+            )));
+        }
+        let deps = AgentStepDeps {
+            store: &self.store,
+            journal: &self.journal,
+            agents: &self.agents,
+            forge: &self.forge,
+            run_id: &self.run_id,
+            workflow: &self.workflow,
+            step_name: name,
+            pause_on_failure: true,
+        };
+        let fut = journaled_start(&deps, opts, 0, &opts.brief, opts.thread.as_ref(), "start");
+        self.in_flight
+            .track(&self.run_id, fut)
+            .await
+            .map_err(|e| match e {
+                WorkflowError::Input { problem } => PassControl::Fault(problem),
+                other => PassControl::Fault(other.to_string()),
+            })
     }
 
     /// Executes an `agent` step (pauses run on failure with `held = true`).

@@ -119,5 +119,6 @@ CREATE TABLE IF NOT EXISTS task_folders (
 
 pub(crate) fn create_feature_tables(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch(FEATURE_TABLES_SQL)?;
-    super::schema_workflow_tables::create_workflow_tables(conn)
+    super::schema_workflow_tables::create_workflow_tables(conn)?;
+    super::schema_workflow_board::create_workflow_board_tables(conn)
 }

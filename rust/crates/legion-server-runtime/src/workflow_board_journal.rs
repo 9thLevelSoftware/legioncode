@@ -63,18 +63,18 @@ pub(crate) fn ensure_confined_deliverable_target(
     })?;
     let rel = target_path
         .strip_prefix(card_dir)
-        .or_else(|_| target_path.strip_prefix(&canonical_card_dir))
-        .or_else(|e| {
-            #[cfg(windows)]
-            if let Some(plain) = canonical_card_dir
-                .to_str()
-                .and_then(|s| s.strip_prefix(r"\\?\"))
-            {
-                return target_path.strip_prefix(Path::new(plain));
-            }
-            Err(e)
-        })
-        .map_err(|_| journal_key_err("Deliverable path escapes card directory"))?;
+        .or_else(|_| target_path.strip_prefix(&canonical_card_dir));
+    #[cfg(windows)]
+    let rel = rel.or_else(|e| {
+        if let Some(plain) = canonical_card_dir
+            .to_str()
+            .and_then(|s| s.strip_prefix(r"\\?\"))
+        {
+            return target_path.strip_prefix(Path::new(plain));
+        }
+        Err(e)
+    });
+    let rel = rel.map_err(|_| journal_key_err("Deliverable path escapes card directory"))?;
     let mut segs = Vec::new();
     for comp in rel.components() {
         match comp {

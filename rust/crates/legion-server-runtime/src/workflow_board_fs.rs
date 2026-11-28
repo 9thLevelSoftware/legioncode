@@ -30,18 +30,17 @@ fn invalid_input_err(msg: impl Into<String>) -> WorkflowBoardRequestError {
 
 /// Returns `true` when `meta` is a symlink or Windows reparse point (e.g. directory junction).
 pub(crate) fn is_symlink_or_reparse_point(meta: &fs::Metadata) -> bool {
-    if meta.file_type().is_symlink() {
-        return true;
-    }
+    let is_symlink = meta.file_type().is_symlink();
     #[cfg(windows)]
     {
         use std::os::windows::fs::MetadataExt as _;
         const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
-        if (meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT) != 0 {
-            return true;
-        }
+        is_symlink || (meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT) != 0
     }
-    false
+    #[cfg(not(windows))]
+    {
+        is_symlink
+    }
 }
 
 /// Returns `true` when `seg` names `.git` metadata (case-insensitive, Windows short-name/dot/stream hardened).

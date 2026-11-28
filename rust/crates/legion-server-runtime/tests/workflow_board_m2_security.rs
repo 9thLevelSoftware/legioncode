@@ -8,6 +8,7 @@ mod workflow_board_m2_support;
 
 use std::fs;
 use std::path::Path;
+#[cfg(windows)]
 use std::process::Command as StdCommand;
 
 use legion_contracts::ids::ProjectId;

@@ -42,14 +42,12 @@ pub(crate) fn stacked_action_phases(payload: &Value) -> Vec<&'static str> {
         .get("featureBranch")
         .and_then(Value::as_bool)
         .unwrap_or(false);
-    StackedActionKind::parse(action_raw)
-        .map(|k| {
-            phases_for_action(k, feature_branch)
-                .into_iter()
-                .map(StackedActionPhase::as_str)
-                .collect()
-        })
-        .unwrap_or_default()
+    StackedActionKind::parse(action_raw).map_or_default(|k| {
+        phases_for_action(k, feature_branch)
+            .into_iter()
+            .map(StackedActionPhase::as_str)
+            .collect()
+    })
 }
 
 pub(crate) async fn git_run_stacked_action(payload: Value) -> RpcExit {

@@ -256,19 +256,17 @@ fn hydrate_check_receipts(
     exec: &CardExecutionDetail,
     plan: Option<&WorkflowBoardPlanDocument>,
 ) -> Result<Vec<WorkflowBoardPlannedCheckReceipt>, WorkflowBoardRequestError> {
-    let check_meta: HashMap<&str, (Option<&str>, Option<&str>)> = plan
-        .map(|p| {
-            p.checks
-                .iter()
-                .map(|c| {
-                    (
-                        c.id.as_str(),
-                        (c.criterion_id.as_deref(), c.description.as_deref()),
-                    )
-                })
-                .collect()
-        })
-        .unwrap_or_default();
+    let check_meta: HashMap<&str, (Option<&str>, Option<&str>)> = plan.map_or_default(|p| {
+        p.checks
+            .iter()
+            .map(|c| {
+                (
+                    c.id.as_str(),
+                    (c.criterion_id.as_deref(), c.description.as_deref()),
+                )
+            })
+            .collect()
+    });
     let planned_by_id: HashMap<&str, _> = exec
         .planning
         .planned_checks

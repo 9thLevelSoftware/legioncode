@@ -14,7 +14,10 @@ use super::helpers::{
 
 pub async fn f7_t2_04_external_spec_edit_invalidates_challenge_binding() -> TestResult<()> {
     let mut env = PlanningEnv::start(true).await?;
-    assert!(check_board_capable(&env, "F7-T2-04"), "required workflow board capability");
+    assert!(
+        check_board_capable(&env, "F7-T2-04"),
+        "required workflow board capability"
+    );
     let created = env
         .ws
         .call_ok(
@@ -162,7 +165,10 @@ pub async fn f8_t1_05_write_journal_and_disk_sha256_consistency() -> TestResult<
 
 pub async fn f8_t2_04_external_disk_edit_invalidates_spec_and_plan_approvals() -> TestResult<()> {
     let mut env = PlanningEnv::start(true).await?;
-    assert!(check_board_capable(&env, "F8-T2-04"), "required workflow board capability");
+    assert!(
+        check_board_capable(&env, "F8-T2-04"),
+        "required workflow board capability"
+    );
     let (card_id, rev) =
         create_and_approve_spec(&mut env.ws, &env.project_id, "Ext Edit Spec", false).await?;
     let plan_upd = env

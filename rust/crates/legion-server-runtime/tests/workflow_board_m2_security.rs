@@ -14,9 +14,9 @@ use legion_contracts::ids::ProjectId;
 use legion_contracts::orchestration::PatchValue;
 use legion_contracts::workflow_board::{
     WorkflowBoardApplyCliImportInput, WorkflowBoardApproveSpecInput, WorkflowBoardArtifactKind,
-    WorkflowBoardCreateCardInput, WorkflowBoardGetArtifactInput, WorkflowBoardGetCardInput,
-    WorkflowBoardPreviewCliImportInput, WorkflowBoardRequestErrorCode, WorkflowBoardSpecSourceType,
-    WorkflowBoardUpdateSpecInput,
+    WorkflowBoardCardSummary, WorkflowBoardCreateCardInput, WorkflowBoardGetArtifactInput,
+    WorkflowBoardGetCardInput, WorkflowBoardPreviewCliImportInput, WorkflowBoardRequestErrorCode,
+    WorkflowBoardSpecSourceType, WorkflowBoardUpdateSpecInput,
 };
 use legion_persistence::workflow_board_repo::stage_write;
 use legion_persistence::workflow_board_repo::types::StageWriteInput;
@@ -85,7 +85,10 @@ fn cli_import_rejects_linked_source_ancestor_without_creating_card() -> TestResu
         .expect_err("CLI import must reject linked ancestors before writing");
     assert_eq!(preview.code, WorkflowBoardRequestErrorCode::InvalidInput);
     assert_eq!(apply.code, preview.code);
-    assert!(board.get_board_snapshot(&project_id)?.cards.is_empty());
+    assert_eq!(
+        board.get_board_snapshot(&project_id)?.cards,
+        [] as [WorkflowBoardCardSummary; 0]
+    );
     assert!(!repo.join(".legion/workflows").exists());
     Ok(())
 }

@@ -141,15 +141,12 @@ async fn drive_spec_explore_challenge(
     .await?;
     rev = exp["revision"].as_u64().ok_or("rev")?;
     for round in 0..6 {
-        let unres: Vec<Value> = exp["decisions"]
-            .as_array()
-            .map(|arr| {
-                arr.iter()
-                    .filter(|d| d["status"] == "unresolved")
-                    .map(|d| json!({ "decisionId": d["id"], "action": "recommend" }))
-                    .collect()
-            })
-            .unwrap_or_default();
+        let unres: Vec<Value> = exp["decisions"].as_array().map_or_default(|arr| {
+            arr.iter()
+                .filter(|d| d["status"] == "unresolved")
+                .map(|d| json!({ "decisionId": d["id"], "action": "recommend" }))
+                .collect()
+        });
         if unres.is_empty() {
             break;
         }

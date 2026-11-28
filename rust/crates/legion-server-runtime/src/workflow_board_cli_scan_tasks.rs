@@ -56,7 +56,7 @@ pub(crate) fn extract_spec_content(
     let acs = fm
         .and_then(|v| v.get("acceptance"))
         .and_then(Value::as_array)
-        .map(|arr| {
+        .map_or_default(|arr| {
             arr.iter()
                 .filter_map(|item| {
                     let id = item.get("id").and_then(Value::as_str)?.trim();
@@ -71,12 +71,11 @@ pub(crate) fn extract_spec_content(
                     }
                 })
                 .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
+        });
     let mut constraints: Vec<String> = fm
         .and_then(|v| v.get("mustNotChange"))
         .and_then(Value::as_array)
-        .map(|arr| {
+        .map_or_default(|arr| {
             arr.iter()
                 .filter_map(|v| {
                     v.as_str()
@@ -85,8 +84,7 @@ pub(crate) fn extract_spec_content(
                         .map(str::to_owned)
                 })
                 .collect()
-        })
-        .unwrap_or_default();
+        });
     if constraints.is_empty() {
         constraints.push("Preserve CLI import provenance and do not auto-commit".to_owned());
     }
@@ -139,8 +137,7 @@ fn parse_single_task(
 ) -> Result<(ScannedTask, String), WorkflowBoardRequestError> {
     let name = path
         .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
+        .map_or_default(|n| n.to_string_lossy().into_owned());
     let rel = format!("{cli_rel}/tasks/{name}");
     let Some((Some(fm), body)) = read_markdown_file(path, &rel, digest_parts)? else {
         return Err(yaml_err(
@@ -297,18 +294,16 @@ fn split_quoted_command_tokens(raw: &str) -> Option<Vec<String>> {
 }
 
 fn str_vec(val: Option<&Value>) -> Vec<String> {
-    val.and_then(Value::as_array)
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| {
-                    v.as_str()
-                        .map(str::trim)
-                        .filter(|s| !s.is_empty())
-                        .map(str::to_owned)
-                })
-                .collect()
-        })
-        .unwrap_or_default()
+    val.and_then(Value::as_array).map_or_default(|arr| {
+        arr.iter()
+            .filter_map(|v| {
+                v.as_str()
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_owned)
+            })
+            .collect()
+    })
 }
 
 fn extract_acceptance_ids(notes: Option<&str>, body: &str) -> Vec<String> {

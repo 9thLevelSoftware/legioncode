@@ -16,7 +16,7 @@ pub(crate) fn extract_spec_ac_ids(spec_json: &str) -> Vec<String> {
     val.get("acceptanceCriteria")
         .or_else(|| val.get("ac"))
         .and_then(Value::as_array)
-        .map(|items| {
+        .map_or_default(|items| {
             items
                 .iter()
                 .filter_map(|item| {
@@ -28,7 +28,6 @@ pub(crate) fn extract_spec_ac_ids(spec_json: &str) -> Vec<String> {
                 })
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 /// Validates the current Spec before recording an approval.

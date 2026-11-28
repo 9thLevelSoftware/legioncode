@@ -52,7 +52,7 @@ async fn t3_r07_f14_f15_out_of_contract_edits_preserved_and_amended() -> TestRes
     let model = install_provider(
         &mut ws, h.workspace_dir().parent().ok_or("missing parent")?,
         "scenario-executor", "Completed task.",
-        r#"const fs = await import('node:fs'); fs.mkdirSync('src', {recursive: true}); fs.writeFileSync('src/unexpected.rs', 'pub fn unexpected() {}');"#,
+        r"const fs = await import('node:fs'); fs.mkdirSync('src', {recursive: true}); fs.writeFileSync('src/unexpected.rs', 'pub fn unexpected() {}');",
     ).await?;
     let (_, blocked) =
         start_stage_settled(&mut ws, &cid, &json!(plan_rev), "execute", Some(model)).await?;
@@ -201,7 +201,7 @@ async fn t3_r09_f17_f21_fresh_review_thread_and_card_lifetime_vs_cancel() -> Tes
     );
     assert_eq!(after_cancel["cardId"], cid);
     let reviewer = install_reviewer(&mut ws, root).await?;
-    let (review, reviewed) = start_stage_settled(
+    let (review, after_review) = start_stage_settled(
         &mut ws,
         &cid,
         &after_cancel["revision"],
@@ -211,8 +211,8 @@ async fn t3_r09_f17_f21_fresh_review_thread_and_card_lifetime_vs_cancel() -> Tes
     .await?;
     assert_ne!(review["threadId"], exec["threadId"]);
     assert_ne!(review["threadId"], cancelled["threadId"]);
-    assert_eq!(reviewed["reviewReport"]["threadId"], review["threadId"]);
-    assert_eq!(reviewed["reviewReport"]["verdict"], "pass");
+    assert_eq!(after_review["reviewReport"]["threadId"], review["threadId"]);
+    assert_eq!(after_review["reviewReport"]["verdict"], "pass");
     Ok(())
 }
 
@@ -227,7 +227,7 @@ async fn t3_r10_f18_f23_multi_client_ship_delivery_and_agent_rejection() -> Test
     assert_eq!(checked["checkReceipts"][0]["status"], "passed");
     let root = h.workspace_dir().parent().ok_or("missing parent")?;
     let reviewer = install_reviewer(&mut ws_a, root).await?;
-    let (review, reviewed) = start_stage_settled(
+    let (review, after_review) = start_stage_settled(
         &mut ws_a,
         &cid,
         &checked["revision"],
@@ -236,12 +236,12 @@ async fn t3_r10_f18_f23_multi_client_ship_delivery_and_agent_rejection() -> Test
     )
     .await?;
     assert_ne!(review["threadId"], exec["threadId"]);
-    assert_eq!(reviewed["reviewReport"]["verdict"], "pass");
+    assert_eq!(after_review["reviewReport"]["verdict"], "pass");
 
     let tok_b = h.pair_client("t3-r10-b", None).await?;
     let mut ws_b = connect_ws_at(h.addr()?, &tok_b).await?;
     let client_b_card = ws_ok(&mut ws_b, "workflowBoard.getCard", json!({ "cardId": cid })).await?;
-    assert_eq!(client_b_card["revision"], reviewed["revision"]);
+    assert_eq!(client_b_card["revision"], after_review["revision"]);
     let cur_rev = &client_b_card["revision"];
     let agent_tok = mint_scoped_session(
         h.origin()?,

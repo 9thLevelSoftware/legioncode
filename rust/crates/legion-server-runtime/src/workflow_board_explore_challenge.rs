@@ -73,8 +73,7 @@ pub(crate) async fn explore_step_impl(
     let missing_decisions = fields
         .intake_analysis
         .as_ref()
-        .map(|a| a.missing_decisions.clone())
-        .unwrap_or_default();
+        .map_or_default(|a| a.missing_decisions.clone());
     let is_pause_or_resume = matches!(action_str.as_deref(), Some("pause" | "resume"));
     let can_seed = planning.card_detail.card.stage == "spec"
         && !matches!(

@@ -73,7 +73,9 @@ async fn t3_r01_f13_f22_launch_strictness_and_ws_scope_guards() -> TestResult<()
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn t3_r02_f4_f20_brief_path_traversal_and_atomic_sqlite_rejection() -> TestResult<()> {
-    let (h, _, mut ws) = start_m1_ws("t3_r02").await?.ok_or("required workflow board scenario setup")?;
+    let (h, _, mut ws) = start_m1_ws("t3_r02")
+        .await?
+        .ok_or("required workflow board scenario setup")?;
     fs::write(h.workspace_dir().join(".env"), "SECRET=123\n")?;
     fs::write(h.workspace_dir().join("bin.md"), b"bad\0null\xfe")?;
     create_project(&mut ws, "proj-t3-r02", "T3 R02", h.workspace_dir()).await?;
@@ -102,7 +104,9 @@ async fn t3_r02_f4_f20_brief_path_traversal_and_atomic_sqlite_rejection() -> Tes
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn t3_r03_f8_f22_concurrent_update_spec_vs_approve_spec_cas() -> TestResult<()> {
-    let (h, tok, mut ws1) = start_m1_ws("t3_r03").await?.ok_or("required workflow board scenario setup")?;
+    let (h, tok, mut ws1) = start_m1_ws("t3_r03")
+        .await?
+        .ok_or("required workflow board scenario setup")?;
     let mut ws2 = connect_ws_at(h.addr()?, &tok).await?;
     create_project(&mut ws1, "proj-t3-r03", "T3 R03", h.workspace_dir()).await?;
     let created = ws_ok(
@@ -183,7 +187,9 @@ async fn t3_r04_f20_f21_torn_write_journal_recovery_and_plan_brief() -> TestResu
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn t3_r05_f2_f22_artifact_traversal_and_large_frame_parts_roundtrip() -> TestResult<()> {
-    let (h, tok, mut ws) = start_m1_ws("t3_r05").await?.ok_or("required workflow board scenario setup")?;
+    let (h, tok, mut ws) = start_m1_ws("t3_r05")
+        .await?
+        .ok_or("required workflow board scenario setup")?;
     create_project(&mut ws, "proj-t3-r05", "T3 R05", h.workspace_dir()).await?;
     let created = ws_ok(
         &mut ws,
@@ -230,8 +236,13 @@ async fn t3_r05_f2_f22_artifact_traversal_and_large_frame_parts_roundtrip() -> T
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn t3_r06_f3_f8_return_for_revision_history_and_human_only_guard() -> TestResult<()> {
-    let (h, tok, mut ws) = start_m1_ws("t3_r06").await?.ok_or("required workflow board scenario setup")?;
-    assert!(probe_m2_planning(&mut ws, "t3_r06").await?, "required workflow board capability");
+    let (h, tok, mut ws) = start_m1_ws("t3_r06")
+        .await?
+        .ok_or("required workflow board scenario setup")?;
+    assert!(
+        probe_m2_planning(&mut ws, "t3_r06").await?,
+        "required workflow board capability"
+    );
     let (_wt, cid, plan_rev) = setup_m3_card(&h, &mut ws, "t3-r06", "outcomes").await?;
     let agent_tok = mint_scoped_session(
         h.origin()?,

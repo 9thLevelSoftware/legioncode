@@ -161,18 +161,14 @@ pub(crate) fn prepare_review_brief_inputs(
     .ok();
     let changed_files_summary: Vec<String> = diff_res
         .as_ref()
-        .map(|d| d.files.iter().map(|f| f.path.clone()).collect())
-        .unwrap_or_default();
-    let mut diff_excerpt = diff_res
-        .as_ref()
-        .map(|d| {
-            d.files
-                .iter()
-                .filter_map(|f| f.patch.as_deref())
-                .collect::<Vec<_>>()
-                .join("\n")
-        })
-        .unwrap_or_default();
+        .map_or_default(|d| d.files.iter().map(|f| f.path.clone()).collect());
+    let mut diff_excerpt = diff_res.as_ref().map_or_default(|d| {
+        d.files
+            .iter()
+            .filter_map(|f| f.patch.as_deref())
+            .collect::<Vec<_>>()
+            .join("\n")
+    });
     if diff_excerpt.chars().count() > 8000 {
         diff_excerpt = diff_excerpt.chars().take(8000).collect();
         diff_excerpt.push_str("\n...[truncated]");

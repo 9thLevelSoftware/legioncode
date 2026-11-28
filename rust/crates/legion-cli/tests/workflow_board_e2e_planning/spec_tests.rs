@@ -40,7 +40,10 @@ pub async fn f4_t1_05_deliverables_written_without_autocommit() -> TestResult<()
 
 pub async fn f4_t2_02_brief_injection_and_shell_treated_as_inert() -> TestResult<()> {
     let mut env = PlanningEnv::start(true).await?;
-    assert!(check_board_capable(&env, "F4-T2-02"), "required workflow board capability");
+    assert!(
+        check_board_capable(&env, "F4-T2-02"),
+        "required workflow board capability"
+    );
     let pwned = env.harness.workspace_dir().join("pwned");
     let brief_path = env.harness.workspace_dir().join("brief-inject.md");
     write_inert_file(
@@ -68,7 +71,10 @@ pub async fn f4_t2_02_brief_injection_and_shell_treated_as_inert() -> TestResult
 
 pub async fn f4_t2_03_input_traversal_and_credential_files_rejected() -> TestResult<()> {
     let mut env = PlanningEnv::start(true).await?;
-    assert!(check_board_capable(&env, "F4-T2-03"), "required workflow board capability");
+    assert!(
+        check_board_capable(&env, "F4-T2-03"),
+        "required workflow board capability"
+    );
     let env_file = env.harness.workspace_dir().join(".env");
     write_inert_file(&env_file, "SECRET_API_KEY=super-secret-value-123\n")?;
 
@@ -201,7 +207,10 @@ pub async fn f6_t1_05_wireframes_saved_uncommitted_and_digest_bound() -> TestRes
 
 pub async fn f6_t2_04_disabling_wireframes_nullifies_index_cleanly() -> TestResult<()> {
     let mut env = PlanningEnv::start(true).await?;
-    assert!(check_board_capable(&env, "F6-T2-04"), "required workflow board capability");
+    assert!(
+        check_board_capable(&env, "F6-T2-04"),
+        "required workflow board capability"
+    );
     let (card_id, rev) =
         create_and_approve_spec(&mut env.ws, &env.project_id, "Disable Wireframes", true).await?;
     let updated = env

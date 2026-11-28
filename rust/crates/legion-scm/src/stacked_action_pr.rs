@@ -119,8 +119,7 @@ async fn create_new_github_pr(
     )
     .await
     .ok()
-    .map(|(_, out, _)| out.trim().to_owned())
-    .unwrap_or_default();
+    .map_or_default(|(_, out, _)| out.trim().to_owned());
 
     let created_out = run_gh_ok(
         cwd,

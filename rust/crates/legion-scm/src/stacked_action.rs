@@ -273,8 +273,7 @@ where
         None,
     )
     .await
-    .map(|s| s.trim().to_owned())
-    .unwrap_or_default();
+    .map_or_default(|s| s.trim().to_owned());
     if cur.is_empty() || cur == "HEAD" {
         return Err(StackedActionError::new(
             Some(StackedActionPhase::Branch),

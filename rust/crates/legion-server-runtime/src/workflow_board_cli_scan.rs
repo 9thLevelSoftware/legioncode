@@ -461,7 +461,7 @@ fn extract_ac_ids(
     let mut ids: Vec<String> = plan_apr_val
         .and_then(|v| v.get("acceptanceIds"))
         .and_then(Value::as_array)
-        .map(|arr| {
+        .map_or_default(|arr| {
             arr.iter()
                 .filter_map(|x| {
                     x.as_str()
@@ -470,8 +470,7 @@ fn extract_ac_ids(
                         .map(str::to_owned)
                 })
                 .collect()
-        })
-        .unwrap_or_default();
+        });
     if ids.is_empty() {
         ids = acceptance_criteria.iter().map(|c| c.id.clone()).collect();
     }

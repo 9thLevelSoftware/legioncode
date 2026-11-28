@@ -119,8 +119,7 @@ pub(crate) fn scan_cli_locks(
             for path in collect_json_files(&dir) {
                 let file_name = path
                     .file_name()
-                    .map(|s| s.to_string_lossy().into_owned())
-                    .unwrap_or_default();
+                    .map_or_default(|s| s.to_string_lossy().into_owned());
                 let rel = format!("{cli_rel_prefix}/cache/{folder}/{file_name}");
                 let entry =
                     inspect_lock_file(&path, &rel, WorkflowBoardCliImportLockKind::LiveSpawn)?;
@@ -143,8 +142,7 @@ pub(crate) fn scan_cli_locks(
                 if is_regular_non_symlink_file(&resume_path) {
                     let run_name = run_dir
                         .file_name()
-                        .map(|s| s.to_string_lossy().into_owned())
-                        .unwrap_or_default();
+                        .map_or_default(|s| s.to_string_lossy().into_owned());
                     let rel = format!("{cli_rel_prefix}/cache/runs/{run_name}/resume.json");
                     let entry = inspect_lock_file(
                         &resume_path,

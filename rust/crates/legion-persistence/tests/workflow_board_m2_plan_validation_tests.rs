@@ -4,7 +4,7 @@ mod workflow_board_m2_support;
 
 use legion_persistence::sqlite::SqliteStore;
 use legion_persistence::workflow_board_repo::{
-    AcMappingInput, AlternativeInput, AlternativeSelectionUpdate, ApprovePlanInput,
+    AcMappingInput, AlternativeInput, AlternativeSelectionUpdate, ApprovalRow, ApprovePlanInput,
     ApproveSpecInput, CreateCardInput, PlannedCheckInput, TaskContractInput, UpdatePlanInput,
     WorkflowBoardRepoError, approve_plan, approve_spec, create_card, update_plan,
 };
@@ -260,7 +260,7 @@ fn approve_plan_rejects_empty_spec_ac_ids_and_invalid_persisted_strategy() -> Te
     ));
     let unchanged = legion_persistence::workflow_board_repo::get_card_detail(conn, "card-noac")?;
     assert_eq!(unchanged.card.revision, 1);
-    assert!(unchanged.approvals.is_empty());
+    assert_eq!(unchanged.approvals, [] as [ApprovalRow; 0]);
     conn.execute(
         "UPDATE workflow_board_cards SET spec_json = ?1 WHERE card_id = 'card-noac'",
         [r#"{"acceptanceCriteria":[{"id":"AC-1","text":"Original criterion"}]}"#],

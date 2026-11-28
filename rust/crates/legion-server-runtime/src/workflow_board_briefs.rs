@@ -245,10 +245,8 @@ fn build_plan_m2_brief_fields(
             c.concerns.len()
         )
     });
-    let challenge_concerns: Vec<BriefChallengeConcern> = hydrated
-        .challenge_receipt
-        .as_ref()
-        .map(|c| {
+    let challenge_concerns: Vec<BriefChallengeConcern> =
+        hydrated.challenge_receipt.as_ref().map_or_default(|c| {
             c.concerns
                 .iter()
                 .map(|con| BriefChallengeConcern {
@@ -259,8 +257,7 @@ fn build_plan_m2_brief_fields(
                     operator_note: con.answer.clone().or_else(|| con.reason.clone()),
                 })
                 .collect()
-        })
-        .unwrap_or_default();
+        });
     let existing_tasks_summary: Vec<String> = hydrated
         .tasks
         .iter()

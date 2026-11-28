@@ -225,8 +225,7 @@ fn append_challenge_concerns(md: &mut String, concerns: &[BriefChallengeConcern]
             .as_deref()
             .map(str::trim)
             .filter(|s| !s.is_empty())
-            .map(|s| format!(" — `{s}`"))
-            .unwrap_or_default();
+            .map_or_default(|s| format!(" — `{s}`"));
         let _ = writeln!(
             md,
             "- **{}** [{}]: {}{}",

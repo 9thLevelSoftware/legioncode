@@ -116,7 +116,10 @@ pub async fn uncond_r03_scoped_read_snapshot_vs_dispatch_command_guard() -> Test
 
 pub async fn f1_t2_05_board_overview_survives_restart() -> TestResult<()> {
     let mut env = PlanningEnv::start(true).await?;
-    assert!(check_board_capable(&env, "F1-T2-05"), "required workflow board capability");
+    assert!(
+        check_board_capable(&env, "F1-T2-05"),
+        "required workflow board capability"
+    );
 
     let created_paused = env
         .ws
@@ -302,7 +305,10 @@ pub async fn f2_t1_05_card_retains_identity_and_history_across_attempts() -> Tes
 
 pub async fn f2_t2_05_large_artifact_chunked_over_frame_parts() -> TestResult<()> {
     let mut env = PlanningEnv::start(true).await?;
-    assert!(check_board_capable(&env, "F2-T2-05"), "required workflow board capability");
+    assert!(
+        check_board_capable(&env, "F2-T2-05"),
+        "required workflow board capability"
+    );
     let huge_body = "Line of large specification artifact for frameParts test.\n".repeat(2800);
     assert!(huge_body.len() > 128 * 1024);
 

@@ -110,7 +110,10 @@ async fn f22_t2_04_mcp_http_boundary_and_thread_scope_isolation() -> TestResult<
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn f22_t2_05_scoped_mcp_rejects_cross_card_and_approval_bypass() -> TestResult<()> {
     let harness = OpaqueBoxHarness::start(true)?;
-    assert!(!(!board_capability_enabled(&harness).await?), "required workflow board capability: [F22-T2-05] cross-card MCP isolation");
+    assert!(
+        board_capability_enabled(&harness).await?,
+        "required workflow board capability: [F22-T2-05] cross-card MCP isolation"
+    );
 
     let admin_tok = harness.pair_client("mcp-cross-card", None).await?;
     let admin_auth = format!("Bearer {admin_tok}");

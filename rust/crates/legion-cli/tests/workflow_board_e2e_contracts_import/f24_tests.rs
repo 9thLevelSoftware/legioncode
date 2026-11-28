@@ -258,7 +258,10 @@ async fn f24_t2_02_refuses_takeover_when_engine_lock_active_pid_present() -> Tes
     let lock_path = seed_active_cli_lock(harness.workspace_dir(), CliLockKind::EngineLock)?;
     assert!(lock_path.is_file());
 
-    assert!(!(!board_capability_enabled(&harness).await?), "required workflow board capability: [F24-T2-02] engine.lock active run refusal");
+    assert!(
+        board_capability_enabled(&harness).await?,
+        "required workflow board capability: [F24-T2-02] engine.lock active run refusal"
+    );
 
     let token = harness.pair_client("f24-engine-lock", None).await?;
     let auth = format!("Bearer {token}");
@@ -316,7 +319,10 @@ async fn f24_t2_03_refuses_takeover_for_live_spawn_and_resume_json_active_locks(
     let live_lock = seed_active_cli_lock(harness.workspace_dir(), CliLockKind::LiveSpawn)?;
     assert!(live_lock.is_file());
 
-    assert!(!(!board_capability_enabled(&harness).await?), "required workflow board capability: [F24-T2-03] live-spawn & resume.json lock refusal");
+    assert!(
+        board_capability_enabled(&harness).await?,
+        "required workflow board capability: [F24-T2-03] live-spawn & resume.json lock refusal"
+    );
 
     let token = harness.pair_client("f24-live-resume-lock", None).await?;
     let auth = format!("Bearer {token}");

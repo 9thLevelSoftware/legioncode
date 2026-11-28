@@ -255,6 +255,8 @@ fn thread_create_generate_title_persists_intent_and_rejects_empty_seed() -> Test
             output_schema: None,
             workspace_strategy: None,
         }),
+        title_renamed: None,
+        workflow_run: None,
     };
     assert!(matches!(
         decide_command(

@@ -299,6 +299,8 @@ async fn vcs_switch_ref_guards_active_checkout() -> TestResult {
             output_schema: None,
             workspace_strategy: None,
         }),
+        title_renamed: None,
+        workflow_run: None,
     });
     // Seed the active run without enqueuing a real provider turn that can finish before the RPC.
     let now = "2026-01-01T00:00:00.000Z";

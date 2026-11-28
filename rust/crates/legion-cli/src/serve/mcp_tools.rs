@@ -48,6 +48,8 @@ pub(super) fn list_tools_json(state: &AppState, caller: &McpCallerContext) -> Va
             "description": "Durable workflow runs on this server (start, list, read, questions, hooks, store, signal, resume, cancel).",
             "inputSchema": { "type": "object" }
         }));
+    } else {
+        tools.extend(super::mcp_workflow_board::list_board_tools(&name));
     }
     if read_feedback_mode(state) != FeedbackMode::Off {
         tools.push(json!({
@@ -80,6 +82,12 @@ pub(super) async fn call_tool(
         "thread_wait" => thread_wait(state, caller, args).await,
         "workflow" => workflow_tool(state, caller, args).await,
         "feedback" => feedback_tool(state, caller, args),
+        "workflow_board_read_brief" => {
+            super::mcp_workflow_board::handle_read_brief(state, caller, args)
+        }
+        "workflow_board_propose" => {
+            super::mcp_workflow_board_propose::handle_propose(state, caller, args).await
+        }
         _ => Err(format!("Unknown MCP tool `{name}`.")),
     };
 

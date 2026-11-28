@@ -479,6 +479,428 @@ export async function runFullRpcAndProviderParityChecks(
     tabId: openedPreview.tabId,
   });
 
+  // 1b. Chained Project Workflow Board lifecycle parity (createCard -> updateSpec -> exploreStep -> challengeStep -> approveSpec -> updatePlan -> approvePlan -> returnForRevision -> approvePlan -> startStage -> getCard -> getArtifact -> invalidation).
+  const createdCardRaw = await rpc.callUnary("wb-create-1", "workflowBoard.createCard", {
+    projectId: primaryProjectId,
+    title: "Wire Parity Board Card",
+    brief: "Initial parity board brief",
+    sourceType: "idea",
+    assistanceMode: "balanced",
+    intakeGoal: "change",
+  });
+  const createdCard = getCompiledCodecs("workflowBoard.createCard").decodeSuccess(
+    createdCardRaw,
+  ) as { readonly cardId: string; readonly revision: number };
+
+  const updatedSpecRaw = await rpc.callUnary("wb-update-1", "workflowBoard.updateSpec", {
+    cardId: createdCard.cardId,
+    expectedRevision: createdCard.revision,
+    acceptanceCriteria: [{ id: "AC-01", text: "Wire parity lifecycle decodes cleanly." }],
+    constraints: ["No auto-commits"],
+    sourceRefs: ["README.md"],
+    wireframesIndex: null,
+  });
+  const updatedSpec = getCompiledCodecs("workflowBoard.updateSpec").decodeSuccess(
+    updatedSpecRaw,
+  ) as { readonly revision: number; readonly specDigest: string | null };
+  assert.isString(updatedSpec.specDigest);
+
+  const exploreInitRaw = await rpc.callUnary("wb-explore-1", "workflowBoard.exploreStep", {
+    cardId: createdCard.cardId,
+    expectedRevision: updatedSpec.revision,
+    action: "step",
+  });
+  const exploreInit = getCompiledCodecs("workflowBoard.exploreStep").decodeSuccess(
+    exploreInitRaw,
+  ) as {
+    readonly revision: number;
+    readonly decisions: ReadonlyArray<{ readonly id: string; readonly status: string }>;
+  };
+  let exploreRevision = exploreInit.revision;
+  const unresolvedIds = exploreInit.decisions
+    .filter((decision) => decision.status === "unresolved")
+    .map((decision) => decision.id);
+  if (unresolvedIds.length > 0) {
+    const exploreAnswerRaw = await rpc.callUnary("wb-explore-2", "workflowBoard.exploreStep", {
+      cardId: createdCard.cardId,
+      expectedRevision: exploreRevision,
+      action: "step",
+      answers: unresolvedIds.map((decisionId) => ({
+        decisionId,
+        action: "recommend",
+      })),
+    });
+    const exploreAnswered = getCompiledCodecs("workflowBoard.exploreStep").decodeSuccess(
+      exploreAnswerRaw,
+    ) as { readonly revision: number };
+    exploreRevision = exploreAnswered.revision;
+  }
+
+  const challengeGenRaw = await rpc.callUnary("wb-challenge-1", "workflowBoard.challengeStep", {
+    cardId: createdCard.cardId,
+    expectedRevision: exploreRevision,
+    action: "start",
+    concerns: [
+      {
+        id: "conc-parity-1",
+        summary: "Confirm parity harness isolates workspace writes",
+        whyMatters: "Prevents untracked edits leaking",
+        evidence: "README.md",
+        assumption: "All board writes are journaled",
+        disposition: "unresolved",
+      },
+    ],
+  });
+  const challengeGen = getCompiledCodecs("workflowBoard.challengeStep").decodeSuccess(
+    challengeGenRaw,
+  ) as { readonly revision: number };
+
+  const challengeAnsRaw = await rpc.callUnary("wb-challenge-2", "workflowBoard.challengeStep", {
+    cardId: createdCard.cardId,
+    expectedRevision: challengeGen.revision,
+    action: "resolve",
+    concerns: [
+      {
+        id: "conc-parity-1",
+        summary: "Confirm parity harness isolates workspace writes",
+        disposition: "answer",
+        answer: "Board writes go through execute_journaled_writes without auto-commits.",
+      },
+    ],
+  });
+  const challengeAns = getCompiledCodecs("workflowBoard.challengeStep").decodeSuccess(
+    challengeAnsRaw,
+  ) as { readonly revision: number; readonly challengeReceipt: { readonly status: string } };
+  assert.strictEqual(challengeAns.challengeReceipt.status, "resolved");
+
+  const approvedSpecRaw = await rpc.callUnary("wb-approve-1", "workflowBoard.approveSpec", {
+    cardId: createdCard.cardId,
+    expectedRevision: challengeAns.revision,
+    expectedDigest: updatedSpec.specDigest ?? undefined,
+  });
+  const approvedSpec = getCompiledCodecs("workflowBoard.approveSpec").decodeSuccess(
+    approvedSpecRaw,
+  ) as { readonly revision: number; readonly specApproval: { readonly status: string } };
+  assert.strictEqual(approvedSpec.specApproval.status, "valid");
+
+  const planPayload = {
+    cardId: createdCard.cardId,
+    expectedRevision: approvedSpec.revision,
+    lenses: [
+      { lens: "ux", applicable: false, reason: "CLI parity flow only" },
+      { lens: "functional", applicable: true, summary: "Covers AC-01 wire round-trip" },
+      { lens: "architecture", applicable: true, summary: "Rust board service + TS codecs" },
+      { lens: "quality", applicable: true, summary: "Verified by rustWireParity" },
+      { lens: "infrastructure", applicable: false, reason: "Local SQLite store only" },
+      { lens: "delivery", applicable: true, summary: "Single balanced task" },
+    ],
+    alternatives: [
+      {
+        id: "alt-a",
+        title: "Single-pass typed codecs",
+        summary: "Decode Rust board responses directly through Effect Schema codecs.",
+        tradeoffs: "Requires lockstep TS and Rust contracts.",
+      },
+      {
+        id: "alt-b",
+        title: "Untyped JSON pass-through",
+        summary: "Skip schema validation for board RPC responses.",
+        tradeoffs: "Loses wire parity guarantees.",
+      },
+    ],
+    selectedAlternativeId: "alt-a",
+    selectionRationale: "Lockstep typed codecs catch wire drift immediately.",
+    strategy: "outcomes",
+    strategyRationale: "Validate AC-01 end-to-end.",
+    granularity: "balanced",
+    tasks: [
+      {
+        taskId: "TSK-01",
+        title: "Wire parity task",
+        filesAllowed: ["README.md"],
+        filesForbidden: [".env"],
+        expectedArtifacts: ["README.md"],
+        verificationCommands: [["git", "status", "--short"]],
+        testingMethod: "regression-first",
+      },
+    ],
+    checks: [
+      {
+        id: "CHK-01",
+        description: "Git status check",
+        argv: ["git", "status", "--short"],
+      },
+    ],
+    acMappings: [
+      {
+        criterionId: "AC-01",
+        method: "automated",
+        checkIds: ["CHK-01"],
+      },
+    ],
+  };
+
+  const updatedPlanRaw = await rpc.callUnary("wb-plan-1", "workflowBoard.updatePlan", planPayload);
+  const updatedPlan = getCompiledCodecs("workflowBoard.updatePlan").decodeSuccess(
+    updatedPlanRaw,
+  ) as { readonly revision: number; readonly planDigest: string | null };
+  assert.isString(updatedPlan.planDigest);
+
+  const approvedPlanRaw = await rpc.callUnary("wb-approve-plan-1", "workflowBoard.approvePlan", {
+    cardId: createdCard.cardId,
+    expectedRevision: updatedPlan.revision,
+    expectedSpecDigest: updatedSpec.specDigest ?? undefined,
+    expectedPlanDigest: updatedPlan.planDigest ?? undefined,
+  });
+  const approvedPlan = getCompiledCodecs("workflowBoard.approvePlan").decodeSuccess(
+    approvedPlanRaw,
+  ) as { readonly revision: number; readonly planApproval: { readonly status: string } };
+  assert.strictEqual(approvedPlan.planApproval.status, "valid");
+
+  const returnedRaw = await rpc.callUnary("wb-return-1", "workflowBoard.returnForRevision", {
+    cardId: createdCard.cardId,
+    expectedRevision: approvedPlan.revision,
+    targetStage: "plan",
+    reason: "Exercise returnForRevision invalidation parity",
+  });
+  const returned = getCompiledCodecs("workflowBoard.returnForRevision").decodeSuccess(
+    returnedRaw,
+  ) as {
+    readonly revision: number;
+    readonly specApproval: { readonly status: string } | null;
+    readonly planApproval: { readonly status: string } | null;
+  };
+  assert.strictEqual(returned.specApproval?.status, "valid");
+  assert.strictEqual(returned.planApproval?.status, "stale");
+
+  const reapprovedPlanRaw = await rpc.callUnary("wb-approve-plan-2", "workflowBoard.approvePlan", {
+    cardId: createdCard.cardId,
+    expectedRevision: returned.revision,
+    expectedSpecDigest: updatedSpec.specDigest ?? undefined,
+    expectedPlanDigest: updatedPlan.planDigest ?? undefined,
+  });
+  const reapprovedPlan = getCompiledCodecs("workflowBoard.approvePlan").decodeSuccess(
+    reapprovedPlanRaw,
+  ) as { readonly revision: number; readonly planApproval: { readonly status: string } };
+  assert.strictEqual(reapprovedPlan.planApproval.status, "valid");
+
+  await rpc.callUnary("wb-enable-wf", "server.updateSettings", {
+    patch: { workflowsEnabled: true },
+  });
+  try {
+    const start1Raw = await rpc.callUnary("wb-start-1", "workflowBoard.startStage", {
+      cardId: createdCard.cardId,
+      expectedRevision: reapprovedPlan.revision,
+      stage: "plan",
+      modelSelection: { instanceId: "devReplay", model: "dev-replay" },
+      runtimeMode: "full-access",
+      interactionMode: "default",
+      workspaceStrategy: { type: "root" },
+    });
+    const start1 = getCompiledCodecs("workflowBoard.startStage").decodeSuccess(start1Raw) as {
+      readonly revision: number;
+      readonly threadId: string;
+      readonly runId: string | null;
+      readonly resumed: boolean;
+    };
+    assert.isFalse(start1.resumed);
+    assert.isNotNull(start1.runId);
+
+    const start2Raw = await rpc.callUnary("wb-start-2", "workflowBoard.startStage", {
+      cardId: createdCard.cardId,
+      expectedRevision: start1.revision,
+      stage: "plan",
+      modelSelection: { instanceId: "devReplay", model: "dev-replay" },
+      runtimeMode: "full-access",
+      interactionMode: "default",
+      workspaceStrategy: { type: "root" },
+    });
+    const start2 = getCompiledCodecs("workflowBoard.startStage").decodeSuccess(start2Raw) as {
+      readonly threadId: string;
+      readonly resumed: boolean;
+    };
+    assert.isTrue(start2.resumed);
+    assert.strictEqual(start2.threadId, start1.threadId);
+
+    const cardDetailRaw = await rpc.callUnary("wb-get-1", "workflowBoard.getCard", {
+      cardId: createdCard.cardId,
+      projectId: primaryProjectId,
+    });
+    getCompiledCodecs("workflowBoard.getCard").decodeSuccess(cardDetailRaw);
+
+    const specArtifactRaw = await rpc.callUnary("wb-art-spec", "workflowBoard.getArtifact", {
+      cardId: createdCard.cardId,
+      key: "spec.md",
+    });
+    getCompiledCodecs("workflowBoard.getArtifact").decodeSuccess(specArtifactRaw);
+
+    const planArtifactRaw = await rpc.callUnary("wb-art-plan", "workflowBoard.getArtifact", {
+      cardId: createdCard.cardId,
+      key: "plan.md",
+    });
+    getCompiledCodecs("workflowBoard.getArtifact").decodeSuccess(planArtifactRaw);
+
+    const invalidatedSpecRaw = await rpc.callUnary("wb-update-2", "workflowBoard.updateSpec", {
+      cardId: createdCard.cardId,
+      expectedRevision: start1.revision,
+      brief: "Edited brief triggers targeted Spec and Plan invalidation.",
+    });
+    const invalidatedSpec = getCompiledCodecs("workflowBoard.updateSpec").decodeSuccess(
+      invalidatedSpecRaw,
+    ) as {
+      readonly revision: number;
+      readonly specApproval: { readonly status: string } | null;
+      readonly planApproval: { readonly status: string } | null;
+    };
+    assert.strictEqual(invalidatedSpec.specApproval?.status, "stale");
+    assert.strictEqual(invalidatedSpec.planApproval?.status, "stale");
+
+    const cardDiffRaw = await rpc.callUnary("wb-diff-1", "workflowBoard.getCardDiff", {
+      cardId: createdCard.cardId,
+    });
+    getCompiledCodecs("workflowBoard.getCardDiff").decodeSuccess(cardDiffRaw);
+
+    const pausedRaw = await rpc.callUnary("wb-pause-1", "workflowBoard.pauseCard", {
+      cardId: createdCard.cardId,
+      expectedRevision: invalidatedSpec.revision,
+      reason: "Parity pause",
+    });
+    const paused = getCompiledCodecs("workflowBoard.pauseCard").decodeSuccess(pausedRaw) as {
+      readonly revision: number;
+      readonly status: string;
+    };
+    assert.strictEqual(paused.status, "paused");
+
+    const resumedRaw = await rpc.callUnary("wb-resume-1", "workflowBoard.resumeCard", {
+      cardId: createdCard.cardId,
+      expectedRevision: paused.revision,
+      reconcileInterrupted: true,
+    });
+    const resumed = getCompiledCodecs("workflowBoard.resumeCard").decodeSuccess(resumedRaw) as {
+      readonly revision: number;
+    };
+
+    const amendedRaw = await rpc.callUnary("wb-amend-1", "workflowBoard.proposeAmendment", {
+      cardId: createdCard.cardId,
+      expectedRevision: resumed.revision,
+      targetStage: "spec",
+      reason: "Parity amendment probe",
+    });
+    getCompiledCodecs("workflowBoard.proposeAmendment").decodeSuccess(amendedRaw);
+  } finally {
+    await rpc.callUnary("wb-restore-wf", "server.updateSettings", {
+      patch: { workflowsEnabled: false },
+    });
+  }
+
+  // 1c. Chained M4 CLI Project Import wire parity (previewCliImport -> applyCliImport -> getCard).
+  const cliParityRel = ".legion-cli-parity";
+  const cliParityRoot = NodePath.join(primaryWorkspaceDir, cliParityRel);
+  NodeFS.mkdirSync(NodePath.join(cliParityRoot, "workflow"), { recursive: true });
+  NodeFS.mkdirSync(NodePath.join(cliParityRoot, "specs", "spec-wire-parity"), { recursive: true });
+  NodeFS.mkdirSync(NodePath.join(cliParityRoot, "tasks"), { recursive: true });
+  NodeFS.writeFileSync(
+    NodePath.join(cliParityRoot, "config.yaml"),
+    "schemaVersion: legion-cli-config/v1\nsandbox:\n  requireHardened: true\n",
+  );
+  NodeFS.writeFileSync(
+    NodePath.join(cliParityRoot, "workflow", "execution.yaml"),
+    [
+      "schemaVersion: legion-cli-workflow-evidence/v1",
+      "specId: spec-wire-parity",
+      "status: blocked",
+      `blocker: "verification command failed with exit 1: node --test test.mjs (log: ${cliParityRel}/cache/runs/r1/verify-1.log)"`,
+      "updatedAt: 2026-10-22T02:28:41.128Z",
+      "",
+    ].join("\n"),
+  );
+  NodeFS.writeFileSync(
+    NodePath.join(cliParityRoot, "workflow", "spec-approval.yaml"),
+    [
+      "schemaVersion: legion-cli-spec-approval/v1",
+      "specId: spec-wire-parity",
+      "approvedAt: 2026-10-22T01:00:17.476Z",
+      "approvedBy: user",
+      "",
+    ].join("\n"),
+  );
+  NodeFS.writeFileSync(
+    NodePath.join(cliParityRoot, "workflow", "plan-approval.yaml"),
+    [
+      "schemaVersion: legion-cli-plan-approval/v1",
+      "specId: spec-wire-parity",
+      "approvedAt: 2026-10-22T01:30:41.084Z",
+      "approvedBy: user",
+      "taskIds:",
+      "  - TSK-0001",
+      "acceptanceIds:",
+      "  - AC-01",
+      "",
+    ].join("\n"),
+  );
+  NodeFS.writeFileSync(
+    NodePath.join(cliParityRoot, "specs", "spec-wire-parity", "SPEC.md"),
+    "---\nid: spec-wire-parity\ntitle: Wire Parity Spec\n---\n\n- AC-01: Parity decodes cleanly\n",
+  );
+  NodeFS.writeFileSync(
+    NodePath.join(cliParityRoot, "tasks", "TSK-0001.md"),
+    [
+      "---",
+      "schemaVersion: legion-cli-task/v1",
+      "id: TSK-0001",
+      "title: Parity Task",
+      "status: blocked",
+      "specId: spec-wire-parity",
+      "contract:",
+      "  filesAllowed:",
+      "    - src/parity.ts",
+      "  verificationCommands:",
+      "    - node --test test.mjs",
+      "---",
+      "",
+      "Parity task.",
+      "",
+    ].join("\n"),
+  );
+
+  const previewCliRaw = await rpc.callUnary("wb-cli-preview-1", "workflowBoard.previewCliImport", {
+    projectId: primaryProjectId,
+    cliDir: cliParityRel,
+  });
+  const previewCli = getCompiledCodecs("workflowBoard.previewCliImport").decodeSuccess(
+    previewCliRaw,
+  ) as {
+    readonly specId: string;
+    readonly canApply: boolean;
+    readonly tasks: ReadonlyArray<unknown>;
+    readonly unsupportedPolicies: ReadonlyArray<unknown>;
+    readonly missingLogNotes: ReadonlyArray<unknown>;
+  };
+  assert.strictEqual(previewCli.specId, "spec-wire-parity");
+  assert.isTrue(previewCli.canApply);
+  assert.strictEqual(previewCli.tasks.length, 1);
+  assert.isAtLeast(previewCli.unsupportedPolicies.length, 1);
+  assert.isAtLeast(previewCli.missingLogNotes.length, 1);
+
+  const applyCliRaw = await rpc.callUnary("wb-cli-apply-1", "workflowBoard.applyCliImport", {
+    projectId: primaryProjectId,
+    cliDir: cliParityRel,
+    acknowledgeUnsupportedPolicies: true,
+  });
+  const applyCli = getCompiledCodecs("workflowBoard.applyCliImport").decodeSuccess(applyCliRaw) as {
+    readonly cardId: string;
+    readonly created: boolean;
+    readonly sourceSpecId: string;
+  };
+  assert.isTrue(applyCli.created);
+  assert.strictEqual(applyCli.sourceSpecId, "spec-wire-parity");
+
+  const importedDetailRaw = await rpc.callUnary("wb-cli-get-1", "workflowBoard.getCard", {
+    cardId: applyCli.cardId,
+    projectId: primaryProjectId,
+  });
+  getCompiledCodecs("workflowBoard.getCard").decodeSuccess(importedDetailRaw);
+
   // 2. launchThread (generateTitle: true + initialMessage) + titleRegeneration + settle/unsettle.
   const titleThreadId = "thread-parity-title";
   await rpc.callUnary("launch-title-1", "orchestration.launchThread", {

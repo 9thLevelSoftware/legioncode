@@ -86,6 +86,52 @@ import {
   AcpRegistrySetProviderInput,
   AcpRegistrySetProviderResult,
 } from "./acpRegistry.ts";
+import {
+  ProjectWorkflowBoardSnapshot,
+  WorkflowBoardApplyCliImportInput,
+  WorkflowBoardApplyCliImportResult,
+  WorkflowBoardApproveDeliveryInput,
+  WorkflowBoardApproveDeliveryResult,
+  WorkflowBoardApprovePlanInput,
+  WorkflowBoardApprovePlanResult,
+  WorkflowBoardApproveSpecInput,
+  WorkflowBoardApproveSpecResult,
+  WorkflowBoardArtifact,
+  WorkflowBoardChallengeStepInput,
+  WorkflowBoardChallengeStepResult,
+  WorkflowBoardCreateCardInput,
+  WorkflowBoardExploreStepInput,
+  WorkflowBoardExploreStepResult,
+  WorkflowBoardGetArtifactInput,
+  WorkflowBoardGetCardDiffInput,
+  WorkflowBoardGetCardDiffResult,
+  WorkflowBoardGetCardInput,
+  WorkflowBoardPauseCardInput,
+  WorkflowBoardPauseCardResult,
+  WorkflowBoardPreviewCliImportInput,
+  WorkflowBoardPreviewCliImportResult,
+  WorkflowBoardProposeAmendmentInput,
+  WorkflowBoardProposeAmendmentResult,
+  WorkflowBoardRecordManualAcceptanceInput,
+  WorkflowBoardRecordManualAcceptanceResult,
+  WorkflowBoardRequestError,
+  WorkflowBoardResolveFindingInput,
+  WorkflowBoardResolveFindingResult,
+  WorkflowBoardResumeCardInput,
+  WorkflowBoardResumeCardResult,
+  WorkflowBoardRetryStepInput,
+  WorkflowBoardRetryStepResult,
+  WorkflowBoardReturnForRevisionInput,
+  WorkflowBoardReturnForRevisionResult,
+  WorkflowBoardStartStageInput,
+  WorkflowBoardStartStageResult,
+  WorkflowBoardSubscribeInput,
+  WorkflowBoardUpdatePlanInput,
+  WorkflowBoardUpdatePlanResult,
+  WorkflowBoardUpdateSpecInput,
+  WorkflowBoardUpdateSpecResult,
+  WorkflowCardDetail,
+} from "./workflowBoard.ts";
 import { ExternalLauncherError, LaunchEditorInput } from "./editor.ts";
 import {
   AuthAccessStreamError,
@@ -737,6 +783,29 @@ export const WS_METHODS = {
   subscribeServerLifecycle: "subscribeServerLifecycle",
   subscribeAuthAccess: "subscribeAuthAccess",
   subscribeResourceTelemetry: "subscribeResourceTelemetry",
+
+  workflowBoardSubscribe: "workflowBoard.subscribe",
+  workflowBoardGetCard: "workflowBoard.getCard",
+  workflowBoardGetArtifact: "workflowBoard.getArtifact",
+  workflowBoardCreateCard: "workflowBoard.createCard",
+  workflowBoardUpdateSpec: "workflowBoard.updateSpec",
+  workflowBoardApproveSpec: "workflowBoard.approveSpec",
+  workflowBoardStartStage: "workflowBoard.startStage",
+  workflowBoardExploreStep: "workflowBoard.exploreStep",
+  workflowBoardChallengeStep: "workflowBoard.challengeStep",
+  workflowBoardUpdatePlan: "workflowBoard.updatePlan",
+  workflowBoardApprovePlan: "workflowBoard.approvePlan",
+  workflowBoardReturnForRevision: "workflowBoard.returnForRevision",
+  workflowBoardPauseCard: "workflowBoard.pauseCard",
+  workflowBoardResumeCard: "workflowBoard.resumeCard",
+  workflowBoardRetryStep: "workflowBoard.retryStep",
+  workflowBoardProposeAmendment: "workflowBoard.proposeAmendment",
+  workflowBoardResolveFinding: "workflowBoard.resolveFinding",
+  workflowBoardRecordManualAcceptance: "workflowBoard.recordManualAcceptance",
+  workflowBoardApproveDelivery: "workflowBoard.approveDelivery",
+  workflowBoardGetCardDiff: "workflowBoard.getCardDiff",
+  workflowBoardPreviewCliImport: "workflowBoard.previewCliImport",
+  workflowBoardApplyCliImport: "workflowBoard.applyCliImport",
 } as const;
 
 const WsServerUpsertKeybindingRpc = Rpc.make(WS_METHODS.serverUpsertKeybinding, {
@@ -2453,6 +2522,142 @@ const WsSubscribeResourceTelemetryRpc = Rpc.make(WS_METHODS.subscribeResourceTel
   stream: true,
 });
 
+const WsWorkflowBoardSubscribeRpc = Rpc.make(WS_METHODS.workflowBoardSubscribe, {
+  payload: WorkflowBoardSubscribeInput,
+  success: ProjectWorkflowBoardSnapshot,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+  stream: true,
+});
+
+const WsWorkflowBoardGetCardRpc = Rpc.make(WS_METHODS.workflowBoardGetCard, {
+  payload: WorkflowBoardGetCardInput,
+  success: WorkflowCardDetail,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardGetArtifactRpc = Rpc.make(WS_METHODS.workflowBoardGetArtifact, {
+  payload: WorkflowBoardGetArtifactInput,
+  success: WorkflowBoardArtifact,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardCreateCardRpc = Rpc.make(WS_METHODS.workflowBoardCreateCard, {
+  payload: WorkflowBoardCreateCardInput,
+  success: WorkflowCardDetail,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardUpdateSpecRpc = Rpc.make(WS_METHODS.workflowBoardUpdateSpec, {
+  payload: WorkflowBoardUpdateSpecInput,
+  success: WorkflowBoardUpdateSpecResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardApproveSpecRpc = Rpc.make(WS_METHODS.workflowBoardApproveSpec, {
+  payload: WorkflowBoardApproveSpecInput,
+  success: WorkflowBoardApproveSpecResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardStartStageRpc = Rpc.make(WS_METHODS.workflowBoardStartStage, {
+  payload: WorkflowBoardStartStageInput,
+  success: WorkflowBoardStartStageResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardExploreStepRpc = Rpc.make(WS_METHODS.workflowBoardExploreStep, {
+  payload: WorkflowBoardExploreStepInput,
+  success: WorkflowBoardExploreStepResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardChallengeStepRpc = Rpc.make(WS_METHODS.workflowBoardChallengeStep, {
+  payload: WorkflowBoardChallengeStepInput,
+  success: WorkflowBoardChallengeStepResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardUpdatePlanRpc = Rpc.make(WS_METHODS.workflowBoardUpdatePlan, {
+  payload: WorkflowBoardUpdatePlanInput,
+  success: WorkflowBoardUpdatePlanResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardApprovePlanRpc = Rpc.make(WS_METHODS.workflowBoardApprovePlan, {
+  payload: WorkflowBoardApprovePlanInput,
+  success: WorkflowBoardApprovePlanResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardReturnForRevisionRpc = Rpc.make(WS_METHODS.workflowBoardReturnForRevision, {
+  payload: WorkflowBoardReturnForRevisionInput,
+  success: WorkflowBoardReturnForRevisionResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardPauseCardRpc = Rpc.make(WS_METHODS.workflowBoardPauseCard, {
+  payload: WorkflowBoardPauseCardInput,
+  success: WorkflowBoardPauseCardResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardResumeCardRpc = Rpc.make(WS_METHODS.workflowBoardResumeCard, {
+  payload: WorkflowBoardResumeCardInput,
+  success: WorkflowBoardResumeCardResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardRetryStepRpc = Rpc.make(WS_METHODS.workflowBoardRetryStep, {
+  payload: WorkflowBoardRetryStepInput,
+  success: WorkflowBoardRetryStepResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardProposeAmendmentRpc = Rpc.make(WS_METHODS.workflowBoardProposeAmendment, {
+  payload: WorkflowBoardProposeAmendmentInput,
+  success: WorkflowBoardProposeAmendmentResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardResolveFindingRpc = Rpc.make(WS_METHODS.workflowBoardResolveFinding, {
+  payload: WorkflowBoardResolveFindingInput,
+  success: WorkflowBoardResolveFindingResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardRecordManualAcceptanceRpc = Rpc.make(
+  WS_METHODS.workflowBoardRecordManualAcceptance,
+  {
+    payload: WorkflowBoardRecordManualAcceptanceInput,
+    success: WorkflowBoardRecordManualAcceptanceResult,
+    error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+  },
+);
+
+const WsWorkflowBoardApproveDeliveryRpc = Rpc.make(WS_METHODS.workflowBoardApproveDelivery, {
+  payload: WorkflowBoardApproveDeliveryInput,
+  success: WorkflowBoardApproveDeliveryResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardGetCardDiffRpc = Rpc.make(WS_METHODS.workflowBoardGetCardDiff, {
+  payload: WorkflowBoardGetCardDiffInput,
+  success: WorkflowBoardGetCardDiffResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardPreviewCliImportRpc = Rpc.make(WS_METHODS.workflowBoardPreviewCliImport, {
+  payload: WorkflowBoardPreviewCliImportInput,
+  success: WorkflowBoardPreviewCliImportResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
+const WsWorkflowBoardApplyCliImportRpc = Rpc.make(WS_METHODS.workflowBoardApplyCliImport, {
+  payload: WorkflowBoardApplyCliImportInput,
+  success: WorkflowBoardApplyCliImportResult,
+  error: Schema.Union([WorkflowBoardRequestError, EnvironmentAuthorizationError]),
+});
+
 export class RpcScopeAuthorization extends RpcMiddleware.Service<RpcScopeAuthorization>()(
   "legioncode/contracts/RpcScopeAuthorization",
   { error: EnvironmentAuthorizationError },
@@ -2716,4 +2921,26 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2SubscribeThreadRpc,
   WsOrchestrationV2SubscribeCommandOutputRpc,
   WsOrchestrationV2SubscribePromptSuggestionRpc,
+  WsWorkflowBoardSubscribeRpc,
+  WsWorkflowBoardGetCardRpc,
+  WsWorkflowBoardGetArtifactRpc,
+  WsWorkflowBoardCreateCardRpc,
+  WsWorkflowBoardUpdateSpecRpc,
+  WsWorkflowBoardApproveSpecRpc,
+  WsWorkflowBoardStartStageRpc,
+  WsWorkflowBoardExploreStepRpc,
+  WsWorkflowBoardChallengeStepRpc,
+  WsWorkflowBoardUpdatePlanRpc,
+  WsWorkflowBoardApprovePlanRpc,
+  WsWorkflowBoardReturnForRevisionRpc,
+  WsWorkflowBoardPauseCardRpc,
+  WsWorkflowBoardResumeCardRpc,
+  WsWorkflowBoardRetryStepRpc,
+  WsWorkflowBoardProposeAmendmentRpc,
+  WsWorkflowBoardResolveFindingRpc,
+  WsWorkflowBoardRecordManualAcceptanceRpc,
+  WsWorkflowBoardApproveDeliveryRpc,
+  WsWorkflowBoardGetCardDiffRpc,
+  WsWorkflowBoardPreviewCliImportRpc,
+  WsWorkflowBoardApplyCliImportRpc,
 ).middleware(RpcScopeAuthorization);

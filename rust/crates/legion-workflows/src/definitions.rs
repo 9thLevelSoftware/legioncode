@@ -16,7 +16,7 @@ use crate::definitions_reload::{
     LoadedRecord, ManagerInner, archive_retired, collect_all_problems, perform_reload,
     rebuild_engine,
 };
-use crate::engine::WorkflowEngine;
+use crate::engine::{WorkflowDefinition, WorkflowEngine};
 use crate::store::WorkflowStore;
 use crate::traits::{WorkflowAgentDriver, WorkflowForgeDriver};
 use crate::types::{
@@ -41,9 +41,28 @@ impl WorkflowDefinitionsManager {
         location: WorkflowsLocation,
         workflows_enabled: bool,
     ) -> Result<Arc<Self>, WorkflowError> {
+        Self::open_with_builtins(
+            store,
+            agents,
+            forge,
+            location,
+            Vec::new(),
+            workflows_enabled,
+        )
+    }
+
+    /// Initializes definitions from `location` alongside native Rust built-in workflow definitions.
+    pub fn open_with_builtins(
+        store: WorkflowStore,
+        agents: Arc<dyn WorkflowAgentDriver>,
+        forge: Arc<dyn WorkflowForgeDriver>,
+        location: WorkflowsLocation,
+        builtins: Vec<WorkflowDefinition>,
+        workflows_enabled: bool,
+    ) -> Result<Arc<Self>, WorkflowError> {
         let engine = WorkflowEngine::new(
             store.clone(),
-            Vec::new(),
+            builtins.clone(),
             Arc::clone(&agents),
             Arc::clone(&forge),
             workflows_enabled,
@@ -57,6 +76,7 @@ impl WorkflowDefinitionsManager {
                 revision: 0,
                 dir_problem: None,
                 dir_next_retry: None,
+                builtins,
                 disk_sources: BTreeMap::new(),
                 loaded: BTreeMap::new(),
                 failed: BTreeMap::new(),
@@ -269,6 +289,21 @@ impl WorkflowDefinitionsManager {
         tags: &[(String, i64)],
     ) -> Option<WorkflowDefinitionProblem> {
         let g = self.inner.lock().ok()?;
+        for builtin in &g.builtins {
+            if tags
+                .iter()
+                .any(|(n, v)| n == &builtin.name && *v == builtin.version)
+            {
+                return Some(WorkflowDefinitionProblem {
+                    message: format!(
+                        "Workflow '{}@{}' is reserved by a built-in stage job.",
+                        builtin.name, builtin.version
+                    ),
+                    file: Some(name.to_owned()),
+                    line: None,
+                });
+            }
+        }
         for (other_file, rec) in &g.loaded {
             if other_file == name {
                 continue;

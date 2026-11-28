@@ -356,3 +356,18 @@ define_id_type!(
     MilestoneId,
     trim_non_empty
 );
+define_id_type!(
+    /// Unique identifier for a Project Workflow Board card.
+    WorkflowCardId,
+    trim_non_empty
+);
+define_id_type!(
+    /// Unique identifier for a Project Workflow Board approval receipt.
+    WorkflowBoardApprovalId,
+    trim_non_empty
+);
+define_id_type!(
+    /// Unique identifier for a Project Workflow Board stage run link.
+    WorkflowBoardStageRunId,
+    trim_non_empty
+);

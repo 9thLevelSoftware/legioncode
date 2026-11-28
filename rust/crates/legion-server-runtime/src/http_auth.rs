@@ -21,7 +21,9 @@ use crate::http_api::RuntimeHttpState;
 pub struct AuthenticatedPrincipal {
     /// Session ID (`"local"` or `"dev"` when unauthenticated local or dev-token authenticated).
     pub session_id: String,
-    /// Subject or role label.
+    /// Subject identifier (`"local"`, `"owner"`, `"one-time-token"`, `"thread:<id>"`, etc.).
+    pub subject: String,
+    /// Role label (`"admin"` or `"client"`).
     pub role: String,
     /// Granted authorization scopes.
     pub scopes: Vec<String>,
@@ -110,6 +112,7 @@ pub fn authenticate_headers(
             if !state.require_auth {
                 return Ok(AuthenticatedPrincipal {
                     session_id: "local".to_owned(),
+                    subject: "local".to_owned(),
                     role: "admin".to_owned(),
                     scopes: vec!["*".to_owned()],
                     method: "local".to_owned(),
@@ -124,6 +127,7 @@ pub fn authenticate_headers(
     {
         return Ok(AuthenticatedPrincipal {
             session_id: "dev".to_owned(),
+            subject: "owner".to_owned(),
             role: "admin".to_owned(),
             scopes: vec!["*".to_owned()],
             method: "dev_token".to_owned(),
@@ -138,6 +142,7 @@ pub fn authenticate_headers(
     let verified = verify_bearer_session_with_conn(&conn, &selected.token, now_ms)?;
     Ok(AuthenticatedPrincipal {
         session_id: verified.session_id,
+        subject: verified.subject,
         role: verified.role,
         scopes: verified.scopes,
         method: verified.method,

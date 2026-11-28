@@ -2,15 +2,19 @@ import { uuidv4 } from "../../lib/uuid";
 import { ThreadUndoNotice } from "./ThreadUndoNotice";
 import { use } from "react";
 import { NativePrimaryColumnContext } from "../../native/v5-workspace-context";
-import { useNavigation } from "@react-navigation/native";
+import { StackActions, useNavigation } from "@react-navigation/native";
 import { useMemo, useState } from "react";
 import { Platform } from "react-native";
 import { useGT, useMessages } from "gt-react-native";
 
 import type { EnvironmentThreadShell } from "@legioncode/client-runtime/state/shell";
 import { pickableProjectGroups } from "@legioncode/client-runtime/state/project-grouping";
+import {
+  isProjectWorkflowBoardEnabled,
+  isProjectWorkflowBoardSupported,
+} from "@legioncode/client-runtime/workflow-board";
 
-import { useProjects } from "../../state/entities";
+import { useProjects, useServerConfigs } from "../../state/entities";
 import { steadyNavigationThreadShellsAtom } from "../../state/threads";
 import { useLaunchingThreads, usePendingNewTasks } from "../../state/use-pending-new-tasks";
 import { useWorkspaceState } from "../../state/workspace";
@@ -50,6 +54,7 @@ export function HomeRouteScreen() {
   const { primarySidebarSearchQuery } = useWorkspacePaneState();
   const selectDetail = useSelectWorkspaceDetail();
   const projects = useProjects();
+  const serverConfigs = useServerConfigs();
   // Stop rebuilding the streaming thread list while Thread covers Home.
   const visible = useHomeRouteVisible();
   const threads = useLaunchingThreads(
@@ -147,8 +152,58 @@ export function HomeRouteScreen() {
       })),
     [projectScopes, threads],
   );
-  const selectedProjectKey =
-    resolveHomeProjectFilterScope(projectScopes, projects, listOptions)?.key ?? null;
+  const selectedScope = resolveHomeProjectFilterScope(projectScopes, projects, listOptions);
+  const selectedProjectKey = selectedScope?.key ?? null;
+  const workflowBoardMember = selectedScope
+    ? (selectedScope.projects.find((project) => {
+        const config = serverConfigs.get(project.environmentId);
+        return (
+          config !== undefined &&
+          isProjectWorkflowBoardEnabled({
+            settings: config.settings,
+            capabilities: config.environment.capabilities,
+          })
+        );
+      }) ??
+      selectedScope.projects.find((project) => {
+        const config = serverConfigs.get(project.environmentId);
+        return (
+          config !== undefined && isProjectWorkflowBoardSupported(config.environment.capabilities)
+        );
+      }) ??
+      null)
+    : null;
+  const anyCapableEnvironment = environments.some((env) => {
+    if (selectedEnvironmentId !== null && env.environmentId !== selectedEnvironmentId) {
+      return false;
+    }
+    const config = serverConfigs.get(env.environmentId);
+    return (
+      env.connectionState === "connected" &&
+      config !== undefined &&
+      isProjectWorkflowBoardSupported(config.environment.capabilities)
+    );
+  });
+  const handleOpenWorkflowBoard =
+    workflowBoardMember !== null
+      ? () =>
+          navigation.dispatch(
+            StackActions.push("WorkflowBoard", {
+              environmentId: String(workflowBoardMember.environmentId),
+              projectId: String(workflowBoardMember.id),
+            }),
+          )
+      : selectedScope === null && anyCapableEnvironment
+        ? () =>
+            navigation.dispatch(
+              StackActions.push(
+                "WorkflowBoard",
+                selectedEnvironmentId !== null
+                  ? { environmentId: String(selectedEnvironmentId) }
+                  : undefined,
+              ),
+            )
+        : undefined;
 
   if (layout.usesSplitView && !nativePrimaryColumn) {
     return (
@@ -182,6 +237,8 @@ export function HomeRouteScreen() {
                 selectedProjectKey,
                 onEnvironmentChange: setSelectedEnvironmentId,
                 onProjectChange: setSelectedProjectKey,
+                onOpenWorkflowBoard: handleOpenWorkflowBoard,
+                ...(selectedScope ? { workflowBoardSubtitle: selectedScope.title } : {}),
               },
               m,
             ),
@@ -191,6 +248,7 @@ export function HomeRouteScreen() {
         <HomeScreen
           catalogState={catalogState}
           environments={environments}
+          onOpenWorkflowBoard={handleOpenWorkflowBoard}
           onAddConnection={() => openSettings(navigation, "SettingsEnvironmentNew")}
           onArchiveThread={archiveThread}
           onDeleteThread={confirmDeleteThread}

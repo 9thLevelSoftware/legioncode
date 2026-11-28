@@ -160,6 +160,8 @@ fn make_thread_create(
             workspace_strategy: None,
             output_schema: None,
         }),
+        title_renamed: None,
+        workflow_run: None,
     }))
 }
 

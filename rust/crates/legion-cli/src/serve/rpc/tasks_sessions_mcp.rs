@@ -321,6 +321,8 @@ async fn run_now(state: &Arc<AppState>, payload: Value) -> RpcExit {
                 output_schema: None,
                 workspace_strategy: None,
             }),
+            title_renamed: None,
+            workflow_run: None,
         });
         let _ = state.orchestrator.dispatch_now(&cmd).await;
     }

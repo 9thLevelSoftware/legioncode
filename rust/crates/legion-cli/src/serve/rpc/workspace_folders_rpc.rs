@@ -208,6 +208,8 @@ mod tests {
             delegated_from: None,
             imported_native_thread: None,
             initial_message: None,
+            title_renamed: None,
+            workflow_run: None,
         });
         let _ = state.orchestrator.dispatch_now(&cmd).await?;
         Ok(tf)

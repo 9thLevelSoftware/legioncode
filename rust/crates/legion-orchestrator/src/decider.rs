@@ -39,6 +39,8 @@
 //!     delegated_from: None,
 //!     imported_native_thread: None,
 //!     initial_message: None,
+//!     title_renamed: None,
+//!     workflow_run: None,
 //! });
 //! let decision = decide_command(&DeciderThreadState::default(), &cmd, "2026-11-20T00:00:00.000Z")?;
 //! assert_eq!(decision.events.len(), 1);

@@ -35,6 +35,14 @@ pub mod mail_deliver;
 pub mod schema;
 pub mod schema_validate;
 pub mod scrub;
+pub mod stage_brief;
+pub mod stage_brief_m3;
+mod stage_brief_render;
+pub mod stage_driver_common;
+pub mod stage_execute;
+pub mod stage_plan;
+pub mod stage_review;
+pub mod stage_spec;
 pub mod store;
 pub mod store_ops;
 pub mod store_queries;
@@ -63,6 +71,25 @@ pub use engine_replay::ReplayContext;
 pub use engine_step::{EngineControl, PassOutcome, RunEndInfo, StepExecContext};
 pub use journal::{JournalEntry, WorkflowJournal};
 pub use schema::ensure_workflow_and_feedback_schema;
+pub use stage_brief::{
+    AssembledPlanBrief, AssembledSpecBrief, BriefChallengeConcern, PlanBriefInput, SpecBriefInput,
+    build_plan_brief, build_spec_brief, sha256_prefixed,
+};
+pub use stage_brief_m3::{
+    AssembledExecuteBrief, AssembledReviewBrief, ExecuteBriefInput, ReviewBriefInput,
+    build_execute_brief, build_review_brief,
+};
+pub use stage_execute::{
+    ExecuteStageDriver, WORKFLOW_BOARD_EXECUTE_NAME, WORKFLOW_BOARD_EXECUTE_VERSION,
+};
+pub use stage_plan::{
+    PlanStageDriver, WORKFLOW_BOARD_PLAN_NAME, WORKFLOW_BOARD_PLAN_VERSION,
+    builtin_stage_definitions,
+};
+pub use stage_review::{
+    ReviewStageDriver, WORKFLOW_BOARD_REVIEW_NAME, WORKFLOW_BOARD_REVIEW_VERSION,
+};
+pub use stage_spec::{SpecStageDriver, WORKFLOW_BOARD_SPEC_NAME, WORKFLOW_BOARD_SPEC_VERSION};
 pub use store::WorkflowStore;
 pub use traits::{
     PullRequestQuery, PullRequestStanding, UnavailableAgentDriver, UnavailableForgeDriver,

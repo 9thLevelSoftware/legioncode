@@ -8,6 +8,9 @@ pub mod mcp;
 mod mcp_milestones;
 mod mcp_tools;
 mod mcp_wf_feedback;
+mod mcp_workflow_board;
+mod mcp_workflow_board_exec;
+mod mcp_workflow_board_propose;
 pub(crate) mod rpc;
 mod rpc_terminal;
 pub mod rpc_wave_d;
@@ -245,20 +248,29 @@ pub async fn spawn_server_with_dev_url(
         orchestrator.spawn_outbox_worker(outbox_executor, OutboxWorkerOptions::default());
     let terminal_runtime = Arc::new(TerminalRuntime::default());
     let milestone_hub = Arc::new(MilestoneHub::new());
-    let (workflow_store, workflow_manager, bg_tasks) =
-        init_workflow_and_bg_tasks(&config, &paths, &orchestrator, &milestone_hub);
+    let (workflow_store, workflow_manager, mut bg_tasks) = init_workflow_and_bg_tasks(
+        &config,
+        &paths,
+        &environment_id,
+        &orchestrator,
+        &milestone_hub,
+    );
 
     let runtime_http = build_runtime_http_state(
         &config,
         &paths,
         bind_host,
         local_addr.port(),
+        &environment_id,
         &orchestrator,
         &terminal_runtime,
         &milestone_hub,
         workflow_manager.as_ref(),
         dev_url,
     );
+    if let Some(ref board) = runtime_http.workflow_board {
+        bg_tasks.push(board.spawn_turn_observer());
+    }
     let state = Arc::new(AppState {
         descriptor,
         orchestrator: Arc::clone(&orchestrator),

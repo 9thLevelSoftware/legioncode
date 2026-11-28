@@ -9,7 +9,7 @@ use legion_contracts::environment::{
 use legion_contracts::ids::{EnvironmentId, IdError};
 use legion_persistence::ownership::{OwnershipError, SERVER_EXIT_CODE_STATE_DIR_OWNED};
 use legion_persistence::paths::PathsError;
-use legion_persistence::sqlite::SqliteStoreError;
+use legion_persistence::sqlite::{BUILD_MIGRATION_HEAD, SqliteStoreError};
 use thiserror::Error;
 
 use crate::fallback::{expand_home, resolve_base_dir};
@@ -207,7 +207,9 @@ pub(crate) fn build_descriptor(
         platform,
         env!("CARGO_PKG_VERSION"),
     )
-    .database_migration(database_migration.unwrap_or(105))
+    .database_migration(
+        database_migration.unwrap_or_else(|| u32::try_from(BUILD_MIGRATION_HEAD).unwrap_or(114)),
+    )
     .voice_transcription(voice_supported)
     .build()
 }
@@ -315,8 +317,8 @@ mod tests {
         let env_id = legion_contracts::ids::EnvironmentId::new("env-test-1")?;
         let v = serde_json::to_value(super::build_descriptor(env_id, Path::new("."), None))?;
         assert_eq!(v["orchestrationProtocolVersion"], 2);
-        assert_eq!(v["databaseMigration"], 105);
-        for key in "shellThreadFamilies shellOlderSettled connectionProbe attachmentUploads vcsBranchStatus inlineMessageContext threadSettlement projectOrganization ignoredFileListing ignoredFileSearch environmentThemes commandOutputStreaming".split(' ') {
+        assert_eq!(v["databaseMigration"], super::BUILD_MIGRATION_HEAD);
+        for key in "shellThreadFamilies shellOlderSettled connectionProbe attachmentUploads vcsBranchStatus inlineMessageContext threadSettlement projectOrganization ignoredFileListing ignoredFileSearch environmentThemes commandOutputStreaming projectWorkflowBoard".split(' ') {
             assert_eq!(v["capabilities"][key], true, "missing capability {key}");
         }
         assert!(v["capabilities"]["fileAttachments"]["maxUploadBytes"].is_number());

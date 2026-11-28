@@ -1058,6 +1058,55 @@ export function createEnvironmentRpcQueryAtomFamily<
   });
 }
 
+export function createEnvironmentGuardedRpcQueryAtomFamily<
+  R,
+  ER,
+  TTag extends EnvironmentUnaryRpcTag,
+>(
+  runtime: Atom.AtomRuntime<EnvironmentRegistry.EnvironmentRegistry | R, ER>,
+  options: {
+    readonly label: string;
+    readonly tag: TTag;
+    readonly persistence?: QueryPersistence<EnvironmentRpcSuccess<TTag>>;
+    readonly staleTimeMs?: number;
+    readonly idleTtlMs?: number;
+    readonly refreshIntervalMs?: number;
+    readonly refreshTrigger?: (
+      target: {
+        readonly environmentId: EnvironmentIdType;
+        readonly input: EnvironmentRpcInput<TTag>;
+      },
+      query: Atom.Atom<AsyncResult.AsyncResult<EnvironmentRpcSuccess<TTag>, unknown>>,
+    ) => Atom.Atom<unknown> | undefined;
+    readonly isFinal?: (value: EnvironmentRpcSuccess<TTag>) => boolean;
+    readonly onAnswer?: QueryAnswerHandler<EnvironmentRpcInput<TTag>, EnvironmentRpcSuccess<TTag>>;
+  },
+) {
+  return createEnvironmentQueryAtomFamily(runtime, {
+    label: options.label,
+    ...(options.persistence === undefined ? {} : { persistence: options.persistence }),
+    ...(options.staleTimeMs === undefined ? {} : { staleTimeMs: options.staleTimeMs }),
+    ...(options.idleTtlMs === undefined ? {} : { idleTtlMs: options.idleTtlMs }),
+    ...(options.refreshIntervalMs === undefined
+      ? {}
+      : { refreshIntervalMs: options.refreshIntervalMs }),
+    ...(options.refreshTrigger === undefined ? {} : { refreshTrigger: options.refreshTrigger }),
+    ...(options.isFinal === undefined ? {} : { isFinal: options.isFinal }),
+    ...(options.onAnswer === undefined ? {} : { onAnswer: options.onAnswer }),
+    execute: (input: EnvironmentRpcInput<TTag>) =>
+      AtomRegistry.AtomRegistry.pipe(
+        Effect.flatMap((registry) =>
+          requestGuarded(options.tag, input).pipe(
+            Effect.provideService(RpcPermissionGuard, {
+              authorize: (id, method, payload) =>
+                createCommandPermissions(runtime, method).authorize(registry, id, payload),
+            }),
+          ),
+        ),
+      ),
+  });
+}
+
 export function createEnvironmentRpcSubscriptionAtomFamily<
   R,
   ER,

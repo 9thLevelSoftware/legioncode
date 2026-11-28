@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use legion_contracts::ids::EnvironmentId;
 use legion_orchestrator::Orchestrator;
 use legion_persistence::paths::{ServerDerivedPaths, ensure_server_directories};
-use legion_persistence::sqlite::SqliteStore;
+use legion_persistence::sqlite::{BUILD_MIGRATION_HEAD, SqliteStore};
 use legion_protocol::rpc_codec::{OutputWindowRegistry, RpcCauseReason, RpcExit};
 use legion_server_runtime::{RuntimeHttpState, TerminalRuntime};
 use serde_json::{Value, json};
@@ -33,7 +33,11 @@ pub(super) fn build_test_state() -> (TempDir, Arc<AppState>) {
             .with_terminal_runtime(Arc::clone(&terminal_runtime)),
     );
     let env_id = EnvironmentId::new("env-rpc-test").expect("env id");
-    let descriptor = build_descriptor(env_id, temp.path(), Some(105));
+    let descriptor = build_descriptor(
+        env_id,
+        temp.path(),
+        u32::try_from(BUILD_MIGRATION_HEAD).ok(),
+    );
     let state = Arc::new(AppState {
         descriptor,
         orchestrator,
@@ -109,6 +113,10 @@ async fn server_probe_config_settings_and_keybindings_persist() {
     assert_eq!(cfg["shellThreadFamilies"], true);
     assert_eq!(cfg["shellOlderSettled"], true);
     assert_eq!(cfg["threadSnapshotPagination"], true);
+    assert_eq!(
+        cfg["environment"]["capabilities"]["projectWorkflowBoard"],
+        true
+    );
     assert!(
         cfg["providers"]
             .as_array()

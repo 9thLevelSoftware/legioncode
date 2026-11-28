@@ -126,15 +126,6 @@ pub struct ThreadCreateCommand {
     /// Optional atomic initial message.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub initial_message: Option<InitialThreadMessage>,
-}
-
-/// Wire-extended `thread.create` payload carrying `titleRenamed` and `workflowRun`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WorkflowThreadCreateCommand {
-    /// Core `thread.create` command fields.
-    #[serde(flatten)]
-    pub base: ThreadCreateCommand,
     /// Whether the thread title was explicitly chosen by the user.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title_renamed: Option<bool>,
@@ -142,6 +133,9 @@ pub struct WorkflowThreadCreateCommand {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workflow_run: Option<WorkflowOrigin>,
 }
+
+/// Backwards-compatible alias for [`ThreadCreateCommand`].
+pub type WorkflowThreadCreateCommand = ThreadCreateCommand;
 
 /// Queued continuation message embedded in `thread.metadata.update`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

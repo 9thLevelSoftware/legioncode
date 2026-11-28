@@ -246,6 +246,7 @@ async function runWireParityChecks(
   assert.strictEqual(envRes.status, 200);
   const descriptor = decodeDescriptor(await envRes.json());
   assert.strictEqual(descriptor.orchestrationProtocolVersion, 2);
+  assert.strictEqual(descriptor.capabilities.projectWorkflowBoard, true);
 
   // 2. Pair browser session cookie & verify AuthSessionState
   const pairRes = await fetch(`${origin}/api/auth/browser-session`, {
@@ -453,7 +454,7 @@ it.live(
         );
       }).pipe(Effect.scoped);
 
-      // Verify SQLite v110 migrations & tables persisted cleanly in statev2.sqlite.
+      // Verify SQLite v111 migrations & tables persisted cleanly in statev2.sqlite.
       const dbPath = NodePath.join(homeDir, "userdata", "statev2.sqlite");
       assert.isTrue(NodeFS.existsSync(dbPath), `Expected statev2.sqlite at ${dbPath}`);
       const db = new NodeSqlite.DatabaseSync(dbPath, { readOnly: true });
@@ -461,7 +462,7 @@ it.live(
         const headRow = db
           .prepare("SELECT MAX(migration_id) AS head FROM effect_sql_migrations")
           .get() as { readonly head?: number } | undefined;
-        assert.strictEqual(headRow?.head, 110);
+        assert.strictEqual(headRow?.head, 114);
 
         const tables = new Set(
           (
@@ -484,8 +485,28 @@ it.live(
           "workflow_store",
           "workflow_run_references",
           "workflow_engine_journal",
+          "workflow_board_cards",
+          "workflow_board_revisions",
+          "workflow_board_approvals",
+          "workflow_board_stage_runs",
+          "workflow_board_write_journal",
+          "workflow_board_exploration_rounds",
+          "workflow_board_decisions",
+          "workflow_board_challenges",
+          "workflow_board_plan_designs",
+          "workflow_board_tasks",
+          "workflow_board_planned_checks",
+          "workflow_board_ac_evidence",
+          "workflow_board_contract_violations",
+          "workflow_board_check_receipts",
+          "workflow_board_review_runs",
+          "workflow_board_review_findings",
+          "workflow_board_amendments",
+          "workflow_board_external_actions",
+          "workflow_board_delivery_receipts",
+          "workflow_board_cli_imports",
         ]) {
-          assert.isTrue(tables.has(requiredTable), `Missing SQLite v110 table ${requiredTable}`);
+          assert.isTrue(tables.has(requiredTable), `Missing SQLite v114 table ${requiredTable}`);
         }
       } finally {
         db.close();

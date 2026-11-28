@@ -1,6 +1,7 @@
 import { useGT } from "gt-react-native";
 import { Pressable, ScrollView } from "react-native";
 import { SymbolView } from "../../components/ui/AppSymbol";
+import { Chip } from "../../components/ui/Chip";
 import { ListFilterMenu } from "../layout/workspace/ListFilterMenu";
 import type { EnvironmentId } from "@legioncode/contracts";
 import type {
@@ -15,6 +16,7 @@ export function ThreadListFilters(props: {
   readonly selectedProjectKey: string | null;
   readonly onEnvironmentChange: (environmentId: EnvironmentId | null) => void;
   readonly onProjectChange: (projectKey: string | null) => void;
+  readonly onOpenWorkflowBoard?: (() => void) | undefined;
   /** List padding the scroller bleeds through so pills start where row content does. */
   readonly gutter: number;
 }) {
@@ -87,6 +89,14 @@ export function ThreadListFilters(props: {
           }
         }}
       />
+      {props.onOpenWorkflowBoard ? (
+        <Chip
+          label={gt("Workflow board")}
+          icon="flowchart"
+          onPress={props.onOpenWorkflowBoard}
+          accessibilityLabel={gt("Open workflow board")}
+        />
+      ) : null}
       {props.selectedEnvironmentId !== null || props.selectedProjectKey !== null ? (
         <Pressable
           accessibilityRole="button"

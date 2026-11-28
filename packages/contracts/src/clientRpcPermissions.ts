@@ -106,6 +106,28 @@ export const CLIENT_GUARDED_RPC_SCOPES = {
   [WS_METHODS.peerLinksPairLink]: AuthAccessWriteScope,
   // Send stores and sends a report from a thread's turn: the bar of running that thread.
   [WS_METHODS.agentFeedbackAnswerRequest]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardSubscribe]: AuthOrchestrationReadScope,
+  [WS_METHODS.workflowBoardGetCard]: AuthOrchestrationReadScope,
+  [WS_METHODS.workflowBoardGetArtifact]: AuthOrchestrationReadScope,
+  [WS_METHODS.workflowBoardCreateCard]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardUpdateSpec]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardApproveSpec]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardStartStage]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardExploreStep]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardChallengeStep]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardUpdatePlan]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardApprovePlan]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardReturnForRevision]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardGetCardDiff]: AuthOrchestrationReadScope,
+  [WS_METHODS.workflowBoardPauseCard]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardResumeCard]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardRetryStep]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardProposeAmendment]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardResolveFinding]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardRecordManualAcceptance]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardApproveDelivery]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardPreviewCliImport]: AuthOrchestrationOperateScope,
+  [WS_METHODS.workflowBoardApplyCliImport]: AuthOrchestrationOperateScope,
 } as const;
 export type ClientGuardedRpcTag = keyof typeof CLIENT_GUARDED_RPC_SCOPES;
 

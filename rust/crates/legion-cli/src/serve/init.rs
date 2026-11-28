@@ -3,13 +3,15 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use legion_contracts::ids::EnvironmentId;
 use legion_orchestrator::Orchestrator;
 use legion_persistence::paths::ServerDerivedPaths;
 use legion_protocol::milestones::MilestoneHub;
 use legion_server_runtime::{
-    MilestoneHubWorkflowSink, OrchestratorWorkflowAgentDriver, RuntimeHttpState,
-    ScmWorkflowForgeDriver, TerminalRuntime, start_orchestration_milestone_pump,
+    MilestoneHubWorkflowSink, OrchestratorWorkflowAgentDriver, ProjectWorkflowBoardService,
+    RuntimeHttpState, ScmWorkflowForgeDriver, TerminalRuntime, start_orchestration_milestone_pump,
 };
+use legion_workflows::builtin_stage_definitions;
 use legion_workflows::definitions::WorkflowDefinitionsManager;
 use legion_workflows::definitions_fs::{
     LEGION_WORKFLOWS_ENV, T3_WORKFLOWS_ENV, WorkflowsLocation, resolve_workflows_location,
@@ -22,6 +24,7 @@ use super::{ServeConfig, ServeMode, rpc};
 pub(super) fn init_workflow_and_bg_tasks(
     config: &ServeConfig,
     paths: &ServerDerivedPaths,
+    environment_id: &EnvironmentId,
     orchestrator: &Arc<Orchestrator>,
     milestone_hub: &Arc<MilestoneHub>,
 ) -> (
@@ -43,15 +46,21 @@ pub(super) fn init_workflow_and_bg_tasks(
     )
     .ok();
     let workflow_manager = workflow_store.as_ref().and_then(|store| {
-        WorkflowDefinitionsManager::open(
+        WorkflowDefinitionsManager::open_with_builtins(
             store.clone(),
-            Arc::new(OrchestratorWorkflowAgentDriver::new(Arc::clone(
-                orchestrator,
-            ))),
+            Arc::new(
+                OrchestratorWorkflowAgentDriver::new(
+                    Arc::clone(orchestrator),
+                    paths.worktrees_dir.clone(),
+                )
+                .with_settings_path(Some(paths.settings_path.clone()))
+                .with_environment_id(environment_id.clone()),
+            ),
             Arc::new(ScmWorkflowForgeDriver::new(Arc::clone(
                 orchestrator.sink().db(),
             ))),
             wf_location,
+            builtin_stage_definitions(),
             workflows_enabled,
         )
         .ok()
@@ -91,6 +100,7 @@ pub(super) fn build_runtime_http_state(
     paths: &ServerDerivedPaths,
     bind_host: &str,
     port: u16,
+    environment_id: &EnvironmentId,
     orchestrator: &Arc<Orchestrator>,
     terminal_runtime: &Arc<TerminalRuntime>,
     milestone_hub: &Arc<MilestoneHub>,
@@ -120,6 +130,14 @@ pub(super) fn build_runtime_http_state(
     if let Some(mgr) = workflow_manager {
         rt = rt.with_workflow_manager(Arc::clone(mgr));
     }
+    let workflow_board = Arc::new(ProjectWorkflowBoardService::new(
+        Arc::clone(orchestrator),
+        paths.worktrees_dir.clone(),
+        Some(paths.settings_path.clone()),
+        environment_id.clone(),
+        workflow_manager.cloned(),
+    ));
+    rt = rt.with_workflow_board(workflow_board);
     if dev_url.is_some() {
         rt = rt.with_dev_url(dev_url);
     }

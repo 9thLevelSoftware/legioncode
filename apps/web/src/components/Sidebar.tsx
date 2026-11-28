@@ -73,6 +73,7 @@ import {
   ChevronDownIcon,
   FolderIcon,
   FolderPlusIcon,
+  KanbanIcon,
   PlusIcon,
   SettingsIcon,
 } from "lucide-react";
@@ -109,6 +110,7 @@ import { readLocalApi } from "../localApi";
 import { configuredHostedAppUrl } from "../hostedPairing";
 import { useSidebarPendingFileDropStore } from "../sidebarPendingFileDropStore";
 import { SidebarFolderDrop } from "./sidebar/SidebarFolderDrop";
+import { isProjectGroupWorkflowBoardEnabled } from "./workflow-board/workflowBoard.logic";
 import {
   pickableProjectGroups,
   selectProjectGroupingSettings,
@@ -1248,6 +1250,25 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       });
     },
   );
+  const openProjectWorkflowBoard = useStableCallback(
+    (projectGroup: SidebarProjectSnapshot, projectRef?: ScopedProjectRef) => {
+      if (isMobile) {
+        setOpenMobile(false);
+      }
+      void router.navigate({
+        to: "/projects/$projectKey/board",
+        params: {
+          projectKey: getSidebarProjectSettingsKey(
+            projectGroup,
+            projectGroupingSettings,
+            projects,
+            projectRef,
+          ),
+        },
+        search: {},
+      });
+    },
+  );
   const {
     canPinProjectGroup: canPinProject,
     setProjectGroupPinned,
@@ -1265,6 +1286,18 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
       openProjectSettings(projectGroup);
     },
   );
+  const handleProjectWorkflowBoard = useStableCallback(
+    (
+      event: ReactMouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLInputElement>,
+      projectGroup: SidebarProjectSnapshot,
+    ) => {
+      event.preventDefault();
+      event.stopPropagation();
+      suppressNextScopeChangeRef.current = true;
+      dispatchProjectScopeMenu({ type: "project-settings-opened" });
+      openProjectWorkflowBoard(projectGroup);
+    },
+  );
   const startThreadInProjectFolder = useStableCallback((group: SidebarProjectSnapshot) => {
     if (isMobile) setOpenMobile(false);
     void handleNewThread(scopeProjectRef(group.environmentId, group.id));
@@ -1277,11 +1310,17 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     ) => {
       const api = readLocalApi();
       if (!api) return;
+      const boardEnabled = isProjectGroupWorkflowBoardEnabled(
+        group,
+        serverConfigs,
+        connectedEnvironmentIds,
+      );
       void (async () => {
         const clicked = await settlePromise(() =>
           api.contextMenu.show(
             [
               { id: "new-thread", label: gt("New thread") },
+              ...(boardEnabled ? [{ id: "workflow-board", label: gt("Workflow board") }] : []),
               { id: "copy-path", label: gt("Copy path") },
               ...(canPinProject(group)
                 ? [
@@ -1300,6 +1339,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         switch (clicked.value) {
           case "new-thread":
             startThreadInProjectFolder(group);
+            return;
+          case "workflow-board":
+            openProjectWorkflowBoard(group);
             return;
           case "copy-path":
             copyPathToClipboard(group.workspaceRoot, { path: group.workspaceRoot });
@@ -3253,6 +3295,29 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                     />
                                   ) : null
                                 }
+                                workflowBoard={
+                                  isProjectGroupWorkflowBoardEnabled(
+                                    project,
+                                    serverConfigs,
+                                    connectedEnvironmentIds,
+                                  ) ? (
+                                    <Button
+                                      size="icon-xs"
+                                      variant="ghost-muted"
+                                      tabIndex={-1}
+                                      aria-hidden="true"
+                                      title={gt("Workflow board for {project}", {
+                                        project: project.displayName,
+                                      })}
+                                      onPointerDown={(event) => event.stopPropagation()}
+                                      onClick={(event) => {
+                                        void handleProjectWorkflowBoard(event, project);
+                                      }}
+                                    >
+                                      <KanbanIcon className="size-3.5" />
+                                    </Button>
+                                  ) : null
+                                }
                                 settings={
                                   <Button
                                     size="icon-xs"
@@ -3629,6 +3694,15 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                                 hiddenThreads={folder.hiddenThreads}
                                 onToggle={toggleProjectFolder}
                                 onNewThread={startThreadInProjectFolder}
+                                onWorkflowBoard={
+                                  isProjectGroupWorkflowBoardEnabled(
+                                    folder.group,
+                                    serverConfigs,
+                                    connectedEnvironmentIds,
+                                  )
+                                    ? openProjectWorkflowBoard
+                                    : undefined
+                                }
                                 onContextMenu={handleProjectFolderContextMenu}
                               />,
                             );

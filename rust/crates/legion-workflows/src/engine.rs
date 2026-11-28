@@ -196,6 +196,11 @@ impl WorkflowEngine {
         }
     }
 
+    /// Returns a reference to the backing [`WorkflowStore`].
+    pub const fn store(&self) -> &WorkflowStore {
+        &self.store
+    }
+
     /// Returns `true` when Labs `workflowsEnabled` is currently on.
     pub fn is_enabled(&self) -> bool {
         self.enabled.lock().is_ok_and(|g| *g)

@@ -1,7 +1,7 @@
 import type { EnvironmentThreadShell } from "@legioncode/client-runtime/state/models";
 import { scopedThreadKey, scopeThreadRef } from "@legioncode/client-runtime/environment";
 import type { ContextMenuSource } from "@legioncode/contracts";
-import { ChevronDownIcon, SquarePenIcon } from "lucide-react";
+import { ChevronDownIcon, KanbanIcon, SquarePenIcon } from "lucide-react";
 import { msg, T, useGT, useMessages, Var } from "gt-react";
 import { memo } from "react";
 
@@ -44,6 +44,7 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
   hiddenThreads: readonly EnvironmentThreadShell[];
   onToggle: (group: SidebarProjectSnapshot) => void;
   onNewThread: (group: SidebarProjectSnapshot) => void;
+  onWorkflowBoard?: ((group: SidebarProjectSnapshot) => void) | undefined;
   onContextMenu: (
     group: SidebarProjectSnapshot,
     position: { x: number; y: number },
@@ -111,7 +112,29 @@ export const SidebarProjectFolderHeader = memo(function SidebarProjectFolderHead
         />
       </button>
       {/* Sits over the count, which hides on hover or focus, and left of the chevron. */}
-      <span className="absolute inset-y-0 right-6 flex items-center opacity-0 focus-within:opacity-100 group-hover/project-folder:opacity-100 pointer-coarse:opacity-100">
+      <span className="absolute inset-y-0 right-6 flex items-center gap-0.5 opacity-0 focus-within:opacity-100 group-hover/project-folder:opacity-100 pointer-coarse:opacity-100">
+        {props.onWorkflowBoard ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  data-sidebar-action-for={rowId}
+                  size="icon-xs"
+                  variant="ghost-muted"
+                  aria-label={gt("Workflow board for {project}", { project: group.displayName })}
+                  onClick={() => props.onWorkflowBoard?.(group)}
+                />
+              }
+            >
+              <KanbanIcon aria-hidden />
+            </TooltipTrigger>
+            <TooltipPopup>
+              <T>
+                Workflow board for <Var>{group.displayName}</Var>
+              </T>
+            </TooltipPopup>
+          </Tooltip>
+        ) : null}
         <Tooltip>
           <TooltipTrigger
             render={

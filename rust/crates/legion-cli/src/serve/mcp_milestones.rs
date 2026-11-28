@@ -29,6 +29,7 @@ const PROTOCOL_2025: &str = "2025-06-18";
 #[derive(Debug, Clone)]
 pub(super) struct McpCallerContext {
     pub(super) session_id: Option<String>,
+    pub(super) subject: Option<String>,
     pub(super) thread_id: Option<String>,
     pub(super) has_thread_scope: bool,
 }
@@ -51,6 +52,7 @@ pub(super) fn authorize_caller(state: &AppState, headers: &HeaderMap) -> Option<
     if !state.runtime_http.require_auth {
         return Some(McpCallerContext {
             session_id: None,
+            subject: None,
             has_thread_scope: thread_id.is_some(),
             thread_id,
         });
@@ -71,6 +73,7 @@ pub(super) fn authorize_caller(state: &AppState, headers: &HeaderMap) -> Option<
     {
         return Some(McpCallerContext {
             session_id: None,
+            subject: None,
             has_thread_scope: thread_id.is_some(),
             thread_id,
         });
@@ -90,10 +93,23 @@ pub(super) fn authorize_caller(state: &AppState, headers: &HeaderMap) -> Option<
         .lock()
         .ok()
         .and_then(|conn| verify_bearer_session_with_conn(&conn, token, now_ms).ok())?;
-    let has_thread_scope = thread_id.is_some() || session.subject.starts_with("thread:");
+    let subject_thread_id = session
+        .subject
+        .strip_prefix("thread:")
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned);
+    if let (Some(sub_tid), Some(hdr_tid)) = (&subject_thread_id, &thread_id)
+        && sub_tid != hdr_tid
+    {
+        return None;
+    }
+    let effective_thread_id = subject_thread_id.or(thread_id);
+    let has_thread_scope = effective_thread_id.is_some();
     Some(McpCallerContext {
         session_id: Some(session.session_id),
-        thread_id,
+        subject: Some(session.subject),
+        thread_id: effective_thread_id,
         has_thread_scope,
     })
 }

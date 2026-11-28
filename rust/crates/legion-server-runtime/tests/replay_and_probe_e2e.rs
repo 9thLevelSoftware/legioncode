@@ -131,6 +131,8 @@ fn make_dev_replay_thread_cmd(
             workspace_strategy: None,
             output_schema: None,
         }),
+        title_renamed: None,
+        workflow_run: None,
     }))
 }
 

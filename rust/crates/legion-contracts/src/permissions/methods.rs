@@ -1,4 +1,4 @@
-//! WebSocket RPC method identifiers covering all 257 known methods of `WsRpcGroup` plus unknown custom tags.
+//! WebSocket RPC method identifiers covering all 266 known methods of `WsRpcGroup` plus unknown custom tags.
 
 use thiserror::Error;
 
@@ -361,6 +361,28 @@ define_ws_methods!(
         (WorkflowsGetDefinition, "workflows.getDefinition"),
         (WorkflowsSaveDefinition, "workflows.saveDefinition"),
         (WorkflowsDeleteDefinition, "workflows.deleteDefinition"),
+        (WorkflowBoardSubscribe, "workflowBoard.subscribe"),
+        (WorkflowBoardGetCard, "workflowBoard.getCard"),
+        (WorkflowBoardGetArtifact, "workflowBoard.getArtifact"),
+        (WorkflowBoardCreateCard, "workflowBoard.createCard"),
+        (WorkflowBoardUpdateSpec, "workflowBoard.updateSpec"),
+        (WorkflowBoardApproveSpec, "workflowBoard.approveSpec"),
+        (WorkflowBoardStartStage, "workflowBoard.startStage"),
+        (WorkflowBoardExploreStep, "workflowBoard.exploreStep"),
+        (WorkflowBoardChallengeStep, "workflowBoard.challengeStep"),
+        (WorkflowBoardUpdatePlan, "workflowBoard.updatePlan"),
+        (WorkflowBoardApprovePlan, "workflowBoard.approvePlan"),
+        (WorkflowBoardReturnForRevision, "workflowBoard.returnForRevision"),
+        (WorkflowBoardPauseCard, "workflowBoard.pauseCard"),
+        (WorkflowBoardResumeCard, "workflowBoard.resumeCard"),
+        (WorkflowBoardRetryStep, "workflowBoard.retryStep"),
+        (WorkflowBoardProposeAmendment, "workflowBoard.proposeAmendment"),
+        (WorkflowBoardResolveFinding, "workflowBoard.resolveFinding"),
+        (WorkflowBoardRecordManualAcceptance, "workflowBoard.recordManualAcceptance"),
+        (WorkflowBoardApproveDelivery, "workflowBoard.approveDelivery"),
+        (WorkflowBoardGetCardDiff, "workflowBoard.getCardDiff"),
+        (WorkflowBoardPreviewCliImport, "workflowBoard.previewCliImport"),
+        (WorkflowBoardApplyCliImport, "workflowBoard.applyCliImport"),
         (AgentFeedbackAnswerRequest, "agentFeedback.answerRequest"),
     ],
 );

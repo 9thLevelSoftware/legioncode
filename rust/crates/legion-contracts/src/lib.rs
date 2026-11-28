@@ -21,5 +21,6 @@ pub mod permissions;
 pub mod policy;
 pub mod pull_requests;
 pub mod secrets;
+pub mod workflow_board;
 pub mod workflows;
 pub mod workspace_folders;

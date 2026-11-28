@@ -51,6 +51,8 @@ pub fn create_thread_cmd(
         delegated_from: None,
         imported_native_thread: None,
         initial_message: None,
+        title_renamed: None,
+        workflow_run: None,
     }))
 }
 
@@ -151,6 +153,7 @@ pub fn make_subagent_thread_event(
             relationship_to_parent: Some("subagent".to_owned()),
             root_thread_id: ThreadId::new(root_id)?,
             side_chat: None,
+            workflow_step: None,
         },
         forked_from: None,
         created_at: occurred_at.to_owned(),
@@ -177,6 +180,7 @@ pub fn make_subagent_thread_event(
         rollback_request_id: None,
         rollback_failure: None,
         rollback_unrestored: None,
+        workflow_run: None,
         deleted_at: None,
     };
     Ok(DomainEvent {

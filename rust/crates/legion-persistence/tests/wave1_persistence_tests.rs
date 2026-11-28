@@ -35,7 +35,7 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 #[test]
 fn migrations_v105_apply_idempotently_and_guard_existing_columns() -> TestResult {
-    assert_eq!(BUILD_MIGRATION_HEAD, 110);
+    assert_eq!(BUILD_MIGRATION_HEAD, 114);
     let temp = tempfile::tempdir()?;
     let db_path = temp.path().join("preexisting.sqlite");
 
@@ -56,7 +56,7 @@ fn migrations_v105_apply_idempotently_and_guard_existing_columns() -> TestResult
     pre.close().map_err(|(_, e)| e)?;
 
     let store = SqliteStore::open(&db_path)?;
-    assert_eq!(store.recorded_migration_head()?, Some(110));
+    assert_eq!(store.recorded_migration_head()?, Some(114));
 
     // Verify migrations 103..=105 recorded cleanly and reopening stays idempotent.
     store.close()?;

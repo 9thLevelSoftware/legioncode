@@ -39,6 +39,8 @@ export function buildHomeListFilterMenuItems(
     readonly selectedProjectKey: string | null;
     readonly onEnvironmentChange: (environmentId: EnvironmentId | null) => void;
     readonly onProjectChange: (projectKey: string | null) => void;
+    readonly onOpenWorkflowBoard?: (() => void) | undefined;
+    readonly workflowBoardSubtitle?: string | undefined;
   },
   resolve: MessageResolver = m,
 ): AppBarMenuItem[] {
@@ -83,6 +85,16 @@ export function buildHomeListFilterMenuItems(
           onPress: () => props.onProjectChange(project.key),
         })),
       ],
+    });
+  }
+
+  if (props.onOpenWorkflowBoard) {
+    items.push({
+      id: "workflow-board",
+      title: resolve(msg("Workflow board")),
+      ...(props.workflowBoardSubtitle ? { subtitle: props.workflowBoardSubtitle } : {}),
+      icon: "flowchart",
+      onPress: props.onOpenWorkflowBoard,
     });
   }
 

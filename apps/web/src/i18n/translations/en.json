@@ -396,6 +396,115 @@
   "4c55ce3dea11be53": "Link this environment to Legion Connect for a public URL.",
   "b0f7054082ac0af6": "Only this computer can call this address. Link Legion Connect for a public URL.",
   "9bf61e6a1df6575e": "Works wherever this environment's address is reachable, for example over Tailscale or your own proxy. Link Legion Connect for a public URL.",
+  "8459c68d2060c35a": "Loading workflow board…",
+  "90f601a1a0d6f678": "Checking server workflow board capabilities.",
+  "9fecf458b89a5449": "Environment is not connected",
+  "2f45c5a2f81ba606": "Connect this environment to open its project workflow board.",
+  "4403db20f00cc614": "Workflow board is not supported",
+  "f5abac40497b2046": "This server does not advertise project workflow board support yet.",
+  "34ad53646f06ed80": "Workflows are off",
+  "c6b50b7b14713939": "Enable Workflows in Settings → Labs to use the project workflow board.",
+  "1d35b292a6c7687d": "Read permission required",
+  "fa33841ab2928908": "This session does not have orchestration read access.",
+  "22028ce255e0ea52": "Project not found",
+  "fe8b2f748a612525": "Choose a connected project to open its workflow board.",
+  "4745f5f657095541": "Spec",
+  "086cf7b4ca56543b": "Plan",
+  "a065de4ac95ed77f": "Execute",
+  "d4d0ad32bbf2492d": "Ship",
+  "94bbaba26abf2d27": "Active",
+  "1fb31498e9479945": "Blocked",
+  "8ef7caaaed0e9a2f": "Paused",
+  "691967567dac5630": "Completed",
+  "bea12807777a509e": "Spec approved",
+  "c6bc84b3cad27e0b": "Approval stale",
+  "9f44b2ae72a195e0": "Superseded",
+  "3732e4686ecc2236": "Historical",
+  "360ececbe1c5f453": "Spec draft",
+  "6f076ca649948075": "Plan approved",
+  "45407210a349b739": "Plan approval stale",
+  "7d4a7b98dc3f2a76": "Superseded",
+  "5dfd2410affa78d1": "Historical",
+  "71d442ae8ff8734d": "Plan draft",
+  "88bed77cea96973c": "Blocked",
+  "fba2fd42c6ca6dbc": "Resolve blocker",
+  "334f4e403f01659c": "Resume card",
+  "6322554bddfe0eeb": "View completed card",
+  "7c9ffc61b956d1bf": "Draft and approve spec",
+  "a15fd2fccdf91aa6": "Approve spec",
+  "969da8329b257a62": "Continue guided exploration",
+  "73699aca96bd6637": "Resume exploration",
+  "4f6eac1da6c1edcf": "Open Spec thread",
+  "9d880e1f3c5dcaf3": "Start Plan",
+  "841158a8adfcd661": "Open Plan thread",
+  "364feaa97d59af62": "Revise spec",
+  "a519e85f438e3a98": "Revise plan",
+  "009dcc38518b970c": "Revise execution",
+  "c882aa0b9204e579": "Ready for execution",
+  "652b3111f7ffe081": "Complete active task",
+  "5799efec8b8b94b7": "Run planned checks or next task",
+  "301ca5ac1d045e63": "Continue execution",
+  "f823c2ed9f4a66a4": "Start independent review",
+  "4d1020a08eb4b908": "Open Review thread",
+  "2509cade788dbbdf": "Review for delivery",
+  "f5c238210f2f18fe": "Resolve file-contract violation",
+  "1483de3d575160ef": "Reconcile external changes",
+  "b7e1b00a345e6ee3": "Retry failed check",
+  "f568e6d9e1b9e61b": "Retry independent review",
+  "9cbca87b0c55b7fb": "Retry failed task",
+  "23054cd61a1dae40": "Retry failed step",
+  "0d135da201ad2bad": "Resolve review findings",
+  "cdc91d38b6f98f71": "Fix review finding",
+  "d27c5efd33206ae2": "Select Git delivery actions",
+  "3be969173fbfa5a7": "Acknowledge imported policies",
+  "8dd799e5a890f2c9": "Resolve blocked task",
+  "c6a0b71976577bb6": "Re-approve spec",
+  "8739c3a43e539635": "Follow execution",
+  "e2be9e0de6d4308c": "Shipped",
+  "a999df9a9077e11c": "Ready to ship",
+  "0eadfd4a217b5520": "Ship blocked",
+  "3f68515fe02ebf5a": "Delivery pending",
+  "d0269942595ffbcf": "Pending",
+  "022a26912f57ae82": "Running",
+  "f0059cf63e90467c": "Passed",
+  "3de3e4c5c604f62b": "Failed",
+  "d03b783c26744f27": "Stale",
+  "d00d8815730cd607": "Historical",
+  "6603378371972f1b": "Pass",
+  "23157564c7b0c5c7": "Findings",
+  "f4791321ea4bfd33": "Failed",
+  "22cebdfc8330ee8b": "Stale",
+  "3b44208e87c94661": "Pending",
+  "75d35698f0f23090": "Pending",
+  "ddf48130ba9524e0": "Pass",
+  "854af4695d5e7b98": "Fail",
+  "dfb8cedfa8477f86": "Not applicable",
+  "7a8ff7588b3f6777": "Stale",
+  "4a1e74e28a70a390": "Historical",
+  "1a149b00bbfd6621": "Requires acknowledgement",
+  "685d43222e85476a": "Acknowledged",
+  "797d04eb1c35efd7": "Spec approval",
+  "16fb60ceb54e33e8": "Plan approval",
+  "131a81d7730fa04a": "Execution",
+  "432c14edbadd23fc": "Review",
+  "2e8a21a099e6cc72": "Check",
+  "627beac6eb84f7c8": "This card changed on the server. Refresh and try again.",
+  "7dc8ee61b60fee26": "This card changed on the server (revision {revision}). Refresh and try again.",
+  "f572fe5898fba987": "Approve the spec before starting Plan.",
+  "4fc6d4a3de86ff63": "Complete and approve the plan before proceeding.",
+  "32940a3be17d6e3e": "Resolve all exploration decisions before approving the spec.",
+  "af45a3063dba3cb1": "Complete or resolve challenge concerns before approving the spec.",
+  "453593f5279af5ee": "External file edits were detected. Review and refresh before continuing.",
+  "468d8875a1531d21": "The task file contracts or dependencies have a conflict.",
+  "148b20a8a49bf5c9": "Artifacts on disk do not match the expected revision digest.",
+  "f21458e08e3a9d89": "This workflow card could not be found.",
+  "c329dfd8aa6f885d": "The project could not be found on this server.",
+  "b08bdc990f859d2f": "The requested artifact was not found.",
+  "233efd452c5adf65": "The artifact key is not valid.",
+  "b30f11c7f5b30ac4": "This stage transition is not allowed right now.",
+  "d02bd5dcde1faaf5": "Failed to start the stage thread.",
+  "79b1ca0f8ecdf356": "The workflow board request failed.",
+  "a48ccae4d10fb37a": "This server does not support this workflow board action.",
   "3669395daf36fd33": "No longer registered on this server",
   "fe513cf316e796e3": "Runs as part of other workflows",
   "ccf00b97925efab3": "Started by hand",
@@ -1864,6 +1973,7 @@
   "90896a7348c4e7ce": "Open settings",
   "1d17dc60c59e0524": "Unpin project",
   "5cfaaa20c460c328": "Pin project",
+  "6be625c09e2198d7": "Open workflow board",
   "24adf508b4c5d6b5": "Project settings",
   "60e47b3da5901619": "Settings · {section}",
   "0c659f9a193255dd": "Failed to add project",
@@ -2258,6 +2368,7 @@
   "72c74536ea4cbbb4": "Done",
   "b0d6a54da63aa886": "Edit",
   "f780864e3218484a": "none",
+  "00cec8f8a60014d5": "None of the scoped files have uncommitted changes. Select files below to include them in this commit.",
   "df6dad594cd78417": "Excluded",
   "983426d3b3735ae3": "Commit message (optional)",
   "bc8c52fd255ea8d0": "Commit on new branch",
@@ -2611,6 +2722,7 @@
   "e54720cac68f2adb": "All projects",
   "ac47f86df1c31a4a": "Failed to copy branch",
   "4e6305459e784fea": "Failed to copy thread ID",
+  "15fc18a031baacaa": "Workflow board",
   "5a79b7c910831c76": "Thread title cannot be empty",
   "5c14b37b13312503": "Failed to rename thread",
   "fc97f746bdabe59f": "Failed to settle thread",
@@ -2646,6 +2758,7 @@
   "1c8fc3c4a42949ab": "Projects: {projects}",
   "165511761be2855c": "Search projects",
   "a46a6467883575a4": "Search projects...",
+  "c1e0964ec047106e": "Workflow board for {project}",
   "fdc0e086438a3045": "Project settings for {project}",
   "4c1197b422538300": "Thread search results",
   "792fd010fcd31023": "Couldn't search thread messages",
@@ -12053,6 +12166,14 @@
   "18fc8976ddb6783d": ", failed",
   "10ae251c9435642b": ", done",
   "ef436cc0f1cee213": ", working",
+  "3502e3eeeab4e868": [
+    "Workflow board for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
   "2c3bb8ccf6c38078": "Dismiss provider update notice",
   "3cef7762c22f5fb1": "Dismiss until provider status changes",
   "0f90824868d6c3af": "New thread ({shortcut})",
@@ -12414,6 +12535,1082 @@
   "2cddd6095abc734a": "7 days",
   "53493056306708cf": "30 days",
   "c719359d18d37ad3": "90 days",
+  "77eed5dc15386226": "Orchestration operate permission is required.",
+  "709266ea8f8f9fbe": "Workflows are disabled in Settings -> Labs.",
+  "4a0f0b51d0b09e3f": "Select a valid provider, model, and workspace strategy.",
+  "c51bd65d9933c53a": "Card must be in Execute to run tasks.",
+  "947590fcd1d48c0c": "Resume the paused card before starting tasks.",
+  "c452f673680552a0": "Completed cards cannot start new tasks.",
+  "49ac2f29e61bf2bb": "Plan approval is required or stale. Re-approve Plan first.",
+  "3e5f240f07aad2af": "Acknowledge unsupported CLI policies before starting Execute.",
+  "c6ed067f6c1935b5": "Reconcile pending journal entries or external edits first.",
+  "cdc0dc3b70d02fdd": "Resolve pending file-contract violations before starting another task.",
+  "b727f7dcedbb99e0": "Only one mutating task can run at a time ({taskId} is active).",
+  "c3db6bc3e0594804": "Task is already complete.",
+  "bfd986ed3038a46f": "Retry this blocked task before starting execution.",
+  "c992d0264ee206ad": "Waiting on incomplete prerequisite tasks.",
+  "041babd36d9c000b": "Independent review runs in Execute or Ship.",
+  "46dcca82ee3f9a6e": "Resume the paused card before starting review.",
+  "ecfdd9c5a2eb05a7": "Completed cards cannot start a new review.",
+  "090cbc7e1d69ad89": "Plan approval is required or stale before independent review.",
+  "36aa53d49af8f40a": "Resolve pending file-contract violations before review.",
+  "a2a52ce20b456ecc": "Finish active task {taskId} before launching independent review.",
+  "3ddb95355dcebee2": "Allowed",
+  "e40e0d50641ef262": "Unexpected",
+  "6d227e931d448c01": "Forbidden",
+  "1a22550031b8805a": "Unassigned",
+  "9e893e0b7189cade": "Worktree diff",
+  "d3fa5df47d263836": [
+    "base ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "75e394a90d4e3c8a": [
+    "snapshot ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "17f622999756f4a3": [
+    "diff ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "97107cad02a2eaeb": "Refresh diff",
+  "1e914c155089b234": "Diff output was truncated because more than 250 files changed.",
+  "d3b616e4946e8eaa": "Loading card diff…",
+  "561ab4c144816ffe": "No changed product files detected in this worktree.",
+  "34371b40df46ce20": "Could not approve spec.",
+  "0264e7c2814c6b1b": "Spec approved at revision {revision}.",
+  "8c986e50755d3c22": "Card workspace",
+  "cf2c1fa24c9e6b72": "Card stage workspace tabs",
+  "60955638c07d65cb": "Connected stage thread",
+  "f9f71384a58888c5": [
+    "Imported from ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "f465ce3e3e456642": "Managed by LegionCode",
+  "e05e66d858edc983": [
+    "Card ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " · rev ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "f44fd36664981ac6": "Return for revision",
+  "667e8e1240b3cb64": "Spec",
+  "0faf657712a9d10a": "Plan",
+  "d56d671e2becfb4a": "Execute",
+  "c2191f40bcabaa52": "Ship",
+  "8ecdf11e3f5ce172": [
+    "History (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "28a213b593db1c78": "Action failed",
+  "bf0a2a2980d65f46": "Spec approval is stale",
+  "17795c4de5653257": "The spec changed after approval. Review the updated spec digest and re-approve before starting Plan.",
+  "e2221be531b13c55": "Plan approval is stale",
+  "79fc8ea510a6058d": "Downstream plan approval was invalidated by a spec or revision change. Review and re-approve the plan before execution.",
+  "fee3be43c6726418": "External edits detected",
+  "733e099627d16adc": [
+    "CLI import provenance (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "471a7919a72dd9fe": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " decisions ·",
+    " ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    " assumptions ·",
+    " ",
+    {
+      "i": 3,
+      "k": "_gt_value_3",
+      "v": "v"
+    },
+    " ACs ·",
+    " ",
+    {
+      "i": 4,
+      "k": "_gt_value_4",
+      "v": "v"
+    },
+    " historical receipts"
+  ],
+  "4b7e6829f42ffe2e": "Source directory",
+  "80dcee6cc023050f": "Source spec ID",
+  "2cbee85b787ff893": "Ownership",
+  "17af677e66b5ffc2": "Historical CLI receipts (native revalidation required)",
+  "f913056e7e8d2dc1": "Historical",
+  "c4ba40406c77fc87": "Adopted CLI policies",
+  "cf3f1c93e24e92de": "Missing CLI check logs",
+  "e482c557b2a52289": "Spec is approved. You can advance to the Plan stage.",
+  "8a33e7183cd44d1a": "Resolve exploration decisions and complete bounded challenge to approve the spec.",
+  "30ff41e82482fa32": "Approving…",
+  "b5cd560567347feb": "Spec approved",
+  "4f19d3b3fb35d010": "Approve spec",
+  "9b939cda922855a0": "Revision ledger",
+  "95fdd684b1e8a1c5": "No revisions recorded yet.",
+  "18125122c20c5a92": [
+    "rev ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "66043444263910c2": "Connected Spec thread",
+  "1b6cc343adf389f5": "Connected Execute thread",
+  "c21dc703736e0106": "Connected Review thread",
+  "3e524f39fabce11e": "Connected Plan thread",
+  "02cad9b729613548": "Unresolved",
+  "fdbe65b636bb30ff": "Answer",
+  "230512cebc263fe8": "Dismiss",
+  "51abc5d935121cb3": "Accept",
+  "c05a58687f5a28dc": "Accept risk",
+  "30a5e7226b9dbba7": "Defer",
+  "a12f23b46f37685b": "Enter an answer for concern {concernId}.",
+  "cf92e5f933b0b963": "Enter a dismissal reason for concern {concernId}.",
+  "c5976e49894827b0": "Could not save challenge responses.",
+  "ae41cd4c80118f6d": "Challenge dispositions saved.",
+  "1756e4a67ba773e9": "Manual fallback requires resolving active concerns, 3 non-empty answers, and exact acknowledgement.",
+  "c03d9bff982ec8be": "Could not record manual challenge fallback.",
+  "3f46e012244d813e": "Manual 3-question challenge fallback recorded.",
+  "8a7a228fa65d9528": "Challenge step failed.",
+  "dc031ac1ab3f29c9": "Challenge synthesis complete while preserving verbatim human answers.",
+  "7420b076b48c4bef": "Challenge marked complete.",
+  "415dc07bc215e5db": "Challenge pass started.",
+  "388d79c7d8f529a5": "Disposition for {concernId}",
+  "2b6423bcbd69286a": "Answer for {concernId}",
+  "b4c613b8f63820a5": "Provide an answer (preserved verbatim during synthesis)...",
+  "9ec5b98f08eb6e6d": "Dismissal reason for {concernId}",
+  "f2c84f662714d51d": "Why is this concern dismissed?",
+  "dcd764755f0348c4": "Bounded challenge",
+  "92bb6f58e9ec02a0": [
+    "Concerns ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "/3"
+  ],
+  "24ff2758dcd27f9d": "Start challenge",
+  "2e48b2b105060b2f": [
+    "Synthesize (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "/1)"
+  ],
+  "fed04a3437b36b29": "Complete challenge",
+  "0705296529b25c30": "Manual fallback",
+  "5050fd724173d6b2": "Challenge is stale because the spec or exploration answers changed. Re-run or complete challenge before approving the spec.",
+  "81375a9f97997bfd": [
+    "Why it matters: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "f583d7f3c6c2ebfc": [
+    "Evidence: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "06c2a55b23b225e6": "Save challenge responses",
+  "b2b45902059502cc": "Manual fallback recorded",
+  "bb7fa951b9594321": "Manual 3-question challenge fallback",
+  "203ee5b864f72a42": "Resolve or dispose all active concerns before using manual fallback.",
+  "9ab699c2fcfba074": "1. What failure mode or rollback boundary could invalidate this spec?",
+  "aa0d42f62ed4956a": "2. Which acceptance criteria or file contracts remain most exposed?",
+  "f43aee7ab46c279c": "3. How will Plan verification confirm these assumptions?",
+  "fda3e7a0d01bd1a1": [
+    "Type ",
+    {
+      "t": "code",
+      "i": 1,
+      "c": "I acknowledge"
+    },
+    " to confirm manual challenge completion"
+  ],
+  "aaffe004de86479c": "Submit manual fallback",
+  "c259295d3f067e59": "Automated",
+  "69b26fe68936a290": "Manual",
+  "5914a15ca04303be": "External",
+  "4639a9fb2678a86c": "Check {number} ID",
+  "9dab7ff6c0dd4671": "Check {number} argv command",
+  "3a22c96ebda92c57": "vp test run src/feature.test.ts",
+  "e266bf5d9c7db8c1": "Remove check {checkId}",
+  "52c5b976dcea8c95": "Check {number} description",
+  "e21609c215334f11": "What this check verifies",
+  "d15557b39bcb0885": "Evidence method for {criterionId}",
+  "c678f4fe74ab1b29": "Check IDs for {criterionId}",
+  "03542b84f024ecb0": "CHK-01",
+  "d2be106fc1b6e781": "Manual verification procedure for {criterionId}",
+  "32ddc4fda2b8fe1a": "Describe the manual verification steps...",
+  "2f343e083f199969": "External reference for {criterionId}",
+  "6a4422ba1b43d561": "External evidence reference or ticket",
+  "d8cc6ea29cbae9f8": "External source for {criterionId}",
+  "edd8438375734cbd": "External system or CI source",
+  "6439d7b5393a32ca": "Argv-only planned checks",
+  "151172a2a766c4b7": "Add check",
+  "f69e49d00cdd3034": "Check ID cannot be empty.",
+  "2c4e6cabe4615e81": "Check command must be an argv-only invocation (no shell wrappers or operators like sh -c, cmd /c, &&, |, or $()).",
+  "e569f781d744df7c": "Acceptance criteria evidence mapping",
+  "ed59bc527c71f2ca": [
+    "Mapped ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "/",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "6a62fc7f8a1da16b": "No acceptance criteria defined in the spec yet.",
+  "ea0bc42e6af70bad": "Unmapped",
+  "0f236fec0492046c": "Could not preview CLI project.",
+  "f339ee381b0a98f2": "Could not import CLI project.",
+  "b27820fa4b8a1cd3": ".legion-cli",
+  "91b8a1beff4a7dbe": "Stop the active CLI run before importing into LegionCode.",
+  "8e459a49cca877f9": "Import CLI project",
+  "7843ed30a2a297dd": "Preview an existing .legion-cli directory, review historical receipts and adopted policies, and import explicitly into the project workflow board.",
+  "687773e1e528b185": "CLI directory (relative to workspace)",
+  "e67f02a4a2cee1a3": "Previewing…",
+  "74d30d60822d04a6": "Preview import",
+  "93757c47ab8e6715": "Enter a safe workspace-relative path (no traversal, .git, or credential files).",
+  "5957c075ecbc3906": "Preview failed",
+  "4f9d4c6c773a866e": "Import failed",
+  "be8595e2c762ebb9": "Active CLI run detected: takeover refused",
+  "7524f9f016331f97": [
+    " ",
+    "(pid ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "b9a81413dbff86a4": [
+    " ",
+    "· run ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "7cd38cdbbe9c9db7": "Stale CLI locks ignored",
+  "e5674185bfd401f5": [
+    " ",
+    "(dead pid ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "55c299251817faf2": "Import notes",
+  "bd3696cd846d198e": [
+    "Unsupported adopted CLI policies (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "3508d167aa20eb25": "Blocks Execute",
+  "d86ee2dd51487951": [
+    "Configured: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "79e39a82ba67cc62": "Acknowledge blocking unsupported policies during import so Execute can run in LegionCode",
+  "94d5303faa191007": "Already imported (re-syncs idempotently)",
+  "a3799f9730d6a44e": "Decisions",
+  "e38d50e7f83b3f05": "Assumptions",
+  "907b69c8a7f51573": "Acceptance criteria",
+  "157610c46916b2d8": [
+    "Preserved tasks (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "f086bac12c9ea015": "No CLI tasks found.",
+  "56fa7120bacb4121": [
+    "Historical receipts (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "55bf41657b2b79b7": "Requires native revalidation",
+  "29fcc734bf45f2b5": "Missing check logs noted",
+  "8024d6d8c02f619c": "Apply import",
+  "5b1991cdca348ed3": "Could not create workflow card.",
+  "31006457b62318ae": "Guided",
+  "47a22f11b45bef8e": "Balanced",
+  "718f44ac6a9a9bfc": "Direct",
+  "3ba8363bb9358dc5": "Start from idea",
+  "3adab074474e0d6a": "Import brief file",
+  "4d6e5de6af987bee": "Investigate codebase",
+  "9acb512a6c262b10": "Greenfield",
+  "49be8bcac849dde2": "Change",
+  "0470c4f0c4432670": "Audit",
+  "1e280f49cdbeb315": "Feature or spec title",
+  "27dcae60ba950bd2": "Source",
+  "4b80e195c0d37342": "Intake goal",
+  "d12beb9566021328": "Assistance mode",
+  "a2890130274e0ad8": "docs/brief.md",
+  "841124116b0a3155": "Describe the problem, goals, and constraints...",
+  "f7ce9b670326e767": "README.md",
+  "cc1a91676109e080": "New workflow card",
+  "a76ea0f487efbe4c": "Create a feature card starting in Spec from an idea, local brief, or codebase investigation.",
+  "3ac8ed47fe50bd34": "Title",
+  "c317fa79a76d4963": "Source",
+  "09c47b8c1d4e0ea6": "Intake goal",
+  "45e2290d1d82bd92": "Assistance mode",
+  "094a5f0aa8f9ae58": "Brief file path (relative to workspace)",
+  "c19ee24d057b8c56": "Initial spec or idea",
+  "d1e3ddc28b5bb424": "Input reference files (optional, one per line)",
+  "01975aaa5753c397": [
+    "Invalid workspace-relative path: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "b6aff8cc85743aaf": "Enable optional HTML wireframes (leave unchecked for non-UI features)",
+  "a9259586993dea80": "Creating…",
+  "060e03a7ac9e0698": "Create card",
+  "07861447f44abd0f": "Could not pause card.",
+  "58313e63507cfa66": "Card paused.",
+  "9ae598c5e91f3fe5": "Could not resume card.",
+  "ea79ce7d32956b1e": "Reconciled {count} pending item(s) and resumed card.",
+  "61792a9d9d80e033": "Card resumed.",
+  "1348db88d6cbd3fa": "Could not reset Execute stage.",
+  "869d6fd6f8676b91": "Execute stage reset for retry.",
+  "13ff0947a4bdda9e": "Could not start task {taskId}.",
+  "13264e9a1636c412": "Reconnected to task {taskId} thread.",
+  "06077698ed64f5df": "Started task {taskId}.",
+  "749a34d6eccce113": "Could not retry task {taskId}.",
+  "fb53fe1960c6bd41": "Task {taskId} reset to todo.",
+  "920120b4731064c6": "Could not run check {checkId}.",
+  "db2870000950de30": "Executed planned check {checkId}.",
+  "d173b568df7dd8b9": "Amend file contract after unexpected edits on {taskId}",
+  "8d4db3550971e9c1": "Enter a reason for the plan amendment.",
+  "b985a9c2b3b71177": "Git metadata paths (.git) cannot be added to a task's allowed files. Uncheck including unexpected files or adjust the task in Plan.",
+  "b65e2f166a8f0553": "Including those files would conflict with another task's file contract. Adjust files in Plan after proposing the amendment.",
+  "e95116de8fb40fb4": "Could not propose plan amendment.",
+  "1da450985f58f1bf": "Amendment proposed. Review and re-approve Plan before resuming execution.",
+  "1223c4825d141927": "Pause reason",
+  "23fc1b473975bcc3": "Optional pause reason...",
+  "33d40b2afd967984": "Amendment target stage",
+  "bdc0df4d6fe087a2": "Spec",
+  "67733c48eaaec73a": "Plan",
+  "690c93d1ebf80240": "Describe why the plan or file contract must change...",
+  "13ac16afd362776e": "Optional summary of scope changes...",
+  "dc1b13160ae2208e": "Task edits violated the approved file contract.",
+  "ad85508807c7b5e2": "Snapshot changed after this check ran. Re-run check to refresh receipt.",
+  "987d148ab4ff206e": "Execution lifecycle",
+  "600a7b99d303fc1f": [
+    "worktree ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "b80ed2c94c54c53d": "Reconciling…",
+  "44bed7a91f40c330": "Reconcile & resume",
+  "86b687d25db33421": "Resuming…",
+  "0ade85ea90ad751c": "Resume card",
+  "4566cc4be5b16e09": "Pausing…",
+  "90e5dbaabadf76dd": "Pause card",
+  "9eebc8bf0dea4f01": "Retry stage",
+  "da007503403e1774": "Propose plan amendment",
+  "b8ee31bb4f485919": "Reason",
+  "78ff862361e52146": "Summary (optional)",
+  "520906041aced5d1": [
+    "Include unexpected file(s) (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ") in ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    " allowed files"
+  ],
+  "ca18927b3e95d65c": "Submitting…",
+  "723e31b88a93b031": "Submit amendment",
+  "f9c790c16ceb3934": "Amendment history",
+  "1cf7f80d693e29ed": "Reconciliation required",
+  "6450d05feb45a50c": "Refresh state",
+  "a212d6bc6deb0f06": "Pause to reconcile",
+  "95141f907848b644": [
+    "External file edits under .legion/workflows/",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "/ or interrupted write-journal actions must be reconciled before starting new tasks, checks, reviews, or delivery."
+  ],
+  "b0f10332f52e4ca1": [
+    "Unsupported .legion-cli policies (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "5a58fbb6b2c3d62c": "I acknowledge these unsupported .legion-cli policies and want to run Execute in LegionCode",
+  "002cd140e0d8b402": [
+    "Unexpected edits preserved for review (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "da51822777231f07": "Files outside the approved task contract were preserved intact in the worktree for inspection rather than discarded. Propose a plan amendment or return to Plan to update file ownership.",
+  "5acca5c601e49e30": "Return to Plan",
+  "5b860292a027036f": "Allowed",
+  "3596739c417e1455": "Unexpected",
+  "1949b04b9bcdea2e": "Forbidden",
+  "81905eb0d318a479": "Task queue & DAG",
+  "635958befc2b1a25": [
+    "Active mutating task: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "842af46d2568c0de": "No tasks defined in the approved plan.",
+  "ea3ed00c48073b79": "DAG ready",
+  "9ca58cd4346b9930": "Blocked by dependencies",
+  "95be962a05d287ee": "Retry task",
+  "bba1e3a22505b87f": "Starting…",
+  "e40c1fcfde101795": "Resume task",
+  "6fed84a5e21aed17": "Start task",
+  "92b2f5e332fe2b9c": [
+    "Depends on: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "435b7da3a16c01e3": [
+    "Allowed files: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "ec02505643032f35": [
+    "Forbidden files: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "d146df4a0786105b": "Planned checks & receipts",
+  "bafcfc98a9119de4": "No planned argv checks configured.",
+  "35f16b5452140293": "Stale",
+  "24d40be77424ca6c": "Running…",
+  "92d0d9c65378a8b1": "Re-run check",
+  "a006200f48808ab3": "Run check",
+  "71bdec4ce6ad0173": "Check output",
+  "7f9f32d42c987a25": "Could not update exploration.",
+  "00f86bb6249229e7": "Exploration paused. Saved answers are preserved without approving the spec.",
+  "7b80734327349844": "Round complete. Continue to the next exploration round when ready.",
+  "c8036790a5b0d94b": "Exploration updated (round {round}).",
+  "68f2d54da425ec8e": "Enter an answer for decision {decisionId} before submitting.",
+  "275aa6855df79650": "Explain",
+  "e371d17b57b20cba": "Recommend",
+  "f2d7fbd78dde29d1": "Edit",
+  "654173a5a79cfedc": "Unsure",
+  "35f919517eae1fcd": "Answer for {decisionId}",
+  "78b8798cd4f7886c": "Enter your decision answer...",
+  "3d424196d9d438a4": "Guided exploration",
+  "83570a9ff6d6afa8": [
+    "Round ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "6e1cf7870eb5af9c": "Paused",
+  "830d2c65517ac82d": "All decisions resolved",
+  "0ccc58f516ea5cfc": "Start exploration",
+  "5fdfa2857eb659b8": "Resume exploration",
+  "6848686ec40ee487": "Pause",
+  "66d122746ccfe403": [
+    "Recommendation: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "b958a317a69fb7bd": "Continue next round",
+  "ff245f173776d5a4": "Submit round answers",
+  "6f92c000fd81e12a": "This exploration round is ready to advance.",
+  "8f1b3bd23e86e44f": [
+    "Resolved decisions (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "0deabb397a585f0c": "Project root",
+  "75f2761d1fbb7698": "Existing worktree",
+  "cd1ecf414350321f": "Select model",
+  "ffb03f7e9c3d11ad": "Interaction mode",
+  "e6add5f3d5feffa8": "Base ref",
+  "f1b79ec7eaf325fc": "HEAD",
+  "ac96ec22fe9485b9": "Worktree path",
+  "adc7abf973ff3eea": "/path/to/worktree",
+  "aa4732594c744f1b": "Known worktree",
+  "24fda42455f727f7": "Choose known worktree",
+  "40be2953e6845f72": "Optional branch name",
+  "07fe00eba221d93c": "Interaction mode",
+  "a6cd4c24e054da4a": "Base ref",
+  "43f12a1dab02ea9a": "Enter a base ref to continue.",
+  "5d7ffda1509234b9": "Worktree path",
+  "b16cffb0be79b32c": "Enter an existing worktree path to continue.",
+  "5cab12a31fc5ea09": "Branch (optional)",
+  "3f71f14fc9efbea7": "Drag {title} to another stage",
+  "5e214c4145c1a7fb": "Return {title} for revision",
+  "f3ad2605c5fbb17c": "Move {title} to Plan",
+  "fefa29920c99b5b3": "Move {title} to Execute",
+  "a844dc25fe05956e": "Move {title} to Ship",
+  "a622fcbcace25c1e": "Open {stage} stage ({count} cards)",
+  "31bb3fc4acca6bef": "To pick up a workflow card, press Space or Enter. Use the arrow keys to move to a target stage column, and press Space or Enter again to drop, or Escape to cancel.",
+  "62c549af8abc8217": "Picked up card {title}.",
+  "975ade0e42f308ca": "Card {title} is over the {stage} column.",
+  "0a4d1d9909596d8c": "Card {title} is not over an available transition column.",
+  "2f7cabada4de5771": "Dropped card {title} onto the {stage} column.",
+  "de799e3079ac2ab4": "Dropped card {title} without moving stages.",
+  "152698a38a96030e": "Cancelled moving card {title}.",
+  "8cdddfab7537363d": "Completed cards",
+  "837ecc7ee4863ede": "Return",
+  "999e98070ce01f91": "Approve plan",
+  "884b5e93ebd74849": "Approve delivery",
+  "80eb24f25c80b962": "No cards in this stage.",
+  "0aacb150f99bdd98": [
+    "Completed (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "1cf039ea5f16b992": "Shipped only",
+  "0033dc6784409837": "Workflow board breadcrumb",
+  "b84165d70370ef55": "Checkout",
+  "0ce15a50dda3f30e": "Workflow board stages",
+  "320d3be11655af87": "Could not load workflow board",
+  "8be06ace3b979b6e": "Filter Ship cards",
+  "8f73065209a0c3c2": "Select a card",
+  "9b2bfdb020f32d1a": "Pick a card from this stage or create a new card.",
+  "84bb528e852d215b": "Could not load card",
+  "eafda1b10a73aaf2": "Workflow board",
+  "0cc4d69ef1012185": "Open workflows",
+  "e6e7ef8b10498bf2": "New card",
+  "fc91e652b8eca74e": "Loading workflow board…",
+  "3481f6afc0db3da7": [
+    "Enable Workflows in",
+    " ",
+    {
+      "t": "Link",
+      "i": 1,
+      "c": "Settings → Labs"
+    },
+    " ",
+    "to use the project workflow board."
+  ],
+  "29f0824614831f53": "Overview",
+  "a65ad03dda72be9a": "All",
+  "2906d3cddb027693": "In Ship",
+  "2fcaba58023037ad": "Shipped",
+  "5fe4b237d99c3980": "Loading card…",
+  "4c985dd51328cc28": "Alternative {number} ID",
+  "3ad237e8eee6a767": "alt-1",
+  "3b0c03f22209abc7": "Alternative {number} title",
+  "b3eddade61de0eb8": "Alternative title",
+  "ac43df4572671d7b": "Alternative {number} summary",
+  "3a50c07157ec7481": "Design approach summary",
+  "502d0151e0b3298c": "Alternative {number} tradeoffs",
+  "28dfed1758e1d87a": "Key tradeoffs and risks",
+  "303c05f8d0f85244": "Explain why the chosen alternative best satisfies the spec...",
+  "360370ae3f37e072": "Alternative revision limit reached (1/1)",
+  "e1bb9ae67debecf5": "Request one revision to the two alternatives...",
+  "2a6ec46fb5693f3a": "Two-alternative comparison",
+  "6546a55c7516736a": [
+    "Revisions ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "/1"
+  ],
+  "f0950cde2bce0e79": [
+    "Alternative ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "0183f2ebd19ad745": "Select alternative",
+  "ff30149132c3cdd5": "Selection rationale",
+  "f3f554fe1de7210c": "Selection rationale is required when an alternative is selected.",
+  "5a329035ed2c1229": "Revise alternatives feedback (optional, max 1 use)",
+  "4420ade4b732370d": "Outcomes",
+  "d1a44ca878205ac2": "Risk-first",
+  "b4e7b125cebc5402": "Expand-contract",
+  "e958bbbd02e0a523": "Custom",
+  "394c44d5b657f7d3": "Coarse",
+  "c90447bea1f77e6e": "Balanced",
+  "79ab9784f8dbd47c": "Fine",
+  "1994e0d0d9b4707a": "Approve the spec first.",
+  "90aa1c178d307821": "Save the plan to compute plan.md and design.md digests.",
+  "681e570a55f090e3": "Decide all 6 design lenses with summaries or reasons.",
+  "b7a83d1acef2a4c9": "Provide 2 distinct alternatives, pick one, and record the selection rationale.",
+  "268b7dbd70faa3a4": "Complete required planning strategy fields.",
+  "071e5bb32eaee5c9": "Choose a task granularity.",
+  "286d919a69a33080": "Add at least one valid task with exclusive file ownership.",
+  "ff287e49025dd885": "Fix invalid argv check commands.",
+  "7a1e2eb19b79fce7": "Map 100% of acceptance criteria to automated, manual, or external evidence.",
+  "95877a9ae8a92a69": "Complete every decided design lens with a summary or reason.",
+  "9e67e67969f84006": "Provide two materially distinct alternatives with non-empty fields.",
+  "27f2d4e7ef4edeb9": "Selected alternative must match one of the two compared alternatives.",
+  "9ce07c9ef0745466": "Selection rationale is required when selecting an alternative.",
+  "454b38d9b7b1dbfd": "Complete the required strategy rationale or metadata fields.",
+  "53270673d7251418": "Fix task DAG cycles or overlapping allowed files before saving.",
+  "bdf031ac199ab7d3": "Every planned check requires a non-empty ID.",
+  "196f2e9a4c49729a": "Planned checks must be argv-only without shell operators.",
+  "c5e156e178db8c07": "Complete all acceptance criterion evidence mappings before saving.",
+  "2c701beeecf457f7": "Could not save plan.",
+  "11929851c7dad519": "Plan saved at revision {revision}. Spec approval preserved.",
+  "f8e4796a7a2f6c74": "Plan saved at revision {revision}.",
+  "b6377299e8ed9cb5": "Could not approve plan.",
+  "048ebd85d354227a": "Plan approved at revision {revision}.",
+  "27e7aaa4097655ea": "Could not start Plan stage.",
+  "f10a23aaeedfe556": "Resumed existing Plan thread.",
+  "3330a786ec6f948a": "Started Plan stage and prepared Plan brief.",
+  "7411066c7f4681b2": "Planning strategy",
+  "a0b16553f7ef5d46": "Task granularity",
+  "fa94a22606d86531": "Plan-only edit preserves Spec approval",
+  "3651e4f2e62c480e": "Editing plan fields updates the plan revision while keeping the approved spec intact.",
+  "a78d05c9aed2f8f3": "Newer server revision available",
+  "8aaa50b04ce13299": [
+    "Your local plan draft started at revision ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ", while the server is at revision ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    "."
+  ],
+  "cadae74f904ad839": "Reset to server",
+  "3c08c0bc5a2d5619": "Plan stage handoff",
+  "a35b98e6396d1979": "Start Plan to prepare the brief and connect a worktree-aware agent thread.",
+  "af624a327de300be": "Approve the spec before starting Plan.",
+  "f49881dfdd5d8109": "Starting Plan…",
+  "07679c36085e1b62": "Resume Plan",
+  "3625baa4d231de05": "Start Plan",
+  "8cdf99a52d31d9b7": "Prepared Plan brief",
+  "2e9c8c8f7cec674d": "Loading Plan brief…",
+  "8f2e3a30fec7f842": "Plan authoring",
+  "15c4550102b918e6": "Saving plan…",
+  "01b1a962ec786b25": "Save plan",
+  "21e54b8c2e27d7d2": "Plan approved",
+  "c793507c9e809c4d": "Planning strategy",
+  "b6e61688c1c89a68": "Task granularity",
+  "3dcbce2a019e9132": "Custom strategy rationale",
+  "f91d9907f3725e32": "Key uncertainty",
+  "202599da425f022c": "Probe task ID",
+  "4fe51f30c883d67c": "Compatibility window",
+  "eac06ef27b5a97e3": "Transition step",
+  "fd29f70fd57dfbbc": "Retirement prerequisite",
+  "9b9b0713266f65c5": "Remaining Plan approval gates",
+  "e5342a1c2be483f4": "UX",
+  "8aeb986bf3816208": "Functional",
+  "67a0dc21f65919e4": "Architecture",
+  "42adc347a410b574": "Quality",
+  "e821ed62f520237d": "Infrastructure",
+  "7e5497bff6cb4705": "Delivery",
+  "f79d292d68a2fcab": "{lens} applicable",
+  "c4de5cbc6c527c3f": "{lens} not applicable",
+  "56623f7d0aa162d1": "{lens} summary",
+  "785bc2a9c5087f14": "Describe the design decisions for this lens...",
+  "a27944bfcb5dac7c": "{lens} non-applicable reason",
+  "518d0f700cf424c5": "Why is this lens not applicable?",
+  "9daa342dcbf58ecc": "Six design lenses",
+  "e1073d7d9788e2a3": "Applicable",
+  "43af18c4a9e11a01": "Not applicable",
+  "ceea5a3fde0ef45a": "Undecided",
+  "ddc0a1346184eb6c": "Summary is required when applicable.",
+  "aaffe5b9dd08c7a0": "Reason is required when not applicable.",
+  "2d5299203ad2b9d1": "Could not start independent review.",
+  "d04cdfbe115fe3ed": "Independent review launched in a fresh thread.",
+  "7a9204e01ec5b09c": "Could not retry independent review.",
+  "7a858adee736181e": "Review reset for re-run.",
+  "1e3a170313b8f0b1": "A reason is required when dismissing or accepting risk for a finding.",
+  "f346c569dd5c7d14": "Could not resolve review finding.",
+  "74fe7638cce975dc": "Updated finding {id}.",
+  "bd676de1d33c7648": "The product snapshot or plan changed after this review ran. Start a fresh independent review.",
+  "d10d13fd5c0999fc": "Disposition for {id}",
+  "febc6acf6595b684": "Fix in code",
+  "8e54c259329177fa": "Accept risk",
+  "d8a40cb375b734b6": "Dismiss",
+  "e54cac810f096235": "Defer",
+  "dbb2b52bb21fe676": "Resolution reason for {id}",
+  "9596889f52f27eb7": "Explain disposition (required for Dismiss or Accept risk)...",
+  "a7dbdfe65901e1f2": "Independent review",
+  "1a7decbe6a776ba1": "Open review thread",
+  "7902ad7555ce5844": "Retry review",
+  "bcc6c921e479350c": "Launching review…",
+  "b952879faff74b1e": "Start independent review",
+  "a72124afacbee042": "Launches in a fresh thread with no prior execution turn bias against the current product snapshot.",
+  "1a4a33d9d32f4515": "Independent review is stale",
+  "ab0593f3e2c12bfd": "No independent review recorded yet.",
+  "db917e4765113671": [
+    "status ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "79bc5940505f197f": "No findings reported.",
+  "2c91b05fbe4e375e": [
+    "Resolution note: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "dbf0db05e401bedf": "Resolve finding",
+  "e8f7db9a9b875e7a": "A note is required when recording Fail or Not applicable.",
+  "668a1d19df1d2992": "Could not record acceptance observation.",
+  "75861b0570fdfdef": "Recorded observation for {criterionId}.",
+  "7439a4d97d5b4810": "Could not approve delivery.",
+  "523f68888952b288": "Delivery approved. Card marked shipped without auto-commit.",
+  "838c42e7fb3cfe9d": "Product snapshot changed after this observation. Record updated verification.",
+  "0d58fe0d4d8c044d": "Verdict for {id}",
+  "d3d91531eca989c7": "Pass",
+  "dd3f1177a88f7bfe": "Fail",
+  "f387afbb3bef16d5": "Not applicable",
+  "e970b8095d1a4afb": "Evidence reference for {id}",
+  "8bcc0e7dc1704d0d": "Optional evidence ref / URL...",
+  "85d30b60a03c9b67": "Observation note for {id}",
+  "2e41026c25a28476": "Observation note (required for Fail or Not applicable)...",
+  "e8f8fb7c3fa4fcde": "Delivery approval note",
+  "36976091a81dc80e": "Optional delivery note...",
+  "783fbed077962c92": "Delivery receipt",
+  "bf95ee4192c60321": "Receipt ID",
+  "aee1a43ee4f6531c": "Product snapshot",
+  "b9956c674527acb4": "Approved by",
+  "425d2f705ea86abb": "AC summary",
+  "b4366339c2dc8826": [
+    "commit ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "1e24aad893b73bf9": "Delivery readiness & blockers",
+  "98ea45c14a5b1342": "This card has been approved for delivery.",
+  "4266a022c32366ba": "All checks, independent review findings, and acceptance criteria are current.",
+  "598a7929e2626a66": "Go to fix",
+  "6aeaa5f636b823f7": "Acceptance criteria verification",
+  "f4f7ebda4c45b54e": "No acceptance criteria defined in the spec.",
+  "519bf3d628960948": [
+    "Procedure: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "1528799365f156ad": "Record observation",
+  "75c599bf02cb8af8": "Records an authenticated human delivery receipt against the tested snapshot without auto-committing changes.",
+  "8b9aa8c059409266": "Approving delivery…",
+  "69e06d7b4db7b86b": "Source control delivery actions",
+  "5e876a6a95cf413a": "Commit, Push, and Create PR are individually selected actions. Nothing is committed automatically.",
+  "a9c81a5e7a3d8387": "Idea",
+  "f2d7e21a61c598d7": "Brief file",
+  "fe04f4e2de8e7d3a": "Codebase",
+  "6ace4758d8573110": "Could not save spec.",
+  "d4d19566d7a5d535": "Spec saved at revision {revision}.",
+  "305658f3670692c3": "Could not start Spec thread.",
+  "ccffe43447dab032": "Resumed Spec authoring thread.",
+  "74d3c964de109bc4": "Started Spec authoring thread.",
+  "1d0859c2c3667f90": "AC-1: Board displays four stage columns",
+  "3ece920a978e52b3": "Spec authoring",
+  "9b619bc6acf8022c": "Starting Spec…",
+  "84ee5b4ace27c08d": "Resume Spec thread",
+  "c8a3ce1e5a20ceb8": "Start Spec thread",
+  "afd0e18962c972db": "Save spec",
+  "cfde6f4f6892793b": [
+    "Your local draft started at revision ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ", while the server is at revision ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    "."
+  ],
+  "cce76af6ec9caa4c": "Brownfield intake scan",
+  "38cc0f50ebcebd0a": [
+    "Supplied decisions (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "b9de0d1b51a9e47d": [
+    "Inferred codebase signals (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "e3bebfb66ba17a8d": [
+    "Missing decisions (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "0374dd07e98404e6": "Spec title",
+  "068726cb0ed7b768": "Spec brief (Markdown)",
+  "8f3bff8396d01f33": "Acceptance criteria (one per line)",
+  "34857dfae51273ef": "Constraints (one per line)",
+  "7ebc6f90a1ee031f": "Source references (one per line)",
+  "b02f18034c0ab02f": "Input file paths (one per line)",
+  "2d93ca0dceb9a756": [
+    "View latest spec diff (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "8645a8649565ce49": "Test-first",
+  "8185cfe6491c638a": "Regression-first",
+  "dfe3befe52404637": "Existing checks",
+  "1ccf0f59ebea3e3c": "Remove task {taskId}",
+  "f3bee1a5674c7333": "Task {number} ID",
+  "281b1de316c875e5": "TSK-01",
+  "e1ef9fc009c6487b": "Task {number} title",
+  "41b435c414e51be5": "Task summary",
+  "ecc58440ece4e979": "Task {number} blocked by",
+  "4d9f67b471f989ec": "Blocked by (comma-separated IDs)",
+  "7374483495979bc9": "Task {number} blocks",
+  "f13e1d116b717c62": "Blocks (comma-separated IDs)",
+  "0b5544bbdb87109a": "Task {number} testing method",
+  "265f12c7e41fbe76": "Task {number} allowed files",
+  "45e9533d9e50ee84": "Task {number} forbidden files",
+  "6c12d5f4c19d83cb": "Task {number} verification commands",
+  "fc8c0958da6750e6": "vp test run src/feature.test.ts",
+  "d5aa3dcaec18c5dd": "Task DAG and exclusive file ownership",
+  "9f5028cc4b8fa000": "Add task",
+  "b31a7b0e50f5d267": "Task contracts must form an acyclic DAG with unique IDs, valid dependency references, and non-overlapping allowed files.",
+  "ca20955f2b7409ce": "Add at least one task with exclusive file ownership before approving the plan.",
+  "a7c0a351a2570841": [
+    "Task ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "4007da85b7252df3": "Allowed files (one per line)",
+  "a2258e07549c6aa6": "Forbidden files (one per line)",
+  "64498de77cb87a19": "Task verification commands (argv tokens, one command per line)",
+  "c9195b0b17d7e7ab": [
+    "Invalid allowed file path: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "195300b7a99af317": "Verification commands must be argv-only without shell operators.",
+  "8f2d5c4509a34845": "Could not return card for revision.",
+  "62b2af69bf139c45": "Delivery is currently blocked by outstanding checks, findings, or acceptance criteria.",
+  "aebba4867b334cd9": "Target stage",
+  "e978ea34dab15de7": "Describe what needs to be revised...",
+  "7691f04fc06b6446": "Approve spec and move to Plan",
+  "3d64909ee5f06013": "Approve plan and move to Execute",
+  "86cc67c78d3ccdab": "Approve delivery and mark shipped",
+  "0e149e97c8f45467": "Return card for revision",
+  "83fa16d97aa3a569": [
+    "Approve the current spec revision for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " and advance the card to Plan."
+  ],
+  "dace8cf88d67afe6": [
+    "Approve the current plan revision for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " and advance the card to Execute."
+  ],
+  "db7b4ee467985cd6": [
+    "Approve delivery for ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " and create a durable delivery receipt without auto-committing changes."
+  ],
+  "edd1feb2ca2147a8": [
+    "Returning ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " to",
+    " ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    " preserves revision history and marks affected downstream approvals and evidence as stale."
+  ],
+  "93828efdde7a0adc": "Inspect Ship blockers",
+  "a5d24f45656197eb": "You do not have orchestration permission to perform this transition.",
+  "ecc3252761a80898": "Delivery note (optional)",
+  "4b967a3b6c78877e": "Target stage",
+  "230ae8d36a0628f9": "Reason for revision",
+  "fcf160e604bb89db": "Confirm spec approval",
+  "72781fdc5bdb6b1c": "Confirm plan approval",
+  "874ccd0a4122a71d": "Confirm delivery approval",
+  "c04554fba9bd4f5d": "Confirm return for revision",
+  "be6b1845eaf15794": "Could not update wireframe settings.",
+  "57a64bdcb31b781b": "Enabled optional HTML wireframes.",
+  "5f0fb48ef2b94565": "Cleared wireframes for non-UI feature.",
+  "a1f3e5adbdb2810d": "Wireframe preview for {title}",
+  "4e3c08a995d8be2b": "HTML wireframes",
+  "734b88e1cdd8566c": "Skipped (non-UI)",
+  "421a3139f99272a8": "Enable wireframes",
+  "420aec2a3febae7a": "Hide HTML source",
+  "29ed923f964e3363": "View HTML source",
+  "0e419b23921f5338": "Fullscreen preview",
+  "c17fbc5b22082cb6": "Skip wireframes (non-UI)",
+  "48dbbe6886d1a037": "Wireframes are optional and skipped for non-UI features. Enable them if this feature introduces interactive UI layouts.",
+  "c42dc43a82f73e59": "Loading wireframe preview…",
   "0bd950151ddc6407": "Leave without saving? Your changes to this file are lost.",
   "c0ba3f6756b09f30": "Unsaved changes",
   "6914e22d357f0ad6": "Saved and running",
@@ -12649,7 +13846,6 @@
   "5d8d278ff828102d": "All workflows",
   "290e0ab40b87dc17": "Workflows breadcrumb",
   "f3fad236d4b955f1": "Environment",
-  "34ad53646f06ed80": "Workflows are off",
   "8f6589c9e0ac5d4e": "No environment connected",
   "744127f8dfad7d22": "Connect an environment to see its workflow runs.",
   "036182ec7e2ee4d4": "Beside the run",

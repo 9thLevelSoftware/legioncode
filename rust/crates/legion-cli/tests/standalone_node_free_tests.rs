@@ -267,6 +267,8 @@ async fn verify_replay_turn_checkpoint_terminal_and_thread(
             output_schema: None,
             workspace_strategy: None,
         }),
+        title_renamed: None,
+        workflow_run: None,
     });
     let exit = rpc_call(
         &mut ws,

@@ -396,6 +396,115 @@
   "4c55ce3dea11be53": "Verknüpfe diese Umgebung mit Legion Connect, um eine öffentliche URL zu erhalten.",
   "b0f7054082ac0af6": "Nur dieser Computer kann diese Adresse aufrufen. Verknüpfe Legion Connect für eine öffentliche URL.",
   "9bf61e6a1df6575e": "Funktioniert überall, wo die Adresse dieser Umgebung erreichbar ist, zum Beispiel über Tailscale oder deinen eigenen Proxy. Verknüpfe Legion Connect für eine öffentliche URL.",
+  "8459c68d2060c35a": "Workflow-Board wird geladen…",
+  "90f601a1a0d6f678": "Serverfähigkeiten für das Workflow-Board werden geprüft.",
+  "9fecf458b89a5449": "Umgebung ist nicht verbunden",
+  "2f45c5a2f81ba606": "Verbinde diese Umgebung, um das Projekt-Workflow-Board zu öffnen.",
+  "4403db20f00cc614": "Workflow-Board wird nicht unterstützt",
+  "f5abac40497b2046": "Dieser Server meldet noch keine Unterstützung für das Projekt-Workflow-Board.",
+  "34ad53646f06ed80": "Workflows sind aus",
+  "c6b50b7b14713939": "Aktiviere Workflows unter Einstellungen → Labs, um das Projekt-Workflow-Board zu verwenden.",
+  "1d35b292a6c7687d": "Leseberechtigung erforderlich",
+  "fa33841ab2928908": "Diese Sitzung hat keinen Lesezugriff auf die Orchestrierung.",
+  "22028ce255e0ea52": "Projekt nicht gefunden",
+  "fe8b2f748a612525": "Wähle ein verbundenes Projekt, um sein Workflow-Board zu öffnen.",
+  "4745f5f657095541": "Spezifikation",
+  "086cf7b4ca56543b": "Plan",
+  "a065de4ac95ed77f": "Ausführen",
+  "d4d0ad32bbf2492d": "Ausliefern",
+  "94bbaba26abf2d27": "Aktiv",
+  "1fb31498e9479945": "Blockiert",
+  "8ef7caaaed0e9a2f": "Pausiert",
+  "691967567dac5630": "Abgeschlossen",
+  "bea12807777a509e": "Spezifikation freigegeben",
+  "c6bc84b3cad27e0b": "Freigabe veraltet",
+  "9f44b2ae72a195e0": "Ersetzt",
+  "3732e4686ecc2236": "Historisch",
+  "360ececbe1c5f453": "Spezifikationsentwurf",
+  "6f076ca649948075": "Plan freigegeben",
+  "45407210a349b739": "Planfreigabe veraltet",
+  "7d4a7b98dc3f2a76": "Ersetzt",
+  "5dfd2410affa78d1": "Historisch",
+  "71d442ae8ff8734d": "Planentwurf",
+  "88bed77cea96973c": "Blockiert",
+  "fba2fd42c6ca6dbc": "Blocker lösen",
+  "334f4e403f01659c": "Karte fortsetzen",
+  "6322554bddfe0eeb": "Abgeschlossene Karte ansehen",
+  "7c9ffc61b956d1bf": "Spezifikation entwerfen und freigeben",
+  "a15fd2fccdf91aa6": "Spezifikation freigeben",
+  "969da8329b257a62": "Geführte Erkundung fortsetzen",
+  "73699aca96bd6637": "Erkundung fortsetzen",
+  "4f6eac1da6c1edcf": "Spezifikations-Thread öffnen",
+  "9d880e1f3c5dcaf3": "Plan starten",
+  "841158a8adfcd661": "Plan-Thread öffnen",
+  "364feaa97d59af62": "Spezifikation überarbeiten",
+  "a519e85f438e3a98": "Plan überarbeiten",
+  "009dcc38518b970c": "Ausführung überarbeiten",
+  "c882aa0b9204e579": "Bereit zur Ausführung",
+  "652b3111f7ffe081": "Aktive Aufgabe abschließen",
+  "5799efec8b8b94b7": "Geplante Prüfungen oder nächste Aufgabe ausführen",
+  "301ca5ac1d045e63": "Ausführung fortsetzen",
+  "f823c2ed9f4a66a4": "Unabhängige Prüfung starten",
+  "4d1020a08eb4b908": "Prüfungs-Thread öffnen",
+  "2509cade788dbbdf": "Für Auslieferung prüfen",
+  "f5c238210f2f18fe": "Dateivertragsverletzung beheben",
+  "1483de3d575160ef": "Externe Änderungen abgleichen",
+  "b7e1b00a345e6ee3": "Fehlgeschlagene Prüfung wiederholen",
+  "f568e6d9e1b9e61b": "Unabhängige Prüfung wiederholen",
+  "9cbca87b0c55b7fb": "Fehlgeschlagene Aufgabe wiederholen",
+  "23054cd61a1dae40": "Fehlgeschlagenen Schritt wiederholen",
+  "0d135da201ad2bad": "Prüfungsbefunde klären",
+  "cdc91d38b6f98f71": "Prüfungsbefund beheben",
+  "d27c5efd33206ae2": "Git-Auslieferungsaktionen wählen",
+  "3be969173fbfa5a7": "Importierte Richtlinien bestätigen",
+  "8dd799e5a890f2c9": "Blockierte Aufgabe beheben",
+  "c6a0b71976577bb6": "Spezifikation erneut freigeben",
+  "8739c3a43e539635": "Ausführung verfolgen",
+  "e2be9e0de6d4308c": "Ausgeliefert",
+  "a999df9a9077e11c": "Bereit zur Auslieferung",
+  "0eadfd4a217b5520": "Auslieferung blockiert",
+  "3f68515fe02ebf5a": "Auslieferung ausstehend",
+  "d0269942595ffbcf": "Ausstehend",
+  "022a26912f57ae82": "Läuft",
+  "f0059cf63e90467c": "Bestanden",
+  "3de3e4c5c604f62b": "Fehlgeschlagen",
+  "d03b783c26744f27": "Veraltet",
+  "d00d8815730cd607": "Historisch",
+  "6603378371972f1b": "Bestanden",
+  "23157564c7b0c5c7": "Befunde",
+  "f4791321ea4bfd33": "Fehlgeschlagen",
+  "22cebdfc8330ee8b": "Veraltet",
+  "3b44208e87c94661": "Ausstehend",
+  "75d35698f0f23090": "Ausstehend",
+  "ddf48130ba9524e0": "Bestanden",
+  "854af4695d5e7b98": "Nicht bestanden",
+  "dfb8cedfa8477f86": "Nicht zutreffend",
+  "7a8ff7588b3f6777": "Veraltet",
+  "4a1e74e28a70a390": "Historisch",
+  "1a149b00bbfd6621": "Bestätigung erforderlich",
+  "685d43222e85476a": "Bestätigt",
+  "797d04eb1c35efd7": "Spezifikationsfreigabe",
+  "16fb60ceb54e33e8": "Planfreigabe",
+  "131a81d7730fa04a": "Ausführung",
+  "432c14edbadd23fc": "Überprüfung",
+  "2e8a21a099e6cc72": "Prüfung",
+  "627beac6eb84f7c8": "Diese Karte wurde auf dem Server geändert. Aktualisieren und erneut versuchen.",
+  "7dc8ee61b60fee26": "Diese Karte wurde auf dem Server geändert (Revision {revision}). Aktualisieren und erneut versuchen.",
+  "f572fe5898fba987": "Gib die Spezifikation frei, bevor du Plan startest.",
+  "4fc6d4a3de86ff63": "Vervollständigen und genehmigen Sie den Plan, bevor Sie fortfahren.",
+  "32940a3be17d6e3e": "Lösen Sie alle Erkundungsentscheidungen, bevor Sie die Spezifikation freigeben.",
+  "af45a3063dba3cb1": "Schließen oder lösen Sie alle Challenge-Bedenken ab, bevor Sie die Spezifikation freigeben.",
+  "453593f5279af5ee": "Externe Dateiänderungen wurden erkannt. Prüfen und aktualisieren Sie vor dem Fortfahren.",
+  "468d8875a1531d21": "Die Dateiverträge oder Abhängigkeiten der Aufgaben weisen einen Konflikt auf.",
+  "148b20a8a49bf5c9": "Artefakte auf der Festplatte stimmen nicht mit dem erwarteten Revisions-Digest überein.",
+  "f21458e08e3a9d89": "Diese Workflow-Karte wurde nicht gefunden.",
+  "c329dfd8aa6f885d": "Das Projekt wurde auf diesem Server nicht gefunden.",
+  "b08bdc990f859d2f": "Das angeforderte Artefakt wurde nicht gefunden.",
+  "233efd452c5adf65": "Der Artefaktschlüssel ist ungültig.",
+  "b30f11c7f5b30ac4": "Dieser Phasenübergang ist derzeit nicht erlaubt.",
+  "d02bd5dcde1faaf5": "Der Phasen-Thread konnte nicht gestartet werden.",
+  "79b1ca0f8ecdf356": "Die Workflow-Board-Anfrage ist fehlgeschlagen.",
+  "a48ccae4d10fb37a": "Dieser Server unterstützt diese Workflow-Board-Aktion nicht.",
   "3669395daf36fd33": "Auf diesem Server nicht mehr registriert",
   "fe513cf316e796e3": "Läuft als Teil anderer Workflows",
   "ccf00b97925efab3": "Wird von Hand gestartet",
@@ -1863,6 +1972,7 @@
   "90896a7348c4e7ce": "Einstellungen öffnen",
   "1d17dc60c59e0524": "Projekt loslösen",
   "5cfaaa20c460c328": "Projekt anheften",
+  "6be625c09e2198d7": "Workflow-Board öffnen",
   "24adf508b4c5d6b5": "Projekteinstellungen",
   "60e47b3da5901619": "Einstellungen · {section}",
   "0c659f9a193255dd": "Projekt konnte nicht hinzugefügt werden",
@@ -2258,6 +2368,7 @@
   "72c74536ea4cbbb4": "Fertig",
   "b0d6a54da63aa886": "Bearbeiten",
   "f780864e3218484a": "keine",
+  "00cec8f8a60014d5": "Keine der ausgewählten Dateien enthält uncommittete Änderungen. Wähle unten Dateien für diesen Commit aus.",
   "df6dad594cd78417": "Ausgeschlossen",
   "983426d3b3735ae3": "Commit-Nachricht (optional)",
   "bc8c52fd255ea8d0": "Auf neuem Branch committen",
@@ -2611,6 +2722,7 @@
   "e54720cac68f2adb": "Alle Projekte",
   "ac47f86df1c31a4a": "Branch konnte nicht kopiert werden",
   "4e6305459e784fea": "Thread-ID konnte nicht kopiert werden",
+  "15fc18a031baacaa": "Workflow-Board",
   "5a79b7c910831c76": "Der Thread-Titel darf nicht leer sein",
   "5c14b37b13312503": "Thread konnte nicht umbenannt werden",
   "fc97f746bdabe59f": "Thread konnte nicht erledigt werden",
@@ -2646,6 +2758,7 @@
   "1c8fc3c4a42949ab": "Projekte: {projects}",
   "165511761be2855c": "Projekte durchsuchen",
   "a46a6467883575a4": "Projekte durchsuchen...",
+  "c1e0964ec047106e": "Workflow-Board für {project}",
   "fdc0e086438a3045": "Projekteinstellungen für {project}",
   "4c1197b422538300": "Suchergebnisse für Threads",
   "792fd010fcd31023": "Thread-Nachrichten konnten nicht durchsucht werden",
@@ -12045,6 +12158,14 @@
   "18fc8976ddb6783d": ", fehlgeschlagen",
   "10ae251c9435642b": ", fertig",
   "ef436cc0f1cee213": ", arbeitet",
+  "3502e3eeeab4e868": [
+    "Workflow-Board für ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
   "2c3bb8ccf6c38078": "Hinweis zum Anbieter-Update schließen",
   "3cef7762c22f5fb1": "Ausblenden, bis sich der Anbieterstatus ändert",
   "0f90824868d6c3af": "Neuer Thread ({shortcut})",
@@ -12406,6 +12527,1078 @@
   "2cddd6095abc734a": "7 Tage",
   "53493056306708cf": "30 Tage",
   "c719359d18d37ad3": "90 Tage",
+  "77eed5dc15386226": "Berechtigung zur Orchestrierungssteuerung erforderlich.",
+  "709266ea8f8f9fbe": "Workflows sind unter Einstellungen -> Labs deaktiviert.",
+  "4a0f0b51d0b09e3f": "Wählen Sie einen gültigen Anbieter, ein Modell und eine Arbeitsbereichsstrategie.",
+  "c51bd65d9933c53a": "Die Karte muss sich in „Ausführen“ befinden, um Aufgaben zu starten.",
+  "947590fcd1d48c0c": "Setzen Sie die pausierte Karte fort, bevor Sie Aufgaben starten.",
+  "c452f673680552a0": "Abgeschlossene Karten können keine neuen Aufgaben starten.",
+  "49ac2f29e61bf2bb": "Planfreigabe ist erforderlich oder veraltet. Plan zuerst erneut freigeben.",
+  "3e5f240f07aad2af": "Bestätigen Sie nicht unterstützte CLI-Richtlinien, bevor Sie die Ausführung starten.",
+  "c6ed067f6c1935b5": "Gleichen Sie zuerst offene Journal-Einträge oder externe Änderungen ab.",
+  "cdc0dc3b70d02fdd": "Beheben Sie offene Dateivertragsverletzungen, bevor Sie eine weitere Aufgabe starten.",
+  "b727f7dcedbb99e0": "Es kann jeweils nur eine schreibende Aufgabe ausgeführt werden ({taskId} ist aktiv).",
+  "c3db6bc3e0594804": "Aufgabe ist bereits abgeschlossen.",
+  "bfd986ed3038a46f": "Wiederholen Sie diese blockierte Aufgabe, bevor Sie mit der Ausführung beginnen.",
+  "c992d0264ee206ad": "Wartet auf unvollständige Vorgängeraufgaben.",
+  "041babd36d9c000b": "Unabhängige Prüfung läuft in „Ausführen“ oder „Ausliefern“.",
+  "46dcca82ee3f9a6e": "Setzen Sie die pausierte Karte fort, bevor Sie die Prüfung starten.",
+  "ecfdd9c5a2eb05a7": "Abgeschlossene Karten können keine neue Prüfung starten.",
+  "090cbc7e1d69ad89": "Planfreigabe ist vor der unabhängigen Prüfung erforderlich oder veraltet.",
+  "36aa53d49af8f40a": "Beheben Sie offene Dateivertragsverletzungen vor der Prüfung.",
+  "a2a52ce20b456ecc": "Beenden Sie die aktive Aufgabe {taskId}, bevor Sie die unabhängige Prüfung starten.",
+  "3ddb95355dcebee2": "Zulässig",
+  "e40e0d50641ef262": "Unerwartet",
+  "6d227e931d448c01": "Verboten",
+  "1a22550031b8805a": "Nicht zugewiesen",
+  "9e893e0b7189cade": "Worktree-Diff",
+  "d3fa5df47d263836": [
+    "Basis ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "75e394a90d4e3c8a": [
+    "Snapshot ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "17f622999756f4a3": [
+    "Diff ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "97107cad02a2eaeb": "Diff aktualisieren",
+  "1e914c155089b234": "Die Diff-Ausgabe wurde gekürzt, da mehr als 250 Dateien geändert wurden.",
+  "d3b616e4946e8eaa": "Karten-Diff wird geladen…",
+  "561ab4c144816ffe": "Keine geänderten Produktdateien in diesem Worktree erkannt.",
+  "34371b40df46ce20": "Spezifikation konnte nicht freigegeben werden.",
+  "0264e7c2814c6b1b": "Spezifikation in Revision {revision} freigegeben.",
+  "8c986e50755d3c22": "Kartenarbeitsbereich",
+  "cf2c1fa24c9e6b72": "Kartenphasen-Tabs",
+  "60955638c07d65cb": "Verbundener Phasen-Thread",
+  "f9f71384a58888c5": [
+    "Importiert aus ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "f465ce3e3e456642": "Verwaltet von LegionCode",
+  "e05e66d858edc983": [
+    "Karte ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " · Rev. ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "f44fd36664981ac6": "Zur Überarbeitung zurückgeben",
+  "667e8e1240b3cb64": "Spezifikation",
+  "0faf657712a9d10a": "Plan",
+  "d56d671e2becfb4a": "Ausführen",
+  "c2191f40bcabaa52": "Ausliefern",
+  "8ecdf11e3f5ce172": [
+    "Verlauf (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "28a213b593db1c78": "Aktion fehlgeschlagen",
+  "bf0a2a2980d65f46": "Spezifikationsfreigabe veraltet",
+  "17795c4de5653257": "Die Spezifikation wurde nach der Freigabe geändert. Prüfe den aktualisierten Digest und gib sie erneut frei, bevor du Plan startest.",
+  "e2221be531b13c55": "Planfreigabe ist veraltet",
+  "79fc8ea510a6058d": "Die nachgelagerte Planfreigabe wurde durch eine Spezifikations- oder Revisionsänderung ungültig. Prüfen und geben Sie den Plan vor der Ausführung erneut frei.",
+  "fee3be43c6726418": "Externe Änderungen erkannt",
+  "733e099627d16adc": [
+    "CLI-Importherkunft (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "471a7919a72dd9fe": [
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " Entscheidungen · ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    " Annahmen · ",
+    {
+      "i": 3,
+      "k": "_gt_value_3",
+      "v": "v"
+    },
+    " ACs · ",
+    {
+      "i": 4,
+      "k": "_gt_value_4",
+      "v": "v"
+    },
+    " historische Belege"
+  ],
+  "4b7e6829f42ffe2e": "Quellverzeichnis",
+  "80dcee6cc023050f": "Quellspezifikations-ID",
+  "2cbee85b787ff893": "Zuständigkeit",
+  "17af677e66b5ffc2": "Historische CLI-Belege (native erneute Validierung erforderlich)",
+  "f913056e7e8d2dc1": "Historisch",
+  "c4ba40406c77fc87": "Übernommene CLI-Richtlinien",
+  "cf3f1c93e24e92de": "Fehlende CLI-Prüfprotokolle",
+  "e482c557b2a52289": "Die Spezifikation ist freigegeben. Sie können zur Plan-Phase wechseln.",
+  "8a33e7183cd44d1a": "Lösen Sie Erkundungsentscheidungen und schließen Sie die begrenzte Challenge ab, um die Spezifikation freizugeben.",
+  "30ff41e82482fa32": "Wird freigegeben…",
+  "b5cd560567347feb": "Spezifikation freigegeben",
+  "4f19d3b3fb35d010": "Spezifikation freigeben",
+  "9b939cda922855a0": "Revisionsprotokoll",
+  "95fdd684b1e8a1c5": "Noch keine Revisionen erfasst.",
+  "18125122c20c5a92": [
+    "Rev. ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "66043444263910c2": "Verbundener Spezifikations-Thread",
+  "1b6cc343adf389f5": "Verbundener Ausführungs-Thread",
+  "c21dc703736e0106": "Verbundener Prüfungs-Thread",
+  "3e524f39fabce11e": "Verbundener Plan-Thread",
+  "02cad9b729613548": "Ungelöst",
+  "fdbe65b636bb30ff": "Antworten",
+  "230512cebc263fe8": "Verwerfen",
+  "51abc5d935121cb3": "Akzeptieren",
+  "c05a58687f5a28dc": "Risiko akzeptieren",
+  "30a5e7226b9dbba7": "Zurückstellen",
+  "a12f23b46f37685b": "Geben Sie eine Antwort für Bedenken {concernId} ein.",
+  "cf92e5f933b0b963": "Geben Sie einen Ablehnungsgrund für Bedenken {concernId} ein.",
+  "c5976e49894827b0": "Challenge-Antworten konnten nicht gespeichert werden.",
+  "ae41cd4c80118f6d": "Challenge-Entscheidungen gespeichert.",
+  "1756e4a67ba773e9": "Der manuelle Fallback erfordert das Lösen aktiver Bedenken, 3 nicht-leere Antworten und die exakte Bestätigung.",
+  "c03d9bff982ec8be": "Manueller Challenge-Fallback konnte nicht gespeichert werden.",
+  "3f46e012244d813e": "Manueller 3-Fragen-Challenge-Fallback erfasst.",
+  "8a7a228fa65d9528": "Challenge-Schritt fehlgeschlagen.",
+  "dc031ac1ab3f29c9": "Challenge-Synthese abgeschlossen; menschliche Antworten wurden wortgetreu beibehalten.",
+  "7420b076b48c4bef": "Challenge als abgeschlossen markiert.",
+  "415dc07bc215e5db": "Challenge-Durchlauf gestartet.",
+  "388d79c7d8f529a5": "Entscheidung für {concernId}",
+  "2b6423bcbd69286a": "Antwort für {concernId}",
+  "b4c613b8f63820a5": "Antwort eingeben (wird bei der Synthese wortgetreu beibehalten)...",
+  "9ec5b98f08eb6e6d": "Ablehnungsgrund für {concernId}",
+  "f2c84f662714d51d": "Warum wird dieses Bedenken verworfen?",
+  "dcd764755f0348c4": "Begrenzte Challenge",
+  "92bb6f58e9ec02a0": [
+    "Bedenken ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "/3"
+  ],
+  "24ff2758dcd27f9d": "Challenge starten",
+  "2e48b2b105060b2f": [
+    "Synthetisieren (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "/1)"
+  ],
+  "fed04a3437b36b29": "Challenge abschließen",
+  "0705296529b25c30": "Manueller Fallback",
+  "5050fd724173d6b2": "Die Challenge ist veraltet, weil sich die Spezifikation oder Erkundungsantworten geändert haben. Führen Sie sie erneut aus oder schließen Sie sie ab, bevor Sie die Spezifikation freigeben.",
+  "81375a9f97997bfd": [
+    "Warum wichtig: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "f583d7f3c6c2ebfc": [
+    "Nachweis: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "06c2a55b23b225e6": "Challenge-Antworten speichern",
+  "b2b45902059502cc": "Manueller Fallback erfasst",
+  "bb7fa951b9594321": "Manueller 3-Fragen-Challenge-Fallback",
+  "203ee5b864f72a42": "Lösen oder verwerfen Sie alle aktiven Bedenken, bevor Sie den manuellen Fallback nutzen.",
+  "9ab699c2fcfba074": "1. Welcher Fehlerfall oder welche Rollback-Grenze könnte diese Spezifikation ungültig machen?",
+  "aa0d42f62ed4956a": "2. Welche Akzeptanzkriterien oder Dateiverträge sind am stärksten gefährdet?",
+  "f43aee7ab46c279c": "3. Wie bestätigt die Plan-Verifikation diese Annahmen?",
+  "fda3e7a0d01bd1a1": [
+    "Geben Sie ",
+    {
+      "t": "code",
+      "i": 1,
+      "c": "I acknowledge"
+    },
+    " ein, um den manuellen Challenge-Abschluss zu bestätigen"
+  ],
+  "aaffe004de86479c": "Manuellen Fallback absenden",
+  "c259295d3f067e59": "Automatisiert",
+  "69b26fe68936a290": "Manuell",
+  "5914a15ca04303be": "Extern",
+  "4639a9fb2678a86c": "Prüfung {number} ID",
+  "9dab7ff6c0dd4671": "Prüfung {number} argv-Befehl",
+  "3a22c96ebda92c57": "vp test run src/feature.test.ts",
+  "e266bf5d9c7db8c1": "Prüfung {checkId} entfernen",
+  "52c5b976dcea8c95": "Prüfung {number} Beschreibung",
+  "e21609c215334f11": "Was diese Prüfung verifiziert",
+  "d15557b39bcb0885": "Nachweismethode für {criterionId}",
+  "c678f4fe74ab1b29": "Prüfungs-IDs für {criterionId}",
+  "03542b84f024ecb0": "CHK-01",
+  "d2be106fc1b6e781": "Manuelles Prüfverfahren für {criterionId}",
+  "32ddc4fda2b8fe1a": "Beschreiben Sie die manuellen Prüfschritte...",
+  "2f343e083f199969": "Externe Referenz für {criterionId}",
+  "6a4422ba1b43d561": "Externe Nachweisreferenz oder Ticket",
+  "d8cc6ea29cbae9f8": "Externe Quelle für {criterionId}",
+  "edd8438375734cbd": "Externes System oder CI-Quelle",
+  "6439d7b5393a32ca": "Geplante Argv-Prüfungen",
+  "151172a2a766c4b7": "Prüfung hinzufügen",
+  "f69e49d00cdd3034": "Die Prüfungs-ID darf nicht leer sein.",
+  "2c4e6cabe4615e81": "Der Prüfbefehl muss ein reiner Argv-Aufruf sein (keine Shell-Wrapper oder Operatoren wie sh -c, cmd /c, &&, | oder $()).",
+  "e569f781d744df7c": "Nachweiszuordnung der Akzeptanzkriterien",
+  "ed59bc527c71f2ca": [
+    "Zugeordnet ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "/",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    }
+  ],
+  "6a62fc7f8a1da16b": "Noch keine Akzeptanzkriterien in der Spezifikation definiert.",
+  "ea0bc42e6af70bad": "Nicht zugeordnet",
+  "0f236fec0492046c": "Vorschau des CLI-Projekts fehlgeschlagen.",
+  "f339ee381b0a98f2": "CLI-Projekt konnte nicht importiert werden.",
+  "b27820fa4b8a1cd3": ".legion-cli",
+  "91b8a1beff4a7dbe": "Beenden Sie den aktiven CLI-Lauf, bevor Sie in LegionCode importieren.",
+  "8e459a49cca877f9": "CLI-Projekt importieren",
+  "7843ed30a2a297dd": "Zeigen Sie eine Vorschau eines vorhandenen .legion-cli-Verzeichnisses an, prüfen Sie historische Belege und übernommene Richtlinien und importieren Sie explizit in das Projekt-Workflow-Board.",
+  "687773e1e528b185": "CLI-Verzeichnis (relativ zum Arbeitsbereich)",
+  "e67f02a4a2cee1a3": "Vorschau wird geladen…",
+  "74d30d60822d04a6": "Import-Vorschau",
+  "93757c47ab8e6715": "Geben Sie einen sicheren relativen Pfad ein (kein Traversal, .git oder Zugangsdaten).",
+  "5957c075ecbc3906": "Vorschau fehlgeschlagen",
+  "4f9d4c6c773a866e": "Import fehlgeschlagen",
+  "be8595e2c762ebb9": "Aktiver CLI-Lauf erkannt: Übernahme abgelehnt",
+  "7524f9f016331f97": [
+    " ",
+    "(PID ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "b9a81413dbff86a4": [
+    " ",
+    "· Lauf ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "7cd38cdbbe9c9db7": "Veraltete CLI-Sperren ignoriert",
+  "e5674185bfd401f5": [
+    " ",
+    "(tote PID ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "55c299251817faf2": "Importhinweise",
+  "bd3696cd846d198e": [
+    "Nicht unterstützte übernommene CLI-Richtlinien (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "3508d167aa20eb25": "Blockiert Ausführung",
+  "d86ee2dd51487951": [
+    "Konfiguriert: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "79e39a82ba67cc62": "Blockierende nicht unterstützte Richtlinien beim Import bestätigen, damit Execute in LegionCode laufen kann",
+  "94d5303faa191007": "Bereits importiert (wird idempotent neu synchronisiert)",
+  "a3799f9730d6a44e": "Entscheidungen",
+  "e38d50e7f83b3f05": "Annahmen",
+  "907b69c8a7f51573": "Akzeptanzkriterien",
+  "157610c46916b2d8": [
+    "Übernommene Aufgaben (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "f086bac12c9ea015": "Keine CLI-Aufgaben gefunden.",
+  "56fa7120bacb4121": [
+    "Historische Belege (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "55bf41657b2b79b7": "Native erneute Validierung erforderlich",
+  "29fcc734bf45f2b5": "Fehlende Prüfprotokolle vermerkt",
+  "8024d6d8c02f619c": "Import anwenden",
+  "5b1991cdca348ed3": "Workflow-Karte konnte nicht erstellt werden.",
+  "31006457b62318ae": "Geführt",
+  "47a22f11b45bef8e": "Ausgewogen",
+  "718f44ac6a9a9bfc": "Direkt",
+  "3ba8363bb9358dc5": "Mit Idee starten",
+  "3adab074474e0d6a": "Brief-Datei importieren",
+  "4d6e5de6af987bee": "Codebasis untersuchen",
+  "9acb512a6c262b10": "Neuentwicklung",
+  "49be8bcac849dde2": "Änderung",
+  "0470c4f0c4432670": "Audit",
+  "1e280f49cdbeb315": "Feature- oder Spezifikationstitel",
+  "27dcae60ba950bd2": "Quelle",
+  "4b80e195c0d37342": "Aufnahmeziel",
+  "d12beb9566021328": "Unterstützungsmodus",
+  "a2890130274e0ad8": "docs/brief.md",
+  "841124116b0a3155": "Beschreibe das Problem, die Ziele und Einschränkungen...",
+  "f7ce9b670326e767": "README.md",
+  "cc1a91676109e080": "Neue Workflow-Karte",
+  "a76ea0f487efbe4c": "Erstellen Sie eine Feature-Karte in Spezifikation aus einer Idee, einem lokalen Brief oder einer Codebasis-Untersuchung.",
+  "3ac8ed47fe50bd34": "Titel",
+  "c317fa79a76d4963": "Quelle",
+  "09c47b8c1d4e0ea6": "Aufnahmeziel",
+  "45e2290d1d82bd92": "Unterstützungsmodus",
+  "094a5f0aa8f9ae58": "Brief-Dateipfad (relativ zum Workspace)",
+  "c19ee24d057b8c56": "Erste Spezifikation oder Idee",
+  "d1e3ddc28b5bb424": "Eingabe-Referenzdateien (optional, eine pro Zeile)",
+  "01975aaa5753c397": [
+    "Ungültiger relativer Pfad: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "b6aff8cc85743aaf": "Optionale HTML-Wireframes aktivieren (für Nicht-UI-Features deaktiviert lassen)",
+  "a9259586993dea80": "Wird erstellt…",
+  "060e03a7ac9e0698": "Karte erstellen",
+  "07861447f44abd0f": "Karte konnte nicht pausiert werden.",
+  "58313e63507cfa66": "Karte pausiert.",
+  "9ae598c5e91f3fe5": "Karte konnte nicht fortgesetzt werden.",
+  "ea79ce7d32956b1e": "{count} ausstehende(s) Element(e) abgeglichen und Karte fortgesetzt.",
+  "61792a9d9d80e033": "Karte fortgesetzt.",
+  "1348db88d6cbd3fa": "Ausführungsphase konnte nicht zurückgesetzt werden.",
+  "869d6fd6f8676b91": "Ausführungsphase für Wiederholung zurückgesetzt.",
+  "13ff0947a4bdda9e": "Aufgabe {taskId} konnte nicht gestartet werden.",
+  "13264e9a1636c412": "Erneut mit Thread von Aufgabe {taskId} verbunden.",
+  "06077698ed64f5df": "Aufgabe {taskId} gestartet.",
+  "749a34d6eccce113": "Aufgabe {taskId} konnte nicht wiederholt werden.",
+  "fb53fe1960c6bd41": "Aufgabe {taskId} auf „Zu erledigen“ zurückgesetzt.",
+  "920120b4731064c6": "Prüfung {checkId} konnte nicht ausgeführt werden.",
+  "db2870000950de30": "Geplante Prüfung {checkId} ausgeführt.",
+  "d173b568df7dd8b9": "Dateivertrag nach unerwarteten Änderungen in {taskId} anpassen",
+  "8d4db3550971e9c1": "Geben Sie einen Grund für die Planänderung an.",
+  "b985a9c2b3b71177": "Git-Metadatenpfade (.git) können nicht zu den zulässigen Dateien einer Aufgabe hinzugefügt werden. Deaktivieren Sie das Einbeziehen unerwarteter Dateien oder passen Sie die Aufgabe im Plan an.",
+  "b65e2f166a8f0553": "Das Einbeziehen dieser Dateien würde mit dem Dateivertrag einer anderen Aufgabe kollidieren. Passen Sie die Dateien nach dem Änderungsantrag im Plan an.",
+  "e95116de8fb40fb4": "Planänderung konnte nicht vorgeschlagen werden.",
+  "1da450985f58f1bf": "Änderung vorgeschlagen. Plan prüfen und erneut freigeben, bevor die Ausführung fortgesetzt wird.",
+  "1223c4825d141927": "Pausierungsgrund",
+  "23fc1b473975bcc3": "Optionaler Pausierungsgrund...",
+  "33d40b2afd967984": "Zielphase der Änderung",
+  "bdc0df4d6fe087a2": "Spezifikation",
+  "67733c48eaaec73a": "Plan",
+  "690c93d1ebf80240": "Beschreiben Sie, warum der Plan oder Dateivertrag geändert werden muss...",
+  "13ac16afd362776e": "Optionale Zusammenfassung der Umfangsänderungen...",
+  "dc1b13160ae2208e": "Aufgabenänderungen haben gegen den genehmigten Dateivertrag verstoßen.",
+  "ad85508807c7b5e2": "Der Snapshot hat sich nach dieser Prüfung geändert. Führen Sie die Prüfung erneut aus, um den Beleg zu aktualisieren.",
+  "987d148ab4ff206e": "Ausführungslebenszyklus",
+  "600a7b99d303fc1f": [
+    "Worktree ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "b80ed2c94c54c53d": "Wird abgeglichen…",
+  "44bed7a91f40c330": "Abgleichen & fortsetzen",
+  "86b687d25db33421": "Wird fortgesetzt…",
+  "0ade85ea90ad751c": "Karte fortsetzen",
+  "4566cc4be5b16e09": "Wird pausiert…",
+  "90e5dbaabadf76dd": "Karte pausieren",
+  "9eebc8bf0dea4f01": "Phase wiederholen",
+  "da007503403e1774": "Planänderung vorschlagen",
+  "b8ee31bb4f485919": "Grund",
+  "78ff862361e52146": "Zusammenfassung (optional)",
+  "520906041aced5d1": [
+    "Unerwartete Datei(en) (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ") in zulässige Dateien von ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    " aufnehmen"
+  ],
+  "ca18927b3e95d65c": "Wird gesendet…",
+  "723e31b88a93b031": "Änderung einreichen",
+  "f9c790c16ceb3934": "Änderungsverlauf",
+  "1cf7f80d693e29ed": "Abgleich erforderlich",
+  "6450d05feb45a50c": "Status aktualisieren",
+  "a212d6bc6deb0f06": "Für Abgleich pausieren",
+  "95141f907848b644": [
+    "Externe Dateibearbeitungen unter .legion/workflows/",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "/ oder unterbrochene Schreibjournal-Aktionen müssen abgeglichen werden, bevor neue Aufgaben, Prüfungen, Reviews oder Auslieferungen gestartet werden."
+  ],
+  "b0f10332f52e4ca1": [
+    "Nicht unterstützte .legion-cli-Richtlinien (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "5a58fbb6b2c3d62c": "Ich bestätige diese nicht unterstützten .legion-cli-Richtlinien und möchte die Ausführung in LegionCode starten",
+  "002cd140e0d8b402": [
+    "Unerwartete Änderungen zur Prüfung aufbewahrt (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "da51822777231f07": "Dateien außerhalb des genehmigten Aufgabenvertrags wurden zur Prüfung unverändert im Worktree belassen. Schlagen Sie eine Planänderung vor oder kehren Sie zum Plan zurück, um die Dateizuständigkeit anzupassen.",
+  "5acca5c601e49e30": "Zurück zum Plan",
+  "5b860292a027036f": "Zulässig",
+  "3596739c417e1455": "Unerwartet",
+  "1949b04b9bcdea2e": "Verboten",
+  "81905eb0d318a479": "Aufgabenwarteschlange & DAG",
+  "635958befc2b1a25": [
+    "Aktive schreibende Aufgabe: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "842af46d2568c0de": "Keine Aufgaben im freigegebenen Plan definiert.",
+  "ea3ed00c48073b79": "DAG bereit",
+  "9ca58cd4346b9930": "Durch Abhängigkeiten blockiert",
+  "95be962a05d287ee": "Aufgabe wiederholen",
+  "bba1e3a22505b87f": "Wird gestartet…",
+  "e40c1fcfde101795": "Aufgabe fortsetzen",
+  "6fed84a5e21aed17": "Aufgabe starten",
+  "92b2f5e332fe2b9c": [
+    "Abhängig von: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "435b7da3a16c01e3": [
+    "Zulässige Dateien: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "ec02505643032f35": [
+    "Verbotene Dateien: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "d146df4a0786105b": "Geplante Prüfungen & Belege",
+  "bafcfc98a9119de4": "Keine geplanten argv-Prüfungen konfiguriert.",
+  "35f16b5452140293": "Veraltet",
+  "24d40be77424ca6c": "Wird ausgeführt…",
+  "92d0d9c65378a8b1": "Prüfung erneut ausführen",
+  "a006200f48808ab3": "Prüfung ausführen",
+  "71bdec4ce6ad0173": "Prüfungsausgabe",
+  "7f9f32d42c987a25": "Erkundung konnte nicht aktualisiert werden.",
+  "00f86bb6249229e7": "Erkundung pausiert. Gespeicherte Antworten bleiben ohne Spezifikationsfreigabe erhalten.",
+  "7b80734327349844": "Runde abgeschlossen. Fahren Sie mit der nächsten Erkundungsrunde fort, wenn Sie bereit sind.",
+  "c8036790a5b0d94b": "Erkundung aktualisiert (Runde {round}).",
+  "68f2d54da425ec8e": "Geben Sie vor dem Absenden eine Antwort für Entscheidung {decisionId} ein.",
+  "275aa6855df79650": "Erklären",
+  "e371d17b57b20cba": "Empfehlen",
+  "f2d7fbd78dde29d1": "Bearbeiten",
+  "654173a5a79cfedc": "Unsicher",
+  "35f919517eae1fcd": "Antwort für {decisionId}",
+  "78b8798cd4f7886c": "Entscheidungsantwort eingeben...",
+  "3d424196d9d438a4": "Geführte Erkundung",
+  "83570a9ff6d6afa8": [
+    "Runde ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "6e1cf7870eb5af9c": "Pausiert",
+  "830d2c65517ac82d": "Alle Entscheidungen gelöst",
+  "0ccc58f516ea5cfc": "Erkundung starten",
+  "5fdfa2857eb659b8": "Erkundung fortsetzen",
+  "6848686ec40ee487": "Pause",
+  "66d122746ccfe403": [
+    "Empfehlung: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "b958a317a69fb7bd": "Nächste Runde fortsetzen",
+  "ff245f173776d5a4": "Rundenantworten absenden",
+  "6f92c000fd81e12a": "Diese Erkundungsrunde kann fortgesetzt werden.",
+  "8f1b3bd23e86e44f": [
+    "Gelöste Entscheidungen (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "0deabb397a585f0c": "Projektstamm",
+  "75f2761d1fbb7698": "Bestehender Worktree",
+  "cd1ecf414350321f": "Modell auswählen",
+  "ffb03f7e9c3d11ad": "Interaktionsmodus",
+  "e6add5f3d5feffa8": "Basis-Ref",
+  "f1b79ec7eaf325fc": "HEAD",
+  "ac96ec22fe9485b9": "Worktree-Pfad",
+  "adc7abf973ff3eea": "/pfad/zum/worktree",
+  "aa4732594c744f1b": "Bekannter Worktree",
+  "24fda42455f727f7": "Bekannten Worktree wählen",
+  "40be2953e6845f72": "Optionaler Branchname",
+  "07fe00eba221d93c": "Interaktionsmodus",
+  "a6cd4c24e054da4a": "Basis-Ref",
+  "43f12a1dab02ea9a": "Geben Sie eine Basis-Ref ein, um fortzufahren.",
+  "5d7ffda1509234b9": "Worktree-Pfad",
+  "b16cffb0be79b32c": "Geben Sie einen bestehenden Worktree-Pfad ein, um fortzufahren.",
+  "5cab12a31fc5ea09": "Branch (optional)",
+  "3f71f14fc9efbea7": "{title} in eine andere Phase ziehen",
+  "5e214c4145c1a7fb": "{title} zur Überarbeitung zurückgeben",
+  "f3ad2605c5fbb17c": "{title} nach Plan verschieben",
+  "fefa29920c99b5b3": "{title} nach Ausführen verschieben",
+  "a844dc25fe05956e": "{title} nach Ausliefern verschieben",
+  "a622fcbcace25c1e": "Phase {stage} öffnen ({count} Karten)",
+  "31bb3fc4acca6bef": "Um eine Workflow-Karte aufzunehmen, drücke Leertaste oder Eingabe. Nutze die Pfeiltasten, um zu einer Zielspalte zu wechseln, und drücke erneut Leertaste oder Eingabe zum Ablegen oder Escape zum Abbrechen.",
+  "62c549af8abc8217": "Karte {title} aufgenommen.",
+  "975ade0e42f308ca": "Karte {title} befindet sich über der Spalte {stage}.",
+  "0a4d1d9909596d8c": "Karte {title} befindet sich über keiner verfügbaren Übergangsspalte.",
+  "2f7cabada4de5771": "Karte {title} in die Spalte {stage} abgelegt.",
+  "de799e3079ac2ab4": "Karte {title} ohne Phasenwechsel abgelegt.",
+  "152698a38a96030e": "Verschieben der Karte {title} abgebrochen.",
+  "8cdddfab7537363d": "Abgeschlossene Karten",
+  "837ecc7ee4863ede": "Zurückgeben",
+  "999e98070ce01f91": "Plan freigeben",
+  "884b5e93ebd74849": "Auslieferung freigeben",
+  "80eb24f25c80b962": "Keine Karten in dieser Phase.",
+  "0aacb150f99bdd98": [
+    "Abgeschlossen (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "1cf039ea5f16b992": "Nur ausgelieferte",
+  "0033dc6784409837": "Workflow-Board-Brotkrumen",
+  "b84165d70370ef55": "Checkout",
+  "0ce15a50dda3f30e": "Workflow-Board-Phasen",
+  "320d3be11655af87": "Workflow-Board konnte nicht geladen werden",
+  "8be06ace3b979b6e": "Auslieferungskarten filtern",
+  "8f73065209a0c3c2": "Karte auswählen",
+  "9b2bfdb020f32d1a": "Wähle eine Karte aus dieser Phase oder erstelle eine neue Karte.",
+  "84bb528e852d215b": "Karte konnte nicht geladen werden",
+  "eafda1b10a73aaf2": "Workflow-Board",
+  "0cc4d69ef1012185": "Workflows öffnen",
+  "e6e7ef8b10498bf2": "Neue Karte",
+  "fc91e652b8eca74e": "Workflow-Board wird geladen…",
+  "3481f6afc0db3da7": [
+    "Aktiviere Workflows in",
+    " ",
+    {
+      "t": "Link",
+      "i": 1,
+      "c": "Einstellungen → Labs"
+    },
+    ", ",
+    "um das Projekt-Workflow-Board zu nutzen."
+  ],
+  "29f0824614831f53": "Übersicht",
+  "a65ad03dda72be9a": "Alle",
+  "2906d3cddb027693": "In Auslieferung",
+  "2fcaba58023037ad": "Ausgeliefert",
+  "5fe4b237d99c3980": "Karte wird geladen…",
+  "4c985dd51328cc28": "Alternative {number} ID",
+  "3ad237e8eee6a767": "alt-1",
+  "3b0c03f22209abc7": "Alternative {number} Titel",
+  "b3eddade61de0eb8": "Alternativtitel",
+  "ac43df4572671d7b": "Alternative {number} Zusammenfassung",
+  "3a50c07157ec7481": "Zusammenfassung des Entwurfsansatzes",
+  "502d0151e0b3298c": "Alternative {number} Abwägungen",
+  "28dfed1758e1d87a": "Wesentliche Abwägungen und Risiken",
+  "303c05f8d0f85244": "Erklären Sie, warum die gewählte Alternative die Spezifikation am besten erfüllt...",
+  "360370ae3f37e072": "Limit für Alternativen-Überarbeitung erreicht (1/1)",
+  "e1bb9ae67debecf5": "Eine Überarbeitung der beiden Alternativen anfordern...",
+  "2a6ec46fb5693f3a": "Zwei-Alternativen-Vergleich",
+  "6546a55c7516736a": [
+    "Überarbeitungen ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    "/1"
+  ],
+  "f0950cde2bce0e79": [
+    "Alternative ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "0183f2ebd19ad745": "Alternative auswählen",
+  "ff30149132c3cdd5": "Auswahlbegründung",
+  "f3f554fe1de7210c": "Bei Auswahl einer Alternative ist eine Auswahlbegründung erforderlich.",
+  "5a329035ed2c1229": "Feedback zur Überarbeitung der Alternativen (optional, max. 1x)",
+  "4420ade4b732370d": "Ergebnisorientiert",
+  "d1a44ca878205ac2": "Risiko zuerst",
+  "b4e7b125cebc5402": "Erweitern-und-Verengen",
+  "e958bbbd02e0a523": "Benutzerdefiniert",
+  "394c44d5b657f7d3": "Grob",
+  "c90447bea1f77e6e": "Ausgewogen",
+  "79ab9784f8dbd47c": "Fein",
+  "1994e0d0d9b4707a": "Geben Sie zuerst die Spezifikation frei.",
+  "90aa1c178d307821": "Speichern Sie den Plan, um die Digests für plan.md und design.md zu berechnen.",
+  "681e570a55f090e3": "Entscheiden Sie alle 6 Design-Linsen mit Zusammenfassungen oder Begründungen.",
+  "b7a83d1acef2a4c9": "Geben Sie 2 unterschiedliche Alternativen an, wählen Sie eine aus und begründen Sie die Wahl.",
+  "268b7dbd70faa3a4": "Vervollständigen Sie die erforderlichen Felder der Planungsstrategie.",
+  "071e5bb32eaee5c9": "Wählen Sie eine Aufgabengranularität.",
+  "286d919a69a33080": "Fügen Sie mindestens eine gültige Aufgabe mit exklusivem Dateibesitz hinzu.",
+  "ff287e49025dd885": "Korrigieren Sie ungültige Argv-Prüfbefehle.",
+  "7a1e2eb19b79fce7": "Ordnen Sie 100 % der Akzeptanzkriterien automatisierten, manuellen oder externen Nachweisen zu.",
+  "95877a9ae8a92a69": "Vervollständigen Sie jede entschiedene Design-Linse mit einer Zusammenfassung oder Begründung.",
+  "9e67e67969f84006": "Geben Sie zwei wesentlich unterschiedliche Alternativen mit ausgefüllten Feldern an.",
+  "27f2d4e7ef4edeb9": "Die ausgewählte Alternative muss einer der beiden verglichenen Alternativen entsprechen.",
+  "9ce07c9ef0745466": "Bei der Auswahl einer Alternative ist eine Begründung erforderlich.",
+  "454b38d9b7b1dbfd": "Vervollständigen Sie die erforderlichen Strategie-Begründungs- oder Metadatenfelder.",
+  "53270673d7251418": "Beheben Sie vor dem Speichern Zyklen im Aufgaben-DAG oder überschneidende erlaubte Dateien.",
+  "bdf031ac199ab7d3": "Jede geplante Prüfung erfordert eine nicht leere ID.",
+  "196f2e9a4c49729a": "Geplante Prüfungen müssen reine Argv-Befehle ohne Shell-Operatoren sein.",
+  "c5e156e178db8c07": "Vervollständigen Sie vor dem Speichern alle Nachweiszuordnungen für Akzeptanzkriterien.",
+  "2c701beeecf457f7": "Plan konnte nicht gespeichert werden.",
+  "11929851c7dad519": "Plan bei Revision {revision} gespeichert. Spezifikationsfreigabe blieb erhalten.",
+  "f8e4796a7a2f6c74": "Plan bei Revision {revision} gespeichert.",
+  "b6377299e8ed9cb5": "Plan konnte nicht freigegeben werden.",
+  "048ebd85d354227a": "Plan bei Revision {revision} freigegeben.",
+  "27e7aaa4097655ea": "Plan-Phase konnte nicht gestartet werden.",
+  "f10a23aaeedfe556": "Bestehenden Plan-Thread fortgesetzt.",
+  "3330a786ec6f948a": "Plan-Phase gestartet und Plan-Briefing vorbereitet.",
+  "7411066c7f4681b2": "Planungsstrategie",
+  "a0b16553f7ef5d46": "Aufgabengranularität",
+  "fa94a22606d86531": "Reine Plan-Bearbeitung erhält Spezifikationsfreigabe",
+  "3651e4f2e62c480e": "Das Bearbeiten von Planfeldern aktualisiert die Planrevision und lässt die freigegebene Spezifikation unverändert.",
+  "a78d05c9aed2f8f3": "Neuere Server-Revision verfügbar",
+  "8aaa50b04ce13299": [
+    "Ihr lokaler Planentwurf begann bei Revision ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ", der Server steht bei Revision ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    "."
+  ],
+  "cadae74f904ad839": "Auf Server zurücksetzen",
+  "3c08c0bc5a2d5619": "Übergabe an Plan-Phase",
+  "a35b98e6396d1979": "Starte Plan, um das Briefing vorzubereiten und einen Worktree-bewussten Agenten-Thread zu verbinden.",
+  "af624a327de300be": "Geben Sie die Spezifikation frei, bevor Sie Plan starten.",
+  "f49881dfdd5d8109": "Plan wird gestartet…",
+  "07679c36085e1b62": "Plan fortsetzen",
+  "3625baa4d231de05": "Plan starten",
+  "8cdf99a52d31d9b7": "Vorbereitetes Plan-Briefing",
+  "2e9c8c8f7cec674d": "Plan-Briefing wird geladen…",
+  "8f2e3a30fec7f842": "Planerstellung",
+  "15c4550102b918e6": "Plan wird gespeichert…",
+  "01b1a962ec786b25": "Plan speichern",
+  "21e54b8c2e27d7d2": "Plan freigegeben",
+  "c793507c9e809c4d": "Planungsstrategie",
+  "b6e61688c1c89a68": "Aufgabengranularität",
+  "3dcbce2a019e9132": "Begründung der benutzerdefinierten Strategie",
+  "f91d9907f3725e32": "Hauptunsicherheit",
+  "202599da425f022c": "Probe-Aufgaben-ID",
+  "4fe51f30c883d67c": "Kompatibilitätsfenster",
+  "eac06ef27b5a97e3": "Übergangsschritt",
+  "fd29f70fd57dfbbc": "Voraussetzung für Ablösung",
+  "9b9b0713266f65c5": "Verbleibende Planfreigabe-Gates",
+  "e5342a1c2be483f4": "UX",
+  "8aeb986bf3816208": "Funktional",
+  "67a0dc21f65919e4": "Architektur",
+  "42adc347a410b574": "Qualität",
+  "e821ed62f520237d": "Infrastruktur",
+  "7e5497bff6cb4705": "Auslieferung",
+  "f79d292d68a2fcab": "{lens} zutreffend",
+  "c4de5cbc6c527c3f": "{lens} nicht zutreffend",
+  "56623f7d0aa162d1": "{lens} Zusammenfassung",
+  "785bc2a9c5087f14": "Beschreiben Sie die Entwurfsentscheidungen für diese Linse...",
+  "a27944bfcb5dac7c": "{lens} Grund für Nichtanwendbarkeit",
+  "518d0f700cf424c5": "Warum ist diese Linse nicht zutreffend?",
+  "9daa342dcbf58ecc": "Sechs Design-Linsen",
+  "e1073d7d9788e2a3": "Zutreffend",
+  "43af18c4a9e11a01": "Nicht zutreffend",
+  "ceea5a3fde0ef45a": "Unentschieden",
+  "ddc0a1346184eb6c": "Bei Anwendbarkeit ist eine Zusammenfassung erforderlich.",
+  "aaffe5b9dd08c7a0": "Bei Nichtanwendbarkeit ist eine Begründung erforderlich.",
+  "2d5299203ad2b9d1": "Unabhängige Prüfung konnte nicht gestartet werden.",
+  "d04cdfbe115fe3ed": "Unabhängige Prüfung in neuem Thread gestartet.",
+  "7a9204e01ec5b09c": "Unabhängige Prüfung konnte nicht wiederholt werden.",
+  "7a858adee736181e": "Prüfung für Wiederholung zurückgesetzt.",
+  "1e3a170313b8f0b1": "Beim Verwerfen oder Akzeptieren des Risikos eines Befunds ist eine Begründung erforderlich.",
+  "f346c569dd5c7d14": "Prüfungsbefund konnte nicht geklärt werden.",
+  "74fe7638cce975dc": "Befund {id} aktualisiert.",
+  "bd676de1d33c7648": "Der Produkt-Snapshot oder Plan hat sich nach dieser Prüfung geändert. Starten Sie eine neue unabhängige Prüfung.",
+  "d10d13fd5c0999fc": "Maßnahme für {id}",
+  "febc6acf6595b684": "Im Code beheben",
+  "8e54c259329177fa": "Risiko akzeptieren",
+  "d8a40cb375b734b6": "Verwerfen",
+  "e54cac810f096235": "Zurückstellen",
+  "dbb2b52bb21fe676": "Begründung für {id}",
+  "9596889f52f27eb7": "Maßnahme begründen (erforderlich für Verwerfen oder Risiko akzeptieren)...",
+  "a7dbdfe65901e1f2": "Unabhängige Prüfung",
+  "1a7decbe6a776ba1": "Prüfungs-Thread öffnen",
+  "7902ad7555ce5844": "Prüfung wiederholen",
+  "bcc6c921e479350c": "Prüfung wird gestartet…",
+  "b952879faff74b1e": "Unabhängige Prüfung starten",
+  "a72124afacbee042": "Startet in einem neuen Thread ohne Vorprägung durch frühere Ausführungsschritte gegen den aktuellen Produkt-Snapshot.",
+  "1a4a33d9d32f4515": "Unabhängige Prüfung ist veraltet",
+  "ab0593f3e2c12bfd": "Noch keine unabhängige Prüfung erfasst.",
+  "db917e4765113671": [
+    "Status ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "79bc5940505f197f": "Keine Befunde gemeldet.",
+  "2c91b05fbe4e375e": [
+    "Lösungshinweis: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "dbf0db05e401bedf": "Befund klären",
+  "e8f7db9a9b875e7a": "Bei „Nicht bestanden“ oder „Nicht zutreffend“ ist eine Notiz erforderlich.",
+  "668a1d19df1d2992": "Akzeptanzbeobachtung konnte nicht gespeichert werden.",
+  "75861b0570fdfdef": "Beobachtung für {criterionId} gespeichert.",
+  "7439a4d97d5b4810": "Auslieferung konnte nicht freigegeben werden.",
+  "523f68888952b288": "Auslieferung freigegeben. Karte ohne Auto-Commit als ausgeliefert markiert.",
+  "838c42e7fb3cfe9d": "Der Produkt-Snapshot hat sich nach dieser Beobachtung geändert. Erfassen Sie eine aktualisierte Prüfung.",
+  "0d58fe0d4d8c044d": "Ergebnis für {id}",
+  "d3d91531eca989c7": "Bestanden",
+  "dd3f1177a88f7bfe": "Nicht bestanden",
+  "f387afbb3bef16d5": "Nicht zutreffend",
+  "e970b8095d1a4afb": "Belegreferenz für {id}",
+  "8bcc0e7dc1704d0d": "Optionale Belegreferenz / URL...",
+  "85d30b60a03c9b67": "Beobachtungsnotiz für {id}",
+  "2e41026c25a28476": "Beobachtungsnotiz (erforderlich bei Nicht bestanden oder Nicht zutreffend)...",
+  "e8f8fb7c3fa4fcde": "Freigabenotiz zur Auslieferung",
+  "36976091a81dc80e": "Optionale Auslieferungsnotiz...",
+  "783fbed077962c92": "Auslieferungsbeleg",
+  "bf95ee4192c60321": "Beleg-ID",
+  "aee1a43ee4f6531c": "Produkt-Snapshot",
+  "b9956c674527acb4": "Freigegeben von",
+  "425d2f705ea86abb": "AC-Zusammenfassung",
+  "b4366339c2dc8826": [
+    "Commit ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "1e24aad893b73bf9": "Auslieferungsbereitschaft & Blocker",
+  "98ea45c14a5b1342": "Diese Karte wurde zur Auslieferung freigegeben.",
+  "4266a022c32366ba": "Alle Prüfungen, Befunde der unabhängigen Prüfung und Akzeptanzkriterien sind aktuell.",
+  "598a7929e2626a66": "Zur Behebung",
+  "6aeaa5f636b823f7": "Prüfung der Akzeptanzkriterien",
+  "f4f7ebda4c45b54e": "Keine Akzeptanzkriterien in der Spezifikation definiert.",
+  "519bf3d628960948": [
+    "Verfahren: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "1528799365f156ad": "Beobachtung erfassen",
+  "75c599bf02cb8af8": "Erstellt einen authentifizierten menschlichen Auslieferungsbeleg für den getesteten Snapshot ohne automatischen Commit.",
+  "8b9aa8c059409266": "Auslieferung wird freigegeben…",
+  "69e06d7b4db7b86b": "Quellcodeverwaltungs-Aktionen zur Auslieferung",
+  "5e876a6a95cf413a": "Commit, Push und PR erstellen sind einzeln wählbare Aktionen. Nichts wird automatisch committet.",
+  "a9c81a5e7a3d8387": "Idee",
+  "f2d7e21a61c598d7": "Brief-Datei",
+  "fe04f4e2de8e7d3a": "Codebasis",
+  "6ace4758d8573110": "Spezifikation konnte nicht gespeichert werden.",
+  "d4d19566d7a5d535": "Spezifikation in Revision {revision} gespeichert.",
+  "305658f3670692c3": "Spezifikations-Thread konnte nicht gestartet werden.",
+  "ccffe43447dab032": "Spezifikations-Thread fortgesetzt.",
+  "74d3c964de109bc4": "Spezifikations-Thread gestartet.",
+  "1d0859c2c3667f90": "AC-1: Board zeigt vier Phasenspalten",
+  "3ece920a978e52b3": "Spezifikationserstellung",
+  "9b619bc6acf8022c": "Spezifikation wird gestartet…",
+  "84ee5b4ace27c08d": "Spezifikations-Thread fortsetzen",
+  "c8a3ce1e5a20ceb8": "Spezifikations-Thread starten",
+  "afd0e18962c972db": "Spezifikation speichern",
+  "cfde6f4f6892793b": [
+    "Ihr lokaler Entwurf begann bei Revision ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ", der Server steht bei Revision ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    "."
+  ],
+  "cce76af6ec9caa4c": "Brownfield-Bestandsaufnahme",
+  "38cc0f50ebcebd0a": [
+    "Bereitgestellte Entscheidungen (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "b9de0d1b51a9e47d": [
+    "Abgeleitete Codebasis-Signale (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "e3bebfb66ba17a8d": [
+    "Fehlende Entscheidungen (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "0374dd07e98404e6": "Spezifikationstitel",
+  "068726cb0ed7b768": "Spezifikationsbriefing (Markdown)",
+  "8f3bff8396d01f33": "Akzeptanzkriterien (eines pro Zeile)",
+  "34857dfae51273ef": "Einschränkungen (eine pro Zeile)",
+  "7ebc6f90a1ee031f": "Quellreferenzen (eine pro Zeile)",
+  "b02f18034c0ab02f": "Eingabedateipfade (einer pro Zeile)",
+  "2d93ca0dceb9a756": [
+    "Letzten Spezifikations-Diff anzeigen (",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    ")"
+  ],
+  "8645a8649565ce49": "Test-first",
+  "8185cfe6491c638a": "Regression-first",
+  "dfe3befe52404637": "Vorhandene Prüfungen",
+  "1ccf0f59ebea3e3c": "Aufgabe {taskId} entfernen",
+  "f3bee1a5674c7333": "Aufgabe {number} ID",
+  "281b1de316c875e5": "TSK-01",
+  "e1ef9fc009c6487b": "Aufgabe {number} Titel",
+  "41b435c414e51be5": "Aufgabenzusammenfassung",
+  "ecc58440ece4e979": "Aufgabe {number} blockiert durch",
+  "4d9f67b471f989ec": "Blockiert durch (kommagetrennte IDs)",
+  "7374483495979bc9": "Aufgabe {number} blockiert",
+  "f13e1d116b717c62": "Blockiert (kommagetrennte IDs)",
+  "0b5544bbdb87109a": "Aufgabe {number} Testmethode",
+  "265f12c7e41fbe76": "Aufgabe {number} erlaubte Dateien",
+  "45e9533d9e50ee84": "Aufgabe {number} verbotene Dateien",
+  "6c12d5f4c19d83cb": "Aufgabe {number} Prüfbefehle",
+  "fc8c0958da6750e6": "vp test run src/feature.test.ts",
+  "d5aa3dcaec18c5dd": "Aufgaben-DAG und exklusiver Dateibesitz",
+  "9f5028cc4b8fa000": "Aufgabe hinzufügen",
+  "b31a7b0e50f5d267": "Aufgabenverträge müssen einen azyklischen DAG mit eindeutigen IDs, gültigen Abhängigkeiten und sich nicht überschneidenden erlaubten Dateien bilden.",
+  "ca20955f2b7409ce": "Fügen Sie vor der Planfreigabe mindestens eine Aufgabe mit exklusivem Dateibesitz hinzu.",
+  "a7c0a351a2570841": [
+    "Aufgabe ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "4007da85b7252df3": "Erlaubte Dateien (eine pro Zeile)",
+  "a2258e07549c6aa6": "Verbotene Dateien (eine pro Zeile)",
+  "64498de77cb87a19": "Aufgaben-Prüfbefehle (Argv-Tokens, ein Befehl pro Zeile)",
+  "c9195b0b17d7e7ab": [
+    "Ungültiger erlaubter Dateipfad: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    }
+  ],
+  "195300b7a99af317": "Prüfbefehle müssen reine Argv-Aufrufe ohne Shell-Operatoren sein.",
+  "8f2d5c4509a34845": "Karte konnte nicht zur Überarbeitung zurückgegeben werden.",
+  "62b2af69bf139c45": "Die Auslieferung ist derzeit durch offene Prüfungen, Befunde oder Akzeptanzkriterien blockiert.",
+  "aebba4867b334cd9": "Zielphase",
+  "e978ea34dab15de7": "Beschreiben Sie, was überarbeitet werden muss...",
+  "7691f04fc06b6446": "Spezifikation freigeben und nach Plan verschieben",
+  "3d64909ee5f06013": "Plan freigeben und nach Ausführen verschieben",
+  "86cc67c78d3ccdab": "Auslieferung freigeben und als ausgeliefert markieren",
+  "0e149e97c8f45467": "Karte zur Überarbeitung zurückgeben",
+  "83fa16d97aa3a569": [
+    "Aktuelle Spezifikationsrevision für ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " freigeben und die Karte nach Plan verschieben."
+  ],
+  "dace8cf88d67afe6": [
+    "Aktuelle Planrevision für ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " freigeben und die Karte nach Ausführen verschieben."
+  ],
+  "db7b4ee467985cd6": [
+    "Auslieferung für ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " freigeben und einen dauerhaften Auslieferungsbeleg ohne Auto-Commit erstellen."
+  ],
+  "edd1feb2ca2147a8": [
+    "Das Zurückgeben von ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " an ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    " behält das Revisionsprotokoll bei und markiert betroffene nachgelagerte Freigaben und Nachweise als veraltet."
+  ],
+  "93828efdde7a0adc": "Auslieferungsblocker prüfen",
+  "a5d24f45656197eb": "Sie haben keine Orchestrierungsberechtigung für diesen Übergang.",
+  "ecc3252761a80898": "Auslieferungsnotiz (optional)",
+  "4b967a3b6c78877e": "Zielphase",
+  "230ae8d36a0628f9": "Grund für die Überarbeitung",
+  "fcf160e604bb89db": "Spezifikationsfreigabe bestätigen",
+  "72781fdc5bdb6b1c": "Planfreigabe bestätigen",
+  "874ccd0a4122a71d": "Auslieferungsfreigabe bestätigen",
+  "c04554fba9bd4f5d": "Rückgabe zur Überarbeitung bestätigen",
+  "be6b1845eaf15794": "Wireframe-Einstellungen konnten nicht aktualisiert werden.",
+  "57a64bdcb31b781b": "Optionale HTML-Wireframes aktiviert.",
+  "5f0fb48ef2b94565": "Wireframes für Nicht-UI-Feature entfernt.",
+  "a1f3e5adbdb2810d": "Wireframe-Vorschau für {title}",
+  "4e3c08a995d8be2b": "HTML-Wireframes",
+  "734b88e1cdd8566c": "Übersprungen (kein UI)",
+  "421a3139f99272a8": "Wireframes aktivieren",
+  "420aec2a3febae7a": "HTML-Quellcode ausblenden",
+  "29ed923f964e3363": "HTML-Quellcode anzeigen",
+  "0e419b23921f5338": "Vollbildvorschau",
+  "c17fbc5b22082cb6": "Wireframes überspringen (kein UI)",
+  "48dbbe6886d1a037": "Wireframes sind optional und werden für Nicht-UI-Features übersprungen. Aktivieren Sie sie, wenn dieses Feature interaktive UI-Layouts einführt.",
+  "c42dc43a82f73e59": "Wireframe-Vorschau wird geladen…",
   "0bd950151ddc6407": "Ohne Speichern verlassen? Deine Änderungen an dieser Datei gehen verloren.",
   "c0ba3f6756b09f30": "Ungespeicherte Änderungen",
   "6914e22d357f0ad6": "Gespeichert und aktiv",
@@ -12641,7 +13834,6 @@
   "5d8d278ff828102d": "Alle Workflows",
   "290e0ab40b87dc17": "Workflows-Breadcrumb",
   "f3fad236d4b955f1": "Umgebung",
-  "34ad53646f06ed80": "Workflows sind aus",
   "8f6589c9e0ac5d4e": "Keine Umgebung verbunden",
   "744127f8dfad7d22": "Verbinde eine Umgebung, um ihre Workflow-Ausführungen zu sehen.",
   "036182ec7e2ee4d4": "Neben der Ausführung",

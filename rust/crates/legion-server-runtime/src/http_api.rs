@@ -30,6 +30,7 @@ use crate::preview_browser::PreviewBrowserRuntime;
 use crate::provider_probe::ProviderProbeService;
 use crate::static_assets::static_assets_router;
 use crate::terminal_runtime::TerminalRuntime;
+use crate::workflow_board::ProjectWorkflowBoardService;
 
 /// Shared server HTTP state mounted by `legioncode serve` or standalone integration tests.
 #[derive(Clone)]
@@ -65,6 +66,8 @@ pub struct RuntimeHttpState {
     pub feedback_store: Option<Arc<legion_workflows::feedback::FeedbackStore>>,
     /// Optional live workflow definitions and execution manager.
     pub workflow_manager: Option<Arc<legion_workflows::definitions::WorkflowDefinitionsManager>>,
+    /// Optional Project Workflow Board service.
+    pub workflow_board: Option<Arc<ProjectWorkflowBoardService>>,
     /// Provider and speech endpoint health-probe service.
     pub probe_service: Arc<ProviderProbeService>,
     /// Headless browser CDP host runtime for `/api/preview/action`.
@@ -112,6 +115,7 @@ impl RuntimeHttpState {
             milestone_hub: Arc::new(legion_protocol::milestones::MilestoneHub::new()),
             feedback_store,
             workflow_manager: None,
+            workflow_board: None,
             probe_service: Arc::new(ProviderProbeService::default()),
             preview_browser: Arc::new(PreviewBrowserRuntime::new()),
             mcp_sign_in: Arc::new(McpSignInRegistry::new()),
@@ -187,6 +191,13 @@ impl RuntimeHttpState {
         workflow_manager: Arc<legion_workflows::definitions::WorkflowDefinitionsManager>,
     ) -> Self {
         self.workflow_manager = Some(workflow_manager);
+        self
+    }
+
+    /// Attach a [`ProjectWorkflowBoardService`] handle.
+    #[must_use]
+    pub fn with_workflow_board(mut self, workflow_board: Arc<ProjectWorkflowBoardService>) -> Self {
+        self.workflow_board = Some(workflow_board);
         self
     }
 

@@ -38,7 +38,7 @@ fn missing_db_and_supported_protocols_are_ready_with_exact_wire_json() -> Result
     assert!(is_supported_launcher_protocol(4));
     assert!(!is_supported_launcher_protocol(2));
     assert!(!is_supported_launcher_protocol(5));
-    assert_eq!(V2_MIGRATION_MANIFEST.len(), 56);
+    assert_eq!(V2_MIGRATION_MANIFEST.len(), 60);
 
     let dir = tempfile::tempdir()?;
     let db_path = dir.path().join("missing.sqlite");

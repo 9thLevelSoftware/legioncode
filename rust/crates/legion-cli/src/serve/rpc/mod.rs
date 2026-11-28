@@ -6,6 +6,7 @@ mod assets_attachments;
 mod assets_paths;
 mod fs_browse;
 pub(crate) mod git_actions;
+pub(crate) mod git_stacked_action;
 mod mcp_apps;
 mod orchestration;
 mod orchestration_commands;
@@ -36,6 +37,9 @@ mod tasks_sessions_mcp;
 mod tasks_webhooks_mcp;
 mod vcs_git;
 mod vcs_review;
+mod workflow_board;
+mod workflow_board_m3;
+mod workflow_board_m4;
 pub(crate) mod workflows_feedback;
 mod workspace_folders_rpc;
 mod workspace_walk;
@@ -131,6 +135,9 @@ pub(crate) async fn dispatch(state: &Arc<AppState>, tag: &str, payload: Value) -
         _ if tag.starts_with("workspace.") => workspace_folders_rpc::dispatch(state, tag, payload),
         _ if tag.starts_with("workflows.") || tag == "agentFeedback.answerRequest" => {
             workflows_feedback::dispatch(state, tag, payload).await
+        }
+        _ if tag.starts_with("workflowBoard.") => {
+            workflow_board::dispatch(state, tag, payload).await
         }
         "peerLinks.names"
         | "peerLinks.threadHistoryPage"

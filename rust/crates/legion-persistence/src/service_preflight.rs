@@ -83,6 +83,10 @@ pub const V2_MIGRATION_MANIFEST: &[(i64, &str)] = &[
     (108, "AgentFeedback"),
     (109, "IssueTrackerAccounts"),
     (110, "Workflows"),
+    (111, "WorkflowBoard"),
+    (112, "WorkflowBoardPlanning"),
+    (113, "WorkflowBoardExecuteShip"),
+    (114, "WorkflowBoardCliImport"),
 ];
 
 /// Result emitted by [`run_service_preflight`], serializing to exact wire JSON with `"status"` first.

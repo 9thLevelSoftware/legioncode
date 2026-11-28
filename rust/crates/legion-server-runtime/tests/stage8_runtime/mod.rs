@@ -165,6 +165,8 @@ pub async fn dispatch_thread_turn(
             workspace_strategy: None,
             output_schema: None,
         }),
+        title_renamed: None,
+        workflow_run: None,
     });
     let _ = orchestrator
         .dispatch_command(&cmd, "2026-11-20T01:00:00.000Z")

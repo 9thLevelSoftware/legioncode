@@ -70,6 +70,9 @@ pub struct AgentLaunch {
     /// Interaction mode (`default`, `plan`, etc.).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interaction_mode: Option<String>,
+    /// Optional stable launch identity shared across retries and crash recovery.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stable_launch_key: Option<String>,
 }
 
 /// Reference to an issue passed into an agent step or forge API.
@@ -144,6 +147,9 @@ pub struct AgentStartInput {
     pub issue: Option<IssueAddress>,
     /// Launch options for new threads.
     pub launch: Option<AgentLaunch>,
+    /// Optional stable launch identity overriding `launch.stable_launch_key`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stable_launch_key: Option<String>,
 }
 
 /// Handle to a started or attempted agent turn (`AgentTurn`).

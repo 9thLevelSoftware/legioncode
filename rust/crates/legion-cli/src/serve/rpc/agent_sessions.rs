@@ -239,6 +239,8 @@ async fn import_project_sessions(
                 delegated_from: None,
                 imported_native_thread: None,
                 initial_message: None,
+                title_renamed: None,
+                workflow_run: None,
             });
             if state.orchestrator.dispatch_now(&cmd).await.is_ok() {
                 imported += 1;

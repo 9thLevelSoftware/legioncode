@@ -18,6 +18,7 @@ import {
   squashAtomCommandFailure,
 } from "@legioncode/client-runtime/state/runtime";
 import type {
+  GitRunStackedActionResult,
   GitStackedAction,
   SourceControlCloneProtocol,
   SourceControlProviderDiscoveryItem,
@@ -57,6 +58,7 @@ import {
   type GitActionIconName,
   type GitActionMenuItem,
   type GitQuickAction,
+  type CommitCapableStackedAction,
   type DefaultBranchConfirmableAction,
   requiresDefaultBranchConfirmation,
   resolveChangesTotals,
@@ -66,6 +68,8 @@ import {
   resolveGitActionResultToastTiming,
   resolveLiveThreadBranchUpdate,
   getMenuActionDisabledReason,
+  resolvePreferredCommitSelection,
+  resolveQuickActionWithPreferredFiles,
   resolveThreadBranchMetadataPatch,
   resolveQuickAction,
   resolveThreadBranchUpdate,
@@ -164,6 +168,8 @@ interface GitActionsControlProps extends GitActionsViewProps {
   target: GitActionsTarget | null;
   /** Picks the environment and where toasts and links open. */
   threadRef: ScopedThreadRef | null;
+  /** Optional explicit environment when acting outside an active thread. */
+  environmentId?: ScopedThreadRef["environmentId"];
   /** The work the actions belong to: its settings apply, and a created pull request links to it. */
   owner?: { readonly threadId?: ThreadId; readonly projectId?: ProjectId };
   /** Absent when no thread's branch follows this folder; a new branch then needs no thread. */
@@ -172,6 +178,12 @@ interface GitActionsControlProps extends GitActionsViewProps {
   quietUntilWork?: boolean;
   /** The ref the Changes row compares against, when the viewer picked one. */
   changesBaseRef?: string | null;
+  /** Optional file paths to pre-select when opening a Commit dialog. */
+  preferredFilePaths?: ReadonlyArray<string>;
+  /** When false, quick action stays a discrete single Git step instead of stacking commit+push+PR. */
+  allowStackedQuickAction?: boolean;
+  /** Called after a Git stacked action finishes successfully. */
+  onActionSuccess?: (result: GitRunStackedActionResult) => void;
 }
 
 interface ThreadGitActionsControlProps extends GitActionsViewProps {
@@ -998,7 +1010,7 @@ export function PublishRepositoryDialog(props: PublishRepositoryDialogProps) {
 // Local state belongs to one checkout; a new key drops it when the target changes.
 export const GitActionsControl = memo(function GitActionsControl(props: GitActionsControlProps) {
   const checkoutKey = JSON.stringify([
-    props.threadRef?.environmentId ?? null,
+    props.threadRef?.environmentId ?? props.environmentId ?? null,
     props.target?.key ?? null,
     props.target?.cwd ?? null,
   ]);
@@ -1008,10 +1020,14 @@ export const GitActionsControl = memo(function GitActionsControl(props: GitActio
 function CheckoutGitActionsControl({
   target,
   threadRef: activeThreadRef,
+  environmentId,
   owner,
   branchFollower,
   quietUntilWork = false,
   changesBaseRef = null,
+  preferredFilePaths,
+  allowStackedQuickAction = true,
+  onActionSuccess,
   compact = false,
   showActions = true,
   showChanges = true,
@@ -1023,7 +1039,7 @@ function CheckoutGitActionsControl({
   const progressLabelId = useId();
   const gitCwd = target?.cwd ?? null;
   const panelAnchorRef = useRef<HTMLDivElement | null>(null);
-  const activeEnvironmentId = activeThreadRef?.environmentId ?? null;
+  const activeEnvironmentId = activeThreadRef?.environmentId ?? environmentId ?? null;
   const canWriteSourceControl = useEnvironmentScope(
     activeEnvironmentId,
     AuthSourceControlWriteScope,
@@ -1037,9 +1053,12 @@ function CheckoutGitActionsControl({
   const threadToastData = activeThreadRef ? { threadRef: activeThreadRef } : undefined;
   const canCreateFeatureBranch = canWriteSourceControl && (branchFollower?.canFollow() ?? true);
   const [isCommitDialogOpen, setIsCommitDialogOpen] = useState(false);
+  const [commitDialogAction, setCommitDialogAction] =
+    useState<CommitCapableStackedAction>("commit");
   const [dialogCommitMessage, setDialogCommitMessage] = useState("");
   const [excludedFiles, setExcludedFiles] = useState<ReadonlySet<string>>(new Set());
   const [isEditingFiles, setIsEditingFiles] = useState(false);
+  const [preferredFilesUnmatched, setPreferredFilesUnmatched] = useState(false);
   const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
   const [inlineSuccess, setInlineSuccess] = useState<InlineGitActionSuccess | null>(null);
   const [pendingDefaultBranchAction, setPendingDefaultBranchAction] =
@@ -1148,6 +1167,7 @@ function CheckoutGitActionsControl({
     isDefaultRef,
     hasPrimaryRemote,
     messages,
+    allowStackedQuickAction,
   );
   const quickActionDisabledReason = !canWriteSourceControl
     ? gt("This connection cannot change source control.")
@@ -1288,6 +1308,7 @@ function CheckoutGitActionsControl({
       description: createdPullRequest ? null : (actionResult.toast.description ?? null),
       expiresAtMs: inlineSuccessExpiresAt(),
     });
+    onActionSuccess?.(actionResult);
     return true;
   }
 
@@ -1318,9 +1339,11 @@ function CheckoutGitActionsControl({
     const commitMessage = dialogCommitMessage.trim();
 
     setIsCommitDialogOpen(false);
+    setCommitDialogAction("commit");
     setDialogCommitMessage("");
     setExcludedFiles(new Set());
     setIsEditingFiles(false);
+    setPreferredFilesUnmatched(false);
 
     void runGitActionWithToast({
       action: "commit",
@@ -1387,7 +1410,23 @@ function CheckoutGitActionsControl({
       return;
     }
     if (quickAction.action) {
-      void runGitActionWithToast({ action: quickAction.action });
+      const resolved = resolveQuickActionWithPreferredFiles(
+        quickAction.action,
+        allFiles,
+        preferredFilePaths,
+      );
+      if (resolved.kind === "open_dialog_empty_match") {
+        setExcludedFiles(new Set(resolved.excludedFilePaths));
+        setIsEditingFiles(true);
+        setPreferredFilesUnmatched(true);
+        setCommitDialogAction(resolved.action);
+        setIsCommitDialogOpen(true);
+        return;
+      }
+      void runGitActionWithToast({
+        action: resolved.action,
+        ...(resolved.filePaths ? { filePaths: resolved.filePaths } : {}),
+      });
     }
   };
 
@@ -1401,20 +1440,36 @@ function CheckoutGitActionsControl({
       void runGitActionWithToast({ action: "create_pr" });
       return;
     }
-    setExcludedFiles(new Set());
-    setIsEditingFiles(false);
+    const selection = resolvePreferredCommitSelection(allFiles, preferredFilePaths);
+    if (selection.kind === "empty_match") {
+      setExcludedFiles(new Set(selection.excludedFilePaths));
+      setIsEditingFiles(true);
+      setPreferredFilesUnmatched(true);
+    } else if (selection.kind === "subset") {
+      setExcludedFiles(new Set(selection.excludedFilePaths));
+      setIsEditingFiles(false);
+      setPreferredFilesUnmatched(false);
+    } else {
+      setExcludedFiles(new Set());
+      setIsEditingFiles(false);
+      setPreferredFilesUnmatched(false);
+    }
+    setCommitDialogAction("commit");
     setIsCommitDialogOpen(true);
   };
 
   const runDialogAction = () => {
     if (!isCommitDialogOpen) return;
+    const action = commitDialogAction;
     const commitMessage = dialogCommitMessage.trim();
     setIsCommitDialogOpen(false);
+    setCommitDialogAction("commit");
     setDialogCommitMessage("");
     setExcludedFiles(new Set());
     setIsEditingFiles(false);
+    setPreferredFilesUnmatched(false);
     void runGitActionWithToast({
-      action: "commit",
+      action,
       ...(commitMessage ? { commitMessage } : {}),
       ...(!allSelected ? { filePaths: selectedFiles.map((f) => f.path) } : {}),
     }).then(restoreDialogCommitMessageOnFailure(commitMessage));
@@ -1790,9 +1845,11 @@ function CheckoutGitActionsControl({
         onOpenChange={(open) => {
           if (!open) {
             setIsCommitDialogOpen(false);
+            setCommitDialogAction("commit");
             setDialogCommitMessage("");
             setExcludedFiles(new Set());
             setIsEditingFiles(false);
+            setPreferredFilesUnmatched(false);
           }
         }}
       >
@@ -1869,6 +1926,14 @@ function CheckoutGitActionsControl({
                   </p>
                 ) : (
                   <div className="space-y-2">
+                    {preferredFilesUnmatched ? (
+                      <p className="text-xs text-warning-foreground" role="status">
+                        <T>
+                          None of the scoped files have uncommitted changes. Select files below to
+                          include them in this commit.
+                        </T>
+                      </p>
+                    ) : null}
                     <div className="h-44 rounded-lg bg-card ring-1 ring-black/5 dark:bg-white/[0.025] dark:ring-white/5">
                       <ScrollArea>
                         <div className="space-y-1 p-1">
@@ -1962,9 +2027,11 @@ function CheckoutGitActionsControl({
               size="sm"
               onClick={() => {
                 setIsCommitDialogOpen(false);
+                setCommitDialogAction("commit");
                 setDialogCommitMessage("");
                 setExcludedFiles(new Set());
                 setIsEditingFiles(false);
+                setPreferredFilesUnmatched(false);
               }}
             >
               <T>Cancel</T>

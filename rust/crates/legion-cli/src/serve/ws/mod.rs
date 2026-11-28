@@ -2,6 +2,7 @@
 
 mod auth;
 mod auth_access;
+mod auth_guard;
 mod frame_parts;
 mod mux;
 mod orchestration;

@@ -26,7 +26,11 @@ pub(super) fn static_guarded_scope(method: &WsMethod) -> Option<EnvironmentScope
         | WsMethod::SourceControlSignInWait
         | WsMethod::SourceControlSignInCancel => Some(EnvironmentScope::SettingsWrite),
         WsMethod::ServerReclaimDatabaseSpace => Some(EnvironmentScope::EnvironmentMaintain),
-        WsMethod::ServerRefreshProviders => Some(EnvironmentScope::OrchestrationRead),
+        WsMethod::ServerRefreshProviders
+        | WsMethod::WorkflowBoardSubscribe
+        | WsMethod::WorkflowBoardGetCard
+        | WsMethod::WorkflowBoardGetArtifact
+        | WsMethod::WorkflowBoardGetCardDiff => Some(EnvironmentScope::OrchestrationRead),
         WsMethod::PullRequestsRunAction
         | WsMethod::PullRequestsUpdate
         | WsMethod::PullRequestsComment
@@ -71,6 +75,24 @@ pub(super) fn static_guarded_scope(method: &WsMethod) -> Option<EnvironmentScope
         | WsMethod::WorkflowsAnswer
         | WsMethod::WorkflowsResume
         | WsMethod::WorkflowsCancel
+        | WsMethod::WorkflowBoardCreateCard
+        | WsMethod::WorkflowBoardUpdateSpec
+        | WsMethod::WorkflowBoardApproveSpec
+        | WsMethod::WorkflowBoardStartStage
+        | WsMethod::WorkflowBoardExploreStep
+        | WsMethod::WorkflowBoardChallengeStep
+        | WsMethod::WorkflowBoardUpdatePlan
+        | WsMethod::WorkflowBoardApprovePlan
+        | WsMethod::WorkflowBoardReturnForRevision
+        | WsMethod::WorkflowBoardPauseCard
+        | WsMethod::WorkflowBoardResumeCard
+        | WsMethod::WorkflowBoardRetryStep
+        | WsMethod::WorkflowBoardProposeAmendment
+        | WsMethod::WorkflowBoardResolveFinding
+        | WsMethod::WorkflowBoardRecordManualAcceptance
+        | WsMethod::WorkflowBoardApproveDelivery
+        | WsMethod::WorkflowBoardPreviewCliImport
+        | WsMethod::WorkflowBoardApplyCliImport
         | WsMethod::AgentFeedbackAnswerRequest => Some(EnvironmentScope::OrchestrationOperate),
         WsMethod::ProjectsWriteFile => Some(EnvironmentScope::FilesystemWrite),
         WsMethod::GuestShareCreate

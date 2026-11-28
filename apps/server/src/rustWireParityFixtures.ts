@@ -1024,5 +1024,165 @@ export function buildWsRpcFixtures(ctx: ParityFixtureContext): Record<string, Rp
       payload: { threadId: ctx.threadId },
       allowZeroChunks: true,
     },
+    "workflowBoard.subscribe": {
+      payload: { projectId: ctx.projectId },
+    },
+    "workflowBoard.getCard": {
+      payload: { cardId: "card-parity-missing", projectId: ctx.projectId },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.getArtifact": {
+      payload: { cardId: "card-parity-missing", key: "spec.md" },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.createCard": {
+      payload: {
+        projectId: ctx.projectId,
+        title: "Wire Parity Card",
+        brief: "Parity check brief",
+        sourceType: "idea",
+        assistanceMode: "balanced",
+      },
+    },
+    "workflowBoard.updateSpec": {
+      payload: {
+        cardId: "card-parity-missing",
+        expectedRevision: 1,
+        title: "Updated Parity Card",
+        brief: "Updated parity brief",
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.approveSpec": {
+      payload: { cardId: "card-parity-missing", expectedRevision: 1 },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.startStage": {
+      payload: {
+        cardId: "card-parity-missing",
+        expectedRevision: 1,
+        stage: "plan",
+        modelSelection: { instanceId: "devReplay", model: "dev-replay" },
+        runtimeMode: "full-access",
+        interactionMode: "default",
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.exploreStep": {
+      payload: {
+        cardId: "card-parity-missing",
+        expectedRevision: 1,
+        action: "step",
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.challengeStep": {
+      payload: {
+        cardId: "card-parity-missing",
+        expectedRevision: 1,
+        action: "start",
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.updatePlan": {
+      payload: {
+        cardId: "card-parity-missing",
+        expectedRevision: 1,
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.approvePlan": {
+      payload: {
+        cardId: "card-parity-missing",
+        expectedRevision: 1,
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.returnForRevision": {
+      payload: {
+        cardId: "card-parity-missing",
+        expectedRevision: 1,
+        targetStage: "spec",
+        reason: "Needs clearer acceptance criteria",
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.pauseCard": {
+      payload: {
+        cardId: "card-parity-missing",
+        expectedRevision: 1,
+        reason: "Parity pause check",
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.resumeCard": {
+      payload: {
+        cardId: "card-parity-missing",
+        expectedRevision: 1,
+        reconcileInterrupted: true,
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.retryStep": {
+      payload: {
+        cardId: "card-parity-missing",
+        expectedRevision: 1,
+        stepKind: "stage",
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.proposeAmendment": {
+      payload: {
+        cardId: "card-parity-missing",
+        expectedRevision: 1,
+        targetStage: "plan",
+        reason: "Parity amendment probe",
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.resolveFinding": {
+      payload: {
+        cardId: "card-parity-missing",
+        expectedRevision: 1,
+        findingId: "fnd-1",
+        disposition: "fix",
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.recordManualAcceptance": {
+      payload: {
+        cardId: "card-parity-missing",
+        expectedRevision: 1,
+        criterionId: "AC-1",
+        verdict: "pass",
+        note: "Verified manually",
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.approveDelivery": {
+      payload: {
+        cardId: "card-parity-missing",
+        expectedRevision: 1,
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.getCardDiff": {
+      payload: {
+        cardId: "card-parity-missing",
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.previewCliImport": {
+      payload: {
+        projectId: ctx.projectId,
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
+    "workflowBoard.applyCliImport": {
+      payload: {
+        projectId: ctx.projectId,
+      },
+      allowFailureTags: ["WorkflowBoardRequestError"],
+    },
   };
 }
